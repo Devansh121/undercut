@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   FLAT_SURFACE,
+  PATCH_ACROSS,
+  PATCH_ALONG,
   PATCH_HINTS,
+  PATCH_POINTS,
+  createSurfaceSample,
   createPatchSample,
   createSurfaceHint,
   samplePatch,
@@ -26,7 +30,7 @@ const RAMP: SurfaceSampler = {
 describe('contact patch', () => {
   it('reads flat ground exactly', () => {
     const p = createPatchSample();
-    expect(samplePatch(FLAT_SURFACE, 3, -2, 1, 0, 0.32, 0.15, hints, 0, p)).toBe(false);
+    samplePatch(FLAT_SURFACE, 3, -2, 1, 0, 0.32, 0.15, hints, 0, p);
     expect(p.height).toBe(0);
     expect(p.normalY).toBeCloseTo(1, 12);
     expect(p.grip).toBe(1);
@@ -45,6 +49,61 @@ describe('contact patch', () => {
     // Point sampling sees 0.035 / 0.12 = 0.29; a 0.32 m box filter at most 0.035 / 0.32 ≈ 0.11.
     expect(maxSlope).toBeLessThan(0.125);
     expect(last).toBeCloseTo(0.035, 9);
+  });
+});
+
+/** A 35 mm step across the direction of travel at x = 0 (a car heading +X meets it head on). */
+const STEP_ACROSS: SurfaceSampler = {
+  sample(x: number, _z: number, h: SurfaceHint, out: SurfaceSample): void {
+    FLAT_SURFACE.sample(0, 0, h, out);
+    out.height = x >= 0 ? 0.035 : 0;
+  },
+};
+
+/** The same step on a line at 45° to the direction of travel. */
+const STEP_OBLIQUE: SurfaceSampler = {
+  sample(x: number, z: number, h: SurfaceHint, out: SurfaceSample): void {
+    FLAT_SURFACE.sample(0, 0, h, out);
+    out.height = x - z >= 0 ? 0.035 : 0;
+  },
+};
+
+/** Mean of the declared grid, point by point: what any reading of the patch must equal. */
+function gridMean(surface: SurfaceSampler, x: number, z: number, fx: number, fz: number): number {
+  const s = createSurfaceSample();
+  let sum = 0;
+  for (const a of PATCH_ALONG) {
+    for (const c of PATCH_ACROSS) {
+      const along = a * 0.15;
+      const across = c * 0.32;
+      surface.sample(x + fx * along + fz * across, z + fz * along - fx * across, hints[0]!, s);
+      sum += s.height;
+    }
+  }
+  return sum / PATCH_POINTS;
+}
+
+describe('contact patch over steps along and across the travel', () => {
+  it('envelops a longitudinal step over the patch length', () => {
+    const p = createPatchSample();
+    // Centres 20 mm either side of the step: points ahead and behind straddle it.
+    for (const x of [-0.02, 0.02]) {
+      samplePatch(STEP_ACROSS, x, 0, 1, 0, 0.32, 0.15, hints, 0, p);
+      expect(p.height).toBeCloseTo(0.0175, 12);
+      expect(p.height).toBeCloseTo(gridMean(STEP_ACROSS, x, 0, 1, 0), 12);
+    }
+  });
+
+  it('reads an oblique boundary as the grid does, at any heading', () => {
+    const p = createPatchSample();
+    for (const yaw of [0, 0.3, 1.0, 2.2]) {
+      const fx = Math.cos(yaw);
+      const fz = -Math.sin(yaw);
+      for (let u = -0.3; u <= 0.3; u += 0.01) {
+        samplePatch(STEP_OBLIQUE, u, 0, fx, fz, 0.32, 0.15, hints, 0, p);
+        expect(p.height).toBeCloseTo(gridMean(STEP_OBLIQUE, u, 0, fx, fz), 12);
+      }
+    }
   });
 });
 

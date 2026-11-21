@@ -15,6 +15,7 @@ export {
   createSurfaceSample,
   resetControlInput,
   type ControlInput,
+  type PatchSample,
   type SurfaceHint,
   type SurfaceSample,
   type SurfaceSampler,
@@ -65,7 +66,6 @@ export {
   createPatchSample,
   samplePatch,
   tyreVerticalForce,
-  type PatchSample,
 } from './contact';
 export {
   MAX_SUBSTEP,
