@@ -77,3 +77,38 @@ export function tally(
     meanLap: per(time),
   };
 }
+
+/**
+ * Drivability targets the brief sets and the model misses, as measured when recorded (five seeds
+ * of two laps, `tally`), like the physics suite's lap gaps: a test asserts the recorded value
+ * within one incident, so it fails if the gap widens and also if it closes without the record
+ * (and docs/STATUS.md, Known gaps) being updated.
+ */
+export interface DrivabilityGap {
+  /** Incidents (spins, barrier strikes, resets) in the ten laps. */
+  incidents: number;
+  /** Mean lap, s (spins charged). */
+  meanLap: number;
+  reason: string;
+}
+
+export const DRIVABILITY_GAPS = Object.freeze({
+  /** Target: no spin, 6–12 % slower than the reference lap. */
+  disciplinedKeyboard: Object.freeze({
+    incidents: 4,
+    meanLap: 114.42,
+    reason:
+      'Braking at the driving line marks and flooring it on green, on keys: three barrier ' +
+      'strikes just past the Lesmo 1 and Lesmo 2 exits (54 and 46 km/h) and one spin out of ' +
+      'Ascari over the kerb with the rear unloaded; about 42 s a lap off the asphalt, 35 % ' +
+      'slower than the reference.',
+  }),
+  /** Target: at most 1 spin in 10 laps. */
+  clumsyGamepad: Object.freeze({
+    incidents: 3,
+    meanLap: 95.68,
+    reason:
+      'All three at the first chicane exit: two on the kerb with the rear unloaded, one stopped ' +
+      'against the barrier and reset.',
+  }),
+} satisfies Record<string, DrivabilityGap>);

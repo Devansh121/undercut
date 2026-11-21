@@ -96,20 +96,6 @@ const ESC = Object.freeze({
   betaGain: 3,
 });
 
-/** Time constant of the reference yaw rate: how fast the car's yaw can follow the wheel, s. */
-
-/** Share of the tyres' peak lateral grip the reference may ask for. */
-
-/** Yaw-rate error tolerated before a wheel is braked, rad/s: fixed plus a share of the reference. */
-
-/** Wheel brake per rad/s of error past the deadband, and the most one wheel gets. */
-
-/** Drive taken away: all of it (down to neutral) by this much error past the deadband, rad/s. */
-
-/** How fast a wheel brake builds and releases, share per second. */
-
-/** A braked wheel past this multiple of the peak slip ratio has its ESC brake cut. */
-
 /**
  * Below this road speed a driver's downshift request in first passes through, so a stopped car
  * can go 1 → N → R with automatic gears on. The gearbox itself refuses reverse above 1 m/s.
@@ -313,8 +299,10 @@ function stabilityControl(
         amount = Math.min(ESC.maxUnder, ESC.underGain * under);
       }
     }
-    // A wheel the extra brake would lock gets none.
-    if (target >= 0 && -car.slipRatio[target]! > ESC.lock * curve.peakSlipRatio) amount = 0;
+    // A rear wheel the extra brake would lock gets none: a locked rear swings the car round.
+    // The outer front in oversteer keeps its brake even locked (on grass or gravel the least
+    // brake locks it): a sliding front still drags the nose back and turns the car less.
+    if (target >= 2 && -car.slipRatio[target]! > ESC.lock * curve.peakSlipRatio) amount = 0;
   } else {
     memory.refYaw = car.yawRate;
   }

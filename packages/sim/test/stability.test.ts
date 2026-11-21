@@ -10,6 +10,7 @@ import {
   createEnvironment,
   engineFullLoadTorque,
   neutralThrottle,
+  snapshotCar,
   stepCar,
   type AssistSettings,
   type CarState,
@@ -185,10 +186,37 @@ describe('stability assist', () => {
     expect(out.throttle).toBe(1);
   });
 
-  it('drops its wheel brake on a wheel that would lock', () => {
-    const car = turning(50, 0.9);
-    car.slipRatio[1] = -0.5;
-    expect(hold(STABILITY, car, driver({})).wheelBrake).toBeUndefined();
+  it('drops its brake on a rear wheel that would lock, keeps it on a locking outer front', () => {
+    // Understeer to the left: the inner rear (RL) is the target; locked, it gets nothing.
+    const under = turning(30, 0.05, 4, 'front');
+    under.slipRatio[2] = -0.5;
+    expect(hold(STABILITY, under, driver({ steer: 0.3 }), 120).wheelBrake).toBeUndefined();
+    // Oversteer to the left on grass: the outer front (FR) locks at once and keeps braking.
+    const over = turning(50, 0.9);
+    over.slipRatio[1] = -0.5;
+    expect(hold(STABILITY, over, driver({})).wheelBrake?.[1]).toBeGreaterThan(0.2);
+  });
+
+  it('a car with no per-wheel brake is bit for bit the car without the field', () => {
+    // Absent, undefined and all zeros: the same arithmetic, so the unassisted car is unchanged.
+    const run = (extra: Partial<ControlInput>): number[] => {
+      const env = createEnvironment();
+      const car = createCarState(REFERENCE_CAR, { speed: 60, gear: 7, fuel: 20 });
+      for (let k = 0; k < 480; k++) {
+        const t = k * DT;
+        const d = driver({
+          steer: 0.05 * Math.sin(t * 3),
+          throttle: t < 1 ? 1 : 0,
+          brake: t < 1 ? 0 : 0.8,
+          ...extra,
+        });
+        stepCar(car, d, FLAT_SURFACE, DT, env);
+      }
+      return Array.from(snapshotCar(car));
+    };
+    const absent = run({});
+    expect(run({ wheelBrake: undefined })).toEqual(absent);
+    expect(run({ wheelBrake: new Float64Array(4) })).toEqual(absent);
   });
 
   it('a braked front wheel turns the car toward its side', () => {

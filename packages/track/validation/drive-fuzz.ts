@@ -70,6 +70,21 @@ export function driveFuzz(track: Track, seed: number, seconds: number): FuzzResu
     speed: rng.range(5, 80),
     fuel: rng.range(5, 100),
   });
+  // Start moving with the ground: on a grade the ground rises under a rolling car, and a car
+  // started with no vertical velocity meets it as an impact in its first steps (Kemmel at
+  // Spa climbs at 6 %, 4.8 m/s at 80 m/s).
+  {
+    const st = car.state;
+    const fx = Math.cos(st.yaw);
+    const fz = -Math.sin(st.yaw);
+    const a = createSurfaceSample();
+    const b = createSurfaceSample();
+    surface.sample(st.x + fx, st.z + fz, { index: -1 }, a);
+    surface.sample(st.x - fx, st.z - fz, { index: -1 }, b);
+    const rise = (st.vx * (a.height - b.height)) / 2;
+    st.heaveRate = rise;
+    for (let i = 0; i < 4; i++) st.wheelVy[i] = rise;
+  }
   const limits = invariantLimits(car.state.model);
   const corners = new Float64Array(8);
   const wall = createWallSample();

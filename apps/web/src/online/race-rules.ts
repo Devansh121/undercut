@@ -2,7 +2,8 @@
  * Small rules of an online race as the local game applies them: the start lights from the
  * server's schedule, a lap claim timed on the server clock, and a live running order. Pure.
  */
-import type { LapMessage, StartSchedule } from '@undercut/protocol';
+import type { Assists, LapMessage, StartSchedule } from '@undercut/protocol';
+import type { AssistConfig } from '../game/assists';
 
 /** Lights showing at server time `now`: 0 before the first and from lights out. */
 export function lightsOn(s: StartSchedule, now: number): number {
@@ -71,4 +72,24 @@ export function liveOrder(lapLength: number, cars: readonly Runner[]): number[] 
       return b.lap * lapLength + b.s - (a.lap * lapLength + a.s);
     })
     .map((c) => c.seat);
+}
+
+/** The session as the room's assist policy sees it: the assists in use and the setter. */
+export interface AssistHolder {
+  readonly assists: Readonly<AssistConfig>;
+  setAssist<K extends keyof AssistConfig>(key: K, value: AssistConfig[K]): void;
+}
+
+/**
+ * Switch off every assist the room does not allow. A policy without the stability or braking
+ * help fields (a host from before they existed) allows them.
+ */
+export function enforceAssistPolicy(policy: Assists, session: AssistHolder): void {
+  const a = session.assists;
+  if (!policy.abs && a.abs) session.setAssist('abs', 0);
+  if (!policy.tractionControl && a.tractionControl) session.setAssist('tractionControl', 0);
+  if (!policy.autoGears && a.autoGears) session.setAssist('autoGears', false);
+  if (!policy.steeringAssist && a.steering) session.setAssist('steering', 0);
+  if (policy.stability === false && a.stability) session.setAssist('stability', 0);
+  if (policy.brakingHelp === false && a.braking) session.setAssist('braking', 0);
 }

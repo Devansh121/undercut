@@ -12,8 +12,11 @@ DECIMALS = {
     "halfWidthLeft": 3, "halfWidthRight": 3,
     "split": 2, "barrier": 2,
     "scale": 9,
-    "lat": 7, "lon": 7,
+    "lat": 7, "lon": 7, "latitude": 7, "longitude": 7,
     "speedLimit": 4,
+    "enter": 9, "exit": 9,
+    "northYaw": 6,
+    "altitude": 2, "airPressure": 0, "airTemperature": 2,
 }
 DEFAULT_DECIMALS = 3
 

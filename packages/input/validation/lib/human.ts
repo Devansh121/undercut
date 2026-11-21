@@ -102,10 +102,12 @@ export const CLUMSY: Readonly<HumanTraits> = Object.freeze({
   steer: HUMAN_STEER,
 });
 
-/** Brakes at the marks, flat out at the exit mark, no extra mistakes. Same hands and eyes. */
+/**
+ * Brakes at the marks, flat out at the exit mark, no extra mistakes. Same hands and eyes,
+ * reaction drawn per seed like the clumsy driver's.
+ */
 export const DISCIPLINED: Readonly<HumanTraits> = Object.freeze({
   ...CLUMSY,
-  reaction: [0.2, 0.2] as const,
   liftChance: 0,
   kerbChance: 0,
   feet: 'marks',
