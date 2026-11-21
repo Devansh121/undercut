@@ -104,7 +104,8 @@ export function createCarParams(trim = 'medium', overrides = {}) {
   };
 }
 
-async function load(candidate) {
+/** Load both validation libraries with `candidate` applied (null: the committed car). */
+export async function load(candidate) {
   const { module } = await runnerImport(ENTRY, {
     root,
     configFile: false,

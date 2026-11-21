@@ -56,14 +56,19 @@ export interface TyreParams {
    */
   verticalDamping: number;
   /**
-   * Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN, below [44]'s
-   * 1.85–2.15. This is the model's one fitted parameter: fitted to the Monza T1 2025 peak
-   * deceleration (4.7 g, [21][47]) with the hardware-derived brakes, it comes out at 1.80.
+   * Peak lateral friction at the reference load. Fitted to the low-trim slow-corner lateral
+   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.14, inside [44]'s
+   * 1.85 front – 2.15 rear at 3 kN (range 1.8–2.2, doc 1.2).
    */
   muY: number;
-  /** Peak longitudinal friction at the reference load. Doc 1.2: 0.9 × μy ([44] 0.89–0.91). */
+  /**
+   * Peak longitudinal friction at the reference load, and its load slope, fitted together to
+   * the low-load launch (0–100 km/h, doc 2.3) and the high-load braking peaks of two trims
+   * (Monza T1 2025, Singapore T7 2025, doc 2.4): 1.85 and −1.3e-4 per N. At 3 kN μx/μy is 0.86
+   * ([44]: 0.89–0.91); the slope is steeper than [44]'s −5e-5 (doc 1.2 and 7.4).
+   */
   muX: number;
-  /** d(mu)/d(Fz) of each, 1/N. Doc 1.2: −5e-5 ([44]) for μy, the same share for μx. */
+  /** d(mu)/d(Fz), 1/N. Lateral: [44]'s −5e-5. Longitudinal: fitted with `muX`. */
   loadSensitivityY: number;
   loadSensitivityX: number;
   /** Reference load for `muY` and `muX`, N. Doc 1.2: 3 kN. */
@@ -295,7 +300,9 @@ export interface CarParams {
 
 export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   name: 'low',
-  cdA: 1.15, // doc 1.4: 1.15 (1.05–1.25), Monza
+  // Doc 1.4: 1.15 (1.05–1.25), derived from the Monza trap; re-fitted to it with the
+  // calibrated tyres and floor (Results section): 1.16.
+  cdA: 1.16,
   clA: 3.6, // doc 1.4: 3.6 (3.0–4.2)
   balance: 0.44,
   drsDrag: -0.12,
@@ -382,10 +389,10 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     freeRadius: 0.36,
     verticalStiffness: 300e3,
     verticalDamping: 7000,
-    muY: 1.8,
-    muX: 1.62,
+    muY: 2.14,
+    muX: 1.85,
     loadSensitivityY: -5e-5,
-    loadSensitivityX: -4.5e-5,
+    loadSensitivityX: -1.3e-4,
     referenceLoad: 3000,
     muMin: 0.9,
     peakSlipRatio: 0.1,

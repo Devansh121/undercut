@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BRAKING_EVENTS,
-  FIT_TARGET,
+  FIT_TARGETS,
   KMH,
   TARGETS,
   TRAIL_OFF,
@@ -28,11 +28,13 @@ describe('validation: published braking events (doc 2.4)', () => {
 });
 
 describe('fit and check sets', () => {
-  it('fits exactly one target (the Monza T1 2025 peak); everything else is a check', () => {
+  it('marks exactly the declared fit targets; everything else is a check', () => {
     const fits = Object.values(TARGETS)
       .filter((t) => t.fit)
-      .map((t) => t.id);
-    expect(fits).toEqual([FIT_TARGET]);
+      .map((t) => t.id)
+      .sort();
+    expect(fits).toEqual(Object.keys(FIT_TARGETS).sort());
+    expect(fits).toHaveLength(5);
   });
 });
 

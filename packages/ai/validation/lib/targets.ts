@@ -51,11 +51,12 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 90.137,
+    measured: 84.69,
     reason:
-      'The car is slow in the medium-speed corners: sustained lateral grip at 150–250 km/h is ' +
-      '2.3–3.2 g in low trim (doc 7.2), where the corner speeds of a pole lap need about 3.5–4 g. ' +
-      'Section 7.6 has the per-corner breakdown.',
+      'After the tyre and floor calibration the lap is 1.96 s outside the M1 band: the reference ' +
+      "driver's planning margin and driving cost about 1.8 s, the line's margin and unused kerbs " +
+      '0.8 s, and on this line the medium-speed corners are 13–25 % tighter than the published ' +
+      'apex speeds allow a car of this class. docs/physics-validation.md section 7.6.',
   },
 });
 
