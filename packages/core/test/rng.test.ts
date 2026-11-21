@@ -83,6 +83,24 @@ describe('createRng', () => {
     expect(Array.from({ length: 50 }, () => restored.nextUint32())).toEqual(expected);
   });
 
+  it('snapshots only unsigned 32-bit words, unchanged by a restore', () => {
+    for (const seed of [0, 1, 42, 0xffffffff, 123456789]) {
+      const rng = createRng(seed);
+      for (let draw = 0; draw < 200; draw++) {
+        rng.next();
+        const saved = rng.getState();
+        for (const word of saved) {
+          expect(Number.isInteger(word)).toBe(true);
+          expect(word).toBeGreaterThanOrEqual(0);
+          expect(word).toBeLessThan(2 ** 32);
+        }
+        const restored = createRng(7);
+        restored.setState(saved);
+        expect(restored.getState()).toEqual(saved);
+      }
+    }
+  });
+
   it('keeps the state as a copy, not a live reference', () => {
     const rng = createRng(11);
     const saved = rng.getState();
