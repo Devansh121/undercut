@@ -316,6 +316,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Braking in medium and high-downforce trim stronger than published (section 7) | Spa T5 peaks 5.07–5.11 g against 4.5–4.7, distances 82–83 m against 93–99 m; Singapore T7 5.70 g against 4.9 and 1.57 s against 1.90 s; Singapore T14 peak 5.11 g against 4.6 | The model's tyre-limited deceleration rises with downforce; the published peaks barely do (Monza 4.7, Spa 4.7, Singapore 4.9 g). Candidates: high-trim ClA, floor behaviour under dive, load sensitivity. The published distances and times also include a trail-off the fixed event pedal profile only approximates |
 | Monza T1 2023 peak 4.68 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7 g for all three. Check the 2023 source |
 | Pouhon 4.14 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep with μy fitted to braking; the corner is downhill with two apexes and the source is a blog. Re-test on the Spa surface with the reference driver |
+| Monza reference lap 89.926 s against the M1 band 74.852–82.732 s (section 7.6) | 7.19 s outside M1, 8.77 s outside M4; the car itself (driver aside) laps in 88.0 s at the full measured envelope | Medium-speed lateral grip: corner minimum speeds in S2 and S3 are what 2.2–2.5 g allows at 140–180 km/h. On this line +10 % lateral grip is worth 2.3 s, +10 % braking or traction 0.35 s each; at the full envelope the M1 band needs about 1.25× the lateral grip and the M4 band 1.34×. Same root cause as the Pouhon gap and section 7.4 |
 
 ## 6. Sources
 
@@ -405,10 +406,13 @@ recorded (section 3, rule 2). Speeds in km/h, decelerations and accelerations in
 | Pouhon, medium trim, 281 km/h, Spa air (2.5) | 5.7 ± 0.7 | 4.14 | gap |
 | Parabolica exit, low trim, 270 km/h, Monza air | 3.5–4.0 ± 0.6 | 3.62 | pass |
 | Slow corner 85 km/h, low / medium / high trim | 2.0–2.3 ± 0.4 | 1.81 / 1.82 / 1.85 | pass |
+| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 89.926 s | gap |
+| Monza speed trap on that lap, DRS open, no tow (2.2) | 348 ± 6 | 347.3 | pass |
 
-17 of 32 pass, one of them the fit, and 15 are recorded gaps (section 5). Not covered yet: reference laps (2.1),
-sector times and speed traps (2.2), Raidillon and other corners whose grade or compression
-matters (2.5): they need the circuit surface and the reference driver.
+18 of 34 pass, one of them the fit, and 16 are recorded gaps (section 5). The reference lap and its
+trap are measured by the reference driver on the Monza surface (section 7.6). Not covered yet:
+Spa and Singapore laps (2.1), per-sector bands (2.2, an M4 target), and Raidillon and other
+corners whose grade or compression matters (2.5).
 
 **The fit.** One parameter is fitted, to one target: the tyre's peak lateral friction μy, to the
 Monza T1 2025 peak deceleration (4.7 g, a sourced figure). It comes out at 1.80, the sheet's own
@@ -515,3 +519,113 @@ Each needs a source before it changes.
 - The published peak brake powers (2.2–2.7 MW) imply 28–30 kN of friction force at every event if
   the peak power came at the start of the stop, which would cap deceleration below the published
   peaks. They are event figures, not a hardware limit, and the model does not use them.
+
+### 7.6 Reference lap, Monza (2.1, 2.2)
+
+The reference driver (`packages/ai`) drives a flying lap of the committed Monza surface in the
+section 2.1 conditions: low trim exactly as the game builds the car (`createCarParams('low')`,
+`createWorld` with the track's surface, `addCar`), 10 kg of fuel, 25 °C at 180 m, DRS in the
+zones, the MGU-K deploying from a full store. It produces only the `ControlInput` a player's
+devices produce. Measured with `npm run telemetry -- lap`; asserted by
+`packages/ai/validation/reference-lap.test.ts` in the physics job (one lap) and by the nightly
+soak (ten consecutive laps).
+
+| Quantity | Result | Target or reference |
+|---|---|---|
+| Lap | **89.926 s** | 1:18.792 (+11.134 s, +14.1 %); M1 band 74.852–82.732 s: outside by 7.194 s; M4 band 76.428–81.156 s: outside by 8.770 s |
+| Speed trap (412 m, 212 m before T1) | 347.3 km/h | 348 ± 6 (median 348.3), pass |
+| Timing line | 332.3 km/h | fastest 320.7 published (see the note below) |
+| MGU-K deployed from the store / harvested | 3.13 / 1.30 MJ | ≤ 4 / ≤ 2 MJ per lap |
+| Track limits | at most one wheel centre past a white line, never four | rule: never all four wheels beyond the edges |
+| Stability | sideslip at most 4.4°, no spin | |
+| Ten consecutive laps (34 kg start, getting lighter) | 90.406–90.651 s, spread 0.244 s, all clean | nightly soak: spread ≤ 0.5 s |
+
+| Sector | Lap | Speed profile | Pole lap 2025 | Session best | Lap − pole |
+|---|---|---|---|---|---|
+| S1 (0–1609 m) | 25.280 | 24.996 | 26.262 | 26.181 | −0.982 (−3.7 %) |
+| S2 (1609–3434 m) | 30.854 | 30.749 | 26.483 | 26.340 | +4.371 (+16.5 %) |
+| S3 (3434–5793 m) | 33.791 | 33.393 | 26.047 | 26.047 | +7.744 (+29.7 %) |
+
+| Corner | Minimum speed (km/h) | Speed profile | Braking into it | Published |
+|---|---|---|---|---|
+| T1 Rettifilo | 63.0 | 62.9 | from 347 km/h, 192 m, 4.18 s to the minimum | 337→89 km/h in 129 m, 2.75 s; here 337→89 km/h takes 143 m, 2.73 s |
+| T2 Rettifilo | 62.2 | 63.7 | — | — |
+| T3 Biassono | 163.8 | 171.8 | lift only | — |
+| T4 Roggia | 95.7 | 93.6 | from 332 km/h, 169 m, 3.23 s | 107 m, 2.02 s (speeds not published) |
+| T5 Roggia | 107.3 | 105.8 | 23 m | — |
+| T6 Lesmo 1 | 140.0 | 142.5 | from 253 km/h, 117 m, 2.32 s | — |
+| T7 Lesmo 2 | 138.1 | 139.3 | from 249 km/h, 106 m, 2.13 s | — |
+| T8 Ascari entry | 140.4 | 138.7 | from 343 km/h, 181 m, 3.00 s | — |
+| T9 Ascari | 157.4 | 155.8 | — | — |
+| T10 Ascari exit | 186.3 | 190.1 | — | — |
+| T11 Parabolica | 148.0 | 155.3 | from 335 km/h, 253 m, 4.56 s | — |
+
+Plots: `docs/evidence/m1-ai/monza-low-line.png` (the line over the plan, speed as colour),
+close-ups `monza-low-line-t*.png`, and `monza-low-speed.png` (target speed along the lap with the
+driven lap over it).
+
+**Where the 11.1 s go.** Three layers, measured separately:
+
+1. *The car* (9.2 s against the pole lap): the speed profile at the full measured envelope on the
+   same line gives 88.014 s. The car is slow in corners, not on the straights: the trap is on
+   target and S1, which is mostly straight and has the one slow chicane, is faster than the pole
+   lap's sector, while S2 (Roggia, both Lesmos) and S3 (Ascari, Parabolica) lose 4.4 and 7.7 s.
+   The corner minimum speeds are what the measured lateral limit allows: 1.7–1.9 g at 60–100 km/h,
+   2.2–2.5 g at 140–180 km/h, 2.9 g at 220 km/h (envelope at load 1, below), where section 2.5
+   estimates 3.5–4.0 g at the Parabolica exit for the real car. On this line the lap
+   is far more sensitive to lateral grip than to anything else: +10 % lateral 2.27 s, +20 % 4.30 s,
+   +30 % 6.14 s; +10 % braking 0.35 s; +10 % traction 0.36 s. At the full envelope the lap reaches
+   the M1 band at 1.25× the lateral grip, the M4 band at 1.34×, the pole lap at 1.49×. This is the
+   same shortfall as the Pouhon gap and section 7.4's load-sensitivity pattern, now with its cost
+   in lap time; it is the next physics task's target.
+2. *Planning margin* (1.13 s): the reference driver plans with 97 % of the lateral and traction
+   limits and 95 % of the braking limit (89.139 s). Asking for more is slower and then unclean:
+   at 98 % and 99 % it laps in 90.032 and 90.252 s because it runs wider, and at 100 % all four
+   wheels leave the track at Parabolica (90.355 s).
+3. *Driving* (0.79 s against its own plan): mostly Parabolica (about 0.45 s; braking into the
+   turn, the light inside front wheel limits the pedal and the car runs up to 4 m wide), the exits
+   of T1–T2 and Ascari, and the run through Curva Grande, which the profile takes 8 km/h faster.
+
+**Envelope.** Measured by driving the vehicle model (`packages/ai/src/envelope/measure.ts`, 1096 s
+of driving, about 1 s of wall time), cached in `packages/ai/data/monza-low.envelope.json` with a
+hash of its inputs (car parameters, air, fuel and the source of the sim and of the measurement):
+constant-speed lateral sweeps at 60–340 km/h, threshold stops from above top speed, and
+full-throttle runs with wheelspin held at the tyre's peak, DRS closed and open, MGU-K on and off,
+each at 0.8, 1.0 and 1.2 g of normal load (gravity scaled: what a crest or compression does), and
+braking in a held turn for the shape of the combined limit (exponent 1.80). It agrees with the
+physics suite's own manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both
+asserted). At load 1, in g: lateral 1.68 / 1.90 / 2.17 / 2.51 / 2.94 / 3.48 / 4.16 at
+60 / 100 / 140 / 180 / 220 / 260 / 300 km/h; braking (tyres alone) 1.34 / 1.52 / 1.82 / 2.26 /
+2.79 / 3.44 / 4.16; traction 1.05 / 1.09 / 1.25 / 1.48 / 1.84; top speed 344.1 km/h with DRS
+closed and 353.8 km/h open.
+
+**What flatters the car in this measurement**
+
+- The driver plans with the measured envelope of this exact car, so the line and speeds fit the
+  car better than any human's would.
+- A flying start 400 m before the line with the MGU-K deploying on the run-up (it counts against
+  the out-lap) and a full store at the line.
+- No wind, no traffic, no tyre temperature or wear model yet (the softest compound's grip is the
+  tyre's one μ).
+
+**What handicaps it**
+
+- The driver keeps its wheels off the kerbs: in this model a kerb's leading edge (35–50 mm high
+  within 10–12 cm) throws the wheel load around enough (0 to 11 kN within a tick) to unsettle the
+  car at the limit, so the line stays 0.3 m inside the white lines. A real pole lap uses the
+  kerbs at T1–T2, Roggia, both Lesmos and Ascari.
+- The fixed 57 % brake bias and no ABS: braking while turning in, the lightly loaded inside front
+  locks first, and the driver eases the pedal to keep it turning. A real driver adjusts bias per
+  corner.
+- No downforce gain from the tow, and the driver never uses more than 97 % of the envelope.
+- The racing line is computed on the OpenStreetMap-derived centreline and authored widths
+  (track-data.md); local width or curvature errors there show up as line choices.
+
+**Two observations for the track data** (reported, not changed here): the published timing-line
+speed (320.7 km/h, the session's fastest) is lower than this car's 332 km/h at the track's s = 0,
+although this car's corner speeds, Parabolica included, are lower than a pole lap's, which
+suggests the timing line sits about 200 m before s = 0 in reality. And the published sector times cannot be split on
+the track's sector lines with any plausible speed trace: an S3 of 2359 m in 26.047 s needs a mean
+of 326 km/h through Ascari and Parabolica. Both point at the start/finish and sector positions in
+`packages/track/data/monza.json` (built from doc 2.2's "S1 233 m before T4; S2 215 m before
+T8"); the lap time does not depend on them, the sector table above does.

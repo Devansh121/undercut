@@ -33,6 +33,12 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - Committed track files will be offered under ODbL 1.0 with the OpenStreetMap and Copernicus notices, separate from the MIT code.
 - The TUMFTM track dataset is used only as a local cross-check, never shipped: it is OSM-derived but published under LGPL-3.0.
 - Race start fuel 105 kg in the physics targets: the commonly quoted 110 kg cap was not found in the 2025 regulation text.
+- Reference driver (M1): the reference lap at Monza is 89.926 s, outside the M1 band (74.852–82.732 s). It is recorded as a known gap (physics-validation section 5 and 7.6), not loosened: the car lacks medium-speed lateral grip. The test asserts the gap stays within 0.197 s of the recorded value.
+- The reference driver keeps off the kerbs and 0.3 m inside the white lines: the kerb edges in the track model unsettle the car at the limit. Kerb use is a per-profile setting in the line configuration for when kerbs are smoother.
+- The reference driver plans with 97 % of the lateral and traction limits and 95 % of braking: the fastest setting that stays clean (98–99 % is slower, 100 % leaves the track).
+- The flying lap starts 400 m before the timing line on the racing line at the planned speed, with a full energy store, and the MGU-K may deploy on that run-up (it counts against the out-lap). Track limits are judged strictly: a wheel is off once its centre is past the white line.
+- The nightly ten-lap soak starts with 34 kg of fuel (qualifying fuel cannot cover ten laps) and requires a lap-time spread of at most 0.5 s; measured 0.244 s.
+- The Monza timing-line and sector positions in the track file look inconsistent with the published speeds and sector times (physics-validation 7.6); reported, not changed, since the track package belongs to another task.
 
 ## Optional, needs you
 

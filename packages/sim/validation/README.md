@@ -35,13 +35,13 @@ passes 10 % slip, and trailed off over the last 25 % of the speed drop to 30 % p
 corner speed. Each run starts within 0.05 km/h of the stated speed after an approach with DRS
 open, and the end crossing is interpolated; the suite asserts both.
 
-## Reference laps (placeholder)
+## Reference laps
 
-Doc section 2.1 (lap time within ±5 % at M1 and ±3 % at M4 of the era's pole laps at Monza, Spa
-and Singapore) and section 2.2 (sector times and speed traps) need a real circuit surface and a
-reference driver. They arrive with the track package and the AI's reference driver, which will
-add `reference-lap.test.ts` here using the same harness and target table. There is deliberately
-no skipped test standing in for them.
+Doc section 2.1 (the reference lap) and the speed trap of 2.2 are measured by the AI's reference
+driver on the circuit surface, so they live in `packages/ai/validation/` (the sim may not import
+the AI) and run in the same `physics` job: `reference-lap.test.ts` drives one flying lap at
+Monza and judges it with the same target bands and the same recorded-gap rule as this suite.
+The ten-lap soak runs nightly (`npm run test:soak`). Results: doc section 7.6.
 
 ## Adding a check
 
