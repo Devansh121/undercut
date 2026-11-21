@@ -9,6 +9,9 @@ import { expect, test } from '@playwright/test';
  * the server compresses), and every asset in the inventory is fetched. Mobile preset; the
  * inventory logic is the same for every preset.
  */
+// What is fetched does not depend on the canvas size; software WebGL pays per pixel.
+test.use({ viewport: { width: 480, height: 300 } });
+
 test('the budget inventory matches the requests of a real first race, byte for byte', async ({
   page,
 }, info) => {

@@ -10,6 +10,9 @@ import { expect, test } from '@playwright/test';
  * `npm run shots -- monza --lifecycle` (tools/screenshots/shots.mjs): five High sessions on
  * CI's software renderer take minutes and starve the other browser tests.
  */
+// Small canvas: the renderer's lifetime does not depend on it, and software WebGL pays per pixel.
+test.use({ viewport: { width: 480, height: 300 } });
+
 for (const quality of ['mobile'] as const) {
   test(`starting and quitting five sessions on one page leaks nothing and warns about nothing (${quality})`, async ({
     page,

@@ -284,6 +284,7 @@ test.describe('drive', () => {
         await page.evaluate(
           ([camera, at]) => {
             const u = window.__undercut;
+            u?.setTimeScale(1);
             u?.camera(camera as string);
             const p = at as { restart?: boolean; s?: number; kmh?: number };
             if (p.restart) u?.restartLap();
