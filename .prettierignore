@@ -10,3 +10,5 @@ package-lock.json
 *.md
 # Static design mocks, not shipped code.
 design/
+# Committed track files are written byte for byte by tools/track-pipeline.
+packages/track/data/*.json

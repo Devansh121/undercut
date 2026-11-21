@@ -1,0 +1,653 @@
+{
+  "id": "monza",
+  "name": "Monza",
+  "country": "Italy",
+  "direction": "clockwise",
+  "officialLength": 5793.0,
+  "referenceWidth": 10.0,
+  "osm": {
+    "relation": 284565,
+    "pitWay": 38168747,
+    "bbox": [45.605, 9.27, 45.635, 9.3]
+  },
+  "geometry": {
+    "denseStep": 0.5,
+    "smoothSigma": 4.0,
+    "sampleStep": 2.0,
+    "maxLengthChangePct": 0.2,
+    "startHeadingDeg": [0, 15]
+  },
+  "elevation": {
+    "openWindow": 300,
+    "average": 90,
+    "gradeSigma": 20,
+    "publishedRange": 12.8,
+    "rangeTolerance": 2.0
+  },
+  "corners": [
+    {
+      "number": 1,
+      "name": "Variante del Rettifilo",
+      "direction": "right"
+    },
+    {
+      "number": 2,
+      "name": "Variante del Rettifilo",
+      "direction": "left"
+    },
+    {
+      "number": 3,
+      "name": "Curva Biassono",
+      "direction": "right"
+    },
+    {
+      "number": 4,
+      "name": "Variante della Roggia",
+      "direction": "left"
+    },
+    {
+      "number": 5,
+      "name": "Variante della Roggia",
+      "direction": "right"
+    },
+    {
+      "number": 6,
+      "name": "Lesmo 1",
+      "direction": "right"
+    },
+    {
+      "number": 7,
+      "name": "Lesmo 2",
+      "direction": "right"
+    },
+    {
+      "number": 8,
+      "name": "Vialone",
+      "direction": "left"
+    },
+    {
+      "number": 9,
+      "name": "Vialone",
+      "direction": "right"
+    },
+    {
+      "number": 10,
+      "name": "Vialone",
+      "direction": "left"
+    },
+    {
+      "number": 11,
+      "name": "Parabolica",
+      "direction": "right"
+    }
+  ],
+  "timing": {
+    "note": "Offsets from the 2025 circuit map (docs/track-data.md section 4). A corner's position is its curvature apex.",
+    "sectors": [
+      {
+        "corner": 4,
+        "offset": -233
+      },
+      {
+        "corner": 8,
+        "offset": -215
+      }
+    ],
+    "speedTrap": {
+      "corner": 1,
+      "offset": -212
+    },
+    "drs": [
+      {
+        "detection": {
+          "corner": 7,
+          "offset": -95
+        },
+        "activation": {
+          "corner": 7,
+          "offset": 170
+        }
+      },
+      {
+        "detection": {
+          "corner": 11,
+          "offset": 20
+        },
+        "activation": {
+          "s": 12
+        }
+      }
+    ]
+  },
+  "grid": {
+    "note": "Estimates: pole 5 m behind the line on the right (inside of turn 1), 8 m between slots, 2.8 m either side of the centreline.",
+    "slots": 20,
+    "poleS": -5.0,
+    "spacing": 8.0,
+    "lateral": 2.8,
+    "poleSide": "right"
+  },
+  "widths": {
+    "note": "Half-widths left and right in metres, linear between keys. Estimates: FIA reference width 10 m as the floor; the wider main straight and chicane entries follow the shape of the TUMFTM width profile used as a local reference only.",
+    "keys": [
+      [
+        {
+          "s": 0
+        },
+        6.0,
+        6.0
+      ],
+      [
+        {
+          "corner": 1,
+          "offset": -160
+        },
+        6.0,
+        6.0
+      ],
+      [
+        {
+          "corner": 1,
+          "offset": -60
+        },
+        5.5,
+        5.5
+      ],
+      [
+        {
+          "corner": 2,
+          "offset": 60
+        },
+        5.5,
+        5.5
+      ],
+      [
+        {
+          "corner": 2,
+          "offset": 140
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 4,
+          "offset": -90
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 4,
+          "offset": -30
+        },
+        5.5,
+        5.5
+      ],
+      [
+        {
+          "corner": 5,
+          "offset": 40
+        },
+        5.5,
+        5.5
+      ],
+      [
+        {
+          "corner": 5,
+          "offset": 110
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 11,
+          "offset": 120
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 11,
+          "offset": 330
+        },
+        6.0,
+        6.0
+      ]
+    ]
+  },
+  "banking": {
+    "note": "Crossfall per corner in degrees, positive raises the left edge. Estimates: no open dataset has camber.",
+    "ramp": 40,
+    "corners": [
+      {
+        "corner": 3,
+        "deg": 1.5
+      },
+      {
+        "corner": 6,
+        "deg": 1.0
+      },
+      {
+        "corner": 7,
+        "deg": 1.0
+      },
+      {
+        "corner": 11,
+        "deg": 2.0
+      }
+    ]
+  },
+  "kerbProfiles": [
+    {
+      "name": "flat",
+      "note": "Low painted kerb with a ramped inner edge.",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.35, 0.05],
+        [1.5, 0]
+      ],
+      "high": null
+    },
+    {
+      "name": "exit",
+      "note": "Wide, very low exit kerb.",
+      "points": [
+        [0, 0],
+        [0.1, 0.02],
+        [2.3, 0.03],
+        [2.5, 0]
+      ],
+      "high": null
+    },
+    {
+      "name": "chicane",
+      "note": "Flat kerb followed by a raised sausage kerb.",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.4, 0.05],
+        [1.6, 0.05],
+        [1.75, 0.13],
+        [2.05, 0.13],
+        [2.2, 0]
+      ],
+      "high": [1.6, 2.2]
+    }
+  ],
+  "kerbs": {
+    "note": "Estimates from the corner list: inside apex kerbs, outside exit kerbs. Offsets in metres from the apex; side is inside or outside of the corner.",
+    "items": [
+      {
+        "corner": 1,
+        "side": "inside",
+        "from": -24,
+        "to": 12,
+        "profile": "chicane"
+      },
+      {
+        "corner": 1,
+        "side": "outside",
+        "from": -45,
+        "to": -8,
+        "profile": "flat"
+      },
+      {
+        "corner": 2,
+        "side": "inside",
+        "from": -14,
+        "to": 18,
+        "profile": "chicane"
+      },
+      {
+        "corner": 2,
+        "side": "outside",
+        "from": 12,
+        "to": 70,
+        "profile": "exit"
+      },
+      {
+        "corner": 3,
+        "side": "inside",
+        "from": -90,
+        "to": 60,
+        "profile": "flat"
+      },
+      {
+        "corner": 3,
+        "side": "outside",
+        "from": 120,
+        "to": 260,
+        "profile": "exit"
+      },
+      {
+        "corner": 4,
+        "side": "inside",
+        "from": -20,
+        "to": 12,
+        "profile": "chicane"
+      },
+      {
+        "corner": 4,
+        "side": "outside",
+        "from": -45,
+        "to": -10,
+        "profile": "flat"
+      },
+      {
+        "corner": 5,
+        "side": "inside",
+        "from": -14,
+        "to": 16,
+        "profile": "chicane"
+      },
+      {
+        "corner": 5,
+        "side": "outside",
+        "from": 10,
+        "to": 70,
+        "profile": "exit"
+      },
+      {
+        "corner": 6,
+        "side": "inside",
+        "from": -40,
+        "to": 40,
+        "profile": "flat"
+      },
+      {
+        "corner": 6,
+        "side": "outside",
+        "from": 50,
+        "to": 120,
+        "profile": "exit"
+      },
+      {
+        "corner": 7,
+        "side": "inside",
+        "from": -25,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 7,
+        "side": "outside",
+        "from": 25,
+        "to": 90,
+        "profile": "exit"
+      },
+      {
+        "corner": 8,
+        "side": "inside",
+        "from": -25,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 9,
+        "side": "inside",
+        "from": -40,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 9,
+        "side": "outside",
+        "from": -60,
+        "to": -20,
+        "profile": "flat"
+      },
+      {
+        "corner": 10,
+        "side": "inside",
+        "from": -20,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 10,
+        "side": "outside",
+        "from": 15,
+        "to": 80,
+        "profile": "exit"
+      },
+      {
+        "corner": 11,
+        "side": "inside",
+        "from": -30,
+        "to": 130,
+        "profile": "flat"
+      },
+      {
+        "corner": 11,
+        "side": "outside",
+        "from": 200,
+        "to": 330,
+        "profile": "exit"
+      }
+    ]
+  },
+  "runoff": {
+    "note": "Gravel comes from OpenStreetMap gravel and sand polygons within maxScan of the edge. The kind nearest the track is authored (estimates); grass where nothing is listed.",
+    "lineWidth": 0.2,
+    "maxScan": 45,
+    "minGravelLength": 20,
+    "default": "grass",
+    "items": [
+      {
+        "from": {
+          "corner": 1,
+          "offset": -120
+        },
+        "to": {
+          "corner": 2,
+          "offset": 40
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 1,
+          "offset": -40
+        },
+        "to": {
+          "corner": 2,
+          "offset": 60
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 4,
+          "offset": -100
+        },
+        "to": {
+          "corner": 5,
+          "offset": 40
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 4,
+          "offset": -30
+        },
+        "to": {
+          "corner": 5,
+          "offset": 60
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 11,
+          "offset": -40
+        },
+        "to": {
+          "corner": 11,
+          "offset": 330
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "pit": "entry",
+          "offset": 40
+        },
+        "to": {
+          "pit": "exit",
+          "offset": -40
+        },
+        "side": "right",
+        "kind": "asphalt"
+      }
+    ]
+  },
+  "barriers": {
+    "note": "Offsets from the centreline in metres. Where OpenStreetMap maps a wall, fence or guard rail within maxScan of the edge it is used; elsewhere the default rule applies: minimum run-off beyond the edge, and at least `behindGravel` metres behind mapped gravel. Types and authored offsets are estimates. On the pit side the pit wall stands halfway between the track edge and the pit lane.",
+    "maxScan": 45,
+    "minRunoff": 9,
+    "behindGravel": 3,
+    "default": "armco",
+    "items": [
+      {
+        "from": {
+          "corner": 11,
+          "offset": 330
+        },
+        "to": {
+          "corner": 1,
+          "offset": -150
+        },
+        "side": "left",
+        "type": "concrete",
+        "offset": 14
+      },
+      {
+        "from": {
+          "corner": 1,
+          "offset": -150
+        },
+        "to": {
+          "corner": 2,
+          "offset": 60
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 4,
+          "offset": -60
+        },
+        "to": {
+          "corner": 5,
+          "offset": 60
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 4,
+          "offset": -60
+        },
+        "to": {
+          "corner": 5,
+          "offset": 60
+        },
+        "side": "right",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 6,
+          "offset": -30
+        },
+        "to": {
+          "corner": 6,
+          "offset": 90
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 7,
+          "offset": -30
+        },
+        "to": {
+          "corner": 7,
+          "offset": 70
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -60
+        },
+        "to": {
+          "corner": 10,
+          "offset": 60
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -60
+        },
+        "to": {
+          "corner": 10,
+          "offset": 60
+        },
+        "side": "right",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 11,
+          "offset": -40
+        },
+        "to": {
+          "corner": 11,
+          "offset": 200
+        },
+        "side": "left",
+        "type": "tyres"
+      }
+    ]
+  },
+  "pit": {
+    "note": "Path from the OpenStreetMap pit-lane way. Widths, limit lines and boxes are estimates.",
+    "side": "right",
+    "speedLimitKmh": 80,
+    "limitStart": 110,
+    "limitEndFromExit": 120,
+    "widths": [
+      [0, 2.5, 2.5],
+      [60, 3.5, 3.5],
+      [160, 3.5, 9.0],
+      [-160, 3.5, 9.0],
+      [-60, 3.5, 3.5],
+      [-1, 2.5, 2.5]
+    ],
+    "boxes": {
+      "count": 10,
+      "spacing": 20.0,
+      "lateral": -5.5
+    }
+  }
+}
