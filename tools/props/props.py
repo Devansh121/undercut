@@ -11,6 +11,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.abspath('tools/car'))
+sys.path.insert(0, os.path.abspath('tools/props'))
 from carlib.ao import bake
 
 args = argparse.ArgumentParser()
@@ -85,6 +86,7 @@ glass = material('glazing', (.045, .085, .12), .14, .45)
 face = material('board-face', (.80, .79, .75), .62)
 red = material('lamp-red', (.42, .004, .002), .28, emission=2.4)
 cloth = material('clothing', (.52, .54, .56), .92, tex_kind='weave', contrast=.08)
+fabric = material('dark-fabric', (.025, .032, .043), .94, tex_kind='weave', contrast=.10)
 skin = material('skin', (.38, .22, .14), .84)
 
 objects = []
@@ -185,7 +187,7 @@ def board_panel(name, pos, width, height, thickness=.04, tilt_y=0.0, frame_mat=d
         if p.normal.x > .5:
             for i in p.loop_indices:
                 v = ob.data.vertices[ob.data.loops[i].vertex_index].co
-                uv[i].uv = (v.y / width + .5, v.z / height + .5)
+                uv[i].uv = (.5 - v.y / width, v.z / height + .5)
     if tilt_y:
         ob.rotation_euler = (0.0, tilt_y, 0.0)
     if frame_mat is not None:
@@ -563,7 +565,7 @@ for ident, module in specs:
                         rod('fixing-bolt', (.04, py, .42 + i * .32), (.065, py, .42 + i * .32), .016, steel, segs=6)
 
         elif ident == 'concrete-wall':
-            # Sloped FIA precast concrete barrier profile with expansion-joint clearance (3.98 m).
+            # Sloped precast concrete barrier profile with expansion-joint clearance (3.98 m).
             prof = [(-.31, 0.0), (.31, 0.0), (.31, .16), (.23, .30), (.21, 1.20), (-.21, 1.20), (-.23, .30), (-.31, .16)]
             prism_profile('wall', prof, -1.99, 1.99, concrete)
             # Flush painted top band on trackside (+X) upper face.
@@ -643,14 +645,19 @@ for ident, module in specs:
             gantry()
 
         elif ident.startswith('crew'):
-            if 'crouched' in ident:
+            mechanic = 'mechanic' in ident
+            if lod == 0:
+                from crew import build as build_crew
+                pose = 'crouched' if 'crouched' in ident else 'seated' if 'seated' in ident else 'standing'
+                head_pos = build_crew(pose, mechanic, finish, cloth, fabric, rubber, skin, glass)
+            elif 'crouched' in ident:
                 head_pos = person('crouched', 0, footwear=rubber, trousers=cloth)
             elif 'seated' in ident:
-                head_pos = person('seated', 0, footwear=rubber, trousers=dark_steel)
+                head_pos = person('seated', 0, footwear=rubber, trousers=fabric)
             else:
-                head_pos = person('standing', 0, footwear=rubber, trousers=cloth if 'mechanic' in ident else dark_steel)
+                head_pos = person('standing', 0, footwear=rubber, trousers=cloth if 'mechanic' in ident else fabric)
             hx, hy, hz = head_pos
-            if 'mechanic' in ident:
+            if 'mechanic' in ident and lod > 0:
                 # Full-face motorsport pit helmet + wrapped visor + chin guard.
                 bpy.ops.mesh.primitive_uv_sphere_add(
                     segments=14 if lod == 0 else 8, ring_count=8 if lod == 0 else 5,
@@ -659,7 +666,7 @@ for ident, module in specs:
                 finish(bpy.context.object, 'helmet-shell', cloth, smooth=True)
                 box('helmet-chin', (hx + .08, hy, hz - .055), (.11, .16, .07), cloth, bevel=.018)
                 box('helmet-visor', (hx + .115, hy, hz + .015), (.04, .18, .075), glass, bevel=.012)
-            else:
+            elif not mechanic:
                 # Over-ear pit-wall race headset: curved arch over head + twin earcups + boom mic.
                 for a0, a1 in ((-1.35, -.45), (-.45, .45), (.45, 1.35)):
                     p0 = (hx, hy + math.sin(a0) * .132, hz + math.cos(a0) * .138)
@@ -671,7 +678,7 @@ for ident, module in specs:
             attachments.append({'name': 'team-tint', 'position': [0, 0, 0], 'material': 'clothing', 'vertexColour': 'AO'})
 
         elif ident.startswith('crowd'):
-            person('seated' if 'seated' in ident else 'standing', int(ident[-1]), footwear=rubber, trousers=dark_steel)
+            person('seated' if 'seated' in ident else 'standing', int(ident[-1]), footwear=rubber, trousers=fabric)
 
         elif ident == 'braking-board':
             sign_board(1.0, 1.3, bottom_z=.50, twin_posts=True)
@@ -786,6 +793,8 @@ for ident, module in specs:
                 box('lens-hood', (.88, 0, head_z + .34), (.16, .28, .26), dark_steel, bevel=.012)
                 rod('lens-glass', (.80, 0, head_z + .34), (.84, 0, head_z + .34), .095, glass)
 
+        if 'seated' in ident:
+            attachments.append({'name': 'seat', 'position': [0, .50, 0], 'front': '+X'})
         # Authored coordinates above are X front, Y lateral, Z up; glTF exports (X,Z,-Y).
         # Flip author lateral so delivery Z is positive right, then rotate Blender Z-up frame.
         for ob in objects:

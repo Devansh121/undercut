@@ -15,6 +15,13 @@ describe('shipped prop catalogue', () => {
   for (const prop of catalog.props)
     it(`${prop.id} has measured compressed LODs and sane attachment data`, () => {
       expect(prop.pivot).toEqual([0, 0, 0]);
+      if (prop.id.includes('seated')) {
+        expect(prop.attachments.find((a) => a.name === 'seat')).toEqual({
+          name: 'seat',
+          position: [0, 0.5, 0],
+          front: '+X',
+        });
+      }
       expect(prop.bounds.min[1]).toBeGreaterThanOrEqual(-0.005);
       for (let i = 0; i < 3; i++) {
         expect(prop.bounds.max[i]).toBeGreaterThan(prop.bounds.min[i]);
@@ -50,6 +57,14 @@ describe('shipped prop catalogue', () => {
             );
           }
           expect(gltf.materials.map((m) => m.name).sort()).toEqual([...prop.materials].sort());
+        }
+        if (prop.id.startsWith('crew-') || prop.id.startsWith('crowd-')) {
+          expect(gltf.materials.some((m) => m.name === 'dark-steel')).toBe(false);
+          const fabric = gltf.materials.find((m) => m.name === 'dark-fabric');
+          if (!prop.id.includes('mechanic')) {
+            expect(fabric).toBeDefined();
+            expect(fabric.pbrMetallicRoughness.metallicFactor).toBe(0);
+          }
         }
         const count = gltf.meshes.reduce(
           (n, m) =>

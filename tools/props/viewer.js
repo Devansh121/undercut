@@ -241,3 +241,49 @@ window.corridor = async () => {
     triangles: renderer.info.render.triangles,
   };
 };
+
+window.artwork = async (id) => {
+  await window.inspect(id, 'sheet');
+  active[0].visible = true;
+  active[1].visible = false;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#b52b20';
+  ctx.fillRect(0, 0, 350, 512);
+  ctx.fillStyle = '#e8e5d9';
+  ctx.fillRect(350, 0, 324, 512);
+  ctx.fillStyle = '#17589b';
+  ctx.fillRect(674, 0, 350, 512);
+  ctx.fillStyle = '#101318';
+  ctx.font = 'bold 90px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('LEFT  >  27', 512, 300);
+  const texture = new T.CanvasTexture(canvas);
+  texture.flipY = false;
+  texture.colorSpace = T.SRGBColorSpace;
+  active[0].traverse((o) => {
+    if (o.isMesh && o.material.name === (id === 'screen-tower' ? 'glazing' : 'board-face')) {
+      o.material.map = texture;
+      o.material.color.set('#ffffff');
+      o.material.needsUpdate = true;
+    }
+  });
+  const prop = catalog.props.find((p) => p.id === id);
+  const anchor = prop.attachments.find((a) => a.uv);
+  const center = new T.Vector3(...anchor.position);
+  const distance =
+    (Math.max(anchor.size[0] / 1.6, anchor.size[1]) /
+      (2 * Math.tan(T.MathUtils.degToRad(35 / 2)))) *
+    1.2;
+  camera.aspect = 1.6;
+  camera.fov = 35;
+  camera.position.copy(center).add(new T.Vector3(distance, 0, 0));
+  camera.up.set(0, 1, 0);
+  camera.lookAt(center);
+  camera.updateProjectionMatrix();
+  renderer.setViewport(0, 0, 1600, 1000);
+  env.update(camera, center, true);
+  renderer.render(scene, camera);
+};

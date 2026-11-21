@@ -31,6 +31,26 @@ try {
       });
       console.log(`${id} ${mode}`);
     }
+  const boards = [
+    'braking-board',
+    'zone-board',
+    'corner-board',
+    'kilometre-board',
+    'hoarding',
+    'pit-garage',
+    'start-gantry',
+    'bridge-banner',
+    'pedestrian-bridge',
+    'screen-tower',
+  ];
+  for (const id of boards) {
+    await page.evaluate((id) => window.artwork(id), id);
+    await page.screenshot({
+      path: `docs/evidence/m2-models/${id}-artwork.jpg`,
+      type: 'jpeg',
+      quality: 90,
+    });
+  }
   await page.evaluate(() => window.corridor());
   await page.screenshot({
     path: 'docs/evidence/m2-models/corridor.jpg',
