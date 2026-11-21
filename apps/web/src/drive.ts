@@ -7,6 +7,7 @@
 import { Track } from '@undercut/track';
 import {
   ErsMode,
+  SurfaceKind,
   computeMass,
   createCarPose,
   interpolateCarPose,
@@ -52,7 +53,8 @@ import { GameLoop } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
-import { Hud, type HudMessage, type HudState } from './ui/hud';
+import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
+import { setGlyphContext } from './ui/kit/glyph';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
@@ -68,9 +70,9 @@ const REV_START = 10500;
 const REV_FULL = 12200;
 const REV_FLASH = 12350;
 const ERS_MODE_LABEL: Record<number, string> = {
-  [ErsMode.None]: 'Off',
-  [ErsMode.Balanced]: 'Balanced',
-  [ErsMode.Overtake]: 'Overtake',
+  [ErsMode.None]: S.hud.ersModes.off,
+  [ErsMode.Balanced]: S.hud.ersModes.balanced,
+  [ErsMode.Overtake]: S.hud.ersModes.overtake,
 };
 const FRAME_LOG = 7200;
 
@@ -203,6 +205,7 @@ export interface DriveHandle {
   autopilot(on: boolean): void;
   events(): SessionEvent[];
   hudText(): Record<string, string>;
+  setHudVisible(on: boolean): void;
   quit(): void;
   /** Start-up phase times, ms. */
   loadTimes(): Record<string, number>;
@@ -309,9 +312,23 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
-  const hud = new Hud(plan);
+  const teamInfo = teams.teams.find((t) => t.id === teamId) ?? teams.teams[0];
+  const mediumInfo = compounds.compounds.find((c) => c.id === 'medium') ?? compounds.compounds[0];
+  const hudIdentity: HudIdentity | undefined =
+    teamInfo && mediumInfo
+      ? {
+          teamColour: teamInfo.colours.tower,
+          driverCode: playerLivery.code,
+          driverNumber: playerLivery.number,
+          compoundCode: mediumInfo.code,
+          compoundColour: mediumInfo.colour,
+          compoundSlots: mediumInfo.slots,
+        }
+      : undefined;
+  const hud = new Hud(plan, hudIdentity);
   const results = new ResultsStrip();
   let quitting = false;
+  let hudVisible = true;
   const actions = {
     resume: () => resume(),
     restartLap: () => {
@@ -336,7 +353,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     [
       {
         id: 'camera',
-        label: 'Camera',
+        label: S.pause.camera,
         choices: CAMERA_ORDER.map((c) => ({
           value: c,
           label: CAMERA_LABELS[c].replace(' chase', ''),
@@ -346,7 +363,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'quality',
-        label: 'Graphics',
+        label: S.pause.graphics,
         choices: PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
         get: () => quality,
         set: (v) => {
@@ -356,7 +373,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'tc',
-        label: 'Traction control',
+        label: S.setup.tractionControl,
         choices: levels,
         get: () => session.assists.tractionControl,
         set: (v) => setAssist('tractionControl', Number(v)),
@@ -373,7 +390,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'gears',
-        label: 'Gears',
+        label: S.setup.gears,
         choices: [
           { value: 'auto', label: 'Auto' },
           { value: 'manual', label: 'Manual' },
@@ -383,20 +400,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'steering',
-        label: 'Steering help',
+        label: S.setup.steering,
         choices: levels,
         get: () => session.assists.steering,
         set: (v) => setAssist('steering', Number(v)),
       },
     ],
     () =>
-      `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}${o.soundNote?.() ? ` · ${o.soundNote()}` : ''}`,
+      `${S.pause.assistsNote(track.name, S.menu.deviceNames[session.device])}${records.persistent ? '' : ` · ${S.pause.recordsNote}`}${o.soundNote?.() ? ` · ${o.soundNote()}` : ''}`,
     o.audio
       ? (
           [
-            ['master', 'Volume'],
-            ['engine', 'Engine'],
-            ['effects', 'Effects'],
+            ['master', S.pause.volume],
+            ['engine', S.pause.engine],
+            ['effects', S.pause.effects],
           ] as const
         ).map(([id, label]) => ({
           id,
@@ -437,7 +454,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     messageLeft = seconds;
   };
   if (!records.persistent)
-    say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
+    say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
@@ -453,14 +470,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         case 'record':
           void records.save(e.circuit, e.update).then(() => {
             if (!records.persistent)
-              say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
+              say({ tag: S.hud.storage, text: S.hud.recordKept, tone: 'info' }, 4);
           });
           break;
         case 'invalidated':
           say(
             {
-              tag: 'Lap invalid',
-              text: e.reason === 'reset' ? 'Reset to track' : 'Track limits',
+              tag: S.hud.lapInvalid,
+              text: e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits,
               tone: 'invalid',
             },
             3,
@@ -517,6 +534,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // Frame loop.
   const pose = createCarPose();
   const ghostPose = createCarPose();
+  const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
@@ -524,6 +542,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let clock = 0;
   let handle = 0;
   let lookBack = false;
+  let lastHudDevice: DeviceKind | null = null;
   const hudState: HudState = {
     circuit: track.name,
     lengthKm: (track.length / 1000).toFixed(3),
@@ -536,19 +555,26 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     valid: true,
     lapTime: 0,
     liveDelta: null,
-    sectors: [],
+    sectors: [
+      { state: 'none', time: null, delta: null },
+      { state: 'none', time: null, delta: null },
+      { state: 'none', time: null, delta: null },
+    ],
     last: null,
     lastClass: null,
     best: null,
     record: null,
+    ghost: false,
     ers: 0,
     ersLap: 1,
-    ersMode: 'Balanced',
+    ersMode: S.hud.ersModes.balanced,
     drs: 'off',
     carX: 0,
     carZ: 0,
     ghostX: null,
     ghostZ: null,
+    wrongWay: false,
+    stopped: false,
     message: null,
   };
 
@@ -568,18 +594,27 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       for (const action of r.actions) {
         if (action === 'nextCamera') {
           const name = view.nextCamera();
-          say({ tag: 'Camera', text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
+          say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
         }
       }
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      if (f.device !== lastHudDevice) {
+        lastHudDevice = f.device;
+        setGlyphContext(f.device, input.profile.bindings);
+      }
       for (const e of f.events) {
         if (e.type !== 'action') continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
         else pause.navigate(e.action);
       }
       lookBack = false;
+    }
+
+    if (session.device !== lastHudDevice) {
+      lastHudDevice = session.device;
+      setGlyphContext(session.device, input.profile.bindings);
     }
 
     const playing = session.phase === 'running';
@@ -620,43 +655,67 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     });
 
     // HUD.
-    const timer = session.timer;
-    const h = hudState;
-    h.speed = t.speed;
-    h.gear = t.gear;
-    h.rpm = t.engineRpm;
-    h.revLights = revLights;
-    h.lap = timer.lap;
-    h.running = timer.running;
-    h.valid = timer.valid;
-    h.lapTime = session.lapTimeAt(renderTime);
-    h.liveDelta = session.liveDelta();
-    const done = timer.currentSectors;
-    const classes = timer.currentSectorClasses;
-    const ref = timer.bestSectors;
-    h.sectors = [0, 1, 2].map((i) => {
-      if (i < done.length) {
-        const time = done[i] as number;
-        const r = ref?.[i];
-        return { state: classes[i] ?? 'slower', time, delta: r === undefined ? null : time - r };
+    if (hudVisible) {
+      const timer = session.timer;
+      const h = hudState;
+      h.speed = t.speed;
+      h.gear = t.gear;
+      h.rpm = t.engineRpm;
+      h.revLights = revLights;
+      h.lap = timer.lap;
+      h.running = timer.running;
+      h.valid = timer.valid;
+      h.lapTime = session.lapTimeAt(renderTime);
+      h.liveDelta = session.liveDelta();
+      const done = timer.currentSectors;
+      const classes = timer.currentSectorClasses;
+      const ref = timer.bestSectors;
+      for (let i = 0; i < 3; i++) {
+        const slot = h.sectors[i]!;
+        if (i < done.length) {
+          const time = done[i] as number;
+          const r = ref?.[i];
+          slot.state = classes[i] ?? 'slower';
+          slot.time = time;
+          slot.delta = r === undefined ? null : time - r;
+        } else if (timer.running && i === timer.sector) {
+          slot.state = 'run';
+          slot.time = null;
+          slot.delta = null;
+        } else {
+          slot.state = 'none';
+          slot.time = null;
+          slot.delta = null;
+        }
       }
-      if (timer.running && i === timer.sector) return { state: 'run', time: null, delta: null };
-      return { state: 'none', time: null, delta: null };
-    });
-    h.last = lastLap?.time ?? null;
-    h.lastClass = lastLap?.cls ?? null;
-    h.best = timer.bestLap;
-    h.record = timer.record.lap;
-    h.ers = Math.max(0, Math.min(1, t.ersStore / params.ers.storeWindow));
-    h.ersLap = Math.max(0, Math.min(1, 1 - t.ersDeployLap / params.ers.deployPerLap));
-    h.ersMode = ERS_MODE_LABEL[t.ersMode] ?? 'Balanced';
-    h.drs = t.drs > 0.5 ? 'open' : session.drsAvailable ? 'available' : 'off';
-    h.carX = pose.x;
-    h.carZ = pose.z;
-    h.ghostX = ghostOn ? ghostPose.x : null;
-    h.ghostZ = ghostOn ? ghostPose.z : null;
-    h.message = message;
-    hud.update(h);
+      h.last = lastLap?.time ?? null;
+      h.lastClass = lastLap?.cls ?? null;
+      h.best = timer.bestLap;
+      h.record = timer.record.lap;
+      h.ghost = session.ghost !== null;
+      h.ers = Math.max(0, Math.min(1, t.ersStore / params.ers.storeWindow));
+      h.ersLap = Math.max(0, Math.min(1, 1 - t.ersDeployLap / params.ers.deployPerLap));
+      h.ersMode = ERS_MODE_LABEL[t.ersMode] ?? S.hud.ersModes.balanced;
+      h.drs = t.drs > 0.5 ? 'open' : session.drsAvailable ? 'available' : 'off';
+      h.carX = pose.x;
+      h.carZ = pose.z;
+      h.ghostX = ghostOn ? ghostPose.x : null;
+      h.ghostZ = ghostOn ? ghostPose.z : null;
+      if (t.speed > 3) {
+        track.tangentAt(session.s, trackTangent);
+        const dot = Math.cos(pose.yaw) * trackTangent.x - Math.sin(pose.yaw) * trackTangent.z;
+        h.wrongWay = dot < -0.35;
+      } else {
+        h.wrongWay = false;
+      }
+      h.stopped =
+        playing &&
+        session.world.time > 2 &&
+        t.speed < 1.5 &&
+        session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      h.message = message;
+      hud.update(h);
+    }
     overlay?.update();
 
     // Engine and road sound, through the audio seam.
@@ -855,6 +914,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         message: q('hud-message'),
       };
     },
+    setHudVisible: (on) => {
+      hudVisible = on;
+      hud.setVisible(on);
+    },
     quit,
     loadTimes: () => ({ ...loadTimes }),
     resetForTest: () => {
@@ -863,6 +926,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       input.releaseAll();
       input.sample(0, 0);
       if (session.phase === 'paused') resume();
+      hudVisible = true;
+      hud.setVisible(true);
       setSource('human');
       loop.timeScale = 1;
       view.setCamera('chase-near');

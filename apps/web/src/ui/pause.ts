@@ -1,4 +1,9 @@
-import { el, icon, type IconKey } from './dom';
+import type { ActionId } from '@undercut/input';
+import { el } from './dom';
+import { button } from './kit/components';
+import { glyph, refreshGlyphs } from './kit/glyph';
+import type { IconKey } from './kit/icons';
+import { S } from './strings';
 
 export interface Choice<T extends string | number> {
   value: T;
@@ -28,10 +33,23 @@ export interface PauseActions {
   quit(): void;
 }
 
+const CONTROL_ITEMS: readonly { label: string; actions: readonly ActionId[] }[] = [
+  { label: S.pause.controlLabels.steer, actions: ['steerLeft', 'steerRight'] },
+  { label: S.pause.controlLabels.throttle, actions: ['throttle'] },
+  { label: S.pause.controlLabels.brake, actions: ['brake'] },
+  { label: S.pause.controlLabels.shift, actions: ['gearDown', 'gearUp'] },
+  { label: S.pause.controlLabels.drs, actions: ['drs'] },
+  { label: S.pause.controlLabels.ers, actions: ['overtake'] },
+  { label: S.pause.controlLabels.camera, actions: ['nextCamera'] },
+  { label: S.pause.controlLabels.reset, actions: ['resetToTrack'] },
+  { label: S.pause.controlLabels.pause, actions: ['pause'] },
+];
+
 /**
- * The pause menu: actions on the left, settings on the right (camera and assists), over a
- * scrim. Driven by mouse, touch, and by the input layer's menu actions (up, down, left, right,
- * accept, back) for keyboard and gamepad.
+ * The pause menu: actions on the left, settings on the right (camera, graphics, assists and
+ * audio), and a live-device controls strip underneath, over a scrim. Driven by mouse, touch, and
+ * by the input layer's menu actions (up, down, left, right, accept, back) for keyboard and
+ * gamepad.
  */
 export class PauseMenu {
   readonly root: HTMLElement;
@@ -62,7 +80,7 @@ export class PauseMenu {
 
     const card = el('div', 'pause__card');
     const head = el('header', 'pause__head');
-    const title = el('h2', 'pause__title', 'Paused');
+    const title = el('h2', 'pause__title', S.pause.title);
     title.id = 'pause-title';
     const sub = el('span', 'label pause__sub');
     head.append(title, sub);
@@ -71,24 +89,28 @@ export class PauseMenu {
     };
 
     const list = el('div', 'pause__actions');
-    const action = (
+    const addAction = (
       label: string,
-      glyph: IconKey,
+      iconName: IconKey,
       fn: () => void,
       id: string,
       primary = false,
     ): void => {
-      const b = el('button', `pause__action${primary ? ' is-primary' : ''}`);
-      b.type = 'button';
-      b.dataset.action = id;
-      b.append(icon(glyph), el('span', '', label));
-      b.addEventListener('click', fn);
+      const b = button({
+        label,
+        icon: iconName,
+        variant: primary ? 'primary' : 'secondary',
+        ...(primary ? { glyph: 'menuAccept' as const } : {}),
+        action: id,
+        onClick: fn,
+      });
+      b.classList.add('pause__action');
       list.append(b);
       this.focusables.push(b);
     };
-    action('Resume', 'play', actions.resume, 'resume', true);
-    action('Restart lap', 'restart', actions.restartLap, 'restart');
-    action('Reset to track', 'reset', actions.resetToTrack, 'reset');
+    addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
+    addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
+    addAction(S.pause.resetToTrack, 'reset', actions.resetToTrack, 'reset');
 
     const grid = el('div', 'pause__settings');
     for (const setting of settings) {
@@ -142,16 +164,33 @@ export class PauseMenu {
       this.sliders.set(slider.id, { slider, input, output });
     }
 
-    const quit = el('button', 'pause__quit');
-    quit.type = 'button';
-    quit.dataset.action = 'quit';
-    quit.append(icon('exit'), el('span', '', 'Quit to launch'));
-    quit.addEventListener('click', actions.quit);
+    const controls = el('section', 'pause__controls');
+    controls.setAttribute('aria-label', S.pause.controls);
+    const controlsList = el('div', 'pause__controls-list');
+    for (const item of CONTROL_ITEMS) {
+      const cell = el('span', 'pause__control');
+      const keys = el('span', 'pause__control-keys');
+      for (const id of item.actions) keys.append(glyph(id));
+      cell.append(keys, el('span', 'pause__control-label', item.label));
+      controlsList.append(cell);
+    }
+    controls.append(el('span', 'label', S.pause.controls), controlsList);
+
+    const quit = button({
+      label: S.pause.quit,
+      icon: 'exit',
+      variant: 'quiet',
+      action: 'quit',
+      onClick: actions.quit,
+    });
+    quit.classList.add('pause__quit');
     this.focusables.push(quit);
 
     const body = el('div', 'pause__body');
     body.append(list, grid);
-    card.append(head, body, quit);
+    const foot = el('footer', 'pause__foot');
+    foot.append(quit);
+    card.append(head, body, controls, foot);
     root.append(card);
   }
 
@@ -164,6 +203,7 @@ export class PauseMenu {
   show(): void {
     this.sync();
     this.refreshNote();
+    refreshGlyphs(this.root);
     this.root.hidden = false;
     this.focusIndex = 0;
     this.focus();

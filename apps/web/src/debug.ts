@@ -82,6 +82,8 @@ export interface DebugApi {
   dashboard(): { gear: string; speed: string; revs: number } | null;
   /** The player's car's projected bounding box, CSS px. */
   carScreenRect(): { left: number; top: number; right: number; bottom: number };
+  /** Show or hide the HUD layer (frame-time measurement). */
+  setHudVisible(on: boolean): void;
   /** The RaceView itself, for render experiments from tools. */
   view(): unknown;
   quit(): void;
@@ -178,6 +180,7 @@ export function installDebugApi(
     }),
     frameTimes: () => need().frameTimes(),
     resetFrameTimes: () => need().resetFrameTimes(),
+    setHudVisible: (on) => need().setHudVisible(on),
     view: () => need().view,
     carScreenRect: () => need().view.carScreenRect(),
     dashboard: () => need().view.dashboard,
