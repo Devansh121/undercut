@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test } from './base';
 
 /**
@@ -19,9 +21,33 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
     if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
   });
 
+  // The prop models the world loads, against the budget's first-race inventory (the rest of
+  // the inventory is checked by transfer.spec.ts on Lite's world subset).
+  const inventory = JSON.parse(
+    fs.readFileSync(path.resolve('apps/web/dist/first-race.json'), 'utf8'),
+  ) as { presets: Record<string, { files: Record<string, number> }> };
+  const expected = inventory.presets.mobile?.files ?? {};
+  const props = new Map<string, number>();
+  const pending: Promise<void>[] = [];
+  page.on('requestfinished', (request) => {
+    const url = new URL(request.url());
+    if (!url.pathname.startsWith('/assets/props/')) return;
+    pending.push(
+      (async () => {
+        props.set(url.pathname.slice(1), (await request.sizes()).responseBodySize);
+      })(),
+    );
+  });
+
+  // The full Mobile world: the one browser test that builds every structure.
   await page.goto('/?quality=mobile&debug=1');
   await page.getByRole('button', { name: /Start/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+  await Promise.all(pending);
+  const wanted = Object.keys(expected).filter((f) => f.startsWith('assets/props/'));
+  expect(wanted.length).toBeGreaterThan(0);
+  expect([...props.keys()].sort()).toEqual(wanted.sort());
+  for (const [rel, bytes] of props) expect(bytes, `${rel}: bytes on the wire`).toBe(expected[rel]);
 
   const counts = await page.evaluate(() => window.__undercut?.worldCounts() ?? null);
   expect(counts).not.toBeNull();
