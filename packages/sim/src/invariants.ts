@@ -37,8 +37,8 @@ export interface InvariantOptions {
  * How far the body may rise above its static ride height (plus fully unloaded tyres) before it
  * is climbing rather than hopping, m. A car does leave the ground off a kerb; the tallest kerb
  * face on the shipped circuits is 0.13 m, and this allows about four times that. Random driving
- * on Monza, barrier strikes included, peaks at 0.28 m of floor height (docs/physics-validation.md,
- * section 7.7), so anything near the limit is a body being thrown, not a kerb strike.
+ * on Monza, barrier and kerb strikes included, peaks at 0.50 m of floor height over 16.7 h
+ * (docs/physics-validation.md, section 7.7), so the limit is reached only by a body being thrown.
  */
 export const AIRBORNE_ALLOWANCE = 0.5;
 /**

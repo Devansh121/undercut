@@ -863,13 +863,14 @@ limits through them: 2.644 m, ±1.318 rad pitch and ±3.388 rad roll for 2 m ste
 |---|---|---|
 | Adversarial surface (`packages/sim/validation/adversarial-surface.test.ts`, CI): cells 4–16 m with heights ±1 m (steps to 2 m), normals tilted up to 20°, grip 0.2–1.2, drag ×1–10, random inputs held up to 1 s | 6 seeds × 30 s, plus determinism | All in bounds; bit-identical repeat. A 40-seed sweep: no failures, highest floor 2.25 m against 2.65 |
 | Random driving on Monza (`packages/track/validation/drive-fuzz.test.ts`, CI): random start round the lap and across the track, random steer, throttle and brake held 0.1–3 s | 10 seeds × 180 s (30 min) | All in bounds; deepest body corner 5 µm past a face at the end of a step; hardest barrier impact 62.4 m/s; highest floor 0.281 m; the ground-step rule never acted; floor or rim strikes only with a wheel on a kerb |
-| The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | Same assertions. The first soak run failed one seed on a floor strike at the first chicane's sausage kerb, which the strict rule then counted as a failure; strikes on kerbs are now counted, not failed. Raising the skid ceiling to four tyre loads so the floor could lift the car off the kerb was tried and dropped: it threw a rear wheel 1.02 m up (limit 1.01) |
+| The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | All in bounds; deepest corner 52 µm past a face; hardest impact 69.3 m/s; highest floor 0.502 m; no ground steps; one floor strike, on a kerb. The first run had failed that seed because a strike on a kerb counted as a failure; strikes on kerbs are now counted, not failed. Raising the skid ceiling to four tyre loads so the floor could lift the car off the kerb was tried and dropped: it threw a rear wheel 1.02 m up (limit 1.01) |
 | The owner's run (`packages/track/test/offtrack.test.ts`) | 40 s with barriers, and 40 s with the barriers taken away | Bounded both ways; with barriers the car stops at the left barrier before the first chicane and never meets a step |
 | Pit lane (`packages/track/validation/pit-lane.test.ts`) | Entry to exit at 20 m/s | No barrier contact |
 | Ground a car can reach (`packages/track/test/ground-continuity.test.ts`) | Every point inside the barriers plus 0.5 m, and the pit lane, on a 1 m × 0.5 m lattice with 0.25 m probes | No step larger than the steepest kerb flank allows (0.34 m per 0.35 m probe). Before the projection fix: 2.73 m at the first chicane |
 
-Random driving spends about 70 % of its time touching a barrier (an undriven car ends up against
-one), so the coverage of free running is thinner than the hours suggest.
+Random driving spends about 70 % of its time touching a barrier in the three-minute runs and 90 %
+in the ten-minute ones (an undriven car ends up against one), so the coverage of free running is
+thinner than the hours suggest.
 
 **Reference lap.** 85.53912289 s before and after, bit for bit; the physics suite and the AI
 artefact fingerprints are unchanged.
