@@ -64,12 +64,12 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
     if seated:
         # Seated: full-width hips down to a flat seat at the contact level (hidden by the chair).
         hips = [(-.148,.07,.115,0),(-.135,.092,.145,0),(-.10,.106,.157,0),(-.05,.11,.16,0),(0,.11,.158,0),
-                (.06,.11,.156,0),(.10,.102,.146,0)]
+                (.06,.104,.150,0),(.10,.096,.140,0)]
     elif crouched:
         # Crouched: the rump pushes back and down behind the hip line instead of a narrowing bowl.
         # the underside rounds off over a long run into the thighs: no ledge under the rump
         hips = [(-.24,.012,.02,-.01),(-.215,.04,.07,-.015),(-.18,.065,.11,-.02),(-.14,.085,.135,-.022),
-                (-.10,.097,.15,-.02),(-.05,.105,.156,-.01),(0,.108,.155,0),(.06,.11,.156,0),(.10,.102,.146,0)]
+                (-.10,.094,.146,-.016),(-.05,.103,.153,-.008),(0,.106,.153,0),(.06,.104,.150,0),(.10,.096,.140,0)]
     else:
         # Standing: the thigh tops form the seat; the hips stay inside them below the waist.
         hips = [(-.13,.012,.02,0),(-.10,.05,.08,0),(-.05,.085,.13,0),(0,.104,.152,0),(.06,.11,.156,0),
@@ -77,7 +77,7 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
     rings('overall-hips', [(hip+torso_axis*t+Vector((cx,0,0)), d, w) for t, d, w, cx in hips], legs)
     # Continuous tailored torso above the belt, narrowing at the waist and neck.
     sections = []
-    for t, depth, width in [(.03,.098,.142),(.07,.106,.150),(.10,.109,.153),(.18,.10,.145),
+    for t, depth, width in [(.03,.100,.145),(.07,.106,.151),(.10,.109,.153),(.18,.10,.145),
                             (.24,.112,.158),(.40,.125,.174),(.62,.132,.19),(.79,.125,.205),
                             (.90,.11,.20),(1,.085,.16),(1.04,.065,.092)]:
         sections.append((hip+torso_axis*t, depth, width))

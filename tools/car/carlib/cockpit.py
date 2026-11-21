@@ -239,11 +239,13 @@ def build_steering_wheel(q):
     i0 = d.add_verts(disp)
     d.add_face((i0, i0 + 1, i0 + 2, i0 + 3), "display", uv1=[(0, 0), (1, 0), (1, 1), (0, 1)])
     m.merge(d)
-    # push buttons: alternate team-coloured and black caps, as real wheels colour-code them
+    # push buttons: alternate team-coloured and black caps, as real wheels colour-code them. On
+    # Mobile the phone's driver cluster covers the wheel face, so its triangles go to the hands.
     nb = q.n(8, 6)
-    buttons = [(0.078, 0.042), (0.084, 0.016), (0.080, -0.010), (0.064, -0.034), (0.030, -0.036)]
+    buttons = []
     if q.lod == "high":
-        buttons += [(0.062, 0.056), (0.092, -0.032)]
+        buttons = [(0.078, 0.042), (0.084, 0.016), (0.080, -0.010), (0.064, -0.034), (0.030, -0.036),
+                   (0.062, 0.056), (0.092, -0.032)]
     for k, (y, z) in enumerate(buttons):
         for side in (1, -1):
             mat = "paint_edge" if (k % 2 == 0) == (side > 0) else "dark"
@@ -311,7 +313,8 @@ def build_gloves(q):
     with knuckles over the grip, the thumb along the faceplate towards the buttons, and the
     gauntlet with its wrist strap running back towards the driver."""
     m = Mesh()
-    n, rows_n = q.n(16, 8), q.n(9, 5)
+    # the hands are the nearest objects to the cockpit camera: smooth sections, many rows
+    n, rows_n = {"high": (22, 14), "mobile": (14, 9)}.get(q.lod, (8, 5))
     for side in (1, -1):
         cx, cy = GRIP_X + 0.010, side * (GRIP_Y + 0.006)
         rows = []
@@ -336,8 +339,8 @@ def build_gloves(q):
         # thumb: from the inside of the fist across the face towards the upper buttons
         path = [Vector((0.006, side * (GRIP_Y - 0.020), 0.022)), Vector((0.010, side * (GRIP_Y - 0.040), 0.030)),
                 Vector((0.0105, side * (GRIP_Y - 0.058), 0.033)), Vector((0.009, side * (GRIP_Y - 0.068), 0.033))]
-        radii = (0.0125, 0.0105, 0.0095, 0.006)
-        nt = q.n(8, 6)
+        radii = (0.0105, 0.0092, 0.0084, 0.0055)
+        nt = q.n(12, 6)
         rings = []
         for p, r, t_ in zip(path, radii, range(len(path))):
             tang = (path[min(t_ + 1, 3)] - path[max(t_ - 1, 0)]).normalized()
@@ -349,8 +352,9 @@ def build_gloves(q):
         # gauntlet and wrist strap
         a = Vector((cx + 0.026, cy + side * 0.012, -0.004))
         b = Vector((cx + 0.092, cy + side * 0.024, -0.020))
-        tube(m, a, b, 0.031, q.n(12, 6), "glove", radius_b=0.034)
-        tube(m, a.lerp(b, 0.30), a.lerp(b, 0.52), 0.0335, q.n(12, 6), "dark")
+        ng = q.n(20, 10)
+        tube(m, a, b, 0.031, ng, "glove", radius_b=0.034)
+        tube(m, a.lerp(b, 0.30), a.lerp(b, 0.52), 0.0335, ng, "dark")
     return m
 
 

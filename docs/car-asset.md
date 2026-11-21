@@ -8,13 +8,13 @@ All under `apps/web/public/assets/car/` (served at `assets/car/` from the client
 
 | File | Use | Triangles | Draw calls | Size |
 | --- | --- | --- | --- | --- |
-| `car_high.glb` | Player car and close cars on the High preset | 119,602 | 36 | 1.31 MB |
-| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,616 | 23 | 0.61 MB |
-| `car_far.glb` | Distant cars on any preset | 10,584 | 11 | 0.19 MB |
+| `car_high.glb` | Player car and close cars on the High preset | 118,654 | 39 | 1.40 MB |
+| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,730 | 25 | 0.65 MB |
+| `car_far.glb` | Distant cars on any preset | 10,296 | 11 | 0.20 MB |
 | `livery/<team id>.png` | Livery mask, 1024 × 1024, one per team (ten) | | | 26–60 KB each |
 | `livery/index.json` | Team id → mask file and the three colours (from `design/teams.json`) | | | |
 
-Everything together is 2.5 MB. Triangles and draw calls are counted on the shipped files by `npm run car:build` and recorded per node in `docs/evidence/m2-car/stats.json`; the build fails if a level exceeds its triangle budget (120k, 40k, 12k).
+Everything together is 2.6 MB. Triangles and draw calls are counted on the shipped files by `npm run car:build` and recorded per node in `docs/evidence/m2-car/stats.json`; the build fails if a level exceeds its triangle budget (120k, 40k, 12k).
 
 ## Loading
 

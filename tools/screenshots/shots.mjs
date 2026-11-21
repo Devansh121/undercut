@@ -212,11 +212,20 @@ function startServer() {
 async function waitForServer(server) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
+    let body = null;
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/`);
-      if (res.ok) return;
+      if (res.ok) body = await res.text();
     } catch {
       // not up yet
+    }
+    if (body !== null) {
+      // Another checkout's server on the same port would answer too, and the stations would
+      // capture its game. Only this checkout's build will do.
+      const ours = fs.readFileSync(path.join(root, 'apps/web/dist/index.html'), 'utf8');
+      if (body !== ours)
+        throw new Error(`port ${PORT} serves another build (set SHOTS_PORT to a free port)`);
+      return;
     }
     if (server.child.exitCode !== null) throw new Error(`server exited:\n${server.output()}`);
     await new Promise((r) => setTimeout(r, 300));

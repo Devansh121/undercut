@@ -1,8 +1,8 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1398684,
-    "triangles": 118654,
+    "bytes": 1404712,
+    "triangles": 119526,
     "draw_calls": 39,
     "nodes": {
       "body": {
@@ -53,7 +53,7 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 2738,
+        "triangles": 3610,
         "primitives": 6,
         "materials": [
           "carbon",
@@ -220,8 +220,8 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 650200,
-    "triangles": 39730,
+    "bytes": 648328,
+    "triangles": 39922,
     "draw_calls": 25,
     "nodes": {
       "body": {
@@ -268,7 +268,7 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 1242,
+        "triangles": 1434,
         "primitives": 4,
         "materials": [
           "carbon",
@@ -595,5 +595,5 @@
       "bytes": 24276
     }
   },
-  "total_bytes": 2642137
+  "total_bytes": 2646293
 }
