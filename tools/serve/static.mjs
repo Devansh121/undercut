@@ -110,6 +110,9 @@ export function createHandlers({ root, roomsPort }) {
         headers: {
           ...req.headers,
           'x-forwarded-for': req.socket.remoteAddress ?? '',
+          // What the Cloudflare edge sets; the rooms service keys its creation limit on it.
+          // Overwrites anything the client sent.
+          'cf-connecting-ip': req.socket.remoteAddress ?? '',
           'x-forwarded-proto': scheme,
           'x-forwarded-host': req.headers.host ?? '',
         },
