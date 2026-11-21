@@ -117,7 +117,7 @@ describe('lap timing', () => {
 
   it('publishes each lap’s own finishing speed, not the speed it started with', () => {
     // A driver with seeded errors, so consecutive line crossings differ in speed.
-    const noisy: DriverSkill = { ...REFERENCE_SKILL, pedalNoise: 0.05, steerNoise: 0.002, seed: 3 };
+    const noisy: DriverSkill = { ...REFERENCE_SKILL, pedalNoise: 0.05, steerNoise: 0.002, seed: 6 };
     const { result } = drive(noisy, 3, { recordEvery: 1 });
     const crossings = crossingSpeeds(result.trace!.rows, track.length, 0);
     expect(crossings.length).toBeGreaterThanOrEqual(4);

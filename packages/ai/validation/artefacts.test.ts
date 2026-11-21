@@ -6,8 +6,11 @@ import { MONZA, carFor, envelopeFingerprint, lineFingerprint, loadEnvelope } fro
 
 // The artefacts' staleness hashes are behavioural: they hash what the sim, the track and the
 // line code compute, not their source text. These tests change behaviour without touching the
-// committed files and check that the hash notices.
-describe('artefact fingerprints', () => {
+// committed files and check that the hash notices. Each fingerprint drives the line pipeline
+// (about 1.7 s on the laptop) or the sim (about 1 s), and one test takes two, which the 5 s
+// default timeout did not leave room for on a loaded CI runner (5.7 s, a timeout, not a
+// failure); the file's tests get 20 s each.
+describe('artefact fingerprints', { timeout: 20_000 }, () => {
   const envelope = loadEnvelope(MONZA);
   const config = referenceLineConfig(carFor(MONZA));
   const track = MONZA.track();

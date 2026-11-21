@@ -24,16 +24,24 @@ there and has not moved by more than 5 % of the band's half-width. So the test t
 the gap closes (move it to passing) or when it widens (find out why). The Results section of
 `docs/physics-validation.md` lists the same gaps.
 
-One quantity is a fit, not a check: the tyre's peak lateral friction μy was fitted to the Monza
-T1 2025 peak deceleration (4.7 g) and came out at 1.80, the doc's own estimate. That target is
-marked `fit` in the table (`FIT_TARGET`), and a test asserts it is the only one; every other target
-checks the model.
+Every target has one of three roles (`role`, from `FIT_TARGETS` and `SELECTION_TARGETS` in
+`lib/targets.ts`): a direct fit (a parameter was solved for it: 0–100 km/h and the Monza T1
+2025 peak for the tyre's longitudinal friction, the low-trim slow corner for its lateral
+friction, the low-trim top speed for the drag area), a selection check (looked at while choosing
+an estimate: the other braking peaks), or withheld validation (everything else). Tests assert
+the sets. The doc's Results section has the method and why each target is where it is.
 
 The published braking events are driven as the source describes them, with one pedal profile for
 all of them (`TRAIL_OFF` in `lib/drivers.ts`): full pedal within 80 ms, eased whenever a wheel
-passes 10 % slip, and trailed off over the last 25 % of the speed drop to 30 % pedal at the
-corner speed. Each run starts within 0.05 km/h of the stated speed after an approach with DRS
+passes 10 % slip, and an assumed pedal ceiling over the last 25 % of the speed drop, down to 30 %
+at the corner speed. The ceiling's constants are unsupported estimates and it barely acts (the
+threshold controller already asks for less); it does not reproduce the trail braking in the
+published times. Each run starts within 0.05 km/h of the stated speed after an approach with DRS
 open, and the end crossing is interpolated; the suite asserts both.
+
+`npm run telemetry -- calibrate` runs every target here plus the reference lap, its sectors and
+corner speeds, for the committed car or a candidate parameter file (`--set`); see
+`tools/telemetry/README.md`.
 
 ## Reference laps
 
