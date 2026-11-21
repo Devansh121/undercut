@@ -10,6 +10,7 @@ import {
   createEnvironment,
   engineFullLoadTorque,
   neutralThrottle,
+  snapshotCar,
   stepCar,
   type AssistSettings,
   type CarState,
@@ -189,6 +190,28 @@ describe('stability assist', () => {
     const car = turning(50, 0.9);
     car.slipRatio[1] = -0.5;
     expect(hold(STABILITY, car, driver({})).wheelBrake).toBeUndefined();
+  });
+
+  it('a car with no per-wheel brake is bit for bit the car without the field', () => {
+    // Absent, undefined and all zeros: the same arithmetic, so the unassisted car is unchanged.
+    const run = (extra: Partial<ControlInput>): number[] => {
+      const env = createEnvironment();
+      const car = createCarState(REFERENCE_CAR, { speed: 60, gear: 7, fuel: 20 });
+      for (let k = 0; k < 480; k++) {
+        const t = k * DT;
+        const d = driver({
+          steer: 0.05 * Math.sin(t * 3),
+          throttle: t < 1 ? 1 : 0,
+          brake: t < 1 ? 0 : 0.8,
+          ...extra,
+        });
+        stepCar(car, d, FLAT_SURFACE, DT, env);
+      }
+      return Array.from(snapshotCar(car));
+    };
+    const absent = run({});
+    expect(run({ wheelBrake: undefined })).toEqual(absent);
+    expect(run({ wheelBrake: new Float64Array(4) })).toEqual(absent);
   });
 
   it('a braked front wheel turns the car toward its side', () => {

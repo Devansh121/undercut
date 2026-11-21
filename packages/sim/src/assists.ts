@@ -96,20 +96,6 @@ const ESC = Object.freeze({
   betaGain: 3,
 });
 
-/** Time constant of the reference yaw rate: how fast the car's yaw can follow the wheel, s. */
-
-/** Share of the tyres' peak lateral grip the reference may ask for. */
-
-/** Yaw-rate error tolerated before a wheel is braked, rad/s: fixed plus a share of the reference. */
-
-/** Wheel brake per rad/s of error past the deadband, and the most one wheel gets. */
-
-/** Drive taken away: all of it (down to neutral) by this much error past the deadband, rad/s. */
-
-/** How fast a wheel brake builds and releases, share per second. */
-
-/** A braked wheel past this multiple of the peak slip ratio has its ESC brake cut. */
-
 /**
  * Below this road speed a driver's downshift request in first passes through, so a stopped car
  * can go 1 → N → R with automatic gears on. The gearbox itself refuses reverse above 1 m/s.

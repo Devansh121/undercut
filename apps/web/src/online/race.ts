@@ -23,7 +23,7 @@ import { seatLivery } from './liveries';
 import { LineCounter } from './progress';
 import { StartGate } from './start-gate';
 import { RaceHud } from './race-hud';
-import { lapClaim, lightsOn, liveOrder } from './race-rules';
+import { enforceAssistPolicy, lapClaim, lightsOn, liveOrder } from './race-rules';
 import { RemoteCarSmoother } from './smoother';
 import type { OnlineSession } from './session';
 
@@ -274,13 +274,7 @@ export class OnlineRace implements DriveExtension {
     const room = c.room;
     const session = ctx.session;
     const policy = room?.settings.assists;
-    if (policy) {
-      if (!policy.abs && session.assists.abs) session.setAssist('abs', 0);
-      if (!policy.tractionControl && session.assists.tractionControl)
-        session.setAssist('tractionControl', 0);
-      if (!policy.autoGears && session.assists.autoGears) session.setAssist('autoGears', false);
-      if (!policy.steeringAssist && session.assists.steering) session.setAssist('steering', 0);
-    }
+    if (policy) enforceAssistPolicy(policy, session);
     const now = c.serverNow();
     const start = room?.start ?? null;
     this.report.start = start;

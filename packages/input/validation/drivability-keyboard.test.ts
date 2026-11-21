@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { expectLap, lapTargetName } from '../../ai/validation/expect-lap';
 import { MONZA, referenceLap } from '../../ai/validation/lib/index';
 import { ASSISTS_OFF, tally } from './lib/compare';
 
@@ -10,13 +11,12 @@ import { ASSISTS_OFF, tally } from './lib/compare';
  * spins per lap, 41 / 72 / 86 s off or spun per lap.
  */
 describe('drivability: keyboard', () => {
-  it('keeps the validated unassisted reference lap identical', () => {
+  // The unassisted car: the reference driver's lap against the value the physics suite records
+  // (master's, not a copy), as `reference-lap.test.ts` checks it.
+  it(lapTargetName('monza-lap-m1'), () => {
     const { result } = referenceLap(MONZA);
-    const lap = result.laps[0]!;
-    expect(lap.time).toBe(84.9691326147698);
-    expect(lap.trap).toBe(347.3873987429674);
-    expect(lap.sectors).toEqual([27.877479110448448, 28.66689891479436, 28.424754589526998]);
-    expect(result.ticks).toBe(40822);
+    expect(result.spun).toBe(false);
+    expectLap('monza-lap-m1', result.laps[0]!.time);
   });
 
   const preset = tally('keyboard', {}, 5, 2);
