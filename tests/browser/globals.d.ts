@@ -14,6 +14,9 @@ interface UndercutDebugApi {
   resetToTrack(): void;
   capture(): Record<string, unknown>;
   frameTimes(): number[];
+  quit(): void;
+  /** The page's renderer: live geometries, textures and compiled programs. */
+  rendererInfo(): Record<string, number>;
 }
 
 interface Window {

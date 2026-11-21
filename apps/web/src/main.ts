@@ -10,7 +10,10 @@ import {
 } from '@undercut/input/dom';
 import type { QualityName } from '@undercut/render';
 import { debugEnabled, installDebugApi } from './debug';
+import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
+
+type DriveModule = typeof DriveModuleNs;
 import { RecordStore, durableStorage, memoryStorage } from './game/records';
 import { mountLaunchScreen, type LaunchScreen } from './launch';
 
@@ -43,6 +46,7 @@ function chooseQuality(): QualityName {
 }
 
 let drive: DriveHandle | null = null;
+let driveModule: DriveModule | null = null;
 let launch: LaunchScreen | null = null;
 let starting: Promise<DriveHandle> | null = null;
 let menuHandle = 0;
@@ -83,7 +87,8 @@ async function start(): Promise<DriveHandle> {
   cancelAnimationFrame(menuHandle);
   starting = (async () => {
     try {
-      const { startDrive } = await import('./drive');
+      driveModule ??= await import('./drive');
+      const { startDrive } = driveModule;
       const handle = await startDrive({
         canvas: canvas as HTMLCanvasElement,
         host: app as HTMLElement,
@@ -110,4 +115,10 @@ async function start(): Promise<DriveHandle> {
 }
 
 showLaunch();
-if (debugEnabled()) installDebugApi(() => drive, start);
+if (debugEnabled()) {
+  installDebugApi(
+    () => drive,
+    start,
+    () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
+  );
+}

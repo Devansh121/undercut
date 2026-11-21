@@ -19,6 +19,7 @@ import {
   CAMERA_LABELS,
   CAMERA_ORDER,
   RaceView,
+  createRenderer,
   type CameraName,
   type QualityName,
 } from '@undercut/render';
@@ -50,6 +51,19 @@ const ERS_MODE_LABEL: Record<number, string> = {
   [ErsMode.Overtake]: 'Overtake',
 };
 const FRAME_LOG = 7200;
+
+/** The page's renderer, created by the first session and reused by every later one. */
+let pageRenderer: ReturnType<typeof createRenderer> | null = null;
+
+/** Live GPU resources of the page's renderer, for the lifecycle test (0s before any session). */
+export function rendererInfo(): { geometries: number; textures: number; programs: number } {
+  const info = pageRenderer?.info;
+  return {
+    geometries: info?.memory.geometries ?? 0,
+    textures: info?.memory.textures ?? 0,
+    programs: info?.programs?.length ?? 0,
+  };
+}
 
 export interface DriveOptions {
   canvas: HTMLCanvasElement;
@@ -104,7 +118,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   });
   const team = teams.teams.find((t) => t.id === TEAM_ID) ?? teams.teams[0];
   if (!team) throw new Error('design/teams.json has no teams');
+  pageRenderer ??= createRenderer(o.canvas, o.quality);
   const view = new RaceView(o.canvas, {
+    renderer: pageRenderer,
     track,
     quality: o.quality,
     livery: team.colours,

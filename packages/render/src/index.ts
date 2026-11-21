@@ -15,7 +15,13 @@ export { CarModel, type CarGeometry, type Livery } from './car/car-model';
 export { MONZA_AFTERNOON, type LightingPreset } from './environment';
 export { QUALITY, defaultQuality, type Quality, type QualityName } from './quality';
 export { estimateRacingLine } from './racing-line';
-export { RaceView, type RaceViewOptions, type ViewFrame, type ViewStats } from './race-view';
+export {
+  RaceView,
+  createRenderer,
+  type RaceViewOptions,
+  type ViewFrame,
+  type ViewStats,
+} from './race-view';
 
 /** Interpolation factor between the previous and current sim state, in [0, 1). */
 export type RenderAlpha = number;

@@ -8,7 +8,7 @@ import {
   PMREMGenerator,
   Scene,
   Vector3,
-  type Texture,
+  type WebGLRenderTarget,
   type WebGLRenderer,
 } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
@@ -66,7 +66,7 @@ export class Environment {
   readonly fill: HemisphereLight;
   readonly sunDirection = new Vector3();
   private readonly target = new Object3D();
-  private envTexture: Texture | null = null;
+  private envTarget: WebGLRenderTarget | null = null;
   private readonly quality: Quality;
   private readonly envIntensity: number;
 
@@ -124,8 +124,11 @@ export class Environment {
   bakeEnvironment(renderer: WebGLRenderer, scene: Scene): void {
     const pmrem = new PMREMGenerator(renderer);
     const skyScene = new Scene();
+    // A temporary sky sharing the live sky's uniforms, with the sun disc hidden so the disc does
+    // not burn into the prefiltered map. Its own geometry and material are released below.
     const sky = new Sky();
     sky.scale.setScalar(9000);
+    const ownUniforms = sky.material.uniforms;
     sky.material.uniforms = this.sky.material.uniforms;
     const disc = sky.material.uniforms.showSunDisc as { value: number | boolean } | undefined;
     const before = disc?.value;
@@ -133,11 +136,15 @@ export class Environment {
     skyScene.add(sky);
     const target = pmrem.fromScene(skyScene, 0, 0.1, 10000, { size: this.quality.envSize });
     if (disc && before !== undefined) disc.value = before;
-    this.envTexture?.dispose();
-    this.envTexture = target.texture;
+    sky.material.uniforms = ownUniforms;
+    sky.geometry.dispose();
+    sky.material.dispose();
+    pmrem.dispose();
+    // Keep the whole render target: disposing only its texture leaves the framebuffer behind.
+    this.envTarget?.dispose();
+    this.envTarget = target;
     scene.environment = target.texture;
     scene.environmentIntensity = this.envIntensity;
-    pmrem.dispose();
   }
 
   /** Centre the shadow box on `focus`, snapped to whole shadow texels so edges do not crawl. */
@@ -161,9 +168,11 @@ export class Environment {
   }
 
   dispose(): void {
-    this.envTexture?.dispose();
+    this.envTarget?.dispose();
+    this.envTarget = null;
     this.sky.geometry.dispose();
     this.sky.material.dispose();
-    this.sun.shadow.map?.dispose();
+    // The shadow map (its render target) belongs to the light.
+    this.sun.shadow.dispose();
   }
 }

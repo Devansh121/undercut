@@ -15,7 +15,28 @@ import { Environment, MONZA_AFTERNOON, type LightingPreset } from './environment
 import { QUALITY, type Quality, type QualityName } from './quality';
 import { TrackView } from './track-view';
 
+/**
+ * The page's one WebGL renderer. Sessions come and go but the renderer (and its GL context and
+ * state cache) lives as long as the page: a second WebGLRenderer on the same canvas gets the
+ * same context with pixel-store state the new renderer does not know about.
+ */
+export function createRenderer(canvas: HTMLCanvasElement, quality: QualityName): WebGLRenderer {
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: QUALITY[quality].antialias,
+    powerPreference: 'high-performance',
+    stencil: false,
+  });
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFShadowMap;
+  return renderer;
+}
+
 export interface RaceViewOptions {
+  /** The page's renderer from `createRenderer`; the view uses it and never disposes it. */
+  renderer: WebGLRenderer;
   track: Track;
   quality: QualityName;
   livery: Livery;
@@ -75,18 +96,11 @@ export class RaceView {
     this.canvas = canvas;
     this.quality = QUALITY[options.quality];
     const q = this.quality;
-    this.renderer = new WebGLRenderer({
-      canvas,
-      antialias: q.antialias,
-      powerPreference: 'high-performance',
-      stencil: false,
-    });
-    this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer = options.renderer;
     const lighting = options.lighting ?? MONZA_AFTERNOON;
     this.renderer.toneMappingExposure = lighting.exposure;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFShadowMap;
+    this.width = 0;
+    this.height = 0;
 
     this.environment = new Environment(this.scene, lighting, q);
     this.environment.bakeEnvironment(this.renderer, this.scene);
@@ -189,6 +203,9 @@ export class RaceView {
     this.car.dispose();
     this.ghostCar.dispose();
     this.environment.dispose();
-    this.renderer.dispose();
+    this.scene.environment = null;
+    this.scene.clear();
+    // Drop the render lists that still reference this scene's objects; the renderer stays.
+    this.renderer.renderLists.dispose();
   }
 }

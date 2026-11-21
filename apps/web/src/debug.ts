@@ -36,6 +36,8 @@ export interface DebugApi {
   frameTimes(): number[];
   resetFrameTimes(): void;
   renderStats(): Record<string, unknown>;
+  /** The page renderer's live geometries, textures and programs (works between sessions). */
+  rendererInfo(): Record<string, number>;
   /** The RaceView itself, for render experiments from tools. */
   view(): unknown;
   quit(): void;
@@ -55,6 +57,7 @@ export function debugEnabled(): boolean {
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
   start: () => Promise<DriveHandle>,
+  rendererInfo: () => Record<string, number>,
 ): void {
   const need = (): DriveHandle => {
     const d = getDrive();
@@ -129,6 +132,7 @@ export function installDebugApi(
     frameTimes: () => need().frameTimes(),
     resetFrameTimes: () => need().resetFrameTimes(),
     view: () => need().view,
+    rendererInfo,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),
   };
