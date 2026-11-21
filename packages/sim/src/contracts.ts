@@ -115,14 +115,59 @@ export function createSurfaceSample(): SurfaceSample {
   };
 }
 
+/** A tyre contact patch's view of the ground: means over the patch (`contact.ts`). */
+export interface PatchSample {
+  height: number;
+  normalX: number;
+  normalY: number;
+  normalZ: number;
+  grip: number;
+  drag: number;
+}
+
 /** Ground query used by the vehicle model: called per wheel per tick, so it must not allocate. */
 export interface SurfaceSampler {
   /** Fills `out` for the world point (x, z). `hint` belongs to this query point. */
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void;
+  /**
+   * Optional fast path for a tyre's contact patch: the mean of `sample` over the grid
+   * `PATCH_ACROSS` × `PATCH_ALONG` (`contact.ts`) of a patch centred at (x, z), forward along the
+   * unit vector (fx, fz), `width` by `length`. A sampler that knows its ground (a track's
+   * cross-sections) can evaluate the grid without locating every point from scratch. It must
+   * agree with sampling the grid point by point to within the tolerance it documents. Without
+   * it, the vehicle model samples the grid point by point.
+   */
+  samplePatch?(
+    x: number,
+    z: number,
+    fx: number,
+    fz: number,
+    width: number,
+    length: number,
+    hint: SurfaceHint,
+    out: PatchSample,
+  ): void;
 }
 
 /** Infinite flat asphalt at y = 0. For unit tests and straight-line validation manoeuvres. */
 export const FLAT_SURFACE: SurfaceSampler = Object.freeze({
+  samplePatch(
+    _x: number,
+    _z: number,
+    _fx: number,
+    _fz: number,
+    _width: number,
+    _length: number,
+    _hint: SurfaceHint,
+    out: PatchSample,
+  ): void {
+    out.height = 0;
+    out.normalX = 0;
+    out.normalY = 1;
+    out.normalZ = 0;
+    out.grip = 1;
+    out.drag = 1;
+  },
   sample(_x: number, _z: number, _hint: SurfaceHint, out: SurfaceSample): void {
     out.height = 0;
     out.normalX = 0;
