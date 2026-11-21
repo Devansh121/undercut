@@ -128,5 +128,6 @@ describe('cost', () => {
       `young-generation bytes in ${best.quiet} quiet ticks (best of five)`,
     ).toBeLessThan(4 * 1024);
     expect(best.scavenges, 'scavenges while ticking').toBe(0);
-  });
+    // A limit on run time only: the warm-up laps take a while on a shared runner.
+  }, 30_000);
 });

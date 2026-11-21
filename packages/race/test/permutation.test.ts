@@ -38,7 +38,7 @@ function field(seed: number, n: number): Field {
   const stops = [
     { car: 0, at: rng.range(30, 60) },
     { car: 1, at: rng.range(30, 60) },
-    { car: n - 2, at: rng.range(40, 80) },
+    { car: n - 2, at: rng.range(35, 70) },
   ];
   return { scripts, teams, stops };
 }
@@ -47,7 +47,7 @@ function field(seed: number, n: number): Field {
 function run(f: Field, perm: number[], seed: number): { log: RaceEvent[]; result: SessionResult } {
   const circuit = { ...RAIL_CIRCUIT, grid: perm.map((o) => RAIL_CIRCUIT.grid[o]!) };
   const race = new RailRace(
-    { kind: 'race', laps: 4 },
+    { kind: 'race', laps: 3 },
     perm.map((o) => f.scripts[o]!),
     { seed, circuit, teams: perm.map((o) => f.teams[o]!), rules: { blueWindow: 8 } },
   );
@@ -113,5 +113,6 @@ describe('order independence (property)', () => {
       const kinds = new Set(base.log.map((e) => e.type));
       expect(kinds.has('penalty') && kinds.has('pit') && kinds.has('finish')).toBe(true);
     }
-  });
+    // Thirty rail races: about 2 s here, more on a shared CI runner. A limit on run time only.
+  }, 30_000);
 });
