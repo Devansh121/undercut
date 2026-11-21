@@ -78,28 +78,58 @@ async function padPress(page: Page, button: number): Promise<void> {
 
 const PAD = { a: 0, b: 1, lb: 4, rb: 5, up: 12, down: 13, left: 14, right: 15 } as const;
 
-/** A stable name for the focused control. */
-const focusedKey = (page: Page): Promise<string> =>
-  page.evaluate(() => {
-    const a = document.activeElement as HTMLElement | null;
-    if (!a || a === document.body) return '';
-    const path: string[] = [];
-    for (let n: Element | null = a; n && n !== document.body; n = n.parentElement) {
-      const i = n.parentElement ? [...n.parentElement.children].indexOf(n) : 0;
-      path.unshift(`${n.tagName}:${i}`);
-    }
-    return path.join('/');
-  });
+type Dir = 'up' | 'down' | 'left' | 'right';
 
 /**
- * Explore the screen's navigation graph with real input: from each control reached so far,
- * focus it and press each direction; record where focus lands. Returns the controls reached and
- * all controls the screen has.
+ * In the page: wait `frames` animation frames, read which control has focus (its DOM path),
+ * then focus the control at `focus` (a DOM path, or null). One round trip does the read for the
+ * previous step and the set-up for the next. With `pad`, it also presses that fake-pad button
+ * for one frame after focusing and reads the result two frames later, so a pad step is a single
+ * round trip.
  */
-async function explore(
+function step(
   page: Page,
-  press: (dir: 'up' | 'down' | 'left' | 'right') => Promise<void>,
-) {
+  o: { frames: number; focus: string | null; pad?: number },
+): Promise<{ before: string; after: string }> {
+  return page.evaluate(async ({ frames, focus, pad }) => {
+    const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
+    const keyOf = (a: Element | null): string => {
+      if (!(a instanceof HTMLElement) || a === document.body) return '';
+      const path: string[] = [];
+      for (let n: Element | null = a; n && n !== document.body; n = n.parentElement) {
+        const i = n.parentElement ? [...n.parentElement.children].indexOf(n) : 0;
+        path.unshift(`${n.tagName}:${i}`);
+      }
+      return path.join('/');
+    };
+    for (let i = 0; i < frames; i++) await raf();
+    const before = keyOf(document.activeElement);
+    if (focus !== null) {
+      let n: Element = document.body;
+      for (const p of focus.split('/')) n = n.children[Number(p.split(':')[1])] as Element;
+      (n as HTMLElement).focus();
+    }
+    let after = '';
+    if (pad !== undefined) {
+      const fake = (window as unknown as { fakePad: { button(i: number, v: number): void } })
+        .fakePad;
+      fake.button(pad, 1);
+      await raf();
+      fake.button(pad, 0);
+      await raf();
+      after = keyOf(document.activeElement);
+    }
+    return { before, after };
+  }, o);
+}
+
+/**
+ * Explore the screen's navigation graph with real input until every control is reached: from
+ * each control reached so far, focus it and press each direction (a key through the browser's input pipeline, or the fake
+ * pad's D-pad); record where focus lands. Returns the controls reached and all controls the
+ * screen has.
+ */
+async function explore(page: Page, device: 'keyboard' | 'gamepad') {
   const all = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>('[data-nav]')]
       .filter(
@@ -117,27 +147,39 @@ async function explore(
         return path.join('/');
       }),
   );
-  const start = await focusedKey(page);
+  const { before: start } = await step(page, { frames: 0, focus: null });
   expect(all, 'focus starts on a control').toContain(start);
   const seen = new Set([start]);
   const queue = [start];
-  while (queue.length > 0) {
+  let pending: { from: string; dir: Dir } | null = null;
+  const record = (from: string, dir: Dir, now: string): void => {
+    expect(now, `focus lost after ${dir} from ${from}`).not.toBe('');
+    expect(all, `focus left the screen's controls after ${dir}`).toContain(now);
+    if (!seen.has(now)) {
+      seen.add(now);
+      queue.push(now);
+    }
+  };
+  // Until every control has been reached; every press on the way must keep focus on a control.
+  while (queue.length > 0 && seen.size < all.length) {
     const key = queue.shift() as string;
     for (const dir of ['up', 'down', 'left', 'right'] as const) {
-      await page.evaluate((k) => {
-        const parts = k.split('/');
-        let n: Element = document.body;
-        for (const p of parts) n = n.children[Number(p.split(':')[1])] as Element;
-        (n as HTMLElement).focus();
-      }, key);
-      await press(dir);
-      const now = await focusedKey(page);
-      expect(now, `focus lost after ${dir} from ${key}`).not.toBe('');
-      expect(all, `focus left the screen's controls after ${dir}`).toContain(now);
-      if (!seen.has(now)) {
-        seen.add(now);
-        queue.push(now);
+      if (seen.size >= all.length) break;
+      if (device === 'gamepad') {
+        const r = await step(page, { frames: 0, focus: key, pad: PAD[dir] });
+        record(key, dir, r.after);
+        continue;
       }
+      // Keyboard: this call reads the previous press's result and focuses for the next.
+      const r = await step(page, { frames: pending ? 1 : 0, focus: key });
+      if (pending) record(pending.from, pending.dir, r.before);
+      await page.keyboard.press(KEYS[dir]);
+      pending = { from: key, dir };
+    }
+    if (pending && (queue.length === 0 || seen.size >= all.length)) {
+      const r = await step(page, { frames: 1, focus: null });
+      record(pending.from, pending.dir, r.before);
+      pending = null;
     }
   }
   return { reached: [...seen].sort(), all: [...all].sort() };
@@ -158,11 +200,7 @@ test.describe('menus, keyboard only', () => {
     await page.goto('/');
     await page.keyboard.press('Enter');
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
-    const press = async (dir: keyof typeof KEYS): Promise<void> => {
-      await page.keyboard.press(KEYS[dir]);
-      await frames(page, 1);
-    };
-    const hub = await explore(page, press);
+    const hub = await explore(page, 'keyboard');
     expect(hub.reached).toEqual(hub.all);
     expect(hub.all.length).toBeGreaterThan(20);
 
@@ -184,7 +222,7 @@ test.describe('menus, keyboard only', () => {
     await page.locator('[data-action=change-circuit]').focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'circuits');
-    const circuits = await explore(page, press);
+    const circuits = await explore(page, 'keyboard');
     expect(circuits.reached).toEqual(circuits.all);
     await page.keyboard.press('Escape');
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
@@ -239,7 +277,7 @@ test.describe('menus, gamepad only', () => {
     await expect(page.locator('[data-action=back] .glyph')).toHaveText('B');
     await expect(page.locator('[data-testid=device-chip]')).toContainText('Gamepad');
 
-    const hub = await explore(page, (dir) => padPress(page, PAD[dir]));
+    const hub = await explore(page, 'gamepad');
     expect(hub.reached).toEqual(hub.all);
 
     await padPress(page, PAD.rb);
@@ -310,43 +348,57 @@ test.describe('menus, touch only', () => {
   });
 });
 
-/** Anything outside the viewport, or clipping its content, on the current screen. */
-async function layoutProblems(page: Page): Promise<string[]> {
-  return page.evaluate(async () => {
-    const finite = document
-      .getAnimations()
-      .filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity);
-    await Promise.allSettled(finite.map((a) => a.finished));
+/**
+ * In the page, for each step: click the selector (if any; the menus render synchronously), then
+ * list anything outside the viewport or clipping its content, labelled by the step. One round
+ * trip for a whole screen's states: these checks are about layout, not input (the device tests
+ * above drive the same controls with real input).
+ */
+function layoutSweep(
+  page: Page,
+  steps: readonly { label: string; click?: string }[],
+): Promise<string[]> {
+  return page.evaluate((list) => {
     const problems: string[] = [];
     const { innerWidth: w, innerHeight: h } = window;
     const root = document.documentElement;
-    if (root.scrollWidth > w) problems.push(`page is ${root.scrollWidth}px wide in ${w}px`);
-    if (root.scrollHeight > h) problems.push(`page is ${root.scrollHeight}px tall in ${h}px`);
-    for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
-      if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
-      const style = getComputedStyle(el);
-      if (style.visibility === 'hidden' || style.position === 'fixed') continue;
-      // Tooltips sit outside their control by design and show only on hover or focus.
-      if (el.closest('.tip')) continue;
-      const r = el.getBoundingClientRect();
-      const name = `${el.tagName.toLowerCase()}.${String(el.className)}`;
-      if (
-        r.width > 0 &&
-        (r.left < -0.5 || r.top < -0.5 || r.right > w + 0.5 || r.bottom > h + 0.5)
-      ) {
-        problems.push(
-          `${name} leaves the viewport (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`,
-        );
+    for (const { label, click } of list) {
+      if (click) {
+        const target = document.querySelector<HTMLElement>(click);
+        if (!target) {
+          problems.push(`${label}: no ${click}`);
+          continue;
+        }
+        target.click();
       }
-      const clipsX = el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible';
-      const clipsY =
-        el.scrollHeight > el.clientHeight + 1 &&
-        style.overflowY !== 'visible' &&
-        style.overflowY !== 'auto';
-      if (clipsX || clipsY) problems.push(`${name} clips its content`);
+      if (root.scrollWidth > w) problems.push(`${label}: page is ${root.scrollWidth}px wide`);
+      if (root.scrollHeight > h) problems.push(`${label}: page is ${root.scrollHeight}px tall`);
+      for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
+        if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
+        const style = getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.position === 'fixed') continue;
+        // Tooltips sit outside their control by design and show only on hover or focus.
+        if (el.closest('.tip')) continue;
+        const r = el.getBoundingClientRect();
+        const name = `${label}: ${el.tagName.toLowerCase()}.${String(el.className)}`;
+        if (
+          r.width > 0 &&
+          (r.left < -0.5 || r.top < -0.5 || r.right > w + 0.5 || r.bottom > h + 0.5)
+        ) {
+          problems.push(
+            `${name} leaves the viewport (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`,
+          );
+        }
+        const clipsX = el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible';
+        const clipsY =
+          el.scrollHeight > el.clientHeight + 1 &&
+          style.overflowY !== 'visible' &&
+          style.overflowY !== 'auto';
+        if (clipsX || clipsY) problems.push(`${name} clips its content`);
+      }
     }
     return problems;
-  });
+  }, steps);
 }
 
 for (const size of [
@@ -361,27 +413,35 @@ for (const size of [
       test.info().project.name !== (size.height < 500 ? 'phone' : 'desktop'),
       'one project per size',
     );
+    // No transitions: each state is measured as it settles.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize(size);
     await page.goto('/');
-    expect(await layoutProblems(page), 'launch').toEqual([]);
+    expect(await layoutSweep(page, [{ label: 'launch' }])).toEqual([]);
     await openMenu(page);
-    for (const mode of ['timeTrial', 'quickRace', 'weekend', 'championship', 'online']) {
-      await page.locator(`[data-action=mode-${mode}]`).click();
-      expect(await layoutProblems(page), `main menu, ${mode}`).toEqual([]);
-    }
-    await page.locator('[data-action=mode-timeTrial]').click();
-    for (const team of ['norrland', 'terraluce', 'aldermoor', 'quillon']) {
-      await page.locator(`.team[data-team=${team}]`).click();
-      expect(await layoutProblems(page), `main menu, ${team}`).toEqual([]);
-    }
-    if (size.height < 500) {
-      await page.locator('[data-action=edit-settings]').click();
-      expect(await layoutProblems(page), 'settings dialog').toEqual([]);
-      await page.locator('[data-testid=settings-dialog] [data-action=dialog-close]').click();
-    }
-    await page.locator('[data-action=change-circuit]').click();
-    expect(await layoutProblems(page), 'circuit select').toEqual([]);
+    const hub = [
+      ...['timeTrial', 'quickRace', 'weekend', 'championship', 'online'].map((m) => ({
+        label: `main menu, ${m}`,
+        click: `[data-action=mode-${m}]`,
+      })),
+      { label: 'main menu, time trial again', click: '[data-action=mode-timeTrial]' },
+      ...['norrland', 'terraluce', 'aldermoor', 'quillon'].flatMap((t) => [
+        { label: `main menu, ${t}`, click: `.team[data-team=${t}]` },
+        { label: `main menu, ${t} second driver`, click: '.driver[data-driver="1"]' },
+      ]),
+      ...(size.height < 500
+        ? [
+            { label: 'settings dialog', click: '[data-action=edit-settings]' },
+            {
+              label: 'settings dialog closed',
+              click: '[data-testid=settings-dialog] [data-action=dialog-close]',
+            },
+          ]
+        : []),
+      { label: 'circuit select', click: '[data-action=change-circuit]' },
+    ];
+    expect(await layoutSweep(page, hub)).toEqual([]);
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'circuits');
   });
 }
 
