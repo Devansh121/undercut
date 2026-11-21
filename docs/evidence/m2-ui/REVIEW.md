@@ -58,11 +58,13 @@ Measured at `1440×900`, `high` quality preset, with vsync and frame-rate cap di
 
 | State | Frames | Mean (ms) | Median (ms) | p95 (ms) | p99 (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| HUD on | 2848 | 2.108 | 1.6 | 3.5 | 16.1 |
-| HUD off | 2859 | 2.100 | 1.2 | 3.8 | 18.6 |
-| **Delta (on − off)** | — | **+0.008** | **+0.4** | **−0.3** | **−2.5** |
+| HUD on | 3102 | 1.963 | 0.9 | 2.2 | 41.7 |
+| HUD off | 3122 | 1.943 | 0.8 | 1.6 | 32.2 |
+| **Delta (on − off)** | — | **+0.020** | **+0.1** | **+0.6** | **+9.5** |
 
-Re-measured after the tower layout below; the HUD costs well under a millisecond a frame (noise
-dominates at the tails).
+Re-measured after the review fixes. A first run with the new tower component measured +0.78 ms
+mean: the tower re-assigned `hidden` on its tyre mark and footer every frame, which costs a style
+recalculation even when the value is unchanged. With those writes guarded the HUD costs 0.02 ms
+mean (0.1 ms median); the tails are noise from the shared GPU.
 
 Car framing check (`window.__undercut.carScreenRect()` vs `.hud-drive` bounding box): zero overlap on both `1440×900` and `844×390`.

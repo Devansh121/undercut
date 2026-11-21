@@ -43,6 +43,11 @@ interface RowNodes {
 
 const PHONE = '(max-height: 500px) and (orientation: landscape)';
 
+/** Write `hidden` only when it changes: an unchanged write still costs a style recalculation. */
+function setHidden(node: HTMLElement, hidden: boolean): void {
+  if (node.hidden !== hidden) node.hidden = hidden;
+}
+
 export class TimingTower {
   readonly root: HTMLElement;
   private readonly lap: Text;
@@ -108,7 +113,7 @@ export class TimingTower {
 
   /** A footer line (label and value), or hidden with an empty label. */
   setFooter(label: string, value: string, muted = false): void {
-    this.foot.hidden = label === '';
+    setHidden(this.foot, label === '');
     this.footLabel.set(label);
     this.footValue.set(value);
     setClass(this.footValueEl, 'is-empty', muted);
@@ -143,7 +148,7 @@ export class TimingTower {
     setClass(n.li, 'is-record', r.reference === true);
     setClass(n.li, 'is-fastest', r.fastest === true);
     const c = r.compound ?? null;
-    n.compound.hidden = c === null;
+    setHidden(n.compound, c === null);
     if (c) {
       n.compoundCode.set(c.code);
       n.compound.style.setProperty('--compound', c.colour);
