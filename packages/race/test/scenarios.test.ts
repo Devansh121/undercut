@@ -510,3 +510,52 @@ describe('pit lane', () => {
     expect(start1.t).toBeGreaterThanOrEqual(end0.t);
   });
 });
+
+describe('race distance and the compound rule', () => {
+  it('a time-capped race ends at the end of the leader’s lap on which the time runs out', () => {
+    const race = new RailRace({ kind: 'race', laps: 50, timeLimit: 60 }, [
+      { speed: 50 },
+      { speed: 45 },
+    ]);
+    race.runToEnd();
+    const out = race.control.lightsOutAt!;
+    const flag = ofType(race.log, 'flag').find((e) => e.flag === 'chequered')!;
+    const leaderLaps = ofType(race.log, 'lap').filter((e) => e.car === 0);
+    // The flag falls at the leader's first crossing after the cap, not before.
+    const before = leaderLaps.filter((e) => e.at - out < 60);
+    const at = leaderLaps.find((e) => e.at - out >= 60)!;
+    expect(flag.t).toBe(at.t);
+    expect(before.length).toBe(at.result.lap - 1);
+    expect(ofType(race.log, 'finish').map((e) => e.car)).toEqual([0, 1]);
+  });
+
+  it('disqualifies a finisher that ran one compound when the two-compound rule applies', () => {
+    const race = new RailRace({ kind: 'race', laps: 3, twoCompoundRule: true }, [
+      { speed: 50 },
+      { speed: 50, reaction: 0.3 },
+    ]);
+    race.run(12, () => race.control.lightsOutAt !== null);
+    race.request(1, [{ kind: 'tyres', compound: 'hard' }]);
+    race.runToEnd();
+    const r = buildResult(race.control, entrants(2), 1);
+    expect(r.entries[0]).toMatchObject({
+      car: 1,
+      status: 'finished',
+      compounds: ['medium', 'hard'],
+    });
+    expect(r.entries[1]).toMatchObject({
+      car: 0,
+      status: 'dsq',
+      reason: 'two-compound rule',
+      points: 0,
+    });
+  });
+
+  it('applies the two-compound rule by default only at full distance', () => {
+    const short = new RailRace({ kind: 'race', laps: 5 }, [{ speed: 50 }]);
+    expect(short.control.strategy.twoCompoundRule).toBe(false);
+    const full = new RailRace({ kind: 'race' }, [{ speed: 50 }]);
+    expect(full.control.strategy.laps).toBe(50);
+    expect(full.control.strategy.twoCompoundRule).toBe(true);
+  });
+});

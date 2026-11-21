@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { RaceEvent } from '../src/events';
-import type { RaceSession } from '../src/session/session';
+import { createCarParams, type ControlInput } from '@undercut/sim';
+import { MONZA } from '../../ai/validation/lib/index';
+import { InputController } from '../src/session/controllers';
+import { RaceSession } from '../src/session/session';
 import { aiSession, runRace, runSession } from './lib/runner';
 
 // Physics job: the real sim and AI drivers at Monza. Short on purpose (a small field, three
@@ -83,3 +86,55 @@ describe('qualifying from the pit lane at Monza', () => {
       expect(pitStages(run.events, car).slice(0, 2)).toEqual(['release', 'exit']);
   });
 });
+
+describe('the assisted pit lane for a player', () => {
+  it('drives a car with no input out of the garage, and in to its box when asked', () => {
+    const track = MONZA.track();
+    const params = createCarParams(MONZA.trim);
+    let throttle = 0;
+    const session = new RaceSession({
+      track,
+      session: { kind: 'practice', duration: 600, releaseInterval: 2 },
+      seed: 1,
+      params,
+      cars: [
+        {
+          entrant: { id: 'p', name: 'Player', code: 'PLY', team: 0 },
+          controller: new InputController(
+            (_ctx, out: ControlInput) => {
+              out.steer = 0;
+              out.throttle = throttle;
+              out.brake = 0;
+              out.gearShift = 0;
+              out.drs = false;
+              out.overtake = false;
+              out.pitLimiter = false;
+            },
+            { params, assistedPitLane: true },
+          ),
+        },
+      ],
+    });
+    const events = session.run(60, () => undefined);
+    const stages = events
+      .filter((e) => e.type === 'pit')
+      .map((e) => (e.type === 'pit' ? e.stage : ''));
+    expect(stages).toEqual(['release', 'exit']);
+    expect(events.some((e) => e.type === 'pit' && e.stage === 'speeding')).toBe(false);
+    // Asked in while coasting down the pit straight's approach: teleport near the entry, at speed.
+    session.placeCar(0, ...poseAt(session, track.pit.entryS - 100), 40);
+    throttle = 0;
+    session.requestPit(0, [{ kind: 'tyres', compound: 'soft' }]);
+    const more = session.run(60, () => undefined);
+    const stages2 = more
+      .filter((e) => e.type === 'pit')
+      .map((e) => (e.type === 'pit' ? e.stage : ''));
+    expect(stages2.slice(0, 4)).toEqual(['entry', 'stop', 'serviceStart', 'serviceEnd']);
+    expect(session.control.cars[0]!.compound).toBe('soft');
+  });
+});
+
+function poseAt(session: RaceSession, s: number): [number, number, number] {
+  const p = session.lapPose(s, 0);
+  return [p.x, p.z, p.yaw];
+}
