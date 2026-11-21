@@ -87,9 +87,9 @@ export const S = {
     racesTitle: 'Race sessions open in the next update',
     racesBody:
       'The race rules are built: start lights, flags, track limits, penalties, pit stops and points. The race screen that runs them is not in this build yet. Time Trial runs on the same rules today.',
-    onlineTitle: 'Online rooms open in a later update',
+    onlineTitle: 'Private rooms',
     onlineBody:
-      'The rooms service runs beside this build, but the lobby screen is not in it yet. Nothing here connects to it.',
+      'Create a room and share its invite, or join one with a room code. Up to eight drivers race at Monza on equal cars; the host sets the laps and which assists are allowed.',
     unavailable: 'Not in this build yet',
   },
 

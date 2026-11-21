@@ -64,6 +64,8 @@ export interface HudState {
   wrongWay: boolean;
   stopped: boolean;
   message: HudMessage | null;
+  /** Other cars on the map (online): world position, team colour and opacity. Optional. */
+  others?: readonly { x: number; z: number; colour: string; opacity: number }[];
 }
 
 const REV_COLOURS = ['g', 'g', 'g', 'g', 'g', 'r', 'r', 'r', 'r', 'r', 'b', 'b', 'b', 'b', 'b'];
@@ -97,6 +99,8 @@ export class Hud {
   private readonly stoppedEl: HTMLElement;
   private readonly dot: SVGCircleElement;
   private readonly ghostDot: SVGCircleElement;
+  private readonly othersLayer: SVGGElement;
+  private readonly otherDots: SVGCircleElement[] = [];
   private readonly plan: MinimapPlan;
   private lastErs = '';
   private lastMark = '';
@@ -106,7 +110,8 @@ export class Hud {
   private lastGhostY = '';
   private lastGhostVis = false;
 
-  constructor(plan: MinimapPlan, identity?: HudIdentity) {
+  /** `mode`: the tower's session label ("Time trial", "Online race"). */
+  constructor(plan: MinimapPlan, identity?: HudIdentity, mode: string = S.hud.timeTrial) {
     this.plan = plan;
     const root = el('div', 'hud');
     root.dataset.testid = 'hud';
@@ -127,7 +132,7 @@ export class Hud {
     const sHead = el('header', 'hud-tower__head');
     const lapCount = el('span', 'hud-tower__lap');
     lapCount.append(el('span', 'hud-tower__lapword', S.hud.lap), txt('lap', el('b', 'num')));
-    sHead.append(lapCount, el('span', 'label', S.hud.timeTrial));
+    sHead.append(lapCount, el('span', 'label', mode));
     const status = el('div', 'hud-tower__status');
     status.append(el('i', 'hud-tower__flag'), el('span', '', S.hud.greenFlag));
     const rows = el('ol', 'hud-tower__rows');
@@ -287,7 +292,8 @@ export class Hud {
       stroke: '#f2f0eb',
       'stroke-width': 2,
     });
-    s.append(this.ghostDot, this.dot);
+    this.othersLayer = svg('g', { 'data-testid': 'map-others' });
+    s.append(this.ghostDot, this.othersLayer, this.dot);
     map.append(mHead, s);
 
     // Driver cluster (bottom right): tyre panel (desktop) + drive panel.
@@ -474,5 +480,23 @@ export class Hud {
       this.ghostDot.setAttribute('opacity', ghostOn ? '1' : '0');
       this.lastGhostVis = ghostOn;
     }
+    const others = h.others ?? [];
+    while (this.otherDots.length < others.length) {
+      const dot = svg('circle', { r: 4, stroke: '#0b0c0e', 'stroke-width': 1.2 });
+      this.othersLayer.append(dot);
+      this.otherDots.push(dot);
+    }
+    this.otherDots.forEach((dot, i) => {
+      const o = others[i];
+      if (!o) {
+        dot.setAttribute('opacity', '0');
+        return;
+      }
+      const [ox, oy] = this.plan.project(o.x, o.z);
+      dot.setAttribute('cx', ox.toFixed(1));
+      dot.setAttribute('cy', oy.toFixed(1));
+      dot.setAttribute('fill', o.colour);
+      dot.setAttribute('opacity', o.opacity.toFixed(2));
+    });
   }
 }

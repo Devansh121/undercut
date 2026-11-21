@@ -84,7 +84,8 @@ export class LaunchScreen implements Screen {
   };
 
   private open(): void {
-    if (!this.active) return;
+    // Only while it is on screen (an invite link opens the online lobby over it).
+    if (!this.active || !this.root.isConnected) return;
     this.active = false;
     this.go();
   }

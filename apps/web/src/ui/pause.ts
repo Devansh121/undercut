@@ -29,9 +29,12 @@ export interface PauseSlider {
 
 export interface PauseActions {
   resume(): void;
-  restartLap(): void;
+  /** Absent: no restart (an online race cannot restart one car's lap). */
+  restartLap?: () => void;
   resetToTrack(): void;
   quit(): void;
+  /** Label of the quit button; default "Quit to launch". */
+  quitLabel?: string;
 }
 
 const CONTROL_ITEMS: readonly { label: string; actions: readonly ActionId[] }[] = [
@@ -113,7 +116,7 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
-    addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
+    if (actions.restartLap) addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
     addAction(S.pause.resetToTrack, 'reset', actions.resetToTrack, 'reset');
     this.controls = controls ? new ControlsPanel(controls) : null;
     const panel = this.controls;
@@ -184,7 +187,7 @@ export class PauseMenu {
     legend.append(el('span', 'label', S.pause.controls), controlsList);
 
     const quit = button({
-      label: S.pause.quit,
+      label: actions.quitLabel ?? S.pause.quit,
       icon: 'exit',
       variant: 'quiet',
       action: 'quit',

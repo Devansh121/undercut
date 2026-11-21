@@ -41,6 +41,8 @@ export interface HubOptions {
   records: RecordStore;
   device: () => DeviceKind;
   onStart(choice: SessionChoice): void;
+  /** Online Rooms: open the lobby (apps/web/src/online). */
+  onOnline(): void;
   onCircuits(): void;
   onBack(): void;
 }
@@ -54,7 +56,7 @@ const MODE_ICON: Record<ModeId, IconKey> = {
 };
 
 /** Modes that start a session in this build. */
-const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial']);
+const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial', 'online']);
 
 const kmText = (m: number): string => (m / 1000).toFixed(3);
 
@@ -258,6 +260,10 @@ export class HubScreen implements Screen {
   startSession(): void {
     const p = this.o.prefs.get();
     if (!PLAYABLE.has(p.mode) || this.start.disabled) return;
+    if (p.mode === 'online') {
+      this.o.onOnline();
+      return;
+    }
     const c = this.circuit();
     this.o.onStart({
       mode: p.mode,
@@ -377,11 +383,13 @@ export class HubScreen implements Screen {
     this.circuitCard.replaceChildren(head, hero, chips);
     if (hadFocus) this.changeCircuit.focus({ preventScroll: true });
 
-    // Settings or the notice for modes that are not in this build.
-    this.settingsCard.hidden = !playable;
-    this.summaryCard.hidden = !playable;
-    this.noticeCard.hidden = playable;
-    if (!playable) {
+    // Session settings for time trial; otherwise a note: what online rooms offer (their own
+    // settings are in the lobby), or that race sessions are not in this build.
+    const settings = mode === 'timeTrial';
+    this.settingsCard.hidden = !settings;
+    this.summaryCard.hidden = !settings;
+    this.noticeCard.hidden = settings;
+    if (!settings) {
       const online = mode === 'online';
       const h = el('header', 'notice__head');
       h.append(
@@ -434,8 +442,11 @@ export class HubScreen implements Screen {
     const driver = team.drivers[p.driver];
     this.barSummary.replaceChildren(
       this.summaryPart(c.name, S.modes[mode].name),
-      this.summaryPart(team.name, driver ? `#${driver.number} ${driver.last}` : ''),
-      ...(playable
+      // Online, the room assigns teams by seat.
+      ...(mode === 'online'
+        ? []
+        : [this.summaryPart(team.name, driver ? `#${driver.number} ${driver.last}` : '')]),
+      ...(settings
         ? [
             this.summaryPart(
               S.timeOfDay[tod] ?? '',

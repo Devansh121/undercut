@@ -2,7 +2,11 @@ import '../../../design/mock/tokens.css';
 import './styles/kit.css';
 import './styles/menu.css';
 import './styles.css';
-import { InputSystem } from '@undercut/input';
+import './online/race-hud.css';
+import { OnlineFlow } from './online/flow';
+import { codeFromUrl } from './online/invite';
+import type { DriveExtension } from './drive';
+import { InputSystem, type DeviceKind, type MenuButton } from '@undercut/input';
 import {
   WebStorageAdapter,
   attachFocusGuard,
@@ -67,6 +71,7 @@ function chooseQuality(): { quality: QualityName; auto: boolean } {
   };
 }
 
+let online: OnlineFlow | null = null;
 let drive: DriveHandle | null = null;
 let driveModule: DriveModule | null = null;
 let starting: Promise<DriveHandle> | null = null;
@@ -82,7 +87,10 @@ const shell = new Shell(app, () => undefined, {
 });
 shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
-  action: (a, native) => shell.handle(a, native),
+  action: (a, native, device) => {
+    if (online) onlineAction(a, device);
+    else shell.handle(a, native);
+  },
   device: (d) => {
     shell.setDevice(d);
     hub.setDevice(d);
@@ -98,6 +106,10 @@ const hub: HubScreen = new HubScreen({
     audio.gesture();
     start(choice).catch(() => undefined);
   },
+  onOnline: () => {
+    audio.gesture();
+    showOnline(null);
+  },
   onCircuits: () => shell.push(circuits),
   onBack: () => shell.pop(),
 });
@@ -109,6 +121,7 @@ const launch = new LaunchScreen(__BUILD_HASH__, () => {
 
 function showMenus(screen: 'launch' | 'hub'): void {
   drive = null;
+  online = null;
   shell.mount();
   if (screen === 'launch' || !shell.current) shell.reset(launch);
   if (screen === 'hub') {
@@ -132,10 +145,53 @@ function currentChoice(): SessionChoice {
   };
 }
 
-async function start(choice: SessionChoice = currentChoice()): Promise<DriveHandle> {
+/**
+ * The online screens (apps/web/src/online) on the shared menu input: the focused control takes
+ * accept, up and down step through the screen's buttons and fields, a pad's left and right step a
+ * number field. A keyboard's Enter on a button, field or link is already native.
+ */
+function onlineAction(a: MenuButton, device: DeviceKind): void {
+  const active = document.activeElement;
+  const nativeKey =
+    device === 'keyboard' && ['BUTTON', 'INPUT', 'A'].includes(active?.tagName ?? '');
+  if (a === 'menuAccept' && !nativeKey) {
+    if (active instanceof HTMLElement && active !== document.body) active.click();
+  } else if ((a === 'menuLeft' || a === 'menuRight') && device === 'gamepad') {
+    if (active instanceof HTMLInputElement && active.type === 'number' && !active.disabled) {
+      if (a === 'menuRight') active.stepUp();
+      else active.stepDown();
+      active.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  } else if (a === 'menuDown' || a === 'menuUp') {
+    const controls = [
+      ...(app as HTMLElement).querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), a',
+      ),
+    ].filter((b) => !b.closest('[inert]'));
+    const at = controls.indexOf(active as HTMLElement);
+    controls[(at + (a === 'menuDown' ? 1 : controls.length - 1)) % controls.length]?.focus();
+  }
+}
+
+/** Online rooms (lobby, race, results) from the main menu or an invite link. */
+function showOnline(code: string | null): void {
+  menuInput.start();
+  online = new OnlineFlow(
+    app as HTMLElement,
+    code,
+    (extension, quit) => start(currentChoice(), extension, quit),
+    () => showMenus('hub'),
+  );
+}
+
+async function start(
+  choice: SessionChoice = currentChoice(),
+  extension?: DriveExtension,
+  quit?: () => void,
+): Promise<DriveHandle> {
   if (drive) return drive;
   if (starting) return starting;
-  hub.setLoading(true);
+  if (!extension) hub.setLoading(true);
   menuInput.stop();
   starting = (async () => {
     try {
@@ -163,13 +219,23 @@ async function start(choice: SessionChoice = currentChoice()): Promise<DriveHand
           prefs.update((p) => {
             p.assists[device] = { ...(p.assists[device] ?? {}), [key]: value };
           }),
-        onQuit: () => showMenus('hub'),
+        ...(extension ? { extension } : {}),
+        onQuit: () => {
+          drive = null;
+          if (quit) {
+            // Back to the online screens, on the menu input.
+            menuInput.start();
+            quit();
+          } else showMenus('hub');
+        },
       });
       drive = handle;
       return handle;
     } catch (error) {
       if (error instanceof Error && error.name === 'LoadCancelled') {
-        showMenus('hub');
+        // Online: the flow leaves the room and shows its screens again.
+        if (extension) menuInput.start();
+        else showMenus('hub');
         throw error;
       }
       hub.setLoading(false);
@@ -185,6 +251,8 @@ async function start(choice: SessionChoice = currentChoice()): Promise<DriveHand
 }
 
 showMenus('launch');
+const invite = codeFromUrl(location.href);
+if (invite) showOnline(invite);
 if (debugEnabled()) {
   installDebugApi(
     () => drive,
@@ -193,4 +261,13 @@ if (debugEnabled()) {
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),
   );
+}
+
+if (debugEnabled()) {
+  Object.assign(window.__undercut!, {
+    online: () => ({
+      state: online?.session.state ?? null,
+      race: online?.race?.snapshot() ?? null,
+    }),
+  });
 }

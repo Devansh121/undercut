@@ -126,7 +126,14 @@ async function main() {
       }
     });
 
-    handlers = createHandlers({ root: CLIENT_DIR, roomsPort: config.roomsPort });
+    handlers = createHandlers({
+      root: CLIENT_DIR,
+      roomsPort: config.roomsPort,
+      networkOrigins: network.lan.flatMap((i) => [
+        `http://${i.address}:${config.port}`,
+        `https://${i.address}:${config.httpsPort}`,
+      ]),
+    });
     const httpServer = http.createServer(handlers.http);
     const httpsServer = https.createServer({ key: tls.key, cert: tls.cert }, handlers.https);
     for (const server of [httpServer, httpsServer]) {

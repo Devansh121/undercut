@@ -1,0 +1,97 @@
+.online-race {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--safe-t) + 42px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  width: min(480px, calc(100% - var(--safe-l) - var(--safe-r)));
+  pointer-events: none;
+  text-align: center;
+}
+.online-race [hidden] {
+  display: none;
+}
+.online-lights {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--c-ink-0);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-2);
+}
+.online-lights__lamp {
+  display: grid;
+  gap: var(--sp-1);
+}
+.online-lights__dot {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--c-ink-3);
+  border: 1px solid var(--c-line-strong);
+}
+.online-lights__lamp.is-lit .online-lights__dot {
+  background: var(--c-flag-red);
+}
+.online-standing {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--c-ink-1);
+  border: 1px solid var(--c-line-strong);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-20);
+}
+.online-standing__pos {
+  color: var(--c-text-1);
+  font-weight: 700;
+}
+.online-standing__lap {
+  color: var(--c-text-2);
+}
+.online-standing__sep {
+  height: 20px;
+  width: 1px;
+  background: var(--c-line-strong);
+}
+.online-race__caption,
+.online-race__net {
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-ink-1);
+  color: var(--c-text-1);
+}
+.online-race[data-net='ok'] .online-race__net {
+  display: none;
+}
+.online-race__net {
+  color: var(--c-flag-yellow);
+}
+.online-assist {
+  flex-basis: 280px;
+}
+@media (max-height: 500px) {
+  .online-race {
+    top: calc(var(--safe-t) + 96px);
+    gap: var(--sp-1);
+  }
+  .online-lights {
+    padding: var(--sp-2);
+    gap: var(--sp-1);
+  }
+  .online-lights__dot {
+    width: 18px;
+    height: 18px;
+  }
+  .online-standing {
+    font-size: var(--fs-16);
+    padding: var(--sp-1) var(--sp-3);
+  }
+  .online-race__caption,
+  .online-race__net {
+    font-size: var(--fs-10);
+  }
+}
