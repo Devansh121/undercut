@@ -1,4 +1,6 @@
-import { defaultCarState } from '@undercut/audio';
+import { defaultCarState, packCarState, CAR_STATE_LENGTH } from '@undercut/audio';
+import { CarControls, CHUNK } from '../../../packages/audio/src/dsp/controls';
+import { F } from '../../../packages/audio/src/dsp/state';
 import { MemoryStorage } from '@undercut/input';
 import {
   SurfaceKind,
@@ -35,6 +37,25 @@ describe('toAudioCarState', () => {
     expect(a.drs).toBe(1);
     expect(a.impactSerial).toBe(2);
     expect(a.impactSpeed).toBe(8);
+  });
+
+  it('passes high-speed kerb ridge rates through the DSP boundary without clamping', () => {
+    for (const speed of [60, 80, 150]) {
+      const { state, telemetry } = carAt(speed);
+      const mapped = toAudioCarState(
+        { state, telemetry, pitLimiter: false, kerbRoughness: 1 },
+        defaultCarState(),
+      );
+      const expected = speed / KERB_RIDGE_SPACING;
+      expect(mapped.kerbFrequency).toBe(expected);
+      for (const input of [mapped, packCarState(mapped, new Float64Array(CAR_STATE_LENGTH))]) {
+        const controls = new CarControls(48000);
+        controls.set(input);
+        controls.advance(CHUNK);
+        expect(controls.targetOf(F.kerbFrequency)).toBe(expected);
+        expect(controls.buffers[F.kerbFrequency]?.[CHUNK - 1]).toBe(expected);
+      }
+    }
   });
 
   it('maps the sim to the audio engine in SI units', () => {

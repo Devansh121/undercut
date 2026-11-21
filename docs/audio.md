@@ -25,7 +25,7 @@ The game sends an `AudioCarState` (`packages/audio/src/dsp/state.ts`) every sim 
 | `ersPower` | W | MGU-K whine: + deploy, − harvest |
 | `speed` | m/s | Tyre roll, cavity resonance, wind |
 | `slipFront`, `slipRear` | – | Scrub (0.02–0.12) and squeal (0.08–0.2) per axle |
-| `kerb`, `kerbFrequency` | 0–1, Hz | Kerb rumble at the ridge-passing rate |
+| `kerb`, `kerbFrequency` | 0–1, Hz (to 600 Hz: 150 m/s over 0.25 m ridges) | Kerb rumble at the ridge-passing rate |
 | `bottoming` | 0–1 | Plank scrape, with a thump on first contact |
 
 Every field is first checked at the core boundary, whichever form it arrives in (struct or packed): it is clamped to its supported range (`CAR_STATE_RANGE`; engine speed to 15 000 rpm, the pulse tables' limit), and NaN or infinity keeps the field's last valid value. Filters also drop non-finite memory and the mix never passes NaN on, so no update can leave the DSP broken. Every continuous field then ramps linearly from its current value to the new one over the measured update interval, so the control signals are continuous at any update rate. This costs one interval of latency (4–17 ms). Flags switch at the update. Every audible quantity is smoothed again inside the voices.

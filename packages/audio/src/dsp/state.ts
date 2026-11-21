@@ -90,7 +90,8 @@ export const CAR_STATE_RANGE: Readonly<Record<CarStateField, readonly [number, n
   slipFront: [0, 2],
   slipRear: [0, 2],
   kerb: [0, 1],
-  kerbFrequency: [0, 200],
+  // 150 m/s (the speed limit above) across 0.25 m ridge spacing.
+  kerbFrequency: [0, 600],
   bottoming: [0, 1],
   slipRatioFront: [-1, 2],
   slipRatioRear: [-1, 2],

@@ -73,9 +73,32 @@ describe('gear shift: the upshift crack', () => {
     expect(lifted.meters.rms('crack')).toBe(0);
   });
 
-  it('starts the cut within one 128-frame block of the sim event', () => {
+  it('attenuates exhaust and combustion during the ignition cut', () => {
+    const levels = (shifting: boolean) => {
+      const core = new AudioCore({ sampleRate: FS });
+      const state = engineState(10000, 1, { gear: 4 });
+      render(core, T, () => state);
+      const cut = { ...state, shifting, shiftDirection: shifting ? 1 : 0 };
+      // Allow 10 ms for the 2.5 ms cut envelope and exhaust filters to settle.
+      render(core, 0.01, () => cut);
+      core.meters.reset();
+      render(core, 0.02, () => cut);
+      return { exhaust: core.meters.rms('exhaust'), combustion: core.meters.rms('combustion') };
+    };
+    const held = levels(false);
+    const cut = levels(true);
+    // These meters exclude gearbox clack, mesh and crack. A missing ignition cut
+    // leaves both ratios near 1 and fails this minimum 6 dB attenuation requirement.
+    for (const layer of ['exhaust', 'combustion'] as const) {
+      expect(held[layer]).toBeGreaterThan(1e-4);
+      expect(cut[layer]).toBeGreaterThan(0);
+      expect(cut[layer], layer).toBeLessThan(held[layer] * 0.5);
+    }
+  });
+
+  it('starts the shift transient within one 128-frame block of the sim event', () => {
     // Render with and without the shift; the outputs agree exactly until the shift starts,
-    // so the cut cannot precede or lag the reported shift.
+    // so the audible shift transient cannot precede or lag the reported shift.
     const withShift = render(new AudioCore({ sampleRate: FS }), 0.7, upshift(1));
     const without = render(new AudioCore({ sampleRate: FS }), 0.7, (t) =>
       engineState(10_000, 1, { gear: t < T ? 4 : 5 }),
@@ -378,10 +401,12 @@ describe('impacts', () => {
     for (const id of ['master', 'engine', 'effects', 'ui', 'ambience'] as const)
       core.setGain(id, 2);
     const clip = render(core, 1, (t) => ({
-      ...hit(60, 1)(t),
       ...engineState(12_000, 1),
+      impactSpeed: hit(60, 1)(t).impactSpeed,
+      impactSerial: hit(60, 1)(t).impactSerial,
       speed: 80,
     }));
+    expect(core.meters.rms('impact')).toBeGreaterThan(1e-3);
     let peak = 0;
     for (const x of clip.left) peak = Math.max(peak, Math.abs(x));
     expect(peak).toBeLessThan(1);
