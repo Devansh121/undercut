@@ -121,6 +121,11 @@ void main() {
   float h = (1.0 - smoothstep(-0.02, 0.16, dir.y)) * smoothstep(-0.2, -0.03, dir.y);
   col = mix(col, hazeColour, haze * h);
   gl_FragColor = vec4(col, 1.0);
+  // Drawn straight to the canvas (the direct path) the sky needs the renderer's tone map and sRGB
+  // output like every built-in material; three.js enables these chunks only for canvas output,
+  // so into HDR targets and the environment bake the sky stays linear.
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
 }`;
 
 export interface SkyAsset {
