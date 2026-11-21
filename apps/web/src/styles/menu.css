@@ -116,6 +116,7 @@
   position: relative;
   min-height: 0;
   display: grid;
+  overflow: hidden;
 }
 
 .screen {
@@ -202,14 +203,12 @@
     linear-gradient(100deg, #23272d 0%, #15181c 55%, #0f1114 100%);
 }
 
-.launch__stripe {
+.launch__stage::before {
+  content: '';
   position: absolute;
-  right: -10vw;
-  top: 12vh;
-  width: 70vw;
-  height: 52vh;
-  transform: skewX(-18deg);
-  background: repeating-linear-gradient(90deg, rgba(255, 90, 31, 0.9) 0 6px, transparent 6px 26px);
+  inset: 12vh 0 36vh 26vw;
+  clip-path: polygon(12% 0, 100% 0, 100% 100%, 0 100%);
+  background: repeating-linear-gradient(108deg, rgba(255, 90, 31, 0.9) 0 6px, transparent 6px 26px);
   opacity: 0.18;
   pointer-events: none;
 }
@@ -627,7 +626,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   min-height: 56px;
   padding: var(--sp-2) var(--sp-3);
   border: 0;
@@ -643,9 +642,9 @@
 }
 
 .driver__no {
-  min-width: 40px;
+  min-width: 34px;
   font-weight: 700;
-  font-size: var(--fs-32);
+  font-size: var(--fs-24);
   line-height: 1;
   text-align: center;
   color: var(--c-text-3);
@@ -662,11 +661,11 @@
 }
 
 .driver__last {
-  font-size: var(--fs-16);
+  font-size: var(--fs-14);
   font-weight: 700;
-  font-stretch: var(--wdth-semi);
+  font-stretch: var(--wdth-condensed);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -802,6 +801,14 @@
   }
   .team__code {
     display: none;
+  }
+  .driver {
+    padding: var(--sp-2);
+    gap: 6px;
+  }
+  .driver__no {
+    min-width: 26px;
+    font-size: var(--fs-20);
   }
 }
 
@@ -1053,18 +1060,19 @@
   }
   .driver {
     min-height: 40px;
-    gap: 6px;
+    gap: 4px;
     padding: 4px 6px;
   }
   .driver__no {
-    min-width: 20px;
-    font-size: var(--fs-16);
+    min-width: 18px;
+    font-size: var(--fs-14);
   }
   .driver__first {
     display: none;
   }
   .driver__last {
-    font-size: var(--fs-11);
+    font-size: var(--fs-10);
+    letter-spacing: 0;
   }
   .settings-grid {
     grid-template-columns: 1fr;

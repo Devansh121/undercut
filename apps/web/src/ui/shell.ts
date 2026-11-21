@@ -7,6 +7,7 @@ import { GAME_NAME } from '@undercut/core';
 import type { DeviceKind } from '@undercut/input';
 import { el } from './dom';
 import { brandMark, icon, type IconKey } from './kit/icons';
+import { refreshGlyphs } from './kit/glyph';
 import { activeScope, focusFirst, navigate, showFocusRing, type NavAction } from './kit/nav';
 import { S } from './strings';
 
@@ -127,6 +128,7 @@ export class Shell {
 
   private show(screen: Screen, fresh: boolean): void {
     this.main.replaceChildren(screen.root);
+    refreshGlyphs(screen.root);
     this.root.classList.toggle('is-bare', screen.bare === true);
     this.top.hidden = screen.bare === true;
     document.documentElement.dataset.screen = screen.id;

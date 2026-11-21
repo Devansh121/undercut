@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
+import { startTimeTrial } from './helpers';
 
 /**
  * One drive session per worker, shared by the tests that do not need a fresh load. Software
@@ -26,7 +27,7 @@ export const test = base.extend<{ drive: DriveFixture }, { sharedPage: Page }>({
       });
       const page = await context.newPage();
       await page.goto('/?debug=1&quality=lite');
-      await page.getByRole('button', { name: /Start/ }).click();
+      await startTimeTrial(page);
       await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
       await use(page);
       await context.close();

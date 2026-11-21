@@ -105,12 +105,17 @@ export function glyph(action: ActionId, className = ''): HTMLElement {
   return el;
 }
 
+/** Repaint every glyph inside `scope` for the current device and bindings. */
+export function refreshGlyphs(scope: ParentNode = document): void {
+  for (const el of scope.querySelectorAll<HTMLElement>('[data-glyph]')) paint(el);
+}
+
 /** The device whose glyphs show, and its bindings; repaints every glyph on the page. */
 export function setGlyphContext(dev: DeviceKind, map: BindingMap): void {
   device = dev;
   bindings = map;
   document.documentElement.dataset.device = dev;
-  for (const el of document.querySelectorAll<HTMLElement>('[data-glyph]')) paint(el);
+  refreshGlyphs(document);
 }
 
 export function glyphDevice(): DeviceKind {

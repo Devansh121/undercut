@@ -17,7 +17,8 @@ export class LaunchScreen implements Screen {
   readonly bare = true;
   readonly root: HTMLElement;
   private readonly press: HTMLButtonElement;
-  private armed = false;
+  private active = false;
+  private keyTimer = 0;
 
   constructor(
     buildHash: string,
@@ -27,7 +28,6 @@ export class LaunchScreen implements Screen {
     root.setAttribute('aria-labelledby', 'launch-title');
     this.root = root;
     const stage = el('div', 'launch__stage');
-    stage.append(el('div', 'launch__stripe'));
     const title = el('h1', 'launch__title', GAME_NAME);
     title.id = 'launch-title';
     stage.append(title, el('p', 'launch__tagline', S.launch.tagline(TEAMS.length, DRIVER_COUNT)));
@@ -50,15 +50,18 @@ export class LaunchScreen implements Screen {
   }
 
   enter(): void {
-    // Ignore the key that may still be down from the screen before.
-    this.armed = false;
-    window.setTimeout(() => {
-      this.armed = true;
-    }, 150);
-    window.addEventListener('keydown', this.onKey);
+    this.active = true;
+    // Attach the any-key listener on the next task so a keydown that just popped back from
+    // another screen cannot bubble into this one and reopen the menu immediately.
+    window.clearTimeout(this.keyTimer);
+    this.keyTimer = window.setTimeout(() => {
+      if (this.active) window.addEventListener('keydown', this.onKey);
+    }, 0);
   }
 
   leave(): void {
+    this.active = false;
+    window.clearTimeout(this.keyTimer);
     window.removeEventListener('keydown', this.onKey);
   }
 
@@ -73,15 +76,16 @@ export class LaunchScreen implements Screen {
   }
 
   private readonly onKey = (e: KeyboardEvent): void => {
-    if (e.repeat || e.key === 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.repeat || e.key === 'Tab' || e.key === 'Escape' || e.altKey || e.ctrlKey || e.metaKey)
+      return;
     // Enter and Space on the focused prompt click it natively.
     if (document.activeElement === this.press && (e.key === 'Enter' || e.key === ' ')) return;
     this.open();
   };
 
   private open(): void {
-    if (!this.armed) return;
-    this.armed = false;
+    if (!this.active) return;
+    this.active = false;
     this.go();
   }
 }

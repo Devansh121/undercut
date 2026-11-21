@@ -82,6 +82,7 @@ export class HubScreen implements Screen {
   private readonly inDialog: SettingsPanel;
   private readonly settingsDialog: ReturnType<typeof dialog>;
   private readonly resetInline: HTMLButtonElement;
+  private readonly changeCircuit: HTMLButtonElement;
   private device: DeviceKind;
 
   constructor(private readonly o: HubOptions) {
@@ -124,6 +125,13 @@ export class HubScreen implements Screen {
     this.circuitCard = el('section', 'card circuit');
     this.circuitCard.setAttribute('aria-label', S.circuit.title);
     this.circuitCard.dataset.testid = 'circuit-card';
+    this.changeCircuit = button({
+      label: S.circuit.change,
+      variant: 'quiet',
+      action: 'change-circuit',
+      next: true,
+      onClick: () => this.o.onCircuits(),
+    });
     this.presetLabel = el('span', 'label');
     this.resetInline = SettingsPanel.resetButton(this.settingsContext());
     const settingsAside = el('div', 'settings__aside');
@@ -166,6 +174,8 @@ export class HubScreen implements Screen {
     this.carFigure = el('figure', 'team-car');
     this.carImage = el('img', 'team-car__img');
     this.carImage.decoding = 'async';
+    // Lazy: on a phone the car is not shown, and a hidden lazy image is never fetched.
+    this.carImage.loading = 'lazy';
     this.carImage.addEventListener('error', () => this.carFigure.classList.add('is-missing'));
     this.carImage.addEventListener('load', () => this.carFigure.classList.remove('is-missing'));
     this.carFigure.append(this.carImage);
@@ -328,15 +338,7 @@ export class HubScreen implements Screen {
 
     // Circuit card.
     const head = el('header', 'card__head');
-    head.append(el('h2', 'card__title', S.circuit.title));
-    const change = button({
-      label: S.circuit.change,
-      variant: 'quiet',
-      action: 'change-circuit',
-      next: true,
-      onClick: () => this.o.onCircuits(),
-    });
-    head.append(change);
+    head.append(el('h2', 'card__title', S.circuit.title), this.changeCircuit);
     const hero = el('div', 'circuit__hero');
     const art = el('div', 'circuit__art');
     art.append(circuitArt(c.plan));
@@ -373,7 +375,7 @@ export class HubScreen implements Screen {
     // Keep focus on the change button across a re-render.
     const hadFocus = this.circuitCard.contains(document.activeElement);
     this.circuitCard.replaceChildren(head, hero, chips);
-    if (hadFocus) change.focus({ preventScroll: true });
+    if (hadFocus) this.changeCircuit.focus({ preventScroll: true });
 
     // Settings or the notice for modes that are not in this build.
     this.settingsCard.hidden = !playable;

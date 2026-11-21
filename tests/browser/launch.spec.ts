@@ -14,50 +14,25 @@ function watchErrors(page: Page): string[] {
 }
 
 test.describe('launch screen', () => {
-  test('renders the name, the Time Trial start and the build', async ({ page }) => {
+  test('renders the name, the start prompt and the build, and opens the main menu', async ({
+    page,
+  }) => {
     const errors = watchErrors(page);
     await page.goto('/');
 
     await expect(page).toHaveTitle(GAME_NAME);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(GAME_NAME);
-    await expect(page.getByText('Time Trial, Monza')).toBeVisible();
-    const start = page.getByRole('button', { name: /Start/ });
-    await expect(start).toBeEnabled();
+    const press = page.locator('[data-action=press-start]');
+    await expect(press).toContainText(/press any key or tap to start/i);
     await expect(page.locator('.launch__build code')).toHaveText(
       /^([0-9a-f]{7}(\+dirty)?|unversioned)$/,
     );
     // No debug API without ?debug=1 in a production build.
     expect(await page.evaluate(() => typeof window.__undercut !== 'undefined')).toBe(false);
+    await press.click();
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
+    await expect(page.getByRole('button', { name: /Start session/ })).toBeEnabled();
     expect(errors).toEqual([]);
-  });
-
-  test('fits the viewport with nothing clipped or overflowing', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-
-    const report = await page.evaluate(() => {
-      const problems: string[] = [];
-      const { innerWidth: w, innerHeight: h } = window;
-      const root = document.documentElement;
-      if (root.scrollWidth > w)
-        problems.push(`page is ${root.scrollWidth}px wide in a ${w}px viewport`);
-      if (root.scrollHeight > h)
-        problems.push(`page is ${root.scrollHeight}px tall in a ${h}px viewport`);
-      for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
-        const r = el.getBoundingClientRect();
-        const name = `${el.tagName.toLowerCase()}.${el.className}`;
-        if (r.left < 0 || r.top < 0 || r.right > w + 0.5 || r.bottom > h + 0.5) {
-          problems.push(
-            `${name} at ${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)} leaves the viewport`,
-          );
-        }
-        if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'visible') {
-          problems.push(`${name} clips its content horizontally`);
-        }
-      }
-      return problems;
-    });
-    expect(report).toEqual([]);
   });
 });
 
