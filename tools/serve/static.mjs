@@ -32,6 +32,9 @@ const TYPES = {
   '.wav': 'audio/wav',
 };
 
+/** Headers the proxy sets itself; a client's own values are dropped. */
+const SET_BY_PROXY = new Set(['cf-connecting-ip', 'x-forwarded-for']);
+
 /** True for `/rooms` and anything under `/rooms/`. */
 export function isRoomsPath(url) {
   const pathname = (url ?? '/').split('?')[0];
@@ -208,8 +211,12 @@ export function createHandlers({ root, roomsPort }) {
     upstream.once('connect', () => {
       const lines = [`${req.method} ${req.url} HTTP/1.1`];
       for (let i = 0; i < req.rawHeaders.length; i += 2) {
+        // The client address comes from the socket, never from the client.
+        if (SET_BY_PROXY.has(req.rawHeaders[i].toLowerCase())) continue;
         lines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
       }
+      const address = req.socket.remoteAddress ?? '';
+      lines.push(`cf-connecting-ip: ${address}`, `x-forwarded-for: ${address}`);
       upstream.write(`${lines.join('\r\n')}\r\n\r\n`);
       if (head.length > 0) upstream.write(head);
       upstream.pipe(socket);
