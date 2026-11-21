@@ -27,7 +27,7 @@ Vite dev server with hot reload, plus the rooms service behind the same `/rooms`
 | `npm run typecheck` | `tsc` over every package |
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:physics` | Physics validation suite (`packages/sim/validation/`) |
-| `npm run test:rooms` | Protocol and room tests against the local Workers runtime |
+| `npm run test:rooms` | Protocol and room tests against the local Workers runtime, plus server start and stop checks |
 | `npm run build` | Production build plus bundle and asset budget check |
 | `npm run test:browser` | Playwright, desktop 1440×900 and landscape phone 844×390 (build first) |
 | `npm run check:assets` | Asset licence check against `assets/MANIFEST.json` |
