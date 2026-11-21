@@ -45,7 +45,12 @@ export function memoryStorage(port: StoragePort = new MemoryStorage()): RecordSt
   return { port, durable: () => false };
 }
 
-const VERSION = 2;
+/**
+ * 3: timed from the circuit's timing line (the control line), not the start line. Records of
+ * versions 1 and 2 were timed from the start line; their sectors and ghost distances do not
+ * compare, so they are dropped.
+ */
+const VERSION = 3;
 const keyOf = (circuit: string): string => `records.${circuit}`;
 
 /**
@@ -154,17 +159,6 @@ function parseRecord(text: string): CircuitRecord | null {
   const ghost = typeof r.ghost === 'string' ? r.ghost : null;
   const date = typeof r.date === 'string' ? r.date.slice(0, 32) : '';
   if (!positive(r.lap)) return null;
-  if (r.version === 1) {
-    // Version 1 kept one sector list: the best lap's splits.
-    if (!times(r.sectors)) return null;
-    return {
-      lap: r.lap,
-      lapSectors: r.sectors.slice(),
-      bestSectors: r.sectors.slice(),
-      ghost,
-      date,
-    };
-  }
   if (r.version !== VERSION || !times(r.lapSectors) || !times(r.bestSectors)) return null;
   return {
     lap: r.lap,

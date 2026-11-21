@@ -3,7 +3,7 @@
  * the player drives, and the drivers that follow them. Pure: no DOM, no clock, no renderer.
  * A driver produces only a `ControlInput`; the car's physics are exactly the player's.
  */
-export type { Driver, DriverSkill } from './driver/driver';
+export type { Driver, DriverMemory, DriverSkill } from './driver/driver';
 export {
   REFERENCE_GAINS,
   REFERENCE_SKILL,
@@ -12,6 +12,13 @@ export {
   type ReferenceDriverOptions,
 } from './driver/reference';
 export { lockExcess, spinExcess } from './driver/feel';
+export {
+  FOLLOWER_GAINS,
+  PathFollower,
+  type FollowPoint,
+  type FollowerGains,
+  type FollowerState,
+} from './driver/path-follower';
 export {
   EnvelopeModel,
   FULL_ENVELOPE,

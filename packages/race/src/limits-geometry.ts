@@ -7,11 +7,21 @@ import { LEFT, RIGHT, createPathPoint, type Track } from '@undercut/track';
  */
 export const TYRE_HALF_TREAD = 0.18;
 
+/** Counts wheels wholly past the track-limit lines. `TrackLimits` in play; scripts in tests. */
+export interface WheelsOffCounter {
+  wheelsOff(car: CarState): number;
+  /** Forget cached search positions (after a teleport). */
+  reset(): void;
+  /** Cached search positions, for snapshots that continue bit for bit (optional). */
+  hintState?(): number[];
+  setHintState?(hints: readonly number[]): void;
+}
+
 /**
- * Track limits: the white line's outer edge is the limit. A wheel is off when its tread is
- * entirely beyond it; the lap is invalid when all four are off at once (penalties are M3).
+ * Track-limit geometry: the white line's outer edge is the limit. A wheel is off when its tread
+ * is entirely beyond it. One per car (it caches each wheel's search position).
  */
-export class TrackLimits {
+export class TrackLimits implements WheelsOffCounter {
   private readonly track: Track;
   private readonly halfTread: number;
   private readonly hints = [{ index: -1 }, { index: -1 }, { index: -1 }, { index: -1 }];
@@ -31,9 +41,16 @@ export class TrackLimits {
     this.halfTread = halfTread;
   }
 
-  /** Forget cached search positions (after a teleport). */
   reset(): void {
     for (const h of this.hints) h.index = -1;
+  }
+
+  hintState(): number[] {
+    return this.hints.map((h) => h.index);
+  }
+
+  setHintState(hints: readonly number[]): void {
+    this.hints.forEach((h, i) => (h.index = hints[i] ?? -1));
   }
 
   /** How many wheels are wholly beyond the track-limit lines. Allocation-free. */

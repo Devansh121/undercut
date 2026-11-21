@@ -61,7 +61,7 @@ export function controlsHint(map: BindingMap, device: DeviceKind): string {
     const c = controlsFor(map, device, action)[0];
     return c ? controlLabel(c) : NOT_BOUND;
   };
-  return `Brake ${first('brake')} · Throttle ${first('throttle')} · ${first('pause')}, then Controls for all inputs`;
+  return `Brake: ${first('brake')} · Throttle: ${first('throttle')} · ${first('pause')}, then Controls for all inputs`;
 }
 
 let hintShown = false;

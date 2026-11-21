@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LapTimer, crossingFraction, type TimingEvent } from '../src/game/timing';
+import { LapTimer, crossingFraction, type TimingEvent } from '../src/timing/lap-timer';
 
 // A 1000 m loop with sector lines at 0, 300 and 650 m.
 const LINES = { length: 1000, sectors: [0, 300, 650] };
@@ -227,5 +227,92 @@ describe('LapTimer sector records', () => {
     if (lap?.type !== 'lap') throw new Error('no lap');
     expect(lap.result.record).toBe(false);
     expect(lap.result.sectorRecords).toEqual([false, true, false]);
+  });
+});
+
+describe('LapTimer hardening', () => {
+  it('does not count a line twice when the car backs over it and drives on', () => {
+    const timer = new LapTimer(LINES);
+    let r = drive(timer, { s: 990, t: 0 }, 100, 0.2);
+    expect(timer.lap).toBe(1);
+    // Over the sector-1 line at 300 m, back to 290 m, forward again.
+    r = drive(timer, r, 100, 2.85);
+    const over = drive(timer, r, 100, 0.1);
+    expect(over.events.filter((e) => e.type === 'sector')).toHaveLength(1);
+    const back = drive(timer, over, -50, 0.4);
+    expect(back.s).toBeLessThan(300);
+    expect(back.events).toEqual([]);
+    const again = drive(timer, back, 100, 0.5);
+    expect(again.events.filter((e) => e.type === 'sector')).toHaveLength(0);
+    expect(timer.sector).toBe(1);
+  });
+
+  it('does not start or finish a lap from a backwards crossing of the timing line', () => {
+    const timer = new LapTimer(LINES);
+    let r = drive(timer, { s: 990, t: 0 }, 100, 0.2);
+    expect(timer.lap).toBe(1);
+    // Reverse back over the line, then forward over it again: still lap 1, no lap event.
+    r = drive(timer, { s: 10, t: r.t }, -20, 1);
+    expect(r.events).toEqual([]);
+    r = drive(timer, r, 50, 1);
+    expect(r.events.filter((e) => e.type === 'lap' || e.type === 'lapStart')).toEqual([]);
+    expect(timer.lap).toBe(1);
+  });
+
+  it('finds every line crossed inside one long tick, in order, with interpolated times', () => {
+    const timer = new LapTimer({ length: 1000, sectors: [0, 10, 20] });
+    // Cross 0 to start lap 1, then one tick that runs from 5 m to 995 m + 30 m (wrapping).
+    timer.update(999, 1, 0, 0.02);
+    const events = timer.update(1, 25, 0.02, 0.26);
+    expect(events.map((e) => e.type)).toEqual(['sector', 'sector']);
+    const [a, b] = events;
+    if (a?.type !== 'sector' || b?.type !== 'sector') throw new Error('no sectors');
+    expect(a.at).toBeCloseTo(0.02 + (9 / 24) * 0.24, 12);
+    expect(b.at).toBeCloseTo(0.02 + (19 / 24) * 0.24, 12);
+  });
+
+  it('crosses the lines from the pit lane like from the track (positions projected onto the lap)', () => {
+    const timer = new LapTimer(LINES);
+    drive(timer, { s: 990, t: 0 }, 100, 0.2);
+    // Pit-lane speed through the timing line at 20 m/s: the lap still completes once.
+    const r = drive(timer, { s: 10 + 0.2 * 100, t: 0.2 }, 100, 9.6);
+    const slow = drive(timer, r, 20, 2);
+    const laps = [...r.events, ...slow.events].filter((e) => e.type === 'lap');
+    expect(laps).toHaveLength(1);
+  });
+
+  it('carries the distance over a jump between ticks without crossing anything', () => {
+    const timer = new LapTimer(LINES);
+    drive(timer, { s: 990, t: 0 }, 100, 0.2);
+    // The car is moved from 10 m to 400 m (a reset): no sector line is crossed by the jump.
+    const r = drive(timer, { s: 400, t: 0.3 }, 100, 0.1);
+    expect(r.events).toEqual([]);
+    expect(timer.sector).toBe(0);
+    expect(timer.lapDistance).toBeGreaterThan(390);
+  });
+
+  it('starts lap 1 at a standing start on the grid ahead of the timing line', () => {
+    const timer = new LapTimer({ length: 1000, sectors: [950, 300, 650] });
+    timer.startAt(5, 990);
+    expect(timer.running).toBe(true);
+    expect(timer.lap).toBe(1);
+    expect(timer.distance).toBeCloseTo(40, 9);
+    // First line: sector 1 at 300 m (310 m away), at 50 m/s: 6.2 s.
+    const r = drive(timer, { s: 990, t: 5 }, 50, 6.3);
+    const sector = r.events.find((e) => e.type === 'sector');
+    if (sector?.type !== 'sector') throw new Error('no sector');
+    expect(sector.index).toBe(0);
+    expect(sector.at).toBeCloseTo(11.2, 9);
+  });
+
+  it('round-trips its state', () => {
+    const a = new LapTimer(LINES);
+    let r = drive(a, { s: 990, t: 0 }, 100, 5.3);
+    const b = new LapTimer(LINES);
+    b.setState(JSON.parse(JSON.stringify(a.getState())));
+    const ra = drive(a, r, 90, 12);
+    r = drive(b, r, 90, 12);
+    expect(r.events).toEqual(ra.events);
+    expect(b.getState()).toEqual(a.getState());
   });
 });

@@ -10,7 +10,7 @@ The target is a frame from a TV broadcast or a current sim: physically lit, dres
 | Image-based lighting | HDRI per circuit (see survey), PMREM prefiltered, one sun or floodlight key | Same HDRI at 1k, prefiltered once at load |
 | Shadows | Cascaded sun shadows, 3 cascades, 2048 maps, PCF soft; contact shadow under the car | 1 cascade, 1024, car-only near cascade |
 | Ambient occlusion | GTAO/SAO at half resolution, plus baked AO in car and trackside textures | Baked AO only |
-| Tone map | AgX (filmic), exposure per circuit preset, no clipping on white kerbs | AgX |
+| Tone map | Khronos PBR Neutral (chosen over AgX and ACES by comparison, `docs/render.md`), exposure per circuit preset, no clipping on white kerbs | Same |
 | Anti-aliasing | TAA, or SMAA where TAA ghosts on the HUD-free scene | FXAA plus dynamic resolution (floor 30 fps) |
 | Other | Bloom only on emissive (brake glow, floodlights, rain light), mild lens vignette, motion blur on wheels only | No bloom, no motion blur |
 

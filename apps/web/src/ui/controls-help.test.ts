@@ -32,7 +32,7 @@ describe('controls list', () => {
     const { map } = rebind(defaultBindings(), 'keyboard', 'brake', 0, keyControl('KeyJ'));
     expect(row(controlRows(map, 'keyboard'), 'brake')?.input).toBe('J or Down arrow');
     expect(controlsHint(map, 'keyboard')).toBe(
-      'Brake J · Throttle W · Esc, then Controls for all inputs',
+      'Brake: J · Throttle: W · Esc, then Controls for all inputs',
     );
   });
 });

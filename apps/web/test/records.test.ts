@@ -103,17 +103,22 @@ describe('RecordStore', () => {
     });
   });
 
-  it('reads version 1 records, whose sectors were the lap splits', async () => {
+  it('drops records timed from the start line (versions 1 and 2): their sectors do not compare', async () => {
     const storage = new MemoryStorage();
-    await storage.save(
-      'records.monza',
-      JSON.stringify({ version: 1, lap: 81, sectors: [26, 27, 28], ghost: null, date: 'x' }),
-    );
-    expect(await new RecordStore(durable(storage)).load('monza')).toMatchObject({
-      lap: 81,
-      lapSectors: [26, 27, 28],
-      bestSectors: [26, 27, 28],
-    });
+    for (const old of [
+      { version: 1, lap: 81, sectors: [26, 27, 28], ghost: null, date: 'x' },
+      {
+        version: 2,
+        lap: 81,
+        lapSectors: [26, 27, 28],
+        bestSectors: [26, 27, 28],
+        ghost: null,
+        date: 'x',
+      },
+    ]) {
+      await storage.save('records.monza', JSON.stringify(old));
+      expect(await new RecordStore(durable(storage)).load('monza')).toBeNull();
+    }
   });
 
   it('keeps working in memory when storage throws', async () => {
@@ -131,10 +136,10 @@ describe('RecordStore', () => {
     expect(await new RecordStore(durable(storage)).load('monza')).toBeNull();
     for (const bad of [
       { version: 99, lap: 1 },
-      { version: 1, lap: 'fast', sectors: [] },
-      { version: 1, lap: -3, sectors: [1, 2, 3] },
-      { version: 2, lap: 30, lapSectors: [10, 10, 10], bestSectors: [10, 'x', 10] },
-      { version: 2, lap: Infinity, lapSectors: [1, 2, 3], bestSectors: [1, 2, 3] },
+      { version: 3, lap: 'fast', lapSectors: [], bestSectors: [] },
+      { version: 3, lap: -3, lapSectors: [1, 2, 3], bestSectors: [1, 2, 3] },
+      { version: 3, lap: 30, lapSectors: [10, 10, 10], bestSectors: [10, 'x', 10] },
+      { version: 3, lap: Infinity, lapSectors: [1, 2, 3], bestSectors: [1, 2, 3] },
     ]) {
       await storage.save('records.monza', JSON.stringify(bad));
       expect(await new RecordStore(durable(storage)).load('monza')).toBeNull();

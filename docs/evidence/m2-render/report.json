@@ -1,0 +1,989 @@
+{
+  "sha": "2b6da1b",
+  "circuit": "monza",
+  "shots": [
+    {
+      "framing": {
+        "car": {
+          "left": 783.4391750958265,
+          "top": 435.08034484648306,
+          "right": 808.5002807601637,
+          "bottom": 447.45124195493037
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "grid-front",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/grid-front-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 64,
+        "time": 0.26666666666666666,
+        "timeScale": 0,
+        "s": 5636,
+        "d": 2.799999999999992,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 438.49163675677386,
+          "top": 458.8001255912541,
+          "right": 1001.587598251817,
+          "bottom": 803.8604509856027
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "chicane-braking",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/chicane-braking-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 783,
+        "time": 3.2624999999999997,
+        "timeScale": 0,
+        "s": 547.8152586655112,
+        "d": -0.006770379052543167,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": true,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "134",
+        "gear": "3",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "available",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 580.1843011659073,
+          "top": 477.6606153953702,
+          "right": 861.9189199136501,
+          "bottom": 686.2025895386199
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "fast-corner",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/fast-corner-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1311,
+        "time": 5.4625,
+        "timeScale": 0,
+        "s": 1063.1893203491993,
+        "d": 1.5902054082757606,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "chase-far",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "285",
+        "gear": "7",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 250.79080850218014,
+          "top": 114.38384385967409,
+          "right": 1186.377939007197,
+          "bottom": 771.0676189545661
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": true
+      },
+      "station": "cockpit",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/cockpit-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 2087,
+        "time": 8.695833333333333,
+        "timeScale": 0,
+        "s": 5183.067807360301,
+        "d": 1.574232230405548,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "cockpit",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "265",
+        "gear": "7",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 224.7966307817669,
+          "top": -180.7051209034824,
+          "right": 1214.4691284331236,
+          "bottom": 893.3259409039856
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": true
+      },
+      "station": "tcam",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/tcam-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 2903,
+        "time": 12.095833333333333,
+        "timeScale": 0,
+        "s": 1702.8032296074027,
+        "d": 0.19319083996987893,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "tcam",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "198",
+        "gear": "5",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 477.56557481484055,
+          "top": 464.3828304104589,
+          "right": 960.9265076351577,
+          "bottom": 758.2231140096246
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "straight",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/straight-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 3935,
+        "time": 16.395833333333332,
+        "timeScale": 0,
+        "s": 5643.181703226004,
+        "d": -0.13175916130541745,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "306",
+        "gear": "8",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 417.8411257237726,
+          "top": 385.9099308309054,
+          "right": 1113.6042366578051,
+          "bottom": 520.5453624648303
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "tv-kerb",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/tv-kerb-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 3995,
+        "time": 16.645833333333332,
+        "timeScale": 0,
+        "s": 613.3328292140062,
+        "d": 6.0147696197292255,
+        "surface": 2,
+        "wheelsOff": 2,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "114",
+        "gear": "2",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": -563.3541688108693,
+          "top": 180.73183245429416,
+          "right": -537.8602972905484,
+          "bottom": 184.31023656224107
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "pit-lane",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/pit-lane-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 3995,
+        "time": 16.645833333333332,
+        "timeScale": 0,
+        "s": 5000,
+        "d": -3.686426679693777e-14,
+        "surface": 0,
+        "wheelsOff": 2,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "0",
+        "gear": "1",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 449.49030920819155,
+          "top": 188.53484399537047,
+          "right": 460.350121648206,
+          "bottom": 193.89553818046983
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "grid-front",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/grid-front-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 79,
+        "time": 0.32916666666666666,
+        "timeScale": 0,
+        "s": 5636,
+        "d": 2.799999999999992,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "touch",
+        "assists": {
+          "tractionControl": 3,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 3
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 335.33858544129106,
+          "top": 155.60517604305366,
+          "right": 508.57465029398315,
+          "bottom": 267.81249999999994
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "chicane-braking",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/chicane-braking-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 803,
+        "time": 3.345833333333333,
+        "timeScale": 0,
+        "s": 547.9700043128115,
+        "d": -0.0068474765750486995,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": true,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "134",
+        "gear": "3",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "available",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 375.94357896863795,
+          "top": 197.07340138782763,
+          "right": 469.1621469249187,
+          "bottom": 267.7371468990125
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "fast-corner",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/fast-corner-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1338,
+        "time": 5.575,
+        "timeScale": 0,
+        "s": 1065.444262963853,
+        "d": 1.6517265646666424,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "chase-far",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "286",
+        "gear": "7",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 218.33395413715363,
+          "top": 49.59408199689471,
+          "right": 623.7923610678089,
+          "bottom": 334.3396292197668
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": true
+      },
+      "station": "cockpit",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/cockpit-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 2106,
+        "time": 8.775,
+        "timeScale": 0,
+        "s": 5180.5506520594845,
+        "d": 1.5472560809153086,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "cockpit",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "264",
+        "gear": "7",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 207.50237186263456,
+          "top": -78.2977777642078,
+          "right": 636.4440485818951,
+          "bottom": 387.1701393502533
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": true
+      },
+      "station": "tcam",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/tcam-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 2930,
+        "time": 12.208333333333334,
+        "timeScale": 0,
+        "s": 1704.6272788095198,
+        "d": 0.19436084771947956,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "tcam",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "196",
+        "gear": "5",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 346.73541107984215,
+          "top": 171.26223200515622,
+          "right": 497.41421624351887,
+          "bottom": 267.74589049176706
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "straight",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/straight-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 3962,
+        "time": 16.508333333333333,
+        "timeScale": 0,
+        "s": 5642.988671317163,
+        "d": -0.12708768167934203,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "306",
+        "gear": "8",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 291.0559564887897,
+          "top": 167.22630853032632,
+          "right": 592.5738621448907,
+          "bottom": 225.57172739704214
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "tv-kerb",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/tv-kerb-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 4026,
+        "time": 16.775,
+        "timeScale": 0,
+        "s": 613.3328292140062,
+        "d": 6.0147696197292255,
+        "surface": 2,
+        "wheelsOff": 2,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "114",
+        "gear": "2",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": -134.12013812825938,
+          "top": 78.31713508253968,
+          "right": -123.07279549257099,
+          "bottom": 79.86776917697112
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "pit-lane",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/pit-lane-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 4026,
+        "time": 16.775,
+        "timeScale": 0,
+        "s": 5000,
+        "d": -3.686426679693777e-14,
+        "surface": 0,
+        "wheelsOff": 2,
+        "drsAvailable": false,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "0",
+        "gear": "1",
+        "lapTime": "0:00.000",
+        "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "best": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
+        "drs": "off",
+        "message": ""
+      }
+    }
+  ],
+  "lap": null,
+  "moving": {
+    "video": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/moving-1440x900.mp4",
+    "strip": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/moving-strip.jpg",
+    "burst": "../../../../.cache/undercut/scratch/m2-render-pipeline/r12/moving-burst.jpg"
+  },
+  "errors": []
+}
