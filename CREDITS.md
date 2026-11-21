@@ -76,3 +76,7 @@ Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Crea
 The car (`apps/web/public/assets/car/`: three GLB levels of detail, ten team livery masks and the livery index) is generated from nothing by the repository's own scripts in `tools/car/` (`npm run car:build`) and is under the same MIT licence as the code. Its textures (carbon twill, bodywork panel detail, tyre sidewall with an invented maker's mark and compound ticks, brake-disc glow) are drawn procedurally; no third-party image or model is used. The build runs [Blender](https://www.blender.org/) 5.2 LTS (GPL-2.0-or-later) as a tool; Blender is not shipped. The studio lighting in the committed Blender reference renders is Poly Haven's `studio_small_09` HDRI (CC0), used for lighting only and not committed.
 
 The team car images on the main menu (`apps/web/public/assets/ui/cars/`) are renders of that car in each driver's livery, made by `tools/ui/team-cars.mjs` (`npm run ui:cars`) with the repository's car viewer, under the same MIT licence.
+
+## Circuit prop kit
+
+The GLBs in `apps/web/public/assets/props/` are original scripted models by Project contributors, MIT, authored in `tools/props/props.py`: geometry, procedural surface grain and baked vertex ambient occlusion. No third-party models or textures are included. Per-file hashes and provenance are recorded in `assets/MANIFEST.json`.

@@ -1118,3 +1118,93 @@
     padding-top: var(--sp-2);
   }
 }
+
+/* ================= Controls list (menus and pause) ================= */
+
+.controls__card {
+  width: min(720px, 100%);
+}
+
+.controls__device {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-text-2);
+}
+
+.controls__device .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.controls__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--sp-6);
+  margin: 0;
+}
+
+.controls__row {
+  min-height: 40px;
+}
+
+.controls__row dt {
+  white-space: nowrap;
+}
+
+.controls__input {
+  margin: 0;
+  font-size: var(--fs-14);
+  font-weight: 650;
+  text-align: right;
+  color: var(--c-text-1);
+}
+
+.controls__input.is-empty {
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+.controls__note {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-1);
+  background: var(--c-ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--c-text-2);
+}
+
+.shell__controls {
+  height: 32px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-11);
+}
+
+@media (max-width: 640px) {
+  .controls__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .controls__card {
+    width: min(780px, 100%);
+  }
+  .controls__row {
+    min-height: 28px;
+  }
+  .controls__input,
+  .controls__row dt {
+    font-size: var(--fs-12);
+  }
+  .controls__note {
+    margin-top: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-11);
+  }
+  .shell__controls {
+    height: 28px;
+    padding: 0 var(--sp-2);
+  }
+}

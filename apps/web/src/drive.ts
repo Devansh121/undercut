@@ -55,6 +55,7 @@ import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
 import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
 import { setGlyphContext } from './ui/kit/glyph';
+import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
@@ -424,6 +425,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
+    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
@@ -455,6 +457,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
+  // The storage warning goes first; the first-start controls hint follows it.
+  let queued: HudMessage | null = takeFirstStartHint()
+    ? {
+        tag: S.controls.hintTag,
+        text: controlsHint(input.profile.bindings, input.activeDevice),
+        tone: 'info',
+      }
+    : null;
   if (!records.persistent)
     say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
 
@@ -603,10 +613,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
+      const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
         if (e.type !== 'action') continue;
+        if (e.action === 'menuAccept' && native) continue;
+        if (pause.navigate(e.action)) continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
-        else pause.navigate(e.action);
       }
       lookBack = false;
     }
@@ -622,6 +635,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (message) {
       messageLeft -= dt;
       if (messageLeft <= 0) message = null;
+    }
+    if (!message && queued) {
+      say(queued, 6);
+      queued = null;
     }
     results.tick(dt);
 

@@ -5,7 +5,9 @@
  */
 import { GAME_NAME } from '@undercut/core';
 import type { DeviceKind } from '@undercut/input';
+import { ControlsPanel, type ControlsSource } from './controls-help';
 import { el } from './dom';
+import { button } from './kit/components';
 import { brandMark, icon, type IconKey } from './kit/icons';
 import { refreshGlyphs } from './kit/glyph';
 import { activeScope, focusFirst, navigate, showFocusRing, type NavAction } from './kit/nav';
@@ -42,10 +44,13 @@ export class Shell {
   private readonly stack: Screen[] = [];
   /** Where focus was on each screen below the top, to restore it on the way back. */
   private readonly focusMemory = new WeakMap<Screen, HTMLElement>();
+  /** The controls list, opened from the top bar on every menu screen. */
+  readonly controls: ControlsPanel | null;
 
   constructor(
     private readonly host: HTMLElement,
     private readonly onEmpty: () => void = () => {},
+    controls?: ControlsSource,
   ) {
     this.root = el('div', 'shell');
     this.root.dataset.testid = 'menu';
@@ -57,10 +62,24 @@ export class Shell {
     const right = el('div', 'shell__right');
     this.deviceChip = el('span', 'device-chip');
     this.deviceChip.dataset.testid = 'device-chip';
+    this.controls = controls ? new ControlsPanel(controls) : null;
+    const panel = this.controls;
+    if (panel) {
+      const open = button({
+        label: S.controls.title,
+        icon: 'keyboard',
+        variant: 'quiet',
+        action: 'controls',
+        onClick: () => panel.show(),
+      });
+      open.classList.add('shell__controls');
+      right.append(open);
+    }
     right.append(this.deviceChip);
     this.top.append(word, this.crumbs, right);
     this.main = el('div', 'shell__main');
     this.root.append(this.top, this.main);
+    if (panel) this.root.append(panel.root);
     this.root.addEventListener('pointerdown', () => showFocusRing(false));
     this.setDevice('keyboard');
   }
@@ -98,6 +117,7 @@ export class Shell {
 
   /** Replace the whole stack with one screen. */
   reset(screen: Screen): void {
+    this.controls?.hide();
     for (const s of this.stack.splice(0)) s.leave?.();
     this.stack.push(screen);
     this.show(screen, true);
@@ -116,12 +136,19 @@ export class Shell {
     const screen = this.current;
     if (!screen) return;
     if (action !== 'menuAccept' || !nativeAccept) showFocusRing(true);
+    // The controls list sits over everything: Back closes it; accept presses its Back button.
+    if (this.controls?.open) {
+      if (action === 'menuBack') this.controls.hide();
+      else if (action === 'menuAccept' && !nativeAccept) this.controls.accept();
+      return;
+    }
     if (action === 'menuBack') {
       if (screen.back?.()) return;
       if (!this.pop()) this.onEmpty();
       return;
     }
-    const scope = activeScope(screen.root);
+    // The whole shell, so the top bar (Controls) is reachable too; an open dialog narrows it.
+    const scope = activeScope(this.root);
     if (navigate(scope, action, nativeAccept)) return;
     screen.action?.(action);
   }

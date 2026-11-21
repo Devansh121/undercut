@@ -76,7 +76,10 @@ function today(): string {
 }
 
 // ---- Menus
-const shell = new Shell(app);
+const shell = new Shell(app, () => undefined, {
+  bindings: () => input.profile.bindings,
+  device: () => input.activeDevice,
+});
 shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
   action: (a, native) => shell.handle(a, native),

@@ -247,6 +247,36 @@ export const S = {
     recordsNote: 'Records last until the page closes',
   },
 
+  controls: {
+    title: 'Controls',
+    hintTag: 'Controls',
+    rows: {
+      steer: 'Steer',
+      throttle: 'Throttle',
+      brake: 'Brake',
+      gearUp: 'Gear up',
+      gearDown: 'Gear down',
+      drs: 'DRS',
+      overtake: 'Overtake',
+      pitLimiter: 'Pit limiter',
+      camera: 'Camera',
+      lookBack: 'Look back',
+      resetToTrack: 'Reset to track',
+      pause: 'Pause',
+    },
+    notBound: 'Not bound',
+    pauseMenu: 'Pause menu',
+    arrowKeys: 'arrow keys',
+    leftOnly: (c: string) => `${c} (left)`,
+    rightOnly: (c: string) => `${c} (right)`,
+    gearDownWord: 'gear down',
+    gearUpWord: 'gear up',
+    reverse: (down: string, up: string) =>
+      `Reverse, with automatic gears: stop, then press ${down} twice. Press ${up} twice to return to first.`,
+    hint: (brake: string, throttle: string, pause: string) =>
+      `Brake: ${brake} · Throttle: ${throttle} · ${pause}, then Controls for all inputs`,
+  },
+
   gallery: {
     title: 'Interface kit',
   },
