@@ -40,9 +40,17 @@ const LEVEL = {
 };
 
 /**
+ * Most triggers one burst can receive in one control chunk: at most one per cylinder event,
+ * and six cylinders can at most all fire on every sample of a chunk. Never reached in
+ * practice; it bounds a preallocated queue so no trigger is ever dropped or overwritten.
+ */
+const MAX_TRIGGERS = 6 * CHUNK;
+
+/**
  * One short noise burst through a resonator: an overrun pop or a gearbox clack.
- * A trigger names the sample of the current chunk it starts on, and the burst renders
- * sample-accurately from there, so the result does not depend on how blocks are split.
+ * Triggers name the sample of the current chunk they start on and are queued; the burst
+ * renders sample-accurately from one trigger to the next, so the result does not depend on
+ * how blocks are split, however many triggers land in one chunk.
  */
 class Burst {
   private pos = 0;
@@ -50,12 +58,13 @@ class Burst {
   private ring = 0;
   private amplitude = 0;
   private active = false;
-  private pendingAt = -1;
-  private pendingLength = 0;
-  private pendingRing = 0;
-  private pendingAmplitude = 0;
-  private pendingFrequency = 0;
-  private pendingQ = 0;
+  private queued = 0;
+  private readonly qAt = new Int32Array(MAX_TRIGGERS);
+  private readonly qLength = new Int32Array(MAX_TRIGGERS);
+  private readonly qRing = new Int32Array(MAX_TRIGGERS);
+  private readonly qAmplitude = new Int32Array(MAX_TRIGGERS);
+  private readonly qFrequency = new Int32Array(MAX_TRIGGERS);
+  private readonly qQ = new Int32Array(MAX_TRIGGERS);
   private readonly filter: Biquad;
   private readonly scratch = new Float64Array(CHUNK);
 
@@ -66,14 +75,20 @@ class Burst {
 
   /** Whether the burst is sounding at sample `offset` of the chunk being rendered. */
   activeAt(offset: number): boolean {
-    if (this.pendingAt >= 0 && this.pendingAt <= offset) return true;
+    // The latest trigger at or before `offset` decides, if there is one.
+    for (let k = this.queued - 1; k >= 0; k--) {
+      const at = this.qAt[k] as number;
+      if (at <= offset) {
+        return offset - at < (this.qLength[k] as number) + (this.qRing[k] as number);
+      }
+    }
     return this.active && this.pos + offset < this.length + this.ring;
   }
 
   /**
-   * Start a burst at sample `offset` of the chunk being rendered. Every argument is an
-   * integer (frames, thousandths, hertz, tenths), so the call never has to box a
-   * fractional number on the audio thread. A second trigger in the same chunk replaces it.
+   * Start a burst at sample `offset` of the chunk being rendered (offsets arrive in order).
+   * Every argument is an integer (frames, thousandths, hertz, tenths), so the call never has
+   * to box a fractional number on the audio thread.
    */
   trigger(
     offset: number,
@@ -83,12 +98,15 @@ class Burst {
     frequencyHz: number,
     qTenths: number,
   ): void {
-    this.pendingAt = offset;
-    this.pendingLength = lengthFrames < 2 ? 2 : lengthFrames;
-    this.pendingRing = ringFrames;
-    this.pendingAmplitude = amplitudeMilli;
-    this.pendingFrequency = frequencyHz;
-    this.pendingQ = qTenths;
+    const k = this.queued;
+    if (k >= MAX_TRIGGERS) return;
+    this.qAt[k] = offset;
+    this.qLength[k] = lengthFrames < 2 ? 2 : lengthFrames;
+    this.qRing[k] = ringFrames;
+    this.qAmplitude[k] = amplitudeMilli;
+    this.qFrequency[k] = frequencyHz;
+    this.qQ[k] = qTenths;
+    this.queued = k + 1;
   }
 
   /** Add the next `n` samples into `out`, excited by `noise`; add their energy to `meter[slot]`. */
@@ -99,41 +117,26 @@ class Burst {
     meter: Float64Array,
     slot: number,
   ): void {
-    if (!this.active && this.pendingAt < 0) return;
+    if (!this.active && this.queued === 0) return;
     const x = this.scratch;
-    const start = this.pendingAt >= 0 ? this.pendingAt : n;
-    let pos = this.pos;
-    // The burst already sounding, up to the new trigger (or the end of the chunk).
-    let end = 0;
-    if (this.active) {
-      const left = this.length + this.ring - pos;
-      end = left < start ? left : start;
-      this.excite(noise, x, 0, end, pos);
-      this.filter.processRange(x, x, 0, end);
-      pos += end;
-      if (pos >= this.length + this.ring) this.active = false;
-    }
-    for (let i = end; i < start && i < n; i++) x[i] = 0;
-    // A new burst from its trigger sample.
-    if (this.pendingAt >= 0) {
+    let cursor = 0;
+    for (let k = 0; k < this.queued; k++) {
+      const at = this.qAt[k] as number;
+      this.renderSegment(noise, x, cursor, at);
+      // Start the queued burst at its sample: from rest if the previous one had ended.
       if (!this.active) this.filter.reset();
-      this.filter.frequency = this.pendingFrequency;
-      this.filter.q = this.pendingQ / 10;
+      this.filter.frequency = this.qFrequency[k] as number;
+      this.filter.q = (this.qQ[k] as number) / 10;
       this.filter.design();
-      this.length = this.pendingLength;
-      this.ring = this.pendingRing;
-      this.amplitude = this.pendingAmplitude / 1000;
-      this.pendingAt = -1;
+      this.length = this.qLength[k] as number;
+      this.ring = this.qRing[k] as number;
+      this.amplitude = (this.qAmplitude[k] as number) / 1000;
+      this.pos = 0;
       this.active = true;
-      const left = this.length + this.ring;
-      const stop = start + left < n ? start + left : n;
-      this.excite(noise, x, start, stop, 0);
-      this.filter.processRange(x, x, start, stop);
-      for (let i = stop; i < n; i++) x[i] = 0;
-      pos = stop - start;
-      if (pos >= this.length + this.ring) this.active = false;
+      cursor = at;
     }
-    this.pos = pos;
+    this.queued = 0;
+    this.renderSegment(noise, x, cursor, n);
     let energy = 0;
     for (let i = 0; i < n; i++) {
       const v = x[i] as number;
@@ -143,24 +146,28 @@ class Burst {
     meter[slot] = (meter[slot] as number) + energy;
   }
 
-  /** Raised-cosine noise excitation for samples [from, to), the first at burst position `pos`. */
-  private excite(
-    noise: Float64Array,
-    x: Float64Array,
-    from: number,
-    to: number,
-    pos: number,
-  ): void {
-    const len = this.length;
-    const amplitude = this.amplitude;
-    for (let i = from; i < to; i++, pos++) {
-      if (pos < len) {
-        const s = Math.sin((Math.PI * pos) / len);
-        x[i] = (noise[i] as number) * s * s * amplitude;
-      } else {
-        x[i] = 0;
+  /** Render the current burst into `x` over [from, to); zeros once it has ended. */
+  private renderSegment(noise: Float64Array, x: Float64Array, from: number, to: number): void {
+    let end = from;
+    if (this.active) {
+      const left = this.length + this.ring - this.pos;
+      end = from + left < to ? from + left : to;
+      const len = this.length;
+      const amplitude = this.amplitude;
+      let pos = this.pos;
+      for (let i = from; i < end; i++, pos++) {
+        if (pos < len) {
+          const s = Math.sin((Math.PI * pos) / len);
+          x[i] = (noise[i] as number) * s * s * amplitude;
+        } else {
+          x[i] = 0;
+        }
       }
+      this.filter.processRange(x, x, from, end);
+      this.pos = pos;
+      if (pos >= this.length + this.ring) this.active = false;
     }
+    for (let i = end; i < to; i++) x[i] = 0;
   }
 }
 
