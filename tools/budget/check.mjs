@@ -35,17 +35,6 @@ const CAR_FILES = {
   far: 'car/car_far.glb',
 };
 
-const TEXT = new Set([
-  '.js',
-  '.mjs',
-  '.css',
-  '.html',
-  '.json',
-  '.svg',
-  '.txt',
-  '.webmanifest',
-  '.gltf',
-]);
 
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
