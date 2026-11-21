@@ -56,7 +56,26 @@ export {
   type CarStartOptions,
   type MassState,
 } from './state';
-export { FL, FR, RL, RR, createCarModel, type CarModel } from './model';
+export {
+  BUMP_STOP_GAP,
+  DROOP_STOP_GAP,
+  FL,
+  FR,
+  RIM_RADIUS,
+  RL,
+  RR,
+  createCarModel,
+  tyreBottomDeflection,
+  type CarModel,
+} from './model';
+export {
+  AIRBORNE_ALLOWANCE,
+  PLANK_ALLOWANCE,
+  checkCarInvariants,
+  invariantLimits,
+  type InvariantLimits,
+  type InvariantOptions,
+} from './invariants';
 export {
   MAX_SUBSTEP,
   aeroCoefficients,

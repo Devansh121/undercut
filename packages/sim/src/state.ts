@@ -90,6 +90,13 @@ export class CarState {
   externalForceX = 0;
   externalForceZ = 0;
   externalTorque = 0;
+  /**
+   * Diagnostics of the contact's last line of defence (see `liftOutOfGround` in step.ts): how
+   * many substeps met a step in the ground, and how many lifted the car out of a penetration no
+   * deflection explains. Both stay zero in normal driving on a continuous track.
+   */
+  groundSteps = 0;
+  contactLifts = 0;
 
   // Per wheel, in FL, FR, RL, RR order.
   readonly wheelSpeed = new Float64Array(4);
@@ -171,6 +178,8 @@ const SCALAR_KEYS = [
   'externalForceX',
   'externalForceZ',
   'externalTorque',
+  'groundSteps',
+  'contactLifts',
 ] as const satisfies readonly (keyof CarState)[];
 
 const WHEEL_KEYS = [
