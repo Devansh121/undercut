@@ -1,0 +1,873 @@
+{
+  "sha": "d5e23eb",
+  "circuit": "monza",
+  "shots": [
+    {
+      "framing": {
+        "car": {
+          "left": 731.3004517873899,
+          "top": 436.7236764147812,
+          "right": 742.0929595980865,
+          "bottom": 441.00925097027994
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "grid-front",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/grid-front-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 71,
+        "time": 0.29583333333333334,
+        "timeScale": 0,
+        "s": 5312.5,
+        "d": 3.333488706892554e-14,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: S · Throttle: W · Esc, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 438.3630154108551,
+          "top": 458.8421994488709,
+          "right": 1001.4626409976038,
+          "bottom": 803.9448314293968
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "chicane-braking",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/chicane-braking-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 790,
+        "time": 3.2916666666666665,
+        "timeScale": 0,
+        "s": 547.8151373334061,
+        "d": -0.006770411745615979,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": true,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "134",
+        "gear": "3",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "available",
+        "message": "ControlsBrake: S · Throttle: W · Esc, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 478.4989778727697,
+          "top": 463.8604679760176,
+          "right": 961.8506124492332,
+          "bottom": 757.625990432235
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "straight",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/straight-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1820,
+        "time": 7.583333333333333,
+        "timeScale": 0,
+        "s": 5642.356536735797,
+        "d": -0.1232286655708233,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 1,
+        "running": true,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 2.0370614755310044,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "306",
+        "gear": "8",
+        "lapTime": "0:02.034",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: S · Throttle: W · Esc, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 219.93559540459506,
+          "top": 308.2922864842778,
+          "right": 238.7085465198849,
+          "bottom": 318.693274102413
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "stand-straight",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/stand-straight-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1826,
+        "time": 7.608333333333333,
+        "timeScale": 0,
+        "s": 5312.5,
+        "d": 3.333488706892554e-14,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: S · Throttle: W · Esc, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 1038.3872886024672,
+          "top": 536.167623616525,
+          "right": 1231.1328373567455,
+          "bottom": 616.2235676611
+        },
+        "cluster": {
+          "left": 1113,
+          "top": 715.8125,
+          "right": 1413,
+          "bottom": 873
+        },
+        "overlap": false
+      },
+      "station": "chicane-outside",
+      "viewport": "1440x900",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/chicane-outside-1440x900.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1829,
+        "time": 7.620833333333334,
+        "timeScale": 0,
+        "s": 612,
+        "d": 0.4999999999999709,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "95",
+        "gear": "2",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: S · Throttle: W · Esc, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 426.8968624412023,
+          "top": 189.24693636352382,
+          "right": 431.5736158206146,
+          "bottom": 191.10400875378795
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "grid-front",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/grid-front-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 80,
+        "time": 0.3333333333333333,
+        "timeScale": 0,
+        "s": 5312.5,
+        "d": 3.333488706892554e-14,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "touch",
+        "assists": {
+          "tractionControl": 3,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 3
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: Brake pedal · Throttle: Throttle pedal · Pause button, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 335.36199431813554,
+          "top": 155.51468128994597,
+          "right": 508.6588490997373,
+          "bottom": 267.79914857396864
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "chicane-braking",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/chicane-braking-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 806,
+        "time": 3.3583333333333334,
+        "timeScale": 0,
+        "s": 548.2785977405553,
+        "d": -0.006909705378264024,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": true,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "133",
+        "gear": "3",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "available",
+        "message": "ControlsBrake: Brake pedal · Throttle: Throttle pedal · Pause button, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 346.71911930817805,
+          "top": 171.16591929417606,
+          "right": 497.43970653739143,
+          "bottom": 267.8125
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "straight",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/straight-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1832,
+        "time": 7.633333333333333,
+        "timeScale": 0,
+        "s": 5640.32327957307,
+        "d": -0.10673992831213568,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "chase-near",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 1,
+        "running": true,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 2.0128588206265468,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "306",
+        "gear": "8",
+        "lapTime": "0:02.009",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: Brake pedal · Throttle: Throttle pedal · Pause button, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 205.30542467532447,
+          "top": 133.59332414318703,
+          "right": 213.4403700072678,
+          "bottom": 138.10040052084184
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "stand-straight",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/stand-straight-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1839,
+        "time": 7.6625,
+        "timeScale": 0,
+        "s": 5312.5,
+        "d": 3.333488706892554e-14,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "150",
+        "gear": "4",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: Brake pedal · Throttle: Throttle pedal · Pause button, then Controls for all inputs"
+      }
+    },
+    {
+      "framing": {
+        "car": {
+          "left": 559.9678250610691,
+          "top": 232.3393922477258,
+          "right": 643.4908931238058,
+          "bottom": 267.03021265314334
+        },
+        "cluster": {
+          "left": 306,
+          "top": 277.8125,
+          "right": 538,
+          "bottom": 378
+        },
+        "overlap": false
+      },
+      "station": "chicane-outside",
+      "viewport": "844x390",
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/chicane-outside-844x390.png",
+      "state": {
+        "screen": "drive",
+        "phase": "running",
+        "paused": false,
+        "tick": 1846,
+        "time": 7.691666666666666,
+        "timeScale": 0,
+        "s": 612,
+        "d": 0.4999999999999709,
+        "surface": 0,
+        "wheelsOff": 0,
+        "drsAvailable": false,
+        "safetyResets": 0,
+        "wallHits": 0,
+        "camera": "tv",
+        "viewBuilds": 1,
+        "device": "keyboard",
+        "assists": {
+          "tractionControl": 2,
+          "abs": 2,
+          "autoGears": true,
+          "steering": 2
+        },
+        "lap": 0,
+        "running": false,
+        "valid": true,
+        "sector": 0,
+        "lapTime": 0,
+        "sectors": [],
+        "lastLap": null,
+        "bestLap": null,
+        "record": null,
+        "ghost": false
+      },
+      "hud": {
+        "speed": "95",
+        "gear": "2",
+        "lapTime": "0:00.000",
+        "last": "—:——.———",
+        "best": "—:——.———",
+        "drs": "off",
+        "message": "ControlsBrake: Brake pedal · Throttle: Throttle pedal · Pause button, then Controls for all inputs"
+      }
+    }
+  ],
+  "perf": [
+    {
+      "run": "drive",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": true,
+      "frames": 1179,
+      "avgFps": 58.9,
+      "onePercentLowFps": 32.8,
+      "p99FrameMs": 27.6,
+      "meanFrameMs": 16.99,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 734,
+        "triangles": 3126241,
+        "geometries": 106,
+        "textures": 150,
+        "textureMiB": 432.2,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 9.07,
+        "width": 1920,
+        "height": 1080,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-drive-1920x1080.png"
+    },
+    {
+      "run": "grid",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": true,
+      "frames": 1196,
+      "avgFps": 59.8,
+      "onePercentLowFps": 36.3,
+      "p99FrameMs": 23.4,
+      "meanFrameMs": 16.73,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 767,
+        "triangles": 4477031,
+        "geometries": 117,
+        "textures": 157,
+        "textureMiB": 432.2,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 7.22,
+        "width": 1920,
+        "height": 1080,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-grid-1920x1080.png"
+    },
+    {
+      "run": "drive",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": true,
+      "frames": 1201,
+      "avgFps": 60,
+      "onePercentLowFps": 50.3,
+      "p99FrameMs": 17.2,
+      "meanFrameMs": 16.68,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 263,
+        "triangles": 820330,
+        "geometries": 87,
+        "textures": 106,
+        "textureMiB": 132.1,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 2.01,
+        "width": 844,
+        "height": 390,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-drive-844x390.png"
+    },
+    {
+      "run": "grid",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": true,
+      "frames": 1201,
+      "avgFps": 60,
+      "onePercentLowFps": 49.9,
+      "p99FrameMs": 18.6,
+      "meanFrameMs": 16.67,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 273,
+        "triangles": 1338354,
+        "geometries": 98,
+        "textures": 113,
+        "textureMiB": 132.1,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 2.99,
+        "width": 844,
+        "height": 390,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-grid-844x390.png"
+    },
+    {
+      "run": "drive",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": false,
+      "frames": 2277,
+      "avgFps": 113.7,
+      "onePercentLowFps": 25.2,
+      "p99FrameMs": 15.6,
+      "meanFrameMs": 8.8,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 740,
+        "triangles": 3152259,
+        "geometries": 106,
+        "textures": 150,
+        "textureMiB": 432.2,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 6.71,
+        "width": 1920,
+        "height": 1080,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-drive-1920x1080.png"
+    },
+    {
+      "run": "grid",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": false,
+      "frames": 1757,
+      "avgFps": 87.7,
+      "onePercentLowFps": 6.6,
+      "p99FrameMs": 24,
+      "meanFrameMs": 11.4,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 767,
+        "triangles": 4477031,
+        "geometries": 117,
+        "textures": 157,
+        "textureMiB": 432.2,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 8.45,
+        "width": 1920,
+        "height": 1080,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-grid-1920x1080.png"
+    },
+    {
+      "run": "drive",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": false,
+      "frames": 2727,
+      "avgFps": 136.3,
+      "onePercentLowFps": 61.4,
+      "p99FrameMs": 14.6,
+      "meanFrameMs": 7.34,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 261,
+        "triangles": 820316,
+        "geometries": 87,
+        "textures": 106,
+        "textureMiB": 126.8,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 3.22,
+        "width": 844,
+        "height": 390,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-drive-844x390.png"
+    },
+    {
+      "run": "grid",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": false,
+      "frames": 2267,
+      "avgFps": 113.2,
+      "onePercentLowFps": 54.3,
+      "p99FrameMs": 17.1,
+      "meanFrameMs": 8.83,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 273,
+        "triangles": 1338354,
+        "geometries": 98,
+        "textures": 112,
+        "textureMiB": 126.8,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 2.45,
+        "width": 844,
+        "height": 390,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      },
+      "file": "../../../../.cache/undercut/scratch/m2-circuit-dressing/r15/perf-grid-844x390.png"
+    }
+  ],
+  "lap": null,
+  "moving": null,
+  "errors": []
+}
