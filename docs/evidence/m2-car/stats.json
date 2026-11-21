@@ -1,0 +1,147 @@
+{
+  "high": {
+    "draw_calls": 82,
+    "glb_bytes": 882332,
+    "images": {
+      "carbon_base": [
+        512,
+        512
+      ],
+      "carbon_normal": [
+        512,
+        512
+      ],
+      "disc_glow": [
+        16,
+        64
+      ],
+      "tyre_base": [
+        2048,
+        512
+      ],
+      "tyre_normal": [
+        2048,
+        512
+      ]
+    },
+    "lod": "high",
+    "triangles": 110912,
+    "triangles_by_part": {
+      "body_carbon": 24944,
+      "body_dark": 2680,
+      "body_paint": 39282,
+      "brake_discs": 1024,
+      "drs_flap": 3512,
+      "helmet": 1184,
+      "steering_wheel": 302,
+      "suspension": 3648,
+      "uprights": 3456,
+      "wheels": 30880
+    }
+  },
+  "mobile": {
+    "draw_calls": 67,
+    "glb_bytes": 432940,
+    "images": {
+      "carbon_base": [
+        256,
+        256
+      ],
+      "carbon_normal": [
+        256,
+        256
+      ],
+      "disc_glow": [
+        16,
+        64
+      ],
+      "tyre_base": [
+        1024,
+        256
+      ],
+      "tyre_normal": [
+        1024,
+        256
+      ]
+    },
+    "lod": "mobile",
+    "triangles": 33790,
+    "triangles_by_part": {
+      "body_carbon": 7516,
+      "body_dark": 1242,
+      "body_paint": 10544,
+      "brake_discs": 512,
+      "drs_flap": 984,
+      "helmet": 304,
+      "steering_wheel": 272,
+      "suspension": 1584,
+      "uprights": 2000,
+      "wheels": 8832
+    }
+  },
+  "far": {
+    "draw_calls": 21,
+    "glb_bytes": 236780,
+    "images": {
+      "carbon_base": [
+        256,
+        256
+      ],
+      "carbon_normal": [
+        256,
+        256
+      ],
+      "disc_glow": [
+        16,
+        64
+      ],
+      "tyre_base": [
+        1024,
+        256
+      ],
+      "tyre_normal": [
+        1024,
+        256
+      ]
+    },
+    "lod": "far",
+    "triangles": 14268,
+    "triangles_by_part": {
+      "body_carbon": 3596,
+      "body_dark": 936,
+      "body_paint": 4336,
+      "drs_flap": 348,
+      "helmet": 204,
+      "steering_wheel": 0,
+      "suspension": 1440,
+      "wheels": 3408
+    }
+  },
+  "masks": {
+    "block-sidepod.png": {
+      "bytes": 30784
+    },
+    "chevron-nose.png": {
+      "bytes": 24021
+    },
+    "fade-rear.png": {
+      "bytes": 28261
+    },
+    "index.json": {
+      "bytes": 1708
+    },
+    "pinstripe.png": {
+      "bytes": 63498
+    },
+    "side-band.png": {
+      "bytes": 49823
+    },
+    "split-diagonal.png": {
+      "bytes": 34216
+    },
+    "two-tone-horizontal.png": {
+      "bytes": 36108
+    }
+  },
+  "total_bytes": 1820471
+}

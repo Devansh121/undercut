@@ -33,6 +33,10 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - Committed track files will be offered under ODbL 1.0 with the OpenStreetMap and Copernicus notices, separate from the MIT code.
 - The TUMFTM track dataset is used only as a local cross-check, never shipped: it is OSM-derived but published under LGPL-3.0.
 - Race start fuel 105 kg in the physics targets: the commonly quoted 110 kg cap was not found in the 2025 regulation text.
+- Car geometry compressed with Draco, not meshopt (Blender writes Draco natively); car textures are WebP, not KTX2, until the client has a Basis transcoder path (ADR 0005).
+- Livery by texture masks in a shared atlas (R secondary, G accent, B bare carbon), not vertex colours, so thin pin lines stay sharp (ADR 0005).
+- Two livery patterns were reshaped after a lookalike check: the diagonal split now has the primary colour forward, and the sidepod block is a flank panel only.
+- The far car LOD is 14.3k triangles against the 12k budget; it was kept rather than lose the wheel and wing silhouettes.
 
 ## Optional, needs you
 
