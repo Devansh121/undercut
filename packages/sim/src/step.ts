@@ -453,7 +453,7 @@ function substep(
   }
 
   // ---- Power unit, ERS, brakes, wheel spin. ----
-  stepPowertrain(s, throttle, brake, input.overtake, h);
+  stepPowertrain(s, throttle, brake, input.overtake, h, input.wheelBrake);
 
   // ---- Planar chassis (semi-implicit Euler). ----
   const extX = s.externalForceX * c - s.externalForceZ * sn;
@@ -698,6 +698,11 @@ function pivotCorner(s: CarState, k: number, dz: number, sprungA: number, sprung
   }
 }
 
+/** One wheel's share of an assist's per-wheel brake demand, clamped to [0, 1]. */
+function wheelShare(demand: ArrayLike<number>, i: number): number {
+  return clamp(finite(demand[i] ?? 0), 0, 1);
+}
+
 /** Engine, clutch, gearbox, differential, ERS and brakes for one substep. */
 function stepPowertrain(
   s: CarState,
@@ -705,6 +710,7 @@ function stepPowertrain(
   brake: number,
   overtake: boolean,
   h: number,
+  wheelBrake: ArrayLike<number> | undefined,
 ): void {
   const p = s.model.params;
   const eng = p.engine;
@@ -802,10 +808,15 @@ function stepPowertrain(
   // Brakes (friction torque per wheel) plus rolling resistance as a torque on the wheel.
   const rearBrake = Math.max(0, rearRequest - harvestAtWheels) / 2;
   const crr = tyre.rollingResistance * R;
+  // Per-wheel friction brake an assist asks for on top of the pedal, as a share of that wheel's
+  // own full braking torque (`ControlInput.wheelBrake`). Absent, nothing below changes.
+  const frontFull = (s.model.brakeCapacity * s.brakeBias) / 2;
+  const rearFull = (s.model.brakeCapacity * (1 - s.brakeBias)) / 2;
 
   // Front wheels: free spin with Coulomb friction from brake and rolling resistance.
   for (let i = 0; i < 2; i++) {
-    const bound = ((frontBrake + crr * s.load[i]! * rollDrag[i]!) * h) / If;
+    const fb = wheelBrake ? frontBrake + wheelShare(wheelBrake, i) * frontFull : frontBrake;
+    const bound = ((fb + crr * s.load[i]! * rollDrag[i]!) * h) / If;
     let w = s.wheelSpeed[i]! - (h * s.forceX[i]! * R) / If;
     if (Math.abs(w) <= bound) w = 0;
     else w -= w > 0 ? bound : -bound;
@@ -829,8 +840,10 @@ function stepPowertrain(
   const inputTorque = Math.abs(s.driveTorque * G);
   const ramp = s.driveTorque >= 0 ? p.diff.rampDrive : p.diff.rampCoast;
   const lsdCap = (p.diff.preload + ramp * inputTorque) * h;
-  const brakeL = (rearBrake + crr * s.load[2]! * rollDrag[2]!) * h;
-  const brakeR = (rearBrake + crr * s.load[3]! * rollDrag[3]!) * h;
+  const rbL = wheelBrake ? rearBrake + wheelShare(wheelBrake, 2) * rearFull : rearBrake;
+  const rbR = wheelBrake ? rearBrake + wheelShare(wheelBrake, 3) * rearFull : rearBrake;
+  const brakeL = (rbL + crr * s.load[2]! * rollDrag[2]!) * h;
+  const brakeR = (rbR + crr * s.load[3]! * rollDrag[3]!) * h;
   const clutchMass = clutchCap > 0 ? 1 / (1 / Je + (G * G) / (2 * Ir)) : 0;
   const halfG = G / 2;
   let lc = 0;

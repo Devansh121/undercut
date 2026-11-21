@@ -11,6 +11,7 @@ import {
   rebind,
   serializeProfile,
 } from '../src/bindings';
+import { DEFAULT_KEYBOARD_SHAPING } from '../src/shaping';
 import { controlLabel, deviceOfControl } from '../src/controls';
 
 describe('default bindings', () => {
@@ -137,7 +138,7 @@ describe('profile serialisation', () => {
     expect(controlsFor(profile.bindings, 'keyboard', 'gearUp')).toContain('key:KeyE');
     expect(controlsFor(profile.bindings, 'keyboard', 'resetToTrack')).toEqual(['key:Backspace']);
     expect(profile.shaping.gamepad.stick.gamma).toBe(1.5);
-    expect(profile.shaping.keyboard.returnRate).toBe(8);
+    expect(profile.shaping.keyboard.returnRate).toBe(DEFAULT_KEYBOARD_SHAPING.returnRate);
     expect(findConflicts(profile.bindings)).toEqual([]);
   });
 });

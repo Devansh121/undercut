@@ -150,6 +150,8 @@ export class RoomScreens {
             autoGears: 'Automatic gears',
             racingLine: 'Racing line',
             steeringAssist: 'Steering help',
+            stability: 'Stability help',
+            brakingHelp: 'Braking help',
           };
           const l = el('div', 'pause__setting online-assist');
           l.append(el('span', 'pause__key', labels[key]));
@@ -161,8 +163,10 @@ export class RoomScreens {
             b.type = 'button';
             b.id = 'online-' + key + '-' + on;
             b.setAttribute('role', 'radio');
-            b.setAttribute('aria-checked', String(s.room.settings.assists[key] === on));
-            b.classList.toggle('is-on', s.room.settings.assists[key] === on);
+            // A room from before stability and braking help existed allows them.
+            const allowed = s.room.settings.assists[key] ?? true;
+            b.setAttribute('aria-checked', String(allowed === on));
+            b.classList.toggle('is-on', allowed === on);
             b.disabled = !s.isHost || s.stage !== 'lobby';
             b.onclick = () => this.session.setAssists({ [key]: on });
             choices.append(b);

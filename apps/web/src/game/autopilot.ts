@@ -1,3 +1,4 @@
+import { createRng, type Rng } from '@undercut/core';
 import type { InputSystem } from '@undercut/input';
 import type { CarParams, CarState } from '@undercut/sim';
 import { createVec3, smoothClosed, type Track } from '@undercut/track';
@@ -21,6 +22,21 @@ export interface AutopilotOptions {
   gripUse: number;
   /** Braking deceleration as a multiple of the cornering limit. */
   brakeUse: number;
+  /**
+   * Drive like a clumsy keyboard player (seeded): pedals pressed `reaction` seconds after the
+   * need, every corner braked for a little late or early and floored before the exit.
+   */
+  clumsy?: ClumsyOptions;
+}
+
+export interface ClumsyOptions {
+  seed: number;
+  /** Delay between seeing the need and pressing a pedal, s. */
+  reaction?: number;
+  /** Per corner, drawn from [min, max]: braking this many metres late (negative: early). */
+  brakeLate?: readonly [number, number];
+  /** Per corner: full throttle this many metres before the exit asks for it. */
+  throttleEarly?: readonly [number, number];
 }
 
 const DEFAULTS: AutopilotOptions = {
@@ -30,6 +46,21 @@ const DEFAULTS: AutopilotOptions = {
   gripUse: 0.75,
   brakeUse: 0.7,
 };
+const CLUMSY_DEFAULTS = {
+  reaction: 0.2,
+  brakeLate: [-10, 40] as const,
+  throttleEarly: [10, 50] as const,
+};
+/**
+ * The clumsy player's autopilot settings: nearer the limit than the careful default, so its
+ * mistakes have consequences (the debug API's `clumsyPilot`, the browser lap test).
+ */
+export const CLUMSY_PILOT: Readonly<Partial<AutopilotOptions>> = Object.freeze({
+  gripUse: 0.9,
+  brakeUse: 0.85,
+});
+/** The sim step the pedal delay counts in (ADR 0007). */
+const TICK = 1 / 240;
 const G = 9.80665;
 const AIR = 1.184;
 /** Peak tyre friction the profile assumes before `gripUse` (the sim's tyres peak near 1.8). */
@@ -56,9 +87,11 @@ export class KeyboardAutopilot {
   private readonly hint = { index: -1 };
   private readonly q = { s: 0, d: 0, index: -1 };
   private readonly p = createVec3();
+  private readonly clumsy: Clumsiness | null;
 
   constructor(track: Track, params: CarParams, options: Partial<AutopilotOptions> = {}) {
     const o = { ...DEFAULTS, ...options };
+    this.clumsy = o.clumsy ? new Clumsiness(track, o.clumsy) : null;
     this.track = track;
     this.wheelbase = params.geometry.wheelbase;
     this.maxSteer = params.geometry.maxSteerAngle;
@@ -68,9 +101,10 @@ export class KeyboardAutopilot {
     this.profile = speedProfile(track, params, o);
   }
 
-  /** Forget the search position (after a teleport). */
+  /** Forget the search position and anything held (after a teleport). */
   reset(): void {
     this.hint.index = -1;
+    this.clumsy?.reset();
   }
 
   /** Target speed at lap position s. */
@@ -110,10 +144,94 @@ export class KeyboardAutopilot {
     out.right = demand < steer - band;
 
     // Speed: aim for the profile a short way ahead, so the pedals' ramps have time to act.
-    const target = Math.min(this.targetSpeed(q.s + v * 0.35 + 4), this.targetSpeed(q.s));
-    out.throttle = v < target - 0.5;
-    out.brake = v > target + 1.5;
+    const clumsy = this.clumsy;
+    const late = clumsy ? clumsy.late(q.s) : 0;
+    const early = clumsy ? clumsy.early(q.s) : 0;
+    const target = (at: number): number =>
+      Math.min(this.targetSpeed(at + v * 0.35 + 4), this.targetSpeed(at));
+    const throttle = v < target(q.s + early) - 0.5;
+    const brake = v > target(q.s - late) + 1.5;
+    if (!clumsy) {
+      out.throttle = throttle;
+      out.brake = brake;
+      return out;
+    }
+    clumsy.press(throttle && !brake, brake, out);
     return out;
+  }
+}
+
+/** A clumsy player's mistakes and slow feet, for `KeyboardAutopilot`. */
+class Clumsiness {
+  private readonly rng: Rng;
+  private readonly track: Track;
+  private readonly delay: number;
+  private readonly ring = new Uint8Array(512);
+  private head = 0;
+  private readonly lateRange: readonly [number, number];
+  private readonly earlyRange: readonly [number, number];
+  private readonly lates: Float64Array;
+  private readonly earlies: Float64Array;
+  private prevS = -1;
+
+  constructor(track: Track, o: ClumsyOptions) {
+    this.track = track;
+    this.rng = createRng(o.seed);
+    this.delay = Math.min(511, Math.round((o.reaction ?? CLUMSY_DEFAULTS.reaction) / TICK));
+    this.lateRange = o.brakeLate ?? CLUMSY_DEFAULTS.brakeLate;
+    this.earlyRange = o.throttleEarly ?? CLUMSY_DEFAULTS.throttleEarly;
+    this.lates = new Float64Array(track.corners.length);
+    this.earlies = new Float64Array(track.corners.length);
+    this.newLap();
+  }
+
+  reset(): void {
+    this.ring.fill(0);
+    this.head = 0;
+    this.prevS = -1;
+  }
+
+  private newLap(): void {
+    const r = this.rng;
+    for (let k = 0; k < this.lates.length; k++) {
+      this.lates[k] = this.lateRange[0] + (this.lateRange[1] - this.lateRange[0]) * r.next();
+      this.earlies[k] = this.earlyRange[0] + (this.earlyRange[1] - this.earlyRange[0]) * r.next();
+    }
+  }
+
+  /** The corner whose exit is next along the lap from `s`. */
+  private corner(s: number): number {
+    if (this.prevS >= 0 && this.prevS - s > this.track.length / 2) this.newLap();
+    this.prevS = s;
+    const cs = this.track.corners;
+    let best = 0;
+    let dist = Infinity;
+    for (let k = 0; k < cs.length; k++) {
+      const d = this.track.forwardDistance(s, cs[k]!.end);
+      if (d < dist) {
+        dist = d;
+        best = k;
+      }
+    }
+    return best;
+  }
+
+  late(s: number): number {
+    return this.lates[this.corner(s)]!;
+  }
+
+  early(s: number): number {
+    return this.earlies[this.corner(s)]!;
+  }
+
+  /** Record what the pedals should do now; press what was needed `reaction` ago. */
+  press(throttle: boolean, brake: boolean, out: DrivingKeys): void {
+    const h = this.head;
+    this.ring[h] = (throttle ? 1 : 0) | (brake ? 2 : 0);
+    this.head = (h + 1) % this.ring.length;
+    const seen = this.ring[(h - this.delay + this.ring.length) % this.ring.length]!;
+    out.throttle = (seen & 1) !== 0;
+    out.brake = (seen & 2) !== 0;
   }
 }
 
