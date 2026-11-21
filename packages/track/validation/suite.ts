@@ -44,6 +44,12 @@ export interface CircuitFacts {
   /** Published distance from pole to the turn 1 braking point (physics-validation 4.7). */
   poleToBraking: number;
   pit: { side: 'left' | 'right'; osmLength: number };
+  /**
+   * Straights: outside these stretches (real crests and compressions, named), the vertical
+   * acceleration a car at 300 km/h feels from the vertical curvature stays under `maxStraightG`.
+   */
+  verticalAllowed: (c: Corners) => readonly (readonly [number, number, string])[];
+  maxStraightG: number;
   /** Lap stretches [from, to] where other parts of the lap run close by: sampled densely. */
   closeRuns: readonly (readonly [number, number])[];
 }
@@ -141,6 +147,37 @@ export function describeCircuit(f: CircuitFacts): { data: TrackData; track: Trac
       const range = Math.max(...y) - Math.min(...y);
       expect(Math.abs(range - f.elevationRange[0])).toBeLessThan(f.elevationRange[1]);
       expect(Math.max(...Array.from(lap.grade, Math.abs))).toBeLessThan(f.maxGrade);
+    });
+
+    it('has no fake crest or dip on a straight that a car at 300 km/h would feel', () => {
+      const v = 300 / 3.6;
+      const g = 9.80665;
+      const step = L / n;
+      const w = Math.round(10 / step);
+      const allowed = f.verticalAllowed(c);
+      const corner = (s: number): boolean =>
+        data.corners.some(
+          (k) =>
+            near(s, k.s) < 150 ||
+            track.forwardDistance(k.start, s) < track.forwardDistance(k.start, k.end),
+        );
+      let worst = 0;
+      let where = '';
+      for (let i = 0; i < n; i++) {
+        const s = i * step;
+        if (
+          corner(s) ||
+          allowed.some(([a, b]) => track.forwardDistance(a, s) < track.forwardDistance(a, b))
+        )
+          continue;
+        const kv = (lap.grade[(i + w) % n]! - lap.grade[(i + n - w) % n]!) / (2 * w * step);
+        const acc = Math.abs((v * v * kv) / g);
+        if (acc > worst) {
+          worst = acc;
+          where = `s ${s.toFixed(0)}`;
+        }
+      }
+      expect(worst, where).toBeLessThan(f.maxStraightG);
     });
 
     it('has sane widths and banking', () => {

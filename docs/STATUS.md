@@ -84,7 +84,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Car suspension links are one mesh with morph targets (bump per corner, steer per front corner) rather than one rotating node per link, to keep draw calls near 40 on High.
 - The far car LOD has no suspension links, uprights or decals; it is 10.6k triangles against the 12k budget.
 - Spa and Singapore corner names are places: Stavelot for turn 15 rather than the person's name it is often given, and Singapore corners after the road beside them (docs/track-data.md 5.2, 5.3).
-- Elevation filters differ from the research recommendation after looking at the profiles: Spa gets a 90 m opening (removes a surface-model bump on early Kemmel), Singapore a 400 m opening instead of 300 m (removes a canopy plateau on Raffles Avenue).
+- Elevation filters differ from the research recommendation after looking at the profiles: Spa gets a documented cubic correction along Kemmel (removes a surface-model bump that put a fake crest on the straight), Singapore a 400 m opening instead of 300 m (removes a canopy plateau on Raffles Avenue).
 - Monza's DRS zone 2 now opens 12 m after the timing line (s = 5484.5 m) instead of 12 m after the start line; the racing line was rebuilt and the reference lap is 0.087 s quicker.
 - Spa's pit lane follows the mapped way, which rejoins after La Source, not before its braking zone.
 

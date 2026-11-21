@@ -389,7 +389,8 @@ def main(argv):
     # 6. Elevation.
     dem, dem_rec = inputs.dem_tile(lat0, lon0, offline)
     spans = bridge_spans(cfg, layout, frame, pts, step / quality["scale"])
-    raw_h, h = elevation.profile(pts, frame, dem, cfg, step / quality["scale"], spans)
+    fixes = [(lap.resolve(c["from"]) / quality["scale"], lap.resolve(c["to"]) / quality["scale"]) for c in cfg["elevation"].get("corrections", [])]
+    raw_h, h = elevation.profile(pts, frame, dem, cfg, step / quality["scale"], spans, fixes)
     datum = math.floor(min(h))
     log("elevation: %.1f to %.1f m, range %.1f m (published %.1f)" % (min(h), max(h), max(h) - min(h), cfg["elevation"]["publishedRange"]))
     # 7-8. Width and banking.
@@ -465,6 +466,10 @@ def main(argv):
                     {"way": b["way"], "from": lap.wrap(sp[0] * quality["scale"]), "to": lap.wrap(sp[1] * quality["scale"]), "crown": b["crown"]}
                     for b, sp in zip(cfg["elevation"]["bridges"], spans)
                 ]} if cfg["elevation"].get("bridges") else {}),
+                **({"corrections": [
+                    {"from": lap.resolve(c["from"]), "to": lap.resolve(c["to"]), "note": c["note"]}
+                    for c in cfg["elevation"]["corrections"]
+                ]} if cfg["elevation"].get("corrections") else {}),
             },
             "cornerRule": rule,
             "licence": "ODbL-1.0",

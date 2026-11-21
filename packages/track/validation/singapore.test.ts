@@ -59,6 +59,12 @@ const { data, track } = describeCircuit({
   timingLine: { s: 4798.4, uncertainty: 10 },
   poleToBraking: 178,
   pit: { side: 'left', osmLength: 822.2 },
+  // The two bridges are real crests.
+  verticalAllowed: () =>
+    (
+      raw as unknown as { source: { dem: { bridges: { from: number; to: number }[] } } }
+    ).source.dem.bridges.map((b) => [b.from - 50, b.to + 50, 'bridge'] as const),
+  maxStraightG: 0.8,
   // Turns 1 to 4; turn 8 beside turn 14; the hairpin's two legs by the waterfront; the final
   // corners under the grandstand beside the pit lane.
   closeRuns: [

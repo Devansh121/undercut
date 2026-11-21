@@ -46,7 +46,9 @@ Add `circuits/<id>.json`; no code changes for a circuit like the three built. It
 - `cornerRule` (optional): overrides of the curvature rule (`smoothSigma`, `enter`, `exit`,
   `mergeGap`, `minTurn`) where the official numbering needs them; the file records the rule used;
 - `elevation`: the circuit's filter (opening window, average, Gaussian), the published range the
-  result must match, and optional `bridges` (OSM ways put back as crowned decks after the opening);
+  result must match, optional `bridges` (OSM ways put back as crowned decks after the opening) and
+  `corrections` (spans whose surface-model profile is replaced by a cubic matching height and grade
+  at both ends, each with a `note` saying why);
 - `corners`: official numbering, names by place and direction. The build fails unless the
   curvature rule finds exactly these corners in this order;
 - `timing`, `grid`, `pit`: positions as offsets from corners (`{"corner": 4, "offset": -233}`,

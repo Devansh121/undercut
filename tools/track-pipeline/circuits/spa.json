@@ -25,12 +25,25 @@
     "minTurn": 15
   },
   "elevation": {
-    "note": "A short 90 m opening before the 90 m average removes most of a narrow bump in the surface model on early Kemmel (s 1400 to 1450 m, about 6 m, probably a structure or canopy over the track) that otherwise puts the steepest grade 250 m past the top of Raidillon and a -1.5 g crest (at 300 km/h) on Kemmel; about -0.9 g remains there. A 150 m opening would flatten Raidillon itself (docs/track-data.md section 2.2).",
-    "openWindow": 90,
+    "note": "90 m average and 20 m Gaussian, no opening (docs/track-data.md section 2.2), so Raidillon is not softened further. One targeted correction: along Kemmel (s 1325 to 2150 m) the surface model has a narrow bump of about 6 m at s 1400 to 1450 m followed by a flat (probably a structure or canopy over the track) and a smaller wiggle near s 2000 m; they put crests of -1.5 g and -0.6 g at 300 km/h on the straight. Over that span the profile is replaced by a cubic matching height and grade at both ends.",
+    "openWindow": 0,
     "average": 90,
     "gradeSigma": 20,
     "publishedRange": 102.2,
-    "rangeTolerance": 3.0
+    "rangeTolerance": 3.0,
+    "corrections": [
+      {
+        "from": {
+          "corner": 4,
+          "offset": 157
+        },
+        "to": {
+          "corner": 4,
+          "offset": 982
+        },
+        "note": "Surface-model bump on early Kemmel (s 1400 to 1450 m, about 6 m) and wiggle near s 2000 m replaced by a cubic matching height and grade at both ends (estimate of the real smooth climb)."
+      }
+    ]
   },
   "corners": [
     {

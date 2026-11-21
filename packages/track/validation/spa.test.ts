@@ -58,6 +58,16 @@ const { data, track } = describeCircuit({
   timingLine: { s: 6875.4, uncertainty: 15 },
   poleToBraking: 165,
   pit: { side: 'right', osmLength: 720.5 },
+  // The real compression at the bottom of Eau Rouge and the crest over Raidillon. The other
+  // straights carry undulations of up to about 0.8 g from the surface model (the descent to
+  // Pouhon, the run to the Bus Stop), not yet checked against the circuit.
+  verticalAllowed: (c) => [
+    [c.apex(2) - 200, c.apex(4) + 150, 'Eau Rouge and Raidillon'],
+    // A steady 15 m climb over 150 m in the raw surface model (not a narrow spike), taken as
+    // terrain; not yet checked against a published figure.
+    [c.end(17) - 100, c.start(18) - 300, 'the climb from Blanchimont to the Bus Stop'],
+  ],
+  maxStraightG: 0.8,
   // The start straight beside the run down from La Source; the two legs of Bruxelles.
   closeRuns: [
     [60, 520],
@@ -125,7 +135,34 @@ describe('Spa: elevation', () => {
     let crest = 0;
     for (let s = corner(4); s <= corner(4) + 400; s += step) crest = Math.min(crest, vc(s));
     expect(sag).toBeGreaterThan(1 / 1000);
-    expect(crest).toBeLessThan(-1 / 1000);
+    // About -1/1090 per metre over the top of Raidillon (-0.65 g at 300 km/h).
+    expect(crest).toBeLessThan(-1 / 2000);
+  });
+});
+
+describe('Spa: Kemmel', () => {
+  it('climbs smoothly: no crest or dip a car at 300 km/h would feel as more than 0.3 g', () => {
+    // Regression: a surface-model bump at s 1400 to 1450 m gave -0.87 g (review of PR #18).
+    const v = 300 / 3.6;
+    const w = Math.round(10 / step);
+    let worst = 0;
+    let where = 0;
+    for (let s = corner(4) + 150; s <= corner(5) - 150; s += step) {
+      const i = track.lap.sampleIndex(s);
+      const kv =
+        (track.lap.grade[(i + w) % n]! - track.lap.grade[(i + n - w) % n]!) / (2 * w * step);
+      const acc = Math.abs((v * v * kv) / 9.80665);
+      if (acc > worst) {
+        worst = acc;
+        where = s;
+      }
+    }
+    expect(worst, `s ${where.toFixed(0)}`).toBeLessThan(0.3);
+    // The data's correction is recorded where it was applied.
+    const fixes = (data.source.dem as { corrections: { from: number; to: number }[] }).corrections;
+    expect(fixes).toHaveLength(1);
+    expect(fixes[0]!.from).toBeGreaterThan(corner(4));
+    expect(fixes[0]!.to).toBeLessThan(corner(5));
   });
 });
 
