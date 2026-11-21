@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BRAKING_EVENTS,
+  FIT_TARGET,
   KMH,
+  TARGETS,
   TRAIL_OFF,
   braking,
   measureBrakingCurve,
@@ -23,6 +25,15 @@ describe('validation: published braking events (doc 2.4)', () => {
       }
     });
   }
+});
+
+describe('fit and check sets', () => {
+  it('fits exactly one target (the Monza T1 2025 peak); everything else is a check', () => {
+    const fits = Object.values(TARGETS)
+      .filter((t) => t.fit)
+      .map((t) => t.id);
+    expect(fits).toEqual([FIT_TARGET]);
+  });
 });
 
 describe('the published-event pedal profile', () => {

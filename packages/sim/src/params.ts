@@ -56,9 +56,9 @@ export interface TyreParams {
    */
   verticalDamping: number;
   /**
-   * Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN as a starting point
-   * below [44]'s 1.85–2.15, calibrated to the cornering targets: fitted once to the centre of the
-   * slow-corner band (2.15 g, high trim, 85 km/h), giving 2.12.
+   * Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN, below [44]'s
+   * 1.85–2.15. This is the model's one fitted parameter: fitted to the Monza T1 2025 peak
+   * deceleration (4.7 g, [21][47]) with the hardware-derived brakes, it comes out at 1.80.
    */
   muY: number;
   /** Peak longitudinal friction as a share of lateral. Doc 1.2: 0.9 ([44] 0.89–0.91). */
@@ -299,9 +299,12 @@ export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   frontHeightWeight: 0.7, // estimate: "downforce rises as the floor's front ride height falls"
   referenceHeight: 0.0214, // measured at 300 km/h, 50 kg fuel (Results section)
   leadingEdge: 0.3, // estimate: the floor starts about 1.1 m behind the front axle
-  stallHeight: 0.015, // doc 1.4: about 15–20 mm at the floor leading edge
+  stallHeight: 0.02, // doc 1.4: 15–20 mm; top of the range (see stallLoss)
   stallWidth: 0.004,
-  stallLoss: 0.15, // doc 1.4: 10–25 % over a few millimetres
+  // Doc 1.4: 10–25 %; top of the range. The published peak decelerations barely change with
+  // the downforce level (4.7 g Monza, 4.9 g Singapore), so the floor must give up downforce
+  // when the nose dives under braking, as a ground-effect floor does below its critical height.
+  stallLoss: 0.25,
   rakeBalance: 0.6, // estimate: +0.6 points of front share per 10 mm more rake
   referenceRake: 0.0304, // measured at 300 km/h
 });
@@ -369,7 +372,7 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     freeRadius: 0.36,
     verticalStiffness: 300e3,
     verticalDamping: 7000,
-    muY: 2.12,
+    muY: 1.8,
     muXRatio: 0.9,
     loadSensitivity: -5e-5,
     referenceLoad: 3000,

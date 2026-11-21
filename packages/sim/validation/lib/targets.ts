@@ -39,6 +39,12 @@ function target(
     : { id, label, unit, low, high, stated, source };
 }
 
+/**
+ * The one target a parameter was fitted to: the tyre's peak friction μy was fitted to the
+ * Monza T1 2025 peak deceleration. It checks the fit, not the model; every other target checks.
+ */
+export const FIT_TARGET = 'monza-t1-2025-peak';
+
 /** Published braking events (doc 2.4) with both speeds known. */
 export interface BrakingEvent {
   id: string;
@@ -235,7 +241,8 @@ for (const e of BRAKING_EVENTS) {
       'g',
       band(e.peak, 0.4),
       `${e.peak} ± 0.4`,
-      `doc 2.4 ${e.source}`,
+      `${e.id}-peak` === FIT_TARGET ? `doc 2.4 ${e.source}; μ fitted here` : `doc 2.4 ${e.source}`,
+      `${e.id}-peak` === FIT_TARGET,
     ),
   );
 }
@@ -278,8 +285,7 @@ list.push(
     'g',
     [2.0 - 0.4, 2.3 + 0.4],
     '2.0–2.3 ± 0.4',
-    'doc 2.5 (estimate); μ fitted here',
-    true,
+    'doc 2.5 (estimate)',
   ),
 );
 
