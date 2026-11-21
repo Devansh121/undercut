@@ -142,13 +142,30 @@ export class RoomScreens {
         for (const key of Object.keys(
           s.room.settings.assists,
         ) as (keyof typeof s.room.settings.assists)[]) {
-          const l = el('label', 'online-assist', key.replace(/([A-Z])/g, ' $1'));
-          const check = el('input');
-          check.type = 'checkbox';
-          check.checked = s.room.settings.assists[key];
-          check.disabled = !s.isHost || s.stage !== 'lobby';
-          check.onchange = () => this.session.setAssists({ [key]: check.checked });
-          l.prepend(check);
+          const labels = {
+            abs: 'Anti-lock brakes',
+            tractionControl: 'Traction control',
+            autoGears: 'Automatic gears',
+            racingLine: 'Racing line',
+            steeringAssist: 'Steering help',
+          };
+          const l = el('div', 'pause__setting online-assist');
+          l.append(el('span', 'pause__key', labels[key]));
+          const choices = el('div', 'seg');
+          choices.setAttribute('role', 'radiogroup');
+          choices.setAttribute('aria-label', labels[key]);
+          for (const on of [false, true]) {
+            const b = el('button', 'seg__opt', on ? 'Allowed' : 'Off');
+            b.type = 'button';
+            b.id = 'online-' + key + '-' + on;
+            b.setAttribute('role', 'radio');
+            b.setAttribute('aria-checked', String(s.room.settings.assists[key] === on));
+            b.classList.toggle('is-on', s.room.settings.assists[key] === on);
+            b.disabled = !s.isHost || s.stage !== 'lobby';
+            b.onclick = () => this.session.setAssists({ [key]: on });
+            choices.append(b);
+          }
+          l.append(choices);
           content.append(l);
         }
         const me = s.members.find((m) => m.you);
@@ -171,7 +188,14 @@ export class RoomScreens {
       }
       content.append(button('Leave room', () => this.session.leave()));
     }
-    const status = el('p', '', s.busy ? 'Connecting' : s.status);
+    const connection = {
+      idle: 'Create a room or enter an invite code',
+      connecting: 'Connecting to the room',
+      joined: 'Connected',
+      reconnecting: 'Reconnecting to the room',
+      closed: 'Disconnected',
+    };
+    const status = el('p', '', s.busy ? 'Connecting to the room' : connection[s.status]);
     status.setAttribute('role', 'status');
     this.root.replaceChildren(title, status, content, el('p', 'online-notice', this.notice));
     if (focus) document.getElementById(focus)?.focus();

@@ -108,6 +108,7 @@ export class OnlineSession {
   private results: Results | null = null;
   private ended: Ended | null = null;
   private busy = false;
+  private generation = 0;
   private code: string | null = null;
   private name = '';
   private stateValue: OnlineState;
@@ -195,6 +196,7 @@ export class OnlineSession {
     const name = sanitizeName(rawName);
     if (name === null) return this.fail(ending('name'));
     this.reset();
+    const generation = this.generation;
     this.busy = true;
     this.name = name;
     this.changed();
@@ -202,8 +204,10 @@ export class OnlineSession {
     try {
       res = await this.api.create();
     } catch {
+      if (generation !== this.generation) return;
       return this.fail(ending('lost'));
     }
+    if (generation !== this.generation) return;
     if ('error' in res) {
       return this.fail({
         ...ending('lost'),
@@ -224,6 +228,7 @@ export class OnlineSession {
     const code = normalizeRoomCode(rawCode);
     if (code === null) return this.fail(ending('not_found'));
     this.reset();
+    const generation = this.generation;
     this.busy = true;
     this.name = name;
     this.code = code;
@@ -232,8 +237,10 @@ export class OnlineSession {
     try {
       info = await this.api.info(code);
     } catch {
+      if (generation !== this.generation) return;
       return this.fail(ending('lost'));
     }
+    if (generation !== this.generation) return;
     if (info === null) return this.fail(ending('not_found'));
     const token = this.token(code);
     if (!info.joinable && token === null) {
@@ -358,7 +365,7 @@ export class OnlineSession {
     return c.changeSettings({ assists: { ...room.settings.assists, ...patch } });
   }
 
-  /** Host only: any settings patch (the debug API uses it for short test circuits). */
+  /** Host only: settings updates through the room client. */
   changeSettings(patch: Parameters<RoomClient['changeSettings']>[0]): boolean {
     const c = this.clientValue;
     if (!c?.isHost) return false;
@@ -398,6 +405,7 @@ export class OnlineSession {
   }
 
   private reset(): void {
+    this.generation++;
     const c = this.clientValue;
     this.detach();
     if (c && c.status !== 'closed') c.dropConnection();

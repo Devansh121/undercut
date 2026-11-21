@@ -1,3 +1,4 @@
+import type { FetchLike } from '@undercut/protocol';
 import { describe, expect, it } from 'vitest';
 import { OnlineSession } from '../../src/online/session';
 import { FakeTimers, Rooms, memoryKv } from './loopback';
@@ -176,4 +177,50 @@ describe('OnlineSession', () => {
     expect(again.s.state.you).toBe(id);
     expect(again.s.state.seat).toBe(seat);
   });
+});
+
+describe('abandoned room requests', () => {
+  it.each(['create', 'join'] as const)(
+    'does not open a socket after %s then dispose',
+    async (operation) => {
+      const timers = new FakeTimers();
+      const rooms = new Rooms(timers);
+      rooms.createRoom('BCDFGH');
+      let release!: () => void;
+      const pending = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let opens = 0;
+      const delayed: FetchLike = async (url, init) => {
+        const response = await rooms.fetch(url, init);
+        await pending;
+        return response;
+      };
+      const s = new OnlineSession({
+        roomsUrl: 'http://game.test/rooms',
+        fetch: delayed,
+        transport: {
+          open: (url, h) => {
+            opens++;
+            return rooms.open(url, h);
+          },
+        },
+        timers,
+        random: () => 0.5,
+        storage: memoryKv(),
+      });
+      const request = operation === 'create' ? s.create('Ana') : s.join('BCDFGH', 'Ana');
+      s.dispose();
+      const changes: unknown[] = [];
+      s.on('change', (state) => changes.push(state));
+      release();
+      await request;
+      await settle(rooms);
+      expect(opens).toBe(0);
+      expect(changes).toEqual([]);
+      expect(s.state.status).toBe('idle');
+      expect(s.state.members).toEqual([]);
+      expect(s.client).toBeNull();
+    },
+  );
 });

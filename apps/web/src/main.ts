@@ -1,5 +1,6 @@
 import '../../../design/mock/tokens.css';
 import './styles.css';
+import './online/race-hud.css';
 import { OnlineFlow } from './online/flow';
 import { codeFromUrl } from './online/invite';
 import type { DriveExtension } from './drive';
@@ -215,7 +216,5 @@ if (debugEnabled()) {
       state: online?.session.state ?? null,
       race: online?.race?.snapshot() ?? null,
     }),
-    onlineSettings: (patch: Parameters<OnlineFlow['session']['changeSettings']>[0]) =>
-      online?.session.changeSettings(patch),
   });
 }
