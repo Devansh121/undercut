@@ -26,12 +26,22 @@ export function referenceLineConfig(params: CarParams): LineConfig {
 /** The legal corridor for this car (`line/limits.ts`), with the reference allowances. */
 export function referenceCorridor(params: CarParams): LegalCorridorOptions {
   const g = params.geometry;
+  const m = params.mass;
+  // CoG behind the front axle at qualifying fuel (the dry car's; fuel moves it about 1 cm).
+  const a = g.wheelbase * (1 - m.frontShareDry);
+  const b = g.wheelbase - a;
+  // Tyre half widths, doc 1.2: 345–375 mm front, 440–470 mm rear.
+  const front = 0.18;
+  const rear = 0.2275;
   return {
     rule: 'four-wheels',
-    halfTrackInner: Math.min(g.trackFront, g.trackRear) / 2,
-    halfTrackOuter: Math.max(g.trackFront, g.trackRear) / 2,
-    // Rear tyre, doc 1.2: 440–470 mm wide.
-    tyreHalfWidth: 0.2275,
+    wheels: [
+      { x: a, y: g.trackFront / 2, halfWidth: front },
+      { x: a, y: -g.trackFront / 2, halfWidth: front },
+      { x: -b, y: g.trackRear / 2, halfWidth: rear },
+      { x: -b, y: -g.trackRear / 2, halfWidth: rear },
+    ],
+    patchHalfLength: params.tyre.patchLength / 2,
     halfTread: TYRE_HALF_TREAD,
     maxYaw: (10 * Math.PI) / 180,
     allowance: 0.3,

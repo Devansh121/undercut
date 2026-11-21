@@ -23,7 +23,7 @@ export type CorridorOptions = FixedCorridorOptions | LegalCorridorOptions;
 
 /** Wheel-centre half track the corridor was built for (for the grip under the wheels). */
 export function corridorHalfTrack(o: CorridorOptions): number {
-  return o.rule === 'four-wheels' ? o.halfTrackOuter : o.halfTrack;
+  return o.rule === 'four-wheels' ? Math.max(...o.wheels.map((w) => Math.abs(w.y))) : o.halfTrack;
 }
 
 export interface Corridor {
