@@ -1,4 +1,6 @@
-import { defaultCarState } from '@undercut/audio';
+import { defaultCarState, packCarState, CAR_STATE_LENGTH } from '@undercut/audio';
+import { CarControls, CHUNK } from '../../../packages/audio/src/dsp/controls';
+import { F } from '../../../packages/audio/src/dsp/state';
 import { MemoryStorage } from '@undercut/input';
 import {
   SurfaceKind,
@@ -9,7 +11,7 @@ import {
 } from '@undercut/sim';
 import { LEFT, createGround } from '@undercut/track';
 import { describe, expect, it } from 'vitest';
-import { KERB_RIDGE_SPACING, toAudioCarState } from '../src/game/audio-map';
+import { ImpactEvents, KERB_RIDGE_SPACING, toAudioCarState } from '../src/game/audio-map';
 import { AUDIO_DEFAULTS, AudioSettingsStore } from '../src/game/audio-settings';
 import { DriveSession } from '../src/game/session';
 import { loadMonza } from './fixtures';
@@ -21,7 +23,85 @@ function carAt(speed: number) {
   return { state, telemetry: readCarTelemetry(state, createCarTelemetry()) };
 }
 
+describe('ImpactEvents', () => {
+  it('turns per-frame barrier impact speeds into distinct impact events', () => {
+    const e = new ImpactEvents();
+    const dt = 1 / 60;
+    e.observe(0, dt);
+    expect(e.serial).toBe(0);
+    // A touch below 0.3 m/s is not an impact.
+    e.observe(0.2, dt);
+    expect(e.serial).toBe(0);
+    e.observe(6, dt);
+    expect(e.serial).toBe(1);
+    expect(e.speed).toBe(6);
+    // Corners following within 80 ms belong to the same impact unless twice as hard.
+    e.observe(2, dt);
+    expect(e.serial).toBe(1);
+    e.observe(13, dt);
+    expect(e.serial).toBe(2);
+    expect(e.speed).toBe(13);
+    for (let i = 0; i < 6; i++) e.observe(0, dt);
+    e.observe(3, dt);
+    expect(e.serial).toBe(3);
+    expect(e.speed).toBe(3);
+  });
+
+  it('feeds the audio state through the impact fields', () => {
+    const { state, telemetry } = carAt(40);
+    const e = new ImpactEvents();
+    e.observe(9, 1 / 60);
+    const a = toAudioCarState(
+      {
+        state,
+        telemetry,
+        pitLimiter: false,
+        kerbRoughness: 0,
+        impactSpeed: e.speed,
+        impactSerial: e.serial,
+      },
+      defaultCarState(),
+    );
+    expect(a.impactSpeed).toBe(9);
+    expect(a.impactSerial).toBe(1);
+  });
+});
+
 describe('toAudioCarState', () => {
+  it('preserves lock-up sign, DRS and collision event identity', () => {
+    const { state, telemetry } = carAt(40);
+    telemetry.slipRatio.set([-0.8, -0.2, 0.1, 0.6]);
+    telemetry.drs = 1;
+    const a = toAudioCarState(
+      { state, telemetry, pitLimiter: false, kerbRoughness: 0, impactSerial: 2, impactSpeed: 8 },
+      defaultCarState(),
+    );
+    expect(a.slipRatioFront).toBe(-0.8);
+    expect(a.slipRatioRear).toBe(0.6);
+    expect(a.drs).toBe(1);
+    expect(a.impactSerial).toBe(2);
+    expect(a.impactSpeed).toBe(8);
+  });
+
+  it('passes high-speed kerb ridge rates through the DSP boundary without clamping', () => {
+    for (const speed of [60, 80, 150]) {
+      const { state, telemetry } = carAt(speed);
+      const mapped = toAudioCarState(
+        { state, telemetry, pitLimiter: false, kerbRoughness: 1 },
+        defaultCarState(),
+      );
+      const expected = speed / KERB_RIDGE_SPACING;
+      expect(mapped.kerbFrequency).toBe(expected);
+      for (const input of [mapped, packCarState(mapped, new Float64Array(CAR_STATE_LENGTH))]) {
+        const controls = new CarControls(48000);
+        controls.set(input);
+        controls.advance(CHUNK);
+        expect(controls.targetOf(F.kerbFrequency)).toBe(expected);
+        expect(controls.buffers[F.kerbFrequency]?.[CHUNK - 1]).toBe(expected);
+      }
+    }
+  });
+
   it('maps the sim to the audio engine in SI units', () => {
     const { state, telemetry } = carAt(60);
     state.engineSpeed = 1000;
@@ -133,6 +213,8 @@ describe('AudioSettingsStore', () => {
       master: 1,
       engine: 0,
       effects: AUDIO_DEFAULTS.effects,
+      ui: AUDIO_DEFAULTS.ui,
+      ambience: AUDIO_DEFAULTS.ambience,
     });
     await port.save('settings.audio', '{nope');
     expect(await new AudioSettingsStore(port).load()).toEqual(AUDIO_DEFAULTS);

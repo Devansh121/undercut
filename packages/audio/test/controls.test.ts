@@ -30,6 +30,13 @@ describe('car state', () => {
       kerb: 0.9,
       kerbFrequency: 33,
       bottoming: 0.2,
+      slipRatioFront: -0.4,
+      slipRatioRear: 0.25,
+      grass: 0.5,
+      gravel: 0.25,
+      drs: 1,
+      impactSpeed: 7.5,
+      impactSerial: 3,
     };
     const packed = packCarState(s, new Float64Array(CAR_STATE_LENGTH));
     expect(unpackCarState(packed, defaultCarState())).toEqual(s);
@@ -44,6 +51,21 @@ describe('car state', () => {
 });
 
 describe('control interpolation', () => {
+  it('keeps the sign of slip ratios and steps impact fields instead of ramping them', () => {
+    const c = new CarControls(48_000);
+    c.set({ ...defaultCarState(), slipRatioFront: 0, impactSpeed: 0, impactSerial: 0 });
+    c.advance(CHUNK);
+    c.set({ ...defaultCarState(), slipRatioFront: -0.6, impactSpeed: 9, impactSerial: 1 });
+    c.advance(CHUNK);
+    // Impact speed and serial take their new values at the update's first sample.
+    expect(c.buffers[F.impactSpeed]?.[0]).toBe(9);
+    expect(c.buffers[F.impactSerial]?.[0]).toBe(1);
+    // The slip ratio ramps towards -0.6 and stays negative (a lock-up, not a spin).
+    const last = c.buffers[F.slipRatioFront]?.[CHUNK - 1] as number;
+    expect(last).toBeLessThan(0);
+    expect(c.targetOf(F.slipRatioFront)).toBe(-0.6);
+  });
+
   const at = (rpm: number, extra: Partial<AudioCarState> = {}) => ({
     ...defaultCarState(),
     engineSpeed: rpm,

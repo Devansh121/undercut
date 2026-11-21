@@ -25,7 +25,7 @@ The game sends an `AudioCarState` (`packages/audio/src/dsp/state.ts`) every sim 
 | `ersPower` | W | MGU-K whine: + deploy, − harvest |
 | `speed` | m/s | Tyre roll, cavity resonance, wind |
 | `slipFront`, `slipRear` | – | Scrub (0.02–0.12) and squeal (0.08–0.2) per axle |
-| `kerb`, `kerbFrequency` | 0–1, Hz | Kerb rumble at the ridge-passing rate |
+| `kerb`, `kerbFrequency` | 0–1, Hz (to 600 Hz: 150 m/s over 0.25 m ridges) | Kerb rumble at the ridge-passing rate |
 | `bottoming` | 0–1 | Plank scrape, with a thump on first contact |
 
 Every field is first checked at the core boundary, whichever form it arrives in (struct or packed): it is clamped to its supported range (`CAR_STATE_RANGE`; engine speed to 15 000 rpm, the pulse tables' limit), and NaN or infinity keeps the field's last valid value. Filters also drop non-finite memory and the mix never passes NaN on, so no update can leave the DSP broken. Every continuous field then ramps linearly from its current value to the new one over the measured update interval, so the control signals are continuous at any update rate. This costs one interval of latency (4–17 ms). Flags switch at the update. Every audible quantity is smoothed again inside the voices.
@@ -148,3 +148,72 @@ Render first with `npm run audio:render -- all`, then play, in this order:
 - Loudness targets and the 8 LU spread were set before tuning, from common game-mix practice (integrated levels in the −24 to −16 LUFS range), not from a standard that applies to this game.
 - `rev-sweep` and `load-steps` were added beyond the brief's list because they show the ladder and the load response most clearly.
 - Five spectrograms are committed (about 1 MB); the other four are reproducible with the command above.
+
+## M6 car and road pass (Slice 1)
+
+`npm run audio:render -- reference-lap --evidence docs/evidence/m6-audio` runs the
+reference driver on the committed racing line with the normal vehicle model, captures one timed
+lap at 240 Hz after the out-lap, and replays the exact `toAudioCarState` adapter used by the game.
+`all` (also the default) includes this capture. Full stereo WAVs, spectrograms, measurements and
+`reference-telemetry.json` go to `artifacts/audio/`. The evidence option saves measurements,
+spectrograms and 12-second Vorbis excerpts beginning at 4 s. No third-party recordings are used.
+The full lap is an offline check, deliberately outside CI. It gates pitch (median <0.25%, max <1%,
+more than 100 steady windows), DC (<1e-3), true peak (<0 dBTP), loudness (−28 to −14 LUFS), and
+bit-identical replay with 128- and 4096-frame host blocks (SHA-256 in each report).
+
+The added generators are individually metered before view and bus gains:
+
+- `crack`: a loaded upshift's ignition return excites a short filtered noise burst and three
+  strengthened firing events. A lifted shift produces no crack.
+- `burble`: irregular afterfire and uneven firing on a fresh lift, fading with time and load.
+- `gearWhine`: engaged gear tooth-mesh and final-drive tones, gliding between pairs over 12 ms;
+  stronger on the overrun, silent in neutral. Ratios, tooth counts and balance are design
+  estimates in `spec.ts`, not measured gearbox data.
+- `lockup` and `wheelspin`: signed per-axle longitudinal slip selects a 1.35 kHz howl or a lower
+  rasp. Combined slip builds scrub from 0.3 of the nominal 0.1 grip limit, then squeal past it.
+- `grass` and `gravel`: soft low rumble and swish versus impulsive stone noise and tub resonances;
+  replace asphalt noise according to wheel contact shares. Kerb repetition is speed / 0.25 m.
+- `drs`: one mechanical knock per flap transition; open DRS reduces wind about 3 dB.
+- `impact`: severity-driven body thump and debris burst, once per event serial. Barrier
+  impacts are wired: the sim's per-step `wallImpactSpeed` is kept as the hardest strike of each
+  frame (`FrameResult.wallImpact`, since it resets every 240 Hz step and a 60 Hz frame would
+  miss most of them), and `ImpactEvents` turns it into speed and serial; strikes within 80 ms
+  merge into one impact unless twice as hard. Car-to-car contact impulses are not in the sim
+  yet; they feed `ImpactEvents` the same way when they land. No collision is inferred from
+  ordinary braking.
+
+Existing limiter, spool-lag turbo, deploy/harvest whine, floor strikes and shift cut remain.
+All acoustic levels, resonances and view paths are sound-design estimates; mechanical power-unit
+inputs retain the sources in the original synthesis section and physics validation document.
+
+`VIEW_BALANCE` documents cockpit, T-cam, chase and trackside gains and exhaust cutoffs. Onboard
+views bring intake forward; the chase hears exhaust. Cockpit exhaust is dulled, but combustion
+noise can make the total cockpit spectrum brighter under load. The trackside file is the external
+balance throughout the lap; distance, panning and Doppler belong to Slice 2.
+
+Five saved levels are exposed as settings data: master 0.8, engine 1, effects 0.8, UI 0.8,
+ambience 0.6. Old saves acquire defaults for the new fields. The menus can consume these fields;
+this slice does not redesign their controls. UI cues duck engine/effects up to 3 dB and ambience
+8 dB; impacts duck ambience 6 dB; attack 10 ms, release 300 ms. Engine and road never duck each
+other. Ambience and UI synthesis remain for Slice 2. The same master true-peak limiter protects
+all buses, including gains of 2.
+
+Listen first to `docs/evidence/m6-audio/reference-cockpit-excerpt.ogg`, then the matching
+`reference-trackside-excerpt.ogg`: compare shift cuts, ignition cracks, intake and gear mesh.
+Then play the full WAVs in `artifacts/audio/`: check braking burble and harvest, kerbs versus
+scrub, wind/DRS, and whether the onboard high frequencies become tiring. Use `load-steps` for
+same-RPM tone, and the new layer tests for off-road surfaces and collisions (a clean reference
+lap does not exercise gravel or impacts). A human still needs to judge realism, balance and
+phone/headphone playback; objective gates cannot award the audio scorecard rating.
+
+Reference evidence from this pass (48 kHz stereo, 84.97 s, 1343 steady windows per view):
+
+| View | LUFS | dBTP | Pitch error median / max | DC | Core speed |
+| --- | --- | --- | --- | --- | --- |
+| Cockpit | −17.1 | −6.48 | 0.024 / 0.348 % | 3.43e-7 | 15.5–19.8× real time |
+| Trackside | −19.0 | −9.43 | 0.015 / 0.323 % | 1.76e-7 | 18.1–27× real time |
+
+Speed ranges are two renders of the same lap on the loaded laptop; the sample hashes in `summary.json` were identical across them. Re-rendered after widening the kerb rumble range: only the kerb layer moved (−52.6 to −52.7 dBFS). The core cost is about 4–7% of one CPU core for this one-car render on the loaded laptop,
+excluding analysis and file writing; this is not a mobile AudioWorklet CPU measurement. Both
+views pass the gates and block-size hash comparison. Silent layers are `null` in the JSON
+(the JSON representation of −infinity dBFS).

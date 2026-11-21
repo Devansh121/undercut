@@ -5,6 +5,7 @@
  */
 import { MIN_SAMPLE_RATE } from '../dsp/core';
 import { CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../dsp/state';
+import type { AudioView } from '../dsp/view';
 import type { GainId } from '../dsp/voice';
 import { PROCESSOR_NAME, type ProcessorOptions, type ToProcessor } from './messages';
 
@@ -28,8 +29,10 @@ export interface AudioEngine {
   suspend(): Promise<void>;
   /** Latest state of the player's car. Cheap; call every sim step (60–240 Hz). */
   setCarState(state: AudioCarState): void;
-  /** Bus volume, 0–1 (up to 2 is accepted): master, engine, effects or ui. */
+  /** Bus volume, 0–1 (up to 2 is accepted): master, engine, effects, ui or ambience. */
   setVolume(id: GainId, value: number): void;
+  /** Where the listener is (follows the camera): changes the car's balance, gliding. */
+  setView(view: AudioView): void;
   /** Fade out, stop and release everything. The engine is silent afterwards. */
   dispose(): Promise<void>;
 }
@@ -91,6 +94,7 @@ export class SilentAudioEngine implements AudioEngine {
   }
   setCarState(): void {}
   setVolume(): void {}
+  setView(): void {}
   dispose(): Promise<void> {
     return Promise.resolve();
   }
@@ -119,6 +123,7 @@ class WorkletAudioEngine implements AudioEngine {
   private readonly packed = new Float64Array(CAR_STATE_LENGTH);
   private hasState = false;
   private readonly gains = new Map<GainId, number>();
+  private view: AudioView | undefined;
   private readonly onVisibility = () => void this.reconcile();
 
   constructor(
@@ -170,6 +175,12 @@ class WorkletAudioEngine implements AudioEngine {
     if (this.status === 'silent') return;
     this.gains.set(id, value);
     if (this.node) this.post({ type: 'gain', id, value });
+  }
+
+  setView(view: AudioView): void {
+    if (this.status === 'silent' || view === this.view) return;
+    this.view = view;
+    if (this.node) this.post({ type: 'view', view });
   }
 
   dispose(): Promise<void> {
@@ -249,6 +260,7 @@ class WorkletAudioEngine implements AudioEngine {
       });
       this.node = node;
       for (const [id, value] of this.gains) this.post({ type: 'gain', id, value });
+      if (this.view) this.post({ type: 'view', view: this.view });
       if (this.hasState) this.post({ type: 'state', packed: this.packed });
       // Connected paused: silent until a reconcile step decides it should run.
       node.connect(context.destination as never);
