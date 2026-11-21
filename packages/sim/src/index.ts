@@ -123,6 +123,7 @@ export {
 export {
   ASSIST_SNAPSHOT_LENGTH,
   NO_ASSISTS,
+  ESC_TUNING,
   applyAssists,
   createAssistState,
   neutralThrottle,

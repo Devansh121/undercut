@@ -1,19 +1,21 @@
 import type { ControlInput } from './contracts';
-import { gearRatio, type CarState } from './state';
+import { computeMass, gearRatio, type CarState, type MassState } from './state';
 import { engineFullLoadTorque } from './step';
 import type { TyreCurve } from './tyre';
 
 /**
  * Driver assists: a pure layer between the driver's `ControlInput` and the input the car
  * receives. They read the car the way an ECU's wheel-speed and yaw sensors would (slip, rpm,
- * speed) and only change steering, pedals and gear requests. They never touch the physics.
+ * speed, yaw rate) and change only pedal, per-wheel brake and gear demands. They never touch the
+ * steering or the physics.
  *
  * Each assist has levels; 0 is off. Higher levels intervene earlier.
  *
- * No assist ever adds a force the driver could not: traction control and the stability assist
- * only take engine torque away down to the point where the engine neither drives nor brakes
- * (they never leave engine braking on a wheel they are trying to save), the stability assist
- * eases the brake pedal and adds steering toward a slide the way a driver catches one.
+ * Traction control and the stability assist take engine torque away only down to the point
+ * where the engine neither drives nor brakes (they never leave engine braking on a wheel they
+ * are trying to save). The stability assist works like road-car stability control: it compares
+ * the car's yaw rate with the one the driver's steering asks for and brakes a single wheel to
+ * correct it. It never eases the driver's brake.
  */
 export interface AssistSettings {
   /** Traction control level 0–3. */
@@ -22,9 +24,10 @@ export interface AssistSettings {
   abs: number;
   autoGears: boolean;
   /**
-   * Stability assist, 0 (off) or 1 (on): when the car slides (rear tyre slip angle past
-   * `SLIDE_START`) it steers toward the slide, takes drive away from the rear down to neutral,
-   * cancels engine braking on the rear, eases the brake and holds automatic down-shifts.
+   * Stability assist, 0 (off) or 1 (on). Yaw-rate control against a reference from the
+   * driver's steer and speed (capped by the grip the car has): oversteer brakes the outer front
+   * wheel, takes drive away down to neutral and cancels engine braking on the rear; understeer
+   * brakes the inner rear and eases the throttle. Automatic down-shifts wait while it corrects.
    */
   stability?: number;
 }
@@ -53,15 +56,44 @@ const ABS_RECOVER = 5;
 const DIRECT_CUT = 3;
 /** Automatic gearbox: shift up at this rpm; shift down when the lower gear lands below it. */
 const UPSHIFT_RPM = 11800;
-/** Stability assist: rear slip angle where a slide starts, rad (just under the tyre's peak). */
-const SLIDE_START = 4.5 * (Math.PI / 180);
-/** Drive taken away: all of it (down to neutral) by this much sideslip past the start, rad. */
-const SLIDE_DRIVE_SPAN = 4 * (Math.PI / 180);
-/** Brake pedal eased per radian of sideslip past the start, and the least kept. */
-const SLIDE_BRAKE_RELEASE = 12;
-const SLIDE_BRAKE_FLOOR = 0.2;
-/** Below this speed sideslip means nothing (parking, a spin already over). */
-const SLIDE_MIN_SPEED = 8;
+/** Stability assist tuning (temporary for measurement). */
+export const ESC_TUNING = {
+  ESC_MIN_SPEED: 8,
+  ESC_REFERENCE_LAG: 0.12,
+  ESC_GRIP: 1,
+  ESC_OVER_DEADBAND: 0.04,
+  ESC_OVER_DEADBAND_SHARE: 0.08,
+  ESC_UNDER_DEADBAND: 0.08,
+  ESC_UNDER_DEADBAND_SHARE: 0.25,
+  ESC_OVER_GAIN: 2.5,
+  ESC_UNDER_GAIN: 1.2,
+  ESC_MAX_OVER: 0.6,
+  ESC_MAX_UNDER: 0.3,
+  ESC_DRIVE_SPAN: 0.25,
+  ESC_RISE: 10,
+  ESC_FALL: 20,
+  ESC_LOCK: 1.2,
+  ESC_REAR_GATE: 0.85,
+  ESC_FRONT_GATE: 1,
+  ESC_BETA_GATE: 0.07,
+  ESC_BETA_LIMIT: 0.1,
+  ESC_BETA_GAIN: 3,
+};
+
+/** Time constant of the reference yaw rate: how fast the car's yaw can follow the wheel, s. */
+
+/** Share of the tyres' peak lateral grip the reference may ask for. */
+
+/** Yaw-rate error tolerated before a wheel is braked, rad/s: fixed plus a share of the reference. */
+
+/** Wheel brake per rad/s of error past the deadband, and the most one wheel gets. */
+
+/** Drive taken away: all of it (down to neutral) by this much error past the deadband, rad/s. */
+
+/** How fast a wheel brake builds and releases, share per second. */
+
+/** A braked wheel past this multiple of the peak slip ratio has its ESC brake cut. */
+
 /**
  * Below this road speed a driver's downshift request in first passes through, so a stopped car
  * can go 1 → N → R with automatic gears on. The gearbox itself refuses reverse above 1 m/s.
@@ -79,14 +111,17 @@ export interface AssistState {
   absScale: number;
   /** Ticks to wait before the next automatic shift request. */
   shiftHold: number;
+  /** Stability assist: the reference yaw rate (rad/s) and each wheel's brake demand. */
+  refYaw: number;
+  readonly wheelBrake: Float64Array;
 }
 
 export function createAssistState(): AssistState {
-  return { tcScale: 1, absScale: 1, shiftHold: 0 };
+  return { tcScale: 1, absScale: 1, shiftHold: 0, refYaw: 0, wheelBrake: new Float64Array(4) };
 }
 
 /** Length of an assist snapshot in numbers. */
-export const ASSIST_SNAPSHOT_LENGTH = 3;
+export const ASSIST_SNAPSHOT_LENGTH = 8;
 
 /** Copy the assist memory into `out` (allocated if absent). */
 export function snapshotAssists(memory: AssistState, out?: Float64Array): Float64Array {
@@ -95,6 +130,8 @@ export function snapshotAssists(memory: AssistState, out?: Float64Array): Float6
   buf[0] = memory.tcScale;
   buf[1] = memory.absScale;
   buf[2] = memory.shiftHold;
+  buf[3] = memory.refYaw;
+  for (let i = 0; i < 4; i++) buf[4 + i] = memory.wheelBrake[i]!;
   return buf;
 }
 
@@ -104,6 +141,8 @@ export function restoreAssists(memory: AssistState, snapshot: ArrayLike<number>)
   memory.tcScale = snapshot[0]!;
   memory.absScale = snapshot[1]!;
   memory.shiftHold = snapshot[2]!;
+  memory.refYaw = snapshot[3]!;
+  for (let i = 0; i < 4; i++) memory.wheelBrake[i] = snapshot[4 + i]!;
 }
 
 /**
@@ -170,34 +209,126 @@ export function applyAssists(
   }
   out.brake = brake * memory.absScale * absCut;
 
-  // Stability: the car is sliding.
-  const slide = (settings.stability ?? 0) > 0 ? slideExcess(car) : 0;
-  if (slide > 0) {
-    const beta = Math.atan2(car.vy, Math.abs(car.vx));
-    const maxSteer = car.model.params.geometry.maxSteerAngle;
-    const blend = clamp01(slide / ((3 * Math.PI) / 180));
-    const catchSteer = (beta - 0.3 * car.yawRate) / maxSteer;
-    const steer = out.steer * (1 - blend) + catchSteer * blend;
-    out.steer = steer > 1 ? 1 : steer < -1 ? -1 : steer;
-    const neutral = neutralThrottle(car);
-    const keep = clamp01(1 - slide / SLIDE_DRIVE_SPAN);
-    if (out.throttle > neutral) out.throttle = neutral + (out.throttle - neutral) * keep;
-    else out.throttle = neutral;
-    out.brake *= Math.max(SLIDE_BRAKE_FLOOR, 1 - SLIDE_BRAKE_RELEASE * slide);
+  // Stability: yaw-rate control with one braked wheel and engine torque.
+  const correcting = (settings.stability ?? 0) > 0 ? stabilityControl(memory, car, dt, out) : 0;
+  if ((settings.stability ?? 0) <= 0) {
+    memory.refYaw = car.yawRate;
+    memory.wheelBrake.fill(0);
+    out.wheelBrake = undefined;
   }
 
   if (settings.autoGears) {
     out.gearShift = automaticShift(memory, car, driver);
-    if (slide > 0 && out.gearShift < 0) out.gearShift = 0;
+    if (correcting > 0 && out.gearShift < 0) out.gearShift = 0;
   }
   return out;
 }
 
-/** Rear tyre slip past the start of a slide, rad (0 when gripping or nearly stopped). */
-function slideExcess(car: CarState): number {
-  if (car.vx < SLIDE_MIN_SPEED) return 0;
-  const beta = Math.atan(Math.max(Math.abs(car.slipTan[2]!), Math.abs(car.slipTan[3]!)));
-  return beta > SLIDE_START ? beta - SLIDE_START : 0;
+const escMass: MassState = {
+  total: 0,
+  sprung: 0,
+  a: 0,
+  b: 0,
+  sprungA: 0,
+  sprungB: 0,
+  yawInertia: 0,
+};
+
+/**
+ * The stability assist for one tick. The reference yaw rate is what the steering asks for at
+ * this speed on a neutral car (v·δ / L), held within the grip the tyres have (μ · total load /
+ * mass, over v) and lagged by the car's yaw response. Turning faster than that in the direction
+ * of rotation is oversteer: the outer front wheel is braked (its drag turns the car back) and
+ * drive comes off the rear down to neutral, with engine braking cancelled if the driver has
+ * lifted. Turning slower than asked is understeer: the inner rear is braked and the throttle
+ * eased. Writes `out.throttle` and `out.wheelBrake`; returns the oversteer being corrected,
+ * rad/s past the deadband (0 if none).
+ */
+function stabilityControl(
+  memory: AssistState,
+  car: CarState,
+  dt: number,
+  out: ControlInput,
+): number {
+  const wb = memory.wheelBrake;
+  const v = car.vx;
+  let over = 0;
+  let under = 0;
+  let target = -1;
+  let amount = 0;
+  if (v >= ESC_TUNING.ESC_MIN_SPEED) {
+    const p = car.model.params;
+    const m = computeMass(car.model, car.fuelMass, escMass).total;
+    const curve = car.model.curve;
+    const grip =
+      (ESC_TUNING.ESC_GRIP * curve.muY * (m * 9.80665 + car.downforceFront + car.downforceRear)) /
+      m;
+    const rMax = grip / v;
+    const asked = (v * out.steer * p.geometry.maxSteerAngle) / p.geometry.wheelbase;
+    const ref = asked > rMax ? rMax : asked < -rMax ? -rMax : asked;
+    memory.refYaw += (ref - memory.refYaw) * Math.min(1, dt / ESC_TUNING.ESC_REFERENCE_LAG);
+    const r = car.yawRate;
+    const e = r - memory.refYaw;
+    const refMag = Math.abs(memory.refYaw);
+    // Only an axle that is at its grip counts: a car merely turning faster than a released key
+    // asks is not sliding. Rear at or near peak slip angle (or the body sliding) for oversteer,
+    // front past peak for understeer.
+    const peakTan = curve.peakSlipTan;
+    const rearTan = Math.max(Math.abs(car.slipTan[2]!), Math.abs(car.slipTan[3]!));
+    const frontTan = Math.max(Math.abs(car.slipTan[0]!), Math.abs(car.slipTan[1]!));
+    const beta = Math.abs(Math.atan2(car.vy, v));
+    const rearGone =
+      rearTan >= ESC_TUNING.ESC_REAR_GATE * peakTan || beta > ESC_TUNING.ESC_BETA_GATE;
+    const frontGone = frontTan >= ESC_TUNING.ESC_FRONT_GATE * peakTan;
+    // Sideslip past the limit and still growing counts as oversteer whatever the steering asks
+    // (a driver holding lock while the car swaps ends).
+    const betaSigned = Math.atan2(car.vy, v);
+    const betaOver =
+      betaSigned * r < 0 ? ESC_TUNING.ESC_BETA_GAIN * (beta - ESC_TUNING.ESC_BETA_LIMIT) : 0;
+    const yawOver =
+      e * r > 0 && rearGone
+        ? Math.abs(e) - (ESC_TUNING.ESC_OVER_DEADBAND + ESC_TUNING.ESC_OVER_DEADBAND_SHARE * refMag)
+        : 0;
+    if (yawOver > 0 || betaOver > 0) {
+      over = Math.max(yawOver, betaOver);
+      // Too much rotation to the left: brake the front right, and the reverse.
+      target = r > 0 ? 1 : 0;
+      amount = Math.min(ESC_TUNING.ESC_MAX_OVER, ESC_TUNING.ESC_OVER_GAIN * over);
+    } else if (e * memory.refYaw < 0 && frontGone) {
+      under =
+        Math.abs(e) -
+        (ESC_TUNING.ESC_UNDER_DEADBAND + ESC_TUNING.ESC_UNDER_DEADBAND_SHARE * refMag);
+      if (under > 0) {
+        // Not turning left enough: brake the rear left, and the reverse.
+        target = memory.refYaw > 0 ? 2 : 3;
+        amount = Math.min(ESC_TUNING.ESC_MAX_UNDER, ESC_TUNING.ESC_UNDER_GAIN * under);
+      }
+    }
+    // A wheel the extra brake would lock gets none.
+    if (target >= 0 && -car.slipRatio[target]! > ESC_TUNING.ESC_LOCK * curve.peakSlipRatio)
+      amount = 0;
+  } else {
+    memory.refYaw = car.yawRate;
+  }
+  let any = false;
+  for (let i = 0; i < 4; i++) {
+    const want = i === target ? amount : 0;
+    const now = wb[i]!;
+    wb[i] =
+      want > now
+        ? Math.min(want, now + ESC_TUNING.ESC_RISE * dt)
+        : Math.max(want, now - ESC_TUNING.ESC_FALL * dt);
+    if (wb[i]! > 0) any = true;
+  }
+  out.wheelBrake = any ? wb : undefined;
+
+  if (over > 0 || under > 0) {
+    const neutral = neutralThrottle(car);
+    const keep = clamp01(1 - Math.max(over, under) / ESC_TUNING.ESC_DRIVE_SPAN);
+    if (out.throttle > neutral) out.throttle = neutral + (out.throttle - neutral) * keep;
+    else if (over > 0 && out.brake < 0.02) out.throttle = neutral;
+  }
+  return over > 0 ? over : 0;
 }
 
 /**
