@@ -5,6 +5,8 @@ export interface AudioSettings {
   master: number;
   engine: number;
   effects: number;
+  ui: number;
+  ambience: number;
 }
 
 export type AudioSettingKey = keyof AudioSettings;
@@ -13,6 +15,8 @@ export const AUDIO_DEFAULTS: Readonly<AudioSettings> = Object.freeze({
   master: 0.8,
   engine: 1,
   effects: 0.8,
+  ui: 0.8,
+  ambience: 0.6,
 });
 
 const KEY = 'settings.audio';
@@ -60,6 +64,8 @@ function parse(text: string): AudioSettings {
     master: clamp(r.master, AUDIO_DEFAULTS.master),
     engine: clamp(r.engine, AUDIO_DEFAULTS.engine),
     effects: clamp(r.effects, AUDIO_DEFAULTS.effects),
+    ui: clamp(r.ui, AUDIO_DEFAULTS.ui),
+    ambience: clamp(r.ambience, AUDIO_DEFAULTS.ambience),
   };
 }
 

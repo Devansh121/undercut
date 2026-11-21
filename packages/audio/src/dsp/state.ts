@@ -31,9 +31,12 @@ export interface AudioCarState {
   ersPower: number;
   /** Road speed, m/s. */
   speed: number;
-  /** Combined slip magnitude of the front axle, dimensionless (about 0.1 at peak grip). */
+  /**
+   * Combined slip of the front axle, dimensionless, scaled so that 0.1 is the tyre's force peak
+   * (`SLIP_LIMIT`): scrub builds below it, the tyre slides past it.
+   */
   slipFront: number;
-  /** Combined slip magnitude of the rear axle, dimensionless. */
+  /** Combined slip of the rear axle, scaled the same way. */
   slipRear: number;
   /** Kerb roughness under the car, 0 (none) to 1 (sausage kerb). */
   kerb: number;
@@ -41,7 +44,30 @@ export interface AudioCarState {
   kerbFrequency: number;
   /** Plank or skid-block contact intensity, 0–1. A rising edge also gives a thump. */
   bottoming: number;
+  /**
+   * Longitudinal slip ratio of the front axle's most-slipping wheel, signed: negative when the
+   * wheel turns slower than the road (braking, lock-up at -1), positive when it spins faster.
+   */
+  slipRatioFront: number;
+  /** The same for the rear axle (positive is wheelspin). */
+  slipRatioRear: number;
+  /** Share of the tyre contact points on grass, 0–1. */
+  grass: number;
+  /** Share of the tyre contact points on gravel, 0–1. */
+  gravel: number;
+  /** DRS flap position, 0 closed to 1 open. */
+  drs: number;
+  /** Normal speed of the latest impact (barrier or another car), m/s. Read with `impactSerial`. */
+  impactSpeed: number;
+  /**
+   * Changes (by any amount) each time a new impact happens; the impact sounds once, at the
+   * update where this changes, with `impactSpeed` as its strength. 0 until the first impact.
+   */
+  impactSerial: number;
 }
+
+/** Combined slip at the tyre's force peak, in the scale of `slipFront` and `slipRear`. */
+export const SLIP_LIMIT = 0.1;
 
 /**
  * Supported range of each packed field, `[min, max]`. The core clamps to these; a
@@ -64,8 +90,16 @@ export const CAR_STATE_RANGE: Readonly<Record<CarStateField, readonly [number, n
   slipFront: [0, 2],
   slipRear: [0, 2],
   kerb: [0, 1],
-  kerbFrequency: [0, 200],
+  // 150 m/s (the speed limit above) across 0.25 m ridge spacing.
+  kerbFrequency: [0, 600],
   bottoming: [0, 1],
+  slipRatioFront: [-1, 2],
+  slipRatioRear: [-1, 2],
+  grass: [0, 1],
+  gravel: [0, 1],
+  drs: [0, 1],
+  impactSpeed: [0, 100],
+  impactSerial: [0, 1_000_000],
 };
 
 /** A parked car with the engine off. */
@@ -88,6 +122,13 @@ export function defaultCarState(): AudioCarState {
     kerb: 0,
     kerbFrequency: 0,
     bottoming: 0,
+    slipRatioFront: 0,
+    slipRatioRear: 0,
+    grass: 0,
+    gravel: 0,
+    drs: 0,
+    impactSpeed: 0,
+    impactSerial: 0,
   };
 }
 
@@ -113,6 +154,13 @@ export const CAR_STATE_FIELDS = [
   'kerb',
   'kerbFrequency',
   'bottoming',
+  'slipRatioFront',
+  'slipRatioRear',
+  'grass',
+  'gravel',
+  'drs',
+  'impactSpeed',
+  'impactSerial',
 ] as const satisfies readonly (keyof AudioCarState)[];
 
 export type CarStateField = (typeof CAR_STATE_FIELDS)[number];
@@ -137,6 +185,13 @@ export const F = {
   kerb: 14,
   kerbFrequency: 15,
   bottoming: 16,
+  slipRatioFront: 17,
+  slipRatioRear: 18,
+  grass: 19,
+  gravel: 20,
+  drs: 21,
+  impactSpeed: 22,
+  impactSerial: 23,
 } as const satisfies { readonly [K in CarStateField]: number };
 
 /**
@@ -163,6 +218,13 @@ export function packCarState(state: AudioCarState, out: Float64Array): Float64Ar
   out[F.kerb] = state.kerb;
   out[F.kerbFrequency] = state.kerbFrequency;
   out[F.bottoming] = state.bottoming;
+  out[F.slipRatioFront] = state.slipRatioFront;
+  out[F.slipRatioRear] = state.slipRatioRear;
+  out[F.grass] = state.grass;
+  out[F.gravel] = state.gravel;
+  out[F.drs] = state.drs;
+  out[F.impactSpeed] = state.impactSpeed;
+  out[F.impactSerial] = state.impactSerial;
   return out;
 }
 
@@ -185,6 +247,13 @@ export function unpackCarState(packed: ArrayLike<number>, out: AudioCarState): A
   out.kerb = packed[F.kerb] ?? 0;
   out.kerbFrequency = packed[F.kerbFrequency] ?? 0;
   out.bottoming = packed[F.bottoming] ?? 0;
+  out.slipRatioFront = packed[F.slipRatioFront] ?? 0;
+  out.slipRatioRear = packed[F.slipRatioRear] ?? 0;
+  out.grass = packed[F.grass] ?? 0;
+  out.gravel = packed[F.gravel] ?? 0;
+  out.drs = packed[F.drs] ?? 0;
+  out.impactSpeed = packed[F.impactSpeed] ?? 0;
+  out.impactSerial = packed[F.impactSerial] ?? 0;
   return out;
 }
 

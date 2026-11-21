@@ -1,8 +1,12 @@
 import type { CarControls } from './controls';
 import type { LayerMeters } from './meters';
+import type { ViewMix } from './view';
 
-/** Buses a voice can feed. Each has its own gain under the master gain. */
-export type BusId = 'engine' | 'effects' | 'ui';
+/**
+ * Buses a voice can feed. Each has its own gain under the master gain. Ambience (crowd and
+ * circuit) and UI cues have their buses and saved levels now; their voices come later.
+ */
+export type BusId = 'engine' | 'effects' | 'ui' | 'ambience';
 
 /** Gains the player can set: one per bus plus the master. */
 export type GainId = 'master' | BusId;
@@ -18,7 +22,8 @@ export interface Voice {
    * Write (not add) `frames` mono samples into `out`. `aligned` is true when this chunk starts
    * on a control-rate boundary of the core's sample clock; control-rate work (filter
    * coefficient updates, waking or sleeping optional layers) happens only then, so output
-   * does not depend on how the host splits its blocks.
+   * does not depend on how the host splits its blocks. `view` is the listener's balance for
+   * this chunk (gains per sound group, ramped per sample).
    */
   render(
     controls: CarControls,
@@ -26,5 +31,6 @@ export interface Voice {
     frames: number,
     meters: LayerMeters,
     aligned: boolean,
+    view: ViewMix,
   ): void;
 }

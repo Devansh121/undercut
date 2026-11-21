@@ -127,6 +127,26 @@ describe('GameLoop and DriveSession', () => {
     expect(session.world.tick).toBe(Math.floor(0.25 / STEP + 1e-9));
   });
 
+  it('reports the hardest barrier impact of any step in the frame, not only the last', () => {
+    // The sim resets the impact speed every step; a 60 Hz frame runs four 240 Hz steps.
+    const { loop, session } = setup();
+    const perStep = [0, 7, 0, 0];
+    const tick = session.tick.bind(session);
+    let k = 0;
+    session.tick = (control, device) => {
+      const events = tick(control, device);
+      session.car.state.wallImpactSpeed = perStep[k++ % perStep.length] as number;
+      return events;
+    };
+    const r = loop.frame(1 / 60);
+    expect(r.steps).toBe(4);
+    expect(session.car.state.wallImpactSpeed).toBe(0);
+    expect(r.wallImpact).toBe(7);
+    expect(loop.frame(1 / 60).wallImpact).toBe(7);
+    perStep.fill(0);
+    expect(loop.frame(1 / 60).wallImpact).toBe(0);
+  });
+
   it('scales time for tests and tools', () => {
     const { loop, session } = setup();
     loop.timeScale = 4;
