@@ -12,3 +12,7 @@ package-lock.json
 design/
 # Committed track files are written byte for byte by tools/track-pipeline.
 packages/track/data/*.json
+
+# Generated car assets and their stats are written byte for byte by tools/car.
+apps/web/public/assets/car/
+docs/evidence/m2-car/stats.json
