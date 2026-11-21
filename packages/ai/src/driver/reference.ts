@@ -64,11 +64,19 @@ export interface ControllerGains {
   /** Brake pedal cap taken away per second per unit of slip past the lock threshold, and regained per second. */
   lockGain: number;
   lockRecover: number;
-  /** Throttle taken away per second per unit of rear combined slip past the peak. */
+  /** Throttle taken away per second per unit of rear combined slip past the peak, and regained per second. */
   spinGain: number;
+  spinRecover: number;
   /** Sideslip the driver tolerates before backing off, rad, and the rate per rad beyond it. */
   sideslipLimit: number;
   slideGain: number;
+  /**
+   * Countersteer: road-wheel angle added per radian of sideslip beyond `sideslipLimit`, toward
+   * the slide (1 points the front wheels along the car's path), and brake pedal taken away per
+   * radian of sideslip beyond the limit (a driver comes off the brake when the rear steps out).
+   */
+  counterSteer: number;
+  slideBrakeRelease: number;
 }
 
 export const REFERENCE_GAINS: Readonly<ControllerGains> = Object.freeze({
@@ -84,11 +92,14 @@ export const REFERENCE_GAINS: Readonly<ControllerGains> = Object.freeze({
   downshiftMargin: 1500,
   frontSlipMargin: 1.1,
   understeerLift: 0.5,
-  lockGain: 400,
+  lockGain: 150,
   lockRecover: 6,
   spinGain: 20,
+  spinRecover: 10,
   sideslipLimit: 0.06,
   slideGain: 60,
+  counterSteer: 1,
+  slideBrakeRelease: 12,
 });
 
 const TWO_PI = 2 * Math.PI;
@@ -110,6 +121,7 @@ export class ReferenceDriver implements Driver {
   private readonly deployBeforeLine: boolean;
   private readonly hint = { index: -1 };
   private readonly q: PathPoint = createPathPoint();
+  private readonly slipTan = new Float64Array(4);
   private rng: Rng;
 
   // Memory between ticks.
@@ -249,7 +261,12 @@ export class ReferenceDriver implements Driver {
       steer = lo;
       saturated = yawErr < 0;
     }
-    if (!saturated) this.yawIntegral = integral;
+    // The rear stepping out: steer toward the slide beyond the sideslip the driver accepts, and
+    // hold the yaw integrator (it would otherwise wind up against the countersteer).
+    const beta = wrapAngle(course - tel.yaw);
+    const betaOver = Math.max(0, Math.abs(beta) - g.sideslipLimit);
+    if (betaOver > 0) steer += (Math.sign(beta) * g.counterSteer * betaOver) / maxSteer;
+    if (!saturated && betaOver === 0) this.yawIntegral = integral;
 
     // ---- Speed ----
     // Feedforward read a little ahead covers the time the car takes to build deceleration or
@@ -287,14 +304,22 @@ export class ReferenceDriver implements Driver {
     const slide = sideslip - g.sideslipLimit;
     if (spin > 0 || slide > 0) {
       this.throttleCap -= (g.spinGain * Math.max(spin, 0) + g.slideGain * Math.max(slide, 0)) * dt;
-    } else this.throttleCap += 3 * dt;
+    } else this.throttleCap += g.spinRecover * dt;
     this.throttleCap = Math.max(0, Math.min(1, this.throttleCap));
-    const lockOver = lockExcess(tel.slipRatio, tel.wheelLoad, peak);
+    for (let k = 0; k < 4; k++) this.slipTan[k] = Math.tan(tel.slipAngle[k]!);
+    const lockOver = lockExcess(
+      tel.slipRatio,
+      tel.wheelLoad,
+      peak,
+      this.slipTan,
+      p.tyre.peakSlipTan,
+    );
     if (lockOver > 0) this.brakeCap -= g.lockGain * lockOver * dt;
     else this.brakeCap += g.lockRecover * dt;
     this.brakeCap = Math.max(0, Math.min(1, this.brakeCap));
     throttle = Math.min(throttle, this.throttleCap);
     brake = Math.min(brake, this.brakeCap);
+    if (betaOver > 0) brake *= Math.max(0, 1 - g.slideBrakeRelease * betaOver);
     // Sliding with the brakes off: never let engine braking act on the rear (lift-off
     // oversteer). Hold at least the throttle that cancels the engine's drag.
     const sliding = sideslip > g.sideslipLimit;
@@ -403,7 +428,7 @@ export class ReferenceDriver implements Driver {
 
 /** The reference driver's skill: all of the envelope it can use cleanly, no lag, no errors. */
 export const REFERENCE_SKILL: Readonly<DriverSkill> = Object.freeze({
-  envelope: Object.freeze({ lateral: 0.97, brake: 0.95, traction: 0.97 }),
+  envelope: Object.freeze({ lateral: 0.98, brake: 0.95, traction: 0.98 }),
   reaction: 0,
   steerNoise: 0,
   pedalNoise: 0,

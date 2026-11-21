@@ -1,0 +1,13 @@
+model,profile,speed_kmh,lateral_ms,min_load_fl_n,min_load_rl_n,max_load_fl_n,max_damping_n,max_load_step_n,airborne_s,plank_n,yaw_rate_dps
+point contact (before),flat,100,2,0,0,5669,3902,3932,0.233,0,0.39
+point contact (before),flat,200,5,0,706,11341,7867,8684,0.092,6567,2.07
+point contact (before),exit,200,3,314,2336,6311,2995,3861,0.000,0,0.95
+point contact (before),exit,250,5,0,2142,9280,5914,6909,0.046,0,1.00
+point contact (before),chicane,80,2,0,0,7831,5889,6509,0.333,0,1.11
+point contact (before),chicane,120,4,0,0,14956,12370,13317,0.292,7457,0.62
+contact patch (after),flat,100,2,0,795,3858,935,652,0.196,0,0.32
+contact patch (after),flat,200,5,0,1646,6112,2648,1336,0.100,0,1.95
+contact patch (after),exit,200,3,1406,3147,4156,630,496,0.000,0,0.44
+contact patch (after),exit,250,5,717,3998,5717,1367,721,0.000,0,0.74
+contact patch (after),chicane,80,2,0,0,4903,3656,3813,0.254,0,1.84
+contact patch (after),chicane,120,4,0,0,7129,5398,5315,0.163,0,0.83

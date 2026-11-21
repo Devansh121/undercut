@@ -15,6 +15,7 @@ import {
   throttleOutOfSlowCorner,
   topSpeed,
 } from './manoeuvres';
+import { KERB_CASES, kerbCrossing } from './kerbs';
 import {
   measureAcceleration,
   measureBrakingCurve,
@@ -354,6 +355,46 @@ export const MANOEUVRES: Readonly<Record<string, Manoeuvre>> = {
       return {
         name: 'assists',
         title: 'Assist sanity at the limit (pass = no spin)',
+        rows,
+        traces,
+        summary: { runs: out },
+      };
+    },
+  },
+
+  kerbs: {
+    describe:
+      'Kerb crossings (flat, exit, chicane profiles) at fixed speed and lateral speed: wheel loads, contact loss, damping force, plank, yaw',
+    run() {
+      const rows: ReportRow[] = [];
+      const traces: Report['traces'] = [];
+      const out: unknown[] = [];
+      for (const c of KERB_CASES) {
+        const r = kerbCrossing({ ...c, record: true });
+        const tag = `${c.profile} ${num(c.speed / KMH, 0)} km/h, ${num(c.lateral, 0)} m/s across`;
+        const fl = (a: number[]) => `${num(a[0]!, 0)} / ${num(a[2]!, 0)}`;
+        rows.push(
+          { ...row(`${tag}: left loads min (front / rear), N`, 0, ''), result: fl(r.minLoad) },
+          { ...row(`${tag}: left loads max (front / rear), N`, 0, ''), result: fl(r.maxLoad) },
+          {
+            ...row(`${tag}: largest carcass damping force, N`, Math.max(...r.maxDamping), 'N', 0),
+          },
+          {
+            ...row(`${tag}: largest load step in one tick, N`, Math.max(...r.maxLoadStep), 'N', 0),
+          },
+          { ...row(`${tag}: time airborne, any wheel`, Math.max(...r.airborne), 's', 3) },
+          { ...row(`${tag}: plank force`, r.maxPlankForce, 'N', 0) },
+          { ...row(`${tag}: yaw-rate excursion`, r.maxYawRateDev, 'deg/s', 2) },
+        );
+        traces.push({
+          name: `kerb-${c.profile}-${num(c.speed / KMH, 0)}-${num(c.lateral, 0)}`,
+          trace: r.trace!,
+        });
+        out.push({ ...r, trace: undefined });
+      }
+      return {
+        name: 'kerbs',
+        title: 'Kerb crossings (contact model)',
         rows,
         traces,
         summary: { runs: out },
