@@ -78,7 +78,8 @@ describe('invalid inputs', () => {
     expect(v(F.shiftDirection)).toBe(1);
     expect(Math.abs(v(F.ersPower))).toBeLessThanOrEqual(200_000);
     expect(v(F.speed)).toBeLessThanOrEqual(150);
-    expect(v(F.kerbFrequency)).toBeLessThanOrEqual(200);
+    // 600 Hz: 150 m/s over 0.25 m kerb ridges.
+    expect(v(F.kerbFrequency)).toBe(600);
     c.set(new Float64Array(CAR_STATE_LENGTH).fill(-1e9));
     c.advance(1);
     for (const f of [

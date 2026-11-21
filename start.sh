@@ -31,6 +31,8 @@ if [[ ! -d node_modules || ! -f $stamp || $(cat "$stamp") != "$lock_hash" ]]; th
 fi
 
 echo "Building the client ..."
-npm run --silent build -w @undercut/web -- --logLevel warn
+# The same build as npm run build: the client, then the precompressed .br/.gz siblings the server
+# sends, then the budget check.
+npm run --silent build
 
 exec node tools/serve/start.mjs

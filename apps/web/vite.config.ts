@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 // Relative import on purpose: the config is loaded by Node, which cannot import the
@@ -30,11 +31,47 @@ function gameName(): Plugin {
   };
 }
 
+/**
+ * The Draco decoder that ships with three.js (Apache-2.0, credited in CREDITS.md), served from the
+ * game's own origin at assets/draco/ and never from a CDN. DRACOLoader loads it by fixed file
+ * names, so it is copied as is rather than hashed into the bundle.
+ */
+function dracoDecoder(): Plugin {
+  const dir = fileURLToPath(
+    new URL('../../node_modules/three/examples/jsm/libs/draco/gltf/', import.meta.url),
+  );
+  const files = ['draco_decoder.wasm', 'draco_wasm_wrapper.js'];
+  return {
+    name: 'draco-decoder',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const m = /\/assets\/draco\/([\w.]+)$/.exec(req.url?.split('?')[0] ?? '');
+        const name = m?.[1];
+        if (!name || !files.includes(name)) return next();
+        res.setHeader(
+          'Content-Type',
+          name.endsWith('.wasm') ? 'application/wasm' : 'text/javascript',
+        );
+        res.end(fs.readFileSync(dir + name));
+      });
+    },
+    generateBundle() {
+      for (const name of files) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `assets/draco/${name}`,
+          source: fs.readFileSync(dir + name),
+        });
+      }
+    },
+  };
+}
+
 const roomsPort = Number(process.env.ROOMS_PORT ?? 8787);
 
 export default defineConfig({
   base: './',
-  plugins: [gameName()],
+  plugins: [gameName(), dracoDecoder()],
   define: {
     __BUILD_HASH__: JSON.stringify(buildHash()),
   },

@@ -1,4 +1,4 @@
-import type { AudioCarState } from '@undercut/audio';
+import type { AudioView, AudioCarState } from '@undercut/audio';
 import { createAudioEngine, type AudioEngine } from '@undercut/audio/web';
 import type { StoragePort } from '@undercut/input';
 import type { CarAudioSink } from './game/audio-seam';
@@ -61,7 +61,12 @@ export class PageAudio {
   }
 
   /** The sink the drive screen publishes the player's car to. */
-  readonly sink: CarAudioSink = (state: Readonly<AudioCarState>) => {
+  readonly sink: CarAudioSink = (
+    state: Readonly<AudioCarState>,
+    _paused: boolean,
+    view?: AudioView,
+  ) => {
+    if (view) this.engine?.setView(view);
     this.engine?.setCarState(state as AudioCarState);
   };
 
@@ -93,5 +98,7 @@ export class PageAudio {
     this.engine.setVolume('master', v.master);
     this.engine.setVolume('engine', v.engine);
     this.engine.setVolume('effects', v.effects);
+    this.engine.setVolume('ui', v.ui);
+    this.engine.setVolume('ambience', v.ambience);
   }
 }

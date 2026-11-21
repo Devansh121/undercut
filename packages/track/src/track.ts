@@ -442,6 +442,11 @@ export class Track {
     return this.lap.interpolate(this.halfWidth[side], s);
   }
 
+  /** Offset of the barrier line on one side at s, m (interpolated between samples). */
+  barrierAt(s: number, side: SideIndex): number {
+    return this.lap.interpolate(this.barrier[side], s);
+  }
+
   /** World point at (s, d) on the ground. */
   pointAt(s: number, d: number, out: Vec3): Vec3 {
     this.lap.pointAt(s, d, out);

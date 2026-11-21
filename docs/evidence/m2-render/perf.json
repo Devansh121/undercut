@@ -1,0 +1,316 @@
+{
+  "sha": "2b6da1b",
+  "perf": [
+    {
+      "run": "drive",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": true,
+      "frames": 721,
+      "avgFps": 60,
+      "onePercentLowFps": 59.5,
+      "p99FrameMs": 16.8,
+      "meanFrameMs": 16.67,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 191,
+        "triangles": 789013,
+        "geometries": 53,
+        "textures": 65,
+        "textureMiB": 380.7,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 5.56,
+        "width": 1920,
+        "height": 1080,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      }
+    },
+    {
+      "run": "grid",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": true,
+      "frames": 721,
+      "avgFps": 60,
+      "onePercentLowFps": 59.5,
+      "p99FrameMs": 16.8,
+      "meanFrameMs": 16.67,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 459,
+        "triangles": 4177285,
+        "geometries": 123,
+        "textures": 79,
+        "textureMiB": 380.7,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 5.89,
+        "width": 1920,
+        "height": 1080,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      }
+    },
+    {
+      "run": "drive",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": true,
+      "frames": 720,
+      "avgFps": 60,
+      "onePercentLowFps": 59.5,
+      "p99FrameMs": 16.8,
+      "meanFrameMs": 16.67,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 62,
+        "triangles": 157713,
+        "geometries": 41,
+        "textures": 42,
+        "textureMiB": 97.3,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 2.92,
+        "width": 844,
+        "height": 390,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      }
+    },
+    {
+      "run": "grid",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": true,
+      "frames": 721,
+      "avgFps": 60,
+      "onePercentLowFps": 59.5,
+      "p99FrameMs": 16.8,
+      "meanFrameMs": 16.67,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 128,
+        "triangles": 841963,
+        "geometries": 75,
+        "textures": 49,
+        "textureMiB": 97.3,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 2.64,
+        "width": 844,
+        "height": 390,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      }
+    },
+    {
+      "run": "drive",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": false,
+      "frames": 3863,
+      "avgFps": 320.7,
+      "onePercentLowFps": 12.4,
+      "p99FrameMs": 38.5,
+      "meanFrameMs": 3.12,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 191,
+        "triangles": 789013,
+        "geometries": 53,
+        "textures": 65,
+        "textureMiB": 380.7,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 3.49,
+        "width": 1920,
+        "height": 1080,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      }
+    },
+    {
+      "run": "grid",
+      "viewport": "1920x1080",
+      "quality": "high",
+      "vsync": false,
+      "frames": 2293,
+      "avgFps": 190.9,
+      "onePercentLowFps": 16.9,
+      "p99FrameMs": 36.7,
+      "meanFrameMs": 5.24,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 459,
+        "triangles": 4177285,
+        "geometries": 123,
+        "textures": 79,
+        "textureMiB": 380.7,
+        "pixelRatio": 1,
+        "renderScale": 1,
+        "gpuMs": 4.95,
+        "width": 1920,
+        "height": 1080,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "high"
+      }
+    },
+    {
+      "run": "drive",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": false,
+      "frames": 3965,
+      "avgFps": 330,
+      "onePercentLowFps": 83.8,
+      "p99FrameMs": 9.9,
+      "meanFrameMs": 3.03,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 62,
+        "triangles": 157713,
+        "geometries": 41,
+        "textures": 42,
+        "textureMiB": 102.6,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 0.57,
+        "width": 844,
+        "height": 390,
+        "cars": 1,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      }
+    },
+    {
+      "run": "grid",
+      "viewport": "844x390",
+      "quality": "mobile",
+      "vsync": false,
+      "frames": 5601,
+      "avgFps": 466.3,
+      "onePercentLowFps": 131.9,
+      "p99FrameMs": 6.1,
+      "meanFrameMs": 2.14,
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)",
+      "render": {
+        "calls": 128,
+        "triangles": 841963,
+        "geometries": 75,
+        "textures": 50,
+        "textureMiB": 102.6,
+        "pixelRatio": 1.5,
+        "renderScale": 1,
+        "gpuMs": 0.78,
+        "width": 844,
+        "height": 390,
+        "cars": 20,
+        "renderPath": "hdr",
+        "environmentBakes": 1,
+        "quality": "mobile"
+      }
+    }
+  ],
+  "lifecycleHighGpu": {
+    "quality": "high",
+    "ok": true,
+    "after": [
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 2,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 2
+        }
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 2,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 2
+        }
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 2,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 2
+        }
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 2,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 2
+        }
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 2,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 2
+        }
+      }
+    ],
+    "problems": []
+  }
+}

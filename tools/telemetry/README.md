@@ -12,6 +12,8 @@ npm run telemetry -- cornering --trim high --speeds 85,150,250
 npm run telemetry -- bench             # real-time factor, 1 and 20 cars
 npm run telemetry -- lap               # reference driver, flying lap at Monza
 npm run telemetry -- lap --laps 10     # ten consecutive laps (fuel for all of them)
+npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1
+npm run telemetry -- weekend --cars 20 --laps 5 --qualifying 600 --seed 1
 npm run telemetry -- calibrate         # every target + the Monza lap, one score
 npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only targets|lap]
 ```
@@ -29,6 +31,8 @@ npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only tar
 | `assists` | Full throttle out of a slow corner and full brake in a turn (both at 85 % of the limit) with TC or ABS 0–3; full-pedal straight stop from 300 km/h with ABS 0–3 |
 | `validate` | The table of every target: result, stated target, band, verdict (pass, gap, fail) |
 | `lap` | The reference driver on the committed racing line (`packages/ai`): an out-lap, then timed lap(s) from the control line at Monza in the doc 2.1 conditions; lap, sector, corner, corner-geometry and trap tables against the published figures, driver cost per tick; `lap-monza.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-monza.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
+| `race` | AI cars race at Monza from a standing start (`packages/race`): `--cars` (20), `--laps` (5), `--seed` (1), `--spread` of skill 0–1 (0.5), `--no-pit` (otherwise one tyre stop each around half distance for races of five laps or more). Prints the classification, the event log (positions, sectors and speed traps counted, everything else listed), per-car first-lap position, slowest point and track-limit figures, the watchdog's findings, the first-lap overlap count (cars are ghosts to each other), the speed and a digest of the result so two runs can be compared; writes `race-monza-c<cars>-l<laps>-s<seed>.json` with the result and every event |
+| `weekend` | Qualifying (`--qualifying` seconds, 600; `--practice` seconds to add practice) and then the race on the grid from qualifying, with the same output per session |
 
 `calibrate` is the calibration harness: the 32 component targets (role, result, band, in or out,
 miss in band half-widths, the recorded gap), then the Monza lap with a freshly measured envelope

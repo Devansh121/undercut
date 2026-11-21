@@ -238,6 +238,7 @@ export class RoomMachine {
     };
     at(s.phaseEndsAt);
     at(s.closeAt);
+    if (s.phase === 'lobby') at(s.createdAt + this.timings.maxRoomAgeMs);
     for (const m of s.members) at(m.graceUntil);
     for (const c of s.conns) if (c.member === null) at(c.openedAt + this.timings.joinTimeoutMs);
     // Staleness is checked by polling while cars are on track.
@@ -355,6 +356,10 @@ export class RoomMachine {
       }
       if (ON_TRACK.has(s.phase)) changed = this.updateStaleness() || changed;
       if (s.closeAt !== null && now >= s.closeAt) {
+        this.closeRoom();
+        return;
+      }
+      if (s.phase === 'lobby' && now >= s.createdAt + this.timings.maxRoomAgeMs) {
         this.closeRoom();
         return;
       }

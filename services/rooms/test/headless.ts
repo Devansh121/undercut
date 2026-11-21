@@ -112,7 +112,26 @@ export function raceState(rs: Recorder[], drivers: HeadlessDriver[]): string {
     }),
     host: room?.host,
     members: room?.members.map((m) => `${m.id}:${m.status}:${m.connected}`),
+    // Why a socket ended: the close code and reason each client saw, the errors the
+    // service sent it, and its last status changes (a nightly failure must name this).
+    closed: rs.map((r) => r.of('closed').map((c) => `${c.code}:${c.reason}`)),
+    errors: rs.map((r) => r.of('error').map((e) => e.code)),
+    statuses: rs.map((r) => r.of('status').slice(-6)),
+    serviceLog: serviceLogTail(40),
   });
+}
+
+/** The last `lines` lines the service wrote, for timeout messages. */
+export function serviceLogTail(lines: number): string[] {
+  try {
+    const text = fs.readFileSync(inject('roomsLog'), 'utf8');
+    return text
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .slice(-lines);
+  } catch {
+    return [];
+  }
 }
 
 /** Wait for every recorder to have the results, explaining the race if they never come. */

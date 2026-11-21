@@ -96,7 +96,8 @@ test.describe('drive', () => {
   test('times the start line and a sector line', async ({ drive: { page, problems } }) => {
     await page.evaluate(() => {
       const u = window.__undercut;
-      u?.teleport(5560, 0, 250);
+      // 72 m before Monza's timing line (the control line, s = 5472.5).
+      u?.teleport(5400, 0, 250);
       u?.autopilot(true);
       u?.setTimeScale(4);
     });
@@ -152,6 +153,87 @@ test.describe('drive', () => {
     expect(Math.abs(after.d)).toBeLessThan(0.3);
     expect(after.surface).toBe(SurfaceKind.Asphalt);
     expect(Math.abs((await telemetry(page)).speed)).toBeLessThan(1);
+    expect(problems).toEqual([]);
+  });
+
+  test('stays sane off the track: stops at the barrier with a bounded pose', async ({
+    drive: { page, problems },
+  }, testInfo) => {
+    // The owner's run: last grid slot, 30 m/s, wheel straight, full throttle. The track bends
+    // away and the car leaves it on the run to the first chicane.
+    const slot = track.gridSlots[track.gridSlots.length - 1]!;
+    await page.evaluate(
+      ([s, d]) => {
+        window.__undercut?.teleport(s, d, 108);
+        window.__undercut?.drive({ throttle: 1, steer: 0 });
+        window.__undercut?.setTimeScale(8);
+      },
+      [slot.s, slot.d] as const,
+    );
+    interface Pose {
+      s: number;
+      d: number;
+      time: number;
+      safetyResets: number;
+      wallHits: number;
+      pitch: number;
+      roll: number;
+      rideHeightFront: number;
+      rideHeightRear: number;
+      speed: number;
+    }
+    const pose = (): Promise<Pose> =>
+      page.evaluate(() => {
+        const st = window.__undercut!.state();
+        const t = window.__undercut!.telemetry();
+        return { ...st, ...t } as unknown as Pose;
+      });
+    const seen: Pose[] = [];
+    const start = await pose();
+    // Up to 40 s of sim time, as in the owner's run, or 5 s past the first barrier strike.
+    let struckAt = Infinity;
+    for (;;) {
+      const p = await pose();
+      seen.push(p);
+      if (p.wallHits > start.wallHits && struckAt === Infinity) struckAt = p.time;
+      if (p.time - start.time > 40 || p.time > struckAt + 5) break;
+      await page.waitForTimeout(100);
+    }
+    expect(struckAt, 'the car reached the barrier').toBeLessThan(Infinity);
+    // The game checks the sim's invariants every tick; the safety net never had to act.
+    expect(seen.at(-1)!.safetyResets).toBe(start.safetyResets);
+    for (const p of seen) {
+      expect(Math.abs(p.pitch)).toBeLessThan(0.2);
+      expect(Math.abs(p.roll)).toBeLessThan(0.2);
+      expect(Math.max(p.rideHeightFront, p.rideHeightRear)).toBeLessThan(0.65);
+      // The car's centre is always inside the barrier line on its side.
+      const side = p.d >= 0 ? 0 : 1;
+      expect(Math.abs(p.d)).toBeLessThan(track.barrierAt(p.s, side));
+    }
+    // Lift off and brake: the car comes to rest against the barrier.
+    await page.evaluate(() => window.__undercut?.drive({ throttle: 0, brake: 1, steer: 0 }));
+    await expect
+      .poll(async () => Math.abs((await pose()).speed), { timeout: 20_000 })
+      .toBeLessThan(0.5);
+    await page.evaluate(() => {
+      window.__undercut?.setTimeScale(1);
+      window.__undercut?.camera('chase-far');
+    });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: testInfo.outputPath('car-at-barrier.png') });
+    const rest = await pose();
+    expect(rest.safetyResets).toBe(start.safetyResets);
+    // Parked against the barrier with the keyboard's default assists (automatic gears): Q twice
+    // selects reverse through neutral, and the car backs away.
+    const gear = async (): Promise<number> =>
+      page.evaluate(() => window.__undercut!.telemetry().gear as number);
+    await page.evaluate(() => window.__undercut?.drive({ brake: 0, throttle: 0, gearShift: -1 }));
+    await expect.poll(gear).toBe(0);
+    await page.evaluate(() => window.__undercut?.drive({ gearShift: -1 }));
+    await expect.poll(gear).toBe(-1);
+    await page.evaluate(() => window.__undercut?.drive({ throttle: 0.5 }));
+    await expect.poll(async () => (await pose()).speed, { timeout: 10_000 }).toBeLessThan(-1);
+    await page.evaluate(() => window.__undercut?.drive(null));
     expect(problems).toEqual([]);
   });
 
@@ -284,6 +366,7 @@ test.describe('drive', () => {
         await page.evaluate(
           ([camera, at]) => {
             const u = window.__undercut;
+            u?.setTimeScale(1);
             u?.camera(camera as string);
             const p = at as { restart?: boolean; s?: number; kmh?: number };
             if (p.restart) u?.restartLap();
@@ -292,8 +375,26 @@ test.describe('drive', () => {
           },
           [camera, at] as const,
         );
-        // Cameras settle on real time; wait for the framing to converge.
-        await page.waitForTimeout(1500);
+        // Let the car run briefly, then freeze the sim: the cameras and lift ease on clamped real
+        // time (dt <= 0.25 s, slowest tau = 0.25 s), so 1.5 s of clamped frame time (>= 8 frames)
+        // converges them to >99.7 % without waiting for 30 slow software-WebGL frames.
+        await page.waitForTimeout(500);
+        await page.evaluate(() => {
+          window.__undercut?.setTimeScale(0);
+          window.__undercut?.resetFrameTimes();
+        });
+        await page.waitForFunction(
+          () => {
+            const times = window.__undercut?.frameTimes() ?? [];
+            let clamped = 0;
+            for (const ms of times) clamped += Math.min(250, ms);
+            return times.length >= 8 && clamped >= 1500;
+          },
+          null,
+          {
+            timeout: 30_000,
+          },
+        );
         const r = await page.evaluate(() => {
           const car = window.__undercut?.carScreenRect() as {
             left: number;

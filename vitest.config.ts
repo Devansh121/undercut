@@ -17,6 +17,8 @@ export default defineConfig({
             '**/node_modules/**',
             'packages/sim/validation/**',
             'packages/ai/validation/**',
+            'packages/track/validation/**',
+            'packages/race/validation/**',
             '**/*.runtime.test.*',
           ],
         },
@@ -28,7 +30,12 @@ export default defineConfig({
           // Validation runs drive the sim for whole laps; a shared CI runner can take a
           // few seconds over vitest's 5 s default. A limit on run time, not on results.
           testTimeout: 60_000,
-          include: ['packages/sim/validation/**/*.test.ts', 'packages/ai/validation/**/*.test.ts'],
+          include: [
+            'packages/sim/validation/**/*.test.ts',
+            'packages/ai/validation/**/*.test.ts',
+            'packages/track/validation/**/*.test.ts',
+            'packages/race/validation/**/*.test.ts',
+          ],
           exclude: ['**/node_modules/**', '**/*.soak.test.ts'],
         },
       },
@@ -77,6 +84,16 @@ export default defineConfig({
           globalSetup: ['services/rooms/test/global-setup.ts'],
           env: { SOAK: 'long' },
           testTimeout: 50 * 60_000,
+          hookTimeout: 60_000,
+        },
+      },
+      {
+        // Composed Cloudflare Worker (built client + /rooms) on the local Workers runtime.
+        test: {
+          name: 'deploy',
+          environment: 'node',
+          include: ['tools/deploy/**/*.runtime.test.mjs'],
+          testTimeout: 90_000,
           hookTimeout: 60_000,
         },
       },

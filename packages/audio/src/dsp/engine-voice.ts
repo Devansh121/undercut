@@ -1,10 +1,14 @@
-import { Biquad, BiquadKind, onePoleCoefficient } from './biquad';
+import { Biquad, onePoleCoefficient } from './biquad';
+import { OverrunBurble } from './burble';
+import { Burst } from './burst';
 import { CHUNK, type CarControls } from './controls';
 import { L, type LayerMeters } from './meters';
 import { Noise } from './noise';
 import { pulseTables, TABLE_SIZE } from './pulse-tables';
 import type { PowerUnitSoundSpec } from './spec';
+import { GearWhine } from './gear-whine';
 import { F } from './state';
+import { G, type ViewMix } from './view';
 import type { Voice } from './voice';
 
 const TWO_PI = 2 * Math.PI;
@@ -37,139 +41,13 @@ const LEVEL = {
   /** Thousandths, integer: see `Burst.trigger`. */
   popMilli: 220,
   clackMilli: 120,
+  /** Upshift crack at full load, thousandths. */
+  crackMilli: 380,
+  gearWhine: 0.012,
 };
-
-/**
- * Most triggers one burst can receive in one control chunk: at most one per cylinder event,
- * and six cylinders can at most all fire on every sample of a chunk. Never reached in
- * practice; it bounds a preallocated queue so no trigger is ever dropped or overwritten.
- */
-const MAX_TRIGGERS = 6 * CHUNK;
-
-/**
- * One short noise burst through a resonator: an overrun pop or a gearbox clack.
- * Triggers name the sample of the current chunk they start on and are queued; the burst
- * renders sample-accurately from one trigger to the next, so the result does not depend on
- * how blocks are split, however many triggers land in one chunk.
- */
-class Burst {
-  private pos = 0;
-  private length = 0;
-  private ring = 0;
-  private amplitude = 0;
-  private active = false;
-  private queued = 0;
-  private readonly qAt = new Int32Array(MAX_TRIGGERS);
-  private readonly qLength = new Int32Array(MAX_TRIGGERS);
-  private readonly qRing = new Int32Array(MAX_TRIGGERS);
-  private readonly qAmplitude = new Int32Array(MAX_TRIGGERS);
-  private readonly qFrequency = new Int32Array(MAX_TRIGGERS);
-  private readonly qQ = new Int32Array(MAX_TRIGGERS);
-  private readonly filter: Biquad;
-  private readonly scratch = new Float64Array(CHUNK);
-
-  constructor(sampleRate: number) {
-    this.filter = new Biquad(sampleRate);
-    this.filter.kind = BiquadKind.Bandpass;
-  }
-
-  /** Whether the burst is sounding at sample `offset` of the chunk being rendered. */
-  activeAt(offset: number): boolean {
-    // The latest trigger at or before `offset` decides, if there is one.
-    for (let k = this.queued - 1; k >= 0; k--) {
-      const at = this.qAt[k] as number;
-      if (at <= offset) {
-        return offset - at < (this.qLength[k] as number) + (this.qRing[k] as number);
-      }
-    }
-    return this.active && this.pos + offset < this.length + this.ring;
-  }
-
-  /**
-   * Start a burst at sample `offset` of the chunk being rendered (offsets arrive in order).
-   * Every argument is an integer (frames, thousandths, hertz, tenths), so the call never has
-   * to box a fractional number on the audio thread.
-   */
-  trigger(
-    offset: number,
-    lengthFrames: number,
-    ringFrames: number,
-    amplitudeMilli: number,
-    frequencyHz: number,
-    qTenths: number,
-  ): void {
-    const k = this.queued;
-    if (k >= MAX_TRIGGERS) return;
-    this.qAt[k] = offset;
-    this.qLength[k] = lengthFrames < 2 ? 2 : lengthFrames;
-    this.qRing[k] = ringFrames;
-    this.qAmplitude[k] = amplitudeMilli;
-    this.qFrequency[k] = frequencyHz;
-    this.qQ[k] = qTenths;
-    this.queued = k + 1;
-  }
-
-  /** Add the next `n` samples into `out`, excited by `noise`; add their energy to `meter[slot]`. */
-  renderAdd(
-    noise: Float64Array,
-    out: Float64Array,
-    n: number,
-    meter: Float64Array,
-    slot: number,
-  ): void {
-    if (!this.active && this.queued === 0) return;
-    const x = this.scratch;
-    let cursor = 0;
-    for (let k = 0; k < this.queued; k++) {
-      const at = this.qAt[k] as number;
-      this.renderSegment(noise, x, cursor, at);
-      // Start the queued burst at its sample: from rest if the previous one had ended.
-      if (!this.active) this.filter.reset();
-      this.filter.frequency = this.qFrequency[k] as number;
-      this.filter.q = (this.qQ[k] as number) / 10;
-      this.filter.design();
-      this.length = this.qLength[k] as number;
-      this.ring = this.qRing[k] as number;
-      this.amplitude = (this.qAmplitude[k] as number) / 1000;
-      this.pos = 0;
-      this.active = true;
-      cursor = at;
-    }
-    this.queued = 0;
-    this.renderSegment(noise, x, cursor, n);
-    let energy = 0;
-    for (let i = 0; i < n; i++) {
-      const v = x[i] as number;
-      out[i] = (out[i] as number) + v;
-      energy += v * v;
-    }
-    meter[slot] = (meter[slot] as number) + energy;
-  }
-
-  /** Render the current burst into `x` over [from, to); zeros once it has ended. */
-  private renderSegment(noise: Float64Array, x: Float64Array, from: number, to: number): void {
-    let end = from;
-    if (this.active) {
-      const left = this.length + this.ring - this.pos;
-      end = from + left < to ? from + left : to;
-      const len = this.length;
-      const amplitude = this.amplitude;
-      let pos = this.pos;
-      for (let i = from; i < end; i++, pos++) {
-        if (pos < len) {
-          const s = Math.sin((Math.PI * pos) / len);
-          x[i] = (noise[i] as number) * s * s * amplitude;
-        } else {
-          x[i] = 0;
-        }
-      }
-      this.filter.processRange(x, x, from, end);
-      this.pos = pos;
-      if (pos >= this.length + this.ring) this.active = false;
-    }
-    for (let i = end; i < to; i++) x[i] = 0;
-  }
-}
+/** Firing events after an upshift's cut whose pulses carry the crack (stronger by this). */
+const CRACK_EVENTS = 3;
+const CRACK_BOOST = 0.2;
 
 /**
  * The power-unit voice: a 1.6 L V6 four-stroke, turbocharged, with an MGU-K.
@@ -210,8 +88,12 @@ export class EngineVoice implements Voice {
   private readonly noiseBuf = new Float64Array(CHUNK);
   private readonly tmpBuf = new Float64Array(CHUNK);
   private readonly tmp2Buf = new Float64Array(CHUNK);
+  private readonly exBuf = new Float64Array(CHUNK);
+  private readonly fxBuf = new Float64Array(CHUNK);
+  private readonly mechBuf = new Float64Array(CHUNK);
+  private readonly whineBuf = new Float64Array(CHUNK);
   /** Random numbers for one firing event. */
-  private readonly rnd = new Float64Array(4);
+  private readonly rnd = new Float64Array(7);
 
   private phase = 0;
   private eventCount = 0;
@@ -223,6 +105,8 @@ export class EngineVoice implements Voice {
   private downshiftEnv = 0;
   private throttleWasHigh = false;
   private wasShifting = false;
+  private shiftDir = 0;
+  private crackEvents = 0;
   private crank = 0;
   private spool = 0;
   private turboPhase = 0;
@@ -244,6 +128,8 @@ export class EngineVoice implements Voice {
   private readonly fadeScale: number;
   private readonly popRing: number;
   private readonly clackLength: number;
+  private readonly crackLength: number;
+  private readonly crackRing: number;
 
   private readonly kLoad: number;
   private readonly kOn: number;
@@ -258,6 +144,12 @@ export class EngineVoice implements Voice {
   private readonly kCrank: number;
 
   private readonly formants: Biquad[];
+  /** The exhaust's path to the listener (helmet, bodywork, distance): set by the view. */
+  private readonly exhaustLp: Biquad;
+  private readonly fxLp: Biquad;
+  private readonly crack: Burst;
+  private readonly burble: OverrunBurble;
+  private readonly whine: GearWhine;
   private readonly intake: Biquad;
   private readonly combustion: Biquad;
   private readonly hiss: Biquad;
@@ -282,6 +174,8 @@ export class EngineVoice implements Voice {
     this.fadeScale = 1 / (0.05 * sampleRate);
     this.popRing = Math.round(sampleRate * 0.03);
     this.clackLength = Math.round(sampleRate * 0.003);
+    this.crackLength = Math.round(sampleRate * 0.0025);
+    this.crackRing = Math.round(sampleRate * 0.025);
     const tables = pulseTables(sampleRate);
     this.soft = tables.soft;
     this.hard = tables.hard;
@@ -314,6 +208,11 @@ export class EngineVoice implements Voice {
     this.air = new Biquad(sampleRate).highShelf(9000, 0.7071, -3);
     this.pops = [new Burst(sampleRate), new Burst(sampleRate)];
     this.clack = new Burst(sampleRate);
+    this.crack = new Burst(sampleRate);
+    this.burble = new OverrunBurble(sampleRate);
+    this.whine = new GearWhine(sampleRate, spec.gearbox, spec.limiterSpeed, LEVEL.gearWhine);
+    this.exhaustLp = new Biquad(sampleRate).lowpass(Math.min(14_000, 0.45 * sampleRate), 0.7071);
+    this.fxLp = new Biquad(sampleRate).lowpass(Math.min(14_000, 0.45 * sampleRate), 0.7071);
 
     this.combNoise = new Noise(seeds());
     this.hissNoise = new Noise(seeds());
@@ -327,16 +226,22 @@ export class EngineVoice implements Voice {
     n: number,
     meters: LayerMeters,
     aligned: boolean,
+    view: ViewMix,
   ): void {
     const b = controls.buffers;
     const m = meters.sumSquares;
     if (aligned) {
-      // Control rate: decide which optional layers run.
+      // Control rate: decide which optional layers run, follow the view's exhaust path.
       const boost = (b[F.boost] as Float64Array)[0] as number;
       const ers = (b[F.ersPower] as Float64Array)[0] as number;
       this.turboLive = this.spool > 0 || boost > 0 || controls.targetOf(F.boost) > 0;
       this.ersLive =
         this.deploy + this.harvest > 0 || ers !== 0 || controls.targetOf(F.ersPower) !== 0;
+      const cutoff = Math.min(view.exhaustCutoff, 0.45 * this.sampleRate);
+      this.exhaustLp.frequency = cutoff;
+      this.exhaustLp.design();
+      this.fxLp.frequency = cutoff;
+      this.fxLp.design();
     }
     this.renderPulses(controls, n);
 
@@ -348,14 +253,24 @@ export class EngineVoice implements Voice {
     const load = this.loadBuf;
     const noise = this.noiseBuf;
     const tmp = this.tmpBuf;
+    const ex = this.exBuf;
+    const fx = this.fxBuf;
+    const mech = this.mechBuf;
+    const vg = view.start;
+    const off = view.offset;
+    const vs = view.step;
 
-    // Exhaust: the pulse train through the fixed exhaust resonances.
+    // Exhaust: the pulse train through the fixed exhaust resonances, then the view's path.
     let e = 0;
-    for (let i = 0; i < n; i++) out[i] = (pulse[i] as number) * (amp[i] as number) * LEVEL.exhaust;
+    for (let i = 0; i < n; i++) ex[i] = (pulse[i] as number) * (amp[i] as number) * LEVEL.exhaust;
     for (let f = 0; f < this.formants.length; f++)
-      (this.formants[f] as Biquad).processBlock(out, out, n);
-    for (let i = 0; i < n; i++) e += (out[i] as number) * (out[i] as number);
+      (this.formants[f] as Biquad).processBlock(ex, ex, n);
+    for (let i = 0; i < n; i++) e += (ex[i] as number) * (ex[i] as number);
     m[L.exhaust] = (m[L.exhaust] as number) + e;
+    this.exhaustLp.processBlock(ex, ex, n);
+    let g0 = vg[G.exhaust] as number;
+    let gs = vs[G.exhaust] as number;
+    for (let i = 0; i < n; i++) out[i] = (ex[i] as number) * (g0 + gs * (off + i));
 
     // Intake: the airbox resonance, fed in proportion to load.
     e = 0;
@@ -367,14 +282,16 @@ export class EngineVoice implements Voice {
         LEVEL.intake;
     }
     this.intake.processBlock(tmp, tmp, n);
+    g0 = vg[G.intake] as number;
+    gs = vs[G.intake] as number;
     for (let i = 0; i < n; i++) {
       const v = tmp[i] as number;
-      out[i] = (out[i] as number) + v;
+      out[i] = (out[i] as number) + v * (g0 + gs * (off + i));
       e += v * v;
     }
     m[L.intake] = (m[L.intake] as number) + e;
 
-    // Combustion noise, gated by the firing events, rising with load.
+    // Combustion noise, gated by the firing events, rising with load; heard through the tub.
     e = 0;
     this.combNoise.fill(noise, n);
     for (let i = 0; i < n; i++) {
@@ -388,9 +305,11 @@ export class EngineVoice implements Voice {
         LEVEL.combustion;
     }
     this.combustion.processBlock(tmp, tmp, n);
+    g0 = vg[G.mechanical] as number;
+    gs = vs[G.mechanical] as number;
     for (let i = 0; i < n; i++) {
       const v = tmp[i] as number;
-      out[i] = (out[i] as number) + v;
+      out[i] = (out[i] as number) + v * (g0 + gs * (off + i));
       e += v * v;
     }
     m[L.combustion] = (m[L.combustion] as number) + e;
@@ -398,14 +317,48 @@ export class EngineVoice implements Voice {
     this.dcBlock.processBlock(out, out, n);
     this.air.processBlock(out, out, n);
 
-    if (this.turboLive) this.renderTurbo(controls, out, n, m);
-    if (this.ersLive) this.renderErs(controls, out, n, m);
+    // Turbo and MGU-K whine, summed apart, then scaled by the view.
+    if (this.turboLive || this.ersLive) {
+      const wh = this.whineBuf;
+      wh.fill(0, 0, n);
+      if (this.turboLive) this.renderTurbo(controls, wh, n, m);
+      if (this.ersLive) this.renderErs(controls, wh, n, m);
+      g0 = vg[G.whine] as number;
+      gs = vs[G.whine] as number;
+      for (let i = 0; i < n; i++)
+        out[i] = (out[i] as number) + (wh[i] as number) * (g0 + gs * (off + i));
+    }
 
-    // Pops and the gearbox clack.
+    // Exhaust transients: overrun pops, afterfire burble and the upshift crack.
     this.popNoise.fill(noise, n);
+    fx.fill(0, 0, n);
     for (let p = 0; p < this.pops.length; p++)
-      (this.pops[p] as Burst).renderAdd(noise, out, n, m, L.crackle);
-    this.clack.renderAdd(noise, out, n, m, L.shift);
+      (this.pops[p] as Burst).renderAdd(noise, fx, n, m, L.crackle);
+    this.burble.renderAdd(noise, fx, n, m, L.burble);
+    this.crack.renderAdd(noise, fx, n, m, L.crack);
+    this.fxLp.processBlock(fx, fx, n);
+    g0 = vg[G.exhaust] as number;
+    gs = vs[G.exhaust] as number;
+    for (let i = 0; i < n; i++)
+      out[i] = (out[i] as number) + (fx[i] as number) * (g0 + gs * (off + i));
+
+    // Drivetrain: gear whine and the gearbox clack.
+    this.whine.renderAdd(
+      b[F.engineSpeed] as Float64Array,
+      b[F.gear] as Float64Array,
+      load,
+      b[F.shifting] as Float64Array,
+      gate,
+      mech,
+      n,
+      m,
+      L.gearWhine,
+    );
+    this.clack.renderAdd(noise, mech, n, m, L.shift);
+    g0 = vg[G.mechanical] as number;
+    gs = vs[G.mechanical] as number;
+    for (let i = 0; i < n; i++)
+      out[i] = (out[i] as number) + (mech[i] as number) * (g0 + gs * (off + i));
   }
 
   /** The per-sample part: envelopes, crank phase, firing events and the cylinder pulse sums. */
@@ -449,14 +402,26 @@ export class EngineVoice implements Voice {
 
       this.evIndex = i;
       if (isShifting && !this.wasShifting) this.startShift(dir > 0 ? 1 : -1);
+      // Ignition back on at the end of an upshift: the crack.
+      if (!isShifting && this.wasShifting && this.shiftDir > 0) {
+        this.evLoad = load;
+        this.endUpshift();
+      }
       this.wasShifting = isShifting;
       this.downshiftEnv -= this.downshiftEnv * this.kDownshift;
       if (throttle > 0.6 && w > 730) this.throttleWasHigh = true;
       if (this.throttleWasHigh && throttle < 0.15) {
         this.liftEnv = 1;
         this.throttleWasHigh = false;
+        this.burble.lift();
       }
       this.liftEnv -= this.liftEnv * this.kLift;
+      // Overrun: throttle shut, revs above about 6000 rpm (smoothstep 5000–7500).
+      let ov = (w - 523.6) / 261.8;
+      ov = ov < 0 ? 0 : ov > 1 ? 1 : ov;
+      const shut = throttle < 0.1 ? 1 - throttle * 10 : 0;
+      this.burble.overrun = shut * (1 - load) * ov * ov * (3 - 2 * ov) * this.engineEnv;
+      this.burble.tick();
 
       // Crank gate: 0 below about 300 rpm, 1 above about 1500 rpm, smoothed, so a stopped
       // crank never holds a level.
@@ -606,7 +571,7 @@ export class EngineVoice implements Voice {
   private fire(c: number, revLimiter: number, pitLimiter: number): void {
     const load = this.evLoad;
     const rnd = this.rnd;
-    this.eventNoise.draw(rnd, 4);
+    this.eventNoise.draw(rnd, 7);
     const roughness = 0.03 + 0.09 * (1 - load);
     let gain = (CYLINDER_TRIM[c] as number) * (c % 2 === 1 ? 1 - this.evImbalance : 1);
     gain *= 1 + roughness * (2 * (rnd[0] as number) - 1);
@@ -618,6 +583,14 @@ export class EngineVoice implements Voice {
     }
     this.eventCount++;
     if (cut) gain *= CUT_RESIDUAL;
+    // Partial burns on the overrun.
+    this.burble.event(this.evIndex, rnd, 4);
+    gain *= this.burble.factor;
+    // The first events after an upshift's cut fire into a full charge: the crack's pulses.
+    if (this.crackEvents > 0) {
+      gain *= 1 + CRACK_BOOST * this.evLoad;
+      this.crackEvents--;
+    }
     this.eventGain[c] = gain;
 
     if (this.engineEnv < 0.5) return;
@@ -656,5 +629,26 @@ export class EngineVoice implements Voice {
       30,
     );
     if (!up) this.downshiftEnv = 1;
+    this.shiftDir = up ? 1 : -1;
+  }
+
+  /**
+   * The upshift's ignition cut ends: unburnt charge from the cut lights in the hot exhaust as
+   * the new gear takes load. A short, bright crack scaled by load (none on a lifted upshift),
+   * and the next few pulses fire harder.
+   */
+  private endUpshift(): void {
+    const load = this.evLoad;
+    this.shiftDir = 0;
+    if (load < 0.2) return;
+    this.crack.trigger(
+      this.evIndex,
+      this.crackLength,
+      this.crackRing,
+      Math.round(LEVEL.crackMilli * load),
+      1050,
+      7,
+    );
+    this.crackEvents = CRACK_EVENTS;
   }
 }

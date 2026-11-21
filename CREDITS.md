@@ -7,6 +7,7 @@ Code in this repository is MIT licensed (see `LICENSE`). Third-party code and as
 | Project | Licence | Use |
 | --- | --- | --- |
 | [three.js](https://github.com/mrdoob/three.js) | MIT | 3D rendering |
+| [Draco](https://github.com/google/draco) decoder (`draco_decoder.wasm`, `draco_wasm_wrapper.js`, as shipped in three.js's `examples/jsm/libs/draco/gltf/`) | Apache-2.0 | Decoding the car's compressed geometry; served from the game's own origin at `assets/draco/` |
 
 ## Tools used to build, run and test (not shipped)
 
@@ -60,6 +61,25 @@ Every third-party asset is listed in [`assets/MANIFEST.json`](assets/MANIFEST.js
 Archivo: Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is copied in the file named above, and is also available with a FAQ at: http://scripts.sil.org/OFL. The variable TTF was repackaged as WOFF2 without changes to glyphs, metrics or names.
 
 Barlow: Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow). This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is copied in the file named above, and is also available with a FAQ at: http://scripts.sil.org/OFL. The WOFF2 files are unchanged from upstream.
+
+### Environment textures and skies
+
+Built by `npm run assets:build` (`tools/assets/build_textures.py`): resized and re-encoded as WebP, skies with the sun measured and painted out. Every file is in `assets/MANIFEST.json` with its source URL and sha256. All CC0 1.0; credit is not required and is given anyway.
+
+| Asset | Used for | Author | Source |
+| --- | --- | --- | --- |
+| Asphalt Track | Racing surface, painted lines | Dimitrios Savva, Poly Haven | https://polyhaven.com/a/asphalt_track |
+| Asphalt Pit Lane | Run-off asphalt, pit lane | Dimitrios Savva, Poly Haven | https://polyhaven.com/a/asphalt_pit_lane |
+| Concrete Floor Worn 001 | Kerbs, concrete walls | Dimitrios Savva and Rico Cilliers, Poly Haven | https://polyhaven.com/a/concrete_floor_worn_001 |
+| Gravel Stones | Gravel traps | Amal Kumar, Poly Haven | https://polyhaven.com/a/gravel_stones |
+| Metal Plate | Armco | Rob Tuytel, Poly Haven | https://polyhaven.com/a/metal_plate |
+| Grass001 | Grass, verges, terrain | Lennart Demes, ambientCG | https://ambientcg.com/view?id=Grass001 |
+| Rubber004 | Tyre walls | Lennart Demes, ambientCG | https://ambientcg.com/view?id=Rubber004 |
+| Kloofendal 48d Partly Cloudy (Pure Sky) | Monza afternoon sky and light | Greg Zaal and Jarod Guest, Poly Haven | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky |
+| Kloofendal Overcast (Pure Sky) | Overcast time of day | Greg Zaal, Poly Haven | https://polyhaven.com/a/kloofendal_overcast_puresky |
+| Kloppenheim 07 (Pure Sky) | Night time of day | Greg Zaal and Jarod Guest, Poly Haven | https://polyhaven.com/a/kloppenheim_07_puresky |
+
+Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Creative Commons CC0 1.0 Universal License.
 
 ### Car
 
