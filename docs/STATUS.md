@@ -84,6 +84,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Online rooms: penalties are time penalties (jump start 5 s; track limits 5 s per report after three warnings), not drive-throughs.
 - Online rooms: room creation is limited to 30 per 10 minutes per client address; codes are six characters with no vowels or look-alikes.
 - The soak runs in real time (the Durable Object clock cannot be accelerated): 3 laps in the `rooms` CI job, 12 laps nightly.
+- Online rooms: lap claims carry race time on the server clock, with a 1 s allowance for clock-sync error; a claim ahead of the server's own elapsed race time is refused.
+- Online rooms: a host whose own car has finished or retired is still watched while its AI race, and only snapshots count as signs of life (a hidden tab keeps pinging but stops driving).
+- Online rooms: at most 32 sockets per room, 16 not yet joined, 4 not yet joined per address, admitted at 5 per second after a burst of 30; refused upgrades get HTTP 429.
+- Car snapshots: the top two bits of the flags byte carry a teleport counter (the unused `finished` flag was dropped to make room), so the record stays 56 bytes.
 
 ## Optional, needs you
 

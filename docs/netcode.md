@@ -94,7 +94,8 @@ Error codes (`ERROR_CODES` in `errors.ts`, never renamed): `bad_json`, `bad_mess
 Close codes: 4000 left, 4001 kicked, 4002 resume expired, 4003 room closed, 4004 too
 many strikes, 4005 room full, 4006 race in progress, 4007 version mismatch, 4008 no
 join in time, 4009 replaced by a newer socket for the same member, 4010 unknown resume
-token, 4011 bad name. All but 4008 are terminal: the client does not reconnect.
+token, 4011 bad name, 4012 busy (too many sockets opening; try again). All but 4008 and
+4012 are terminal: the client does not reconnect.
 
 ### Car snapshots (binary)
 
@@ -102,7 +103,8 @@ Fixed 56-byte little-endian records, chosen field by field (`snapshot.ts` has th
 
 | Field | Wire | Resolution | Worst error |
 | --- | --- | --- | --- |
-| seat, flags | u8, u8 | | exact |
+| seat | u8 | | exact |
+| flags (bits 0-5), resets (bits 6-7) | u8 | `CAR_FLAG` bits; teleport counter mod 4 | exact |
 | tick (sender sim tick) | u32 | | exact |
 | t (sender's estimate of server time) | u32, ms after the room epoch | 1 ms | 0.5 ms |
 | x, y, z | i32 | 1 mm | 0.5 mm |
@@ -116,8 +118,18 @@ Fixed 56-byte little-endian records, chosen field by field (`snapshot.ts` has th
 | wheel spin x 4 | i16 | 0.05 rad/s | 0.025 rad/s |
 | lap (completed), s | u16, u32 | 1 mm | 0.5 mm |
 
-Out-of-range values clamp and non-finite ones encode as 0, so a bad sim value never
-throws. 10 000 random cars round-trip inside these bounds in the tests.
+Angles round to the nearest step and wrap in 16-bit space, so an angle just below +pi
+encodes as -32768 (the same direction) instead of clamping to 32767; the bound holds
+round the circle, tested at the seam. Other out-of-range values clamp and non-finite
+ones encode as 0, so a bad sim value never throws. 10 000 random cars round-trip inside
+these bounds in the tests.
+
+**Teleports.** `resets` counts the times the sender placed its car rather than drove it
+(reset to track, put in the pit box). Bump it with each placement. A receiver never
+interpolates between two snapshots whose counters differ: it holds the old place until
+the reset's timestamp, then shows the new one. As a fallback for a bump that was missed,
+the same happens when the car moved more than 1.5 times what either snapshot's speed
+allows in the time between, plus 5 m.
 
 Frames: client to server `[1, count, records...]` (a guest sends its own car, the host
 also its AI cars); server to client `[2, count, receivedAt u32, records...]`, stamped with
@@ -211,7 +223,8 @@ A claim is **rejected** (it does not count; the sender is told why) when:
 | `not_racing` | the car has finished or retired |
 | `duplicate` | the same lap and race time again (retries are harmless) |
 | `lap_not_monotonic` | a lap number at or below the last counted one |
-| `timestamp_implausible` | the claimed crossing time is more than 10 s from its arrival, or before lights out |
+| `timestamp_implausible` | the claimed crossing time is more than 10 s from its arrival, before lights out, or more than 1 s from lights out plus the claimed race time |
+| `ahead_of_race_clock` | the claimed race time is more than 1 s longer than the server has seen elapse since its own lights out |
 | `crossed_while_disconnected` | the claimed crossing time falls in one of the member's disconnections |
 | `lap_too_fast` | under the circuit's minimum lap time |
 | `sector_too_fast` | a sector under its minimum |
@@ -227,6 +240,16 @@ A claim is **flagged** (it counts, and the flag shows in the results) when:
 | `no_snapshot_evidence` | no snapshot of that car in the last 3 s to check against |
 | `time_mismatch` | the lap time differs from the gap between the server's own receipt of the two crossings by more than max(2 s, 10 %) |
 
+**Race time is on the server clock.** `raceMs` is measured from the server's
+`lightsOutAt`, on the client's synced estimate of the server clock, at the crossing; `at`
+is that same instant. Since the server owns lights out, no claim can have raced longer
+than the server has seen elapse: a three-lap finish claimed 39 ms after lights out is
+refused, whatever snapshots and lap times come with it. The 1 s allowance covers clock-sync
+error (half a round trip). Every lap claim goes through this check, and sector times are
+checked as part of their lap (they must add up to it). A client whose own sim fell
+behind (a stall, a hidden tab) still reports race time from the server clock, so its
+slow lap is simply slow.
+
 Minimum lap and sector times come with the room settings (`circuit`), computed by the
 host's client from the track data with `circuitLimits`: distance over 95 m/s (342 km/h,
 a mean no car sustains). A rejected lap does not freeze a car's progress: the next good
@@ -235,11 +258,15 @@ claim may skip laps if its race time covers them.
 **Penalties.** Jump start 5 s. Track limits: three free warnings, then 5 s for each
 further one; a lap with a report does not count for best lap.
 
-**The flag.** The first car to complete the race distance takes the chequered flag.
-Every other car finishes on its first crossing at or after the leader's race time, so a
-lapped car finishes a lap down. This is decided on race times, which each client measures
-on its own sim clock from lights out, not on the order the messages reach the server:
-a crossing just before the leader's, delivered just after it, is still a normal lap.
+**The flag.** The flag falls at the earliest race time at which any car completed the
+race distance. Every car finishes on its first counted crossing at or after that race
+time, so a lapped car finishes a lap down. The server keeps each car's counted crossings
+and derives laps, race time, best lap and flags from them. If a claim of an even earlier
+finish arrives late, the flag moves earlier and every car is judged again: a car that
+had already crossed after the new flag finishes at that crossing, and crossings it
+reported after it stop counting. So the result depends only on the race times claimed,
+never on the order the claims arrive in; a property test replays the same crossings in
+1 200 arrival orders and gets one classification.
 
 **Classification.** Running and finished cars by laps (more first), then race time plus
 penalties, then grid position; retired cars after them, ordered the same way. The same
@@ -260,7 +287,11 @@ penalties, then grid position; retired cars after them, ordered the same way. Th
   (DNF).
 - **Stale and away**: a racer whose snapshots stop is `stale` after 2 s and `away` after
   6 s (its grace period starts, as for a disconnect). A tab that comes back and sends
-  snapshots is `active` again.
+  snapshots is `active` again. A member is watched while anything they drive is racing:
+  the host stays watched while any AI car races, even after its own car finished or
+  retired. Only snapshots count, not pings: a hidden tab keeps its socket and keeps
+  pinging on throttled timers, but stops rendering, so stops driving. A host who goes
+  away hands the AI to the next host as on a disconnect.
 - **A silent or disconnected car is a ghost**, chosen over handing it to the host's AI:
   others see it extrapolated for at most 250 ms, then held, then faded out over 0.5 s,
   and the game lets cars drive through a held or fading car. Handing a human's car to AI
@@ -268,7 +299,9 @@ penalties, then grid position; retired cars after them, ordered the same way. Th
   cannot change the result.
 - **Reconnect**: within the grace period (60 s) a `join` with the resume token takes the
   same member, seat and car back; `welcome` brings the last snapshot and counted
-  progress, and a returning host gets the AI list. A newer socket for the same member
+  progress, a returning host gets the AI list, and anyone returning during the results
+  gets the stored classification again (also after the room was restored from
+  storage). A newer socket for the same member
   closes the older one (4009). After the grace period the seat is gone: the car is DNF
   and a resume gets `resume_expired`.
 - **Kick**: the host removes a member; their token is retired and cannot resume.
@@ -287,8 +320,23 @@ penalties, then grid position; retired cars after them, ordered the same way. Th
 | Strikes | each invalid, over-rate or not-owner message is a strike; one is forgiven every 10 s; 10 close the socket (4004) |
 | Rate-limit replies | at most one `rate_limited` error a second |
 | Rooms per socket | one: a socket joins the room in its URL once (`already_joined` after) |
-| Room creation | 30 per 10 minutes per client address (`CREATE_LIMIT`), keyed on `cf-connecting-ip`, which the local proxy sets from the socket address |
+| Room creation | 30 per 10 minutes per client address (`CREATE_LIMIT`) |
+| Sockets per room | 32 in all; at most 16 not yet joined, and 4 not yet joined from one address. Over the limit the upgrade is refused with HTTP 429 before any state is kept |
+| Socket admission | a room accepts new sockets at 30 burst, 5 per second |
+| Unjoined sockets | not written to storage until they join; closed after the 10 s join timeout |
 | Members | 8 humans (`room_full`) |
+
+**Which address is trusted.** Per-address limits read `CF-Connecting-IP`
+(`services/rooms/src/address.ts`). Deployed, the Worker is reached only through the
+Cloudflare edge, which sets that header to the address of the connection it accepted and
+discards any value the client sent, so it can be trusted there. Locally, both entry
+points do the same: the static server behind `./start.sh` and the Vite dev server
+(`npm run dev`) set it (and `X-Forwarded-For`) from the socket address on every proxied
+request and WebSocket upgrade, replacing the client's value
+(`tools/serve/client-address.runtime.test.mjs` checks both). The rooms service itself
+listens on 127.0.0.1, so nothing reaches it without a proxy. Anything else put in front
+of the Worker must overwrite the header the same way, or the limits become per-claim
+rather than per-client.
 
 **Not protected**: a modified client can drive its own car however it likes (state sync
 trusts each client for its own car) and can report a consistent faster race within the
@@ -332,14 +380,18 @@ const remote = client.remoteCars.sample(client.serverNow()!);  // interpolated v
 
 - **Sending**: `sendSnapshots` sends at most every 33 ms, never bursts to catch up after a
   stall, and skips a slot while the socket has more than 16 kB queued (backpressure).
-  Snapshot `t` should be `serverNow()` at the sim state.
+  Snapshot `t` should be `serverNow()` at the sim state. Bump `resets` whenever the car is
+  placed instead of driven.
+- **Timing reports**: `raceMs` and `at` come from the server clock (`serverNow()` at the
+  crossing, minus `lightsOutAt` for `raceMs`), not from the local sim's elapsed time.
 - **Remote cars**: all remote cars are shown at one server time, `serverNow - delay`,
   where the delay is the worst sender's smoothed transit time plus one send interval plus
   three mean deviations of jitter (50 ms to 1 s, slewed 2 ms per sample so motion stays
   smooth). Position is a cubic Hermite curve through the two snapshots around that time
   using their velocities, so a lost snapshot costs almost nothing on a curve. Past the
   newest snapshot it extrapolates with velocity and yaw rate for up to 250 ms, then holds
-  for 1 s, then fades over 0.5 s (`mode`, `opacity` on each view).
+  for 1 s, then fades over 0.5 s (`mode`, `opacity` on each view). Across a teleport it
+  holds the old place until the reset's time, then snaps.
 - **Reconnect**: on an unexpected close it retries with exponential backoff (250 ms
   doubling to 5 s, +-25 % jitter, 30 attempts) and resumes the seat. Timing reports made
   while reconnecting are queued (up to 64) and sent after; other messages are dropped.
@@ -350,9 +402,9 @@ const remote = client.remoteCars.sample(client.serverNow()!);  // interpolated v
 
 | Command | What |
 | --- | --- |
-| `npm test` | validators (with fuzzing), snapshot codec bounds, the state machine (every phase x every message, plus scenarios), timing referee, classification, client library against an in-memory room, network simulator |
-| `npm run test:rooms` | real WebSockets against `wrangler dev`: endpoints, invalid input, strikes, rate limits, creation limit, a full three-lap race with two humans and host AI (synchronised start, fan-out, identical classification, rematch), leaving, host migration mid-race with AI handover, reconnect within and after grace, and a short soak |
-| `npm run test:soak` | the soak at full length (nightly) |
+| `npm test` | validators (with fuzzing), snapshot codec bounds (including the angle seam), the state machine (every phase x every message, plus scenarios), timing referee, the flag's independence from arrival order (property test), classification, client library against an in-memory room, network simulator |
+| `npm run test:rooms` | real WebSockets against `wrangler dev`: endpoints, invalid input, strikes, rate limits, creation limit, a full three-lap race with two humans and host AI (synchronised start, fan-out, identical classification, rematch), leaving, host migration mid-race with AI handover, reconnect within and after grace, a race-time cheat refused, a silent retired host losing the AI, results resent on reconnect, socket admission limits, the client address set by both local proxies, and a short soak |
+| `npm run test:soak` | both nightly soaks: `test:soak:sim` (reference driver) and `test:soak:rooms` (this soak at full length) |
 
 **Soak** (`tools/netsim/soak.runtime.test.ts`): eight headless clients, each behind the
 network simulator at 150 +- 50 ms one way, 2 % loss, 1 % duplication, against the real
