@@ -498,6 +498,15 @@ export interface StartGantry {
   materials: Material[];
 }
 
+/**
+ * Start-gantry mask for `count` red lamps lit (0 to 5, left to right; 0 is lights out), as
+ * `StartGantry.setLights` takes it: bits 0 to 4 the red pods, bit 5 the green.
+ */
+export function startLightMask(count: number | null): number {
+  if (count === null || count <= 0) return 0;
+  return (1 << Math.min(5, Math.floor(count))) - 1;
+}
+
 export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot = 0): StartGantry {
   const group = new Group();
   group.name = 'world:start-gantry';

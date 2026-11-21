@@ -5,7 +5,12 @@ import monzaTrackJson from '@undercut/track/data/monza.json';
 import brandsJson from '../../../design/brands.json';
 import monzaDressingJson from '../data/monza.dressing.json';
 import { decodeTerrain, gridHeight, hash01, type DressingFile } from '../src/world/dressing';
-import { buildHistoricBanking, buildStartGantry, buildTrackBridges } from '../src/world/furniture';
+import {
+  buildHistoricBanking,
+  buildStartGantry,
+  buildTrackBridges,
+  startLightMask,
+} from '../src/world/furniture';
 import { buildStands, crowdSeats, fitStand, type StandFrame } from '../src/world/grandstands';
 import { LapIndex } from '../src/world/lap-index';
 import {
@@ -235,5 +240,16 @@ describe('lap index and the old oval', () => {
         if (s !== undefined) start = s;
       }
     }
+  });
+});
+
+describe('start light mask', () => {
+  it('lights the red pods left to right and puts them all out at lights out', () => {
+    expect(startLightMask(null)).toBe(0);
+    expect(startLightMask(0)).toBe(0);
+    expect(startLightMask(1)).toBe(0b00001);
+    expect(startLightMask(3)).toBe(0b00111);
+    expect(startLightMask(5)).toBe(0b11111);
+    expect(startLightMask(7)).toBe(0b11111);
   });
 });

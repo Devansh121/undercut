@@ -10,7 +10,7 @@
  *   renderer's fleet and onto the map. They are ghosts for contact in this slice.
  */
 import { circuitInfo } from '@undercut/race';
-import type { CarLivery, RaceView } from '@undercut/render';
+import { startLightMask, type CarLivery, type RaceView } from '@undercut/render';
 import { createCarPose, type CarPose } from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import type { RoomClient, StartSchedule, TimingMessage } from '@undercut/protocol';
@@ -93,6 +93,9 @@ export class OnlineRace implements DriveExtension {
   private readonly finishedAt = new Map<number, number>();
   private readonly unsubscribe: (() => void)[] = [];
   private ctx: DriveExtensionContext | null = null;
+  /** Lamps last shown on the start gantry (bits as `startLightMask`). */
+  private gantryMask = -1;
+  private gantryView: RaceView | null = null;
   private wheelDrop = [0.35, 0.35, 0.35, 0.35];
   private released = false;
   private loadedSent = false;
@@ -423,6 +426,15 @@ export class OnlineRace implements DriveExtension {
     }
     if (phase === 'finished' && !finished) caption = 'Chequered flag: finish this lap';
     if (finished) caption = room?.phase === 'results' ? '' : 'Waiting for the others to finish';
+    // The start gantry over the grid shows the same lamps; all out at lights out.
+    // A rebuilt view (quality switch, context restore) gets them again.
+    const mask = startLightMask(lights);
+    const view = this.ctx?.view() ?? null;
+    if (view && (mask !== this.gantryMask || view !== this.gantryView)) {
+      this.gantryMask = mask;
+      this.gantryView = view;
+      view.world?.setStartLights(mask);
+    }
     this.hud.update({
       lights,
       lamps: start?.lightCount ?? 5,

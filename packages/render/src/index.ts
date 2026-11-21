@@ -60,6 +60,7 @@ export {
 
 export type { BrandSpec } from './world/brands';
 export type { GarageTeam } from './world/pit-building';
+export { startLightMask } from './world/furniture';
 
 /** Interpolation factor between the previous and current sim state, in [0, 1). */
 export type RenderAlpha = number;
