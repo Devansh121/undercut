@@ -19,6 +19,8 @@ export interface LaunchScreen {
   setRecord(record: number | null): void;
   /** Start as if the button was pressed (keyboard or gamepad accept). */
   start(): void;
+  /** Menu accept from a gamepad: press the focused control in the controls list, else Start. */
+  accept(): void;
   /** Close the controls list if it is open (gamepad back). Returns true when it closed it. */
   back(): boolean;
 }
@@ -93,6 +95,10 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
     setRecord,
     start() {
       if (!start.disabled && !panel?.open) start.click();
+    },
+    accept() {
+      if (panel?.accept()) return;
+      if (!start.disabled) start.click();
     },
     back() {
       if (!panel?.open) return false;

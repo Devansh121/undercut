@@ -89,7 +89,7 @@ function showLaunch(): void {
     for (const e of f.events) {
       // A focused button already clicks on Enter; gamepads need the accept passed on.
       const native = f.device === 'keyboard' && document.activeElement?.tagName === 'BUTTON';
-      if (e.type === 'action' && e.action === 'menuAccept' && !native) launch?.start();
+      if (e.type === 'action' && e.action === 'menuAccept' && !native) launch?.accept();
       if (e.type === 'action' && e.action === 'menuBack' && f.device !== 'keyboard') launch?.back();
     }
     menuHandle = requestAnimationFrame(poll);

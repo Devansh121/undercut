@@ -558,8 +558,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
+      const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
         if (e.type !== 'action') continue;
+        if (e.action === 'menuAccept' && native) continue;
         if (pause.navigate(e.action)) continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
       }

@@ -35,9 +35,13 @@ export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = {
   touch: 'Touch',
 };
 
-/** Matches the automatic gearbox in `@undercut/sim` assists: 1 → N → R when stopped, and back. */
-export const REVERSE_NOTE =
-  'With automatic gears, gear down twice at a standstill selects reverse; gear up twice returns to first.';
+/**
+ * Where an action with no control on a device can still be reached. The touch overlay has no
+ * reset button; the pause menu has one.
+ */
+const ELSEWHERE: Partial<Record<ActionId, string>> = {
+  resetToTrack: 'Pause menu',
+};
 
 const NOT_BOUND = 'Not bound';
 
@@ -47,13 +51,66 @@ export function inputLabel(map: BindingMap, device: DeviceKind, action: ActionId
   return controls.length > 0 ? controls.map(controlLabel).join(' or ') : NOT_BOUND;
 }
 
+/** The last left or right in a control name: the side, e.g. "Left stick *left*". */
+const SIDE = /\b(left|right)\b(?!.*\b(?:left|right)\b)/i;
+
+/**
+ * One name for a left and right pair: "A/D", or the shared name when the two differ only by
+ * side ("Left arrow" and "Right arrow" read "arrow keys", "Left stick left" and "Left stick
+ * right" read "Left stick").
+ */
+export function pairLabel(left: string, right: string): string {
+  const strip = (x: string): string => x.replace(SIDE, '').replace(/\s+/g, ' ').trim();
+  const shared = strip(left);
+  if (SIDE.test(left) && SIDE.test(right) && shared && shared === strip(right)) {
+    return shared.toLowerCase() === 'arrow' ? 'arrow keys' : shared;
+  }
+  return `${left}/${right}`;
+}
+
+function capitalise(x: string): string {
+  return x.charAt(0).toUpperCase() + x.slice(1);
+}
+
+/** Steering as one entry: each binding slot pairs its left and right control. */
+function steerLabel(map: BindingMap, device: DeviceKind): string {
+  const left = controlsFor(map, device, 'steerLeft').map(controlLabel);
+  const right = controlsFor(map, device, 'steerRight').map(controlLabel);
+  const parts: string[] = [];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const l = left[i];
+    const r = right[i];
+    if (l && r) parts.push(pairLabel(l, r));
+    else if (l) parts.push(`${l} (left)`);
+    else if (r) parts.push(`${r} (right)`);
+  }
+  return parts.length > 0 ? capitalise(parts.join(' or ')) : NOT_BOUND;
+}
+
 /** Action and input rows for `device`, read from the live binding map. */
 export function controlRows(map: BindingMap, device: DeviceKind): ControlRow[] {
   return ROWS.map(({ id, label, actions }) => {
-    const parts = actions.map((a) => inputLabel(map, device, a));
-    const input = parts.every((p) => p === NOT_BOUND) ? NOT_BOUND : parts.join(' / ');
+    if (id === 'steer') return { id, action: label, input: steerLabel(map, device) };
+    const action = actions[0] as ActionId;
+    let input = inputLabel(map, device, action);
+    if (input === NOT_BOUND) input = ELSEWHERE[action] ?? NOT_BOUND;
     return { id, action: label, input };
   });
+}
+
+/**
+ * How reverse works with automatic gears, naming the bound controls. The automatic gearbox in
+ * `@undercut/sim` assists passes a downshift through in first below 1 m/s, so at a standstill
+ * two downshifts go 1 → N → R and two upshifts come back R → N → 1.
+ */
+export function reverseNote(map: BindingMap, device: DeviceKind): string {
+  const name = (action: ActionId, fallback: string): string => {
+    const c = controlsFor(map, device, action)[0];
+    return c ? controlLabel(c) : fallback;
+  };
+  const down = name('gearDown', 'gear down');
+  const up = name('gearUp', 'gear up');
+  return `Reverse, with automatic gears: stop, then press ${down} twice. Press ${up} twice to return to first.`;
 }
 
 /** The short first-drive hint: brake, throttle and how to reach the controls list. */
@@ -86,8 +143,11 @@ export class ControlsPanel {
   readonly root: HTMLElement;
   private readonly list: HTMLElement;
   private readonly sub: HTMLElement;
+  private readonly note: HTMLElement;
   private readonly close: HTMLButtonElement;
   private returnFocus: HTMLElement | null = null;
+  /** Siblings made inert while the panel is open, so focus and pointer stay in the dialog. */
+  private inerted: HTMLElement[] = [];
 
   constructor(
     private readonly source: ControlsSource,
@@ -109,16 +169,33 @@ export class ControlsPanel {
     head.append(title, this.sub);
 
     this.list = el('dl', 'controls__list');
-    const note = el('p', 'controls__note', REVERSE_NOTE);
+    this.note = el('p', 'controls__note');
 
     this.close = el('button', 'pause__quit');
     this.close.type = 'button';
     this.close.dataset.action = 'close-controls';
     this.close.append(el('span', '', 'Back'));
     this.close.addEventListener('click', () => this.hide());
+    // Back is the dialog's only focusable control: Tab and Shift+Tab stay on it.
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      this.close.focus({ preventScroll: true });
+    });
 
-    card.append(head, this.list, note, this.close);
+    card.append(head, this.list, this.note, this.close);
     root.append(card);
+  }
+
+  /**
+   * Menu accept from a gamepad (a keyboard Enter is already a native click): press the focused
+   * control inside the panel. Returns true when the panel was open and took it.
+   */
+  accept(): boolean {
+    if (!this.open) return false;
+    const active = document.activeElement;
+    if (active instanceof HTMLButtonElement && this.root.contains(active)) active.click();
+    return true;
   }
 
   get open(): boolean {
@@ -127,8 +204,10 @@ export class ControlsPanel {
 
   show(): void {
     const device = this.source.device();
+    const map = this.source.bindings();
     this.sub.textContent = DEVICE_NAMES[device];
-    const rows = controlRows(this.source.bindings(), device).map((r) => {
+    this.note.textContent = reverseNote(map, device);
+    const rows = controlRows(map, device).map((r) => {
       const row = el('div', 'pause__setting controls__row');
       row.dataset.row = r.id;
       row.append(el('dt', 'pause__key', r.action), el('dd', 'controls__input', r.input));
@@ -138,12 +217,21 @@ export class ControlsPanel {
     this.returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.root.hidden = false;
+    const parent = this.root.parentElement;
+    this.inerted = parent
+      ? [...parent.children].filter(
+          (c): c is HTMLElement => c instanceof HTMLElement && c !== this.root && !c.inert,
+        )
+      : [];
+    for (const c of this.inerted) c.inert = true;
     this.close.focus({ preventScroll: true });
   }
 
   hide(): void {
     if (!this.open) return;
     this.root.hidden = true;
+    for (const c of this.inerted) c.inert = false;
+    this.inerted = [];
     this.returnFocus?.focus({ preventScroll: true });
     this.returnFocus = null;
     this.onClose();

@@ -209,10 +209,10 @@ export class PauseMenu {
   navigate(action: string): boolean {
     if (!this.open) return false;
     const active = document.activeElement;
-    // The controls list sits on top: back or pause closes it. Accept is left alone, since the
-    // Enter that opened it arrives here a frame later and would close it straight away.
+    // The controls list sits on top: back or pause closes it, accept presses its focused button.
     if (this.controls?.open) {
       if (action === 'menuBack' || action === 'pause') this.controls.hide();
+      else if (action === 'menuAccept') this.controls.accept();
       return true;
     }
     const rowOf = (
