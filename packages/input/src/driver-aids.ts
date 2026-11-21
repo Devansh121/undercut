@@ -35,6 +35,7 @@ export function assistsFor(device: DeviceKind, overrides: AssistOverrides): Assi
   const preset = assistPresetFor(device);
   return {
     tractionControl: LEVEL[preset.tractionControl],
+    stability: preset.stability ? 1 : 0,
     abs: preset.abs === 'on' ? ABS_ON : 0,
     autoGears: preset.gears === 'automatic',
     steering: LEVEL[preset.steering],

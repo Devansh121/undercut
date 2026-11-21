@@ -333,6 +333,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'tc',
         label: 'Traction control',
+        description: 'Reduces engine drive when the rear tyres slip.',
         choices: levels,
         get: () => session.assists.tractionControl,
         set: (v) => session.setAssist('tractionControl', Number(v)),
@@ -340,6 +341,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'abs',
         label: 'ABS',
+        description: 'Eases braking to prevent wheel locking.',
         choices: [
           { value: 0, label: 'Off' },
           { value: 2, label: 'On' },
@@ -348,8 +350,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         set: (v) => session.setAssist('abs', Number(v)),
       },
       {
+        id: 'stability',
+        label: 'Stability help',
+        description: 'Catches rear slides with steering and pedal corrections.',
+        choices: [
+          { value: 0, label: 'Off' },
+          { value: 1, label: 'On' },
+        ],
+        get: () => session.assists.stability ?? 0,
+        set: (v) => session.setAssist('stability', Number(v)),
+      },
+      {
         id: 'gears',
         label: 'Gears',
+        description: 'Shifts automatically at the engine speed limits.',
         choices: [
           { value: 'auto', label: 'Auto' },
           { value: 'manual', label: 'Manual' },
@@ -360,6 +374,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'steering',
         label: 'Steering help',
+        description: 'Reduces analog steering lock as speed rises. Keys use their own ramps.',
         choices: levels,
         get: () => session.assists.steering,
         set: (v) => session.setAssist('steering', Number(v)),
