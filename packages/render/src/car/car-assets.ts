@@ -1,5 +1,11 @@
 import type { Material, Mesh } from 'three';
-import { MeshPhysicalMaterial, MeshStandardMaterial, Texture, type Object3D } from 'three';
+import {
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  Texture,
+  type Color,
+  type Object3D,
+} from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { AssetLoader } from '../assets/loader';
@@ -124,6 +130,23 @@ export class CarAssets {
   }
 }
 
+/**
+ * Lowest linear albedo a non-emissive car surface may have. The asset's `dark` and
+ * `carbon_matte` are 0.3 % (darker than any real paint, rubber or carbon, about 2.5–5 %), so
+ * shadow-side and cockpit surfaces went black under any light.
+ */
+export const ALBEDO_FLOOR = 0.025;
+/** Surfaces whose darkness is their job (glass, screens, lamps) or that are recoloured anyway. */
+const FLOOR_EXEMPT = new Set(['display', 'visor', 'mirror_glass', 'rain_light', 'decal', 'paint']);
+
+/** Scale `c` so its darkest channel is at least `floor`, keeping the hue. */
+export function liftAlbedo(c: Color, floor: number): Color {
+  const m = Math.min(c.r, c.g, c.b);
+  if (m >= floor || m <= 0)
+    return m <= 0 ? c.setScalar(Math.max(floor, Math.max(c.r, c.g, c.b))) : c;
+  return c.multiplyScalar(floor / m);
+}
+
 /** Per-preset material settings on a freshly parsed level of detail. */
 function prepare(root: Object3D, quality: Quality): void {
   root.traverse((o) => {
@@ -136,6 +159,7 @@ function prepare(root: Object3D, quality: Quality): void {
     for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (m instanceof MeshPhysicalMaterial && !quality.clearcoat) m.clearcoat = 0;
       if (m instanceof MeshStandardMaterial) {
+        if (!m.map && !FLOOR_EXEMPT.has(m.name)) liftAlbedo(m.color, ALBEDO_FLOOR);
         for (const t of [
           m.map,
           m.normalMap,

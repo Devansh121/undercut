@@ -25,7 +25,7 @@ import {
 } from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
 import { LightPool, type LocalLight } from './lighting/light-pool';
-import { skyRotation, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
+import { groundBounce, skyRotation, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
 import type { Quality } from './quality';
 
 /**
@@ -91,6 +91,7 @@ uniform vec3 sunRadiance;
 uniform float sunCos;
 uniform vec3 hazeColour;
 uniform float haze;
+uniform vec3 groundRadiance;
 varying vec3 vDir;
 #include <common>
 void main() {
@@ -110,8 +111,10 @@ void main() {
     col += sunRadiance * (0.4 + 0.6 * r);
   }
   #endif
+  // Below the horizon: the circuit's ground bounce, not the pure-sky image's blue lower half.
+  col = mix(col, groundRadiance, smoothstep(-0.01, -0.12, dir.y));
   // The horizon melts into the haze the ground is fogged with.
-  float h = 1.0 - smoothstep(-0.02, 0.16, dir.y);
+  float h = (1.0 - smoothstep(-0.02, 0.16, dir.y)) * smoothstep(-0.2, -0.03, dir.y);
   col = mix(col, hazeColour, haze * h);
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -239,6 +242,7 @@ export class Environment {
         sunCos: { value: sunCos },
         hazeColour: { value: haze },
         haze: { value: 0.85 },
+        groundRadiance: { value: new Color(...groundBounce(meta, tod)) },
       },
       defines: lum > 1e-4 ? { SUN_DISC: '' } : {},
       side: BackSide,

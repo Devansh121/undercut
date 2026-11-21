@@ -4,24 +4,43 @@ import type { WebGLProgramParametersWithUniforms } from 'three';
  * Shader edits every car material gets. The asset bakes ambient occlusion into vertex colours
  * (COLOR_0), which three.js multiplies into the albedo only: reflections of the sky would then
  * light crevices, the floor's underside and the inside of the sidepods like chrome. This makes the
- * baked occlusion attenuate the environment's specular and clear-coat reflections too, with the
- * usual roughness-aware specular-occlusion curve.
+ * baked occlusion attenuate the environment's specular and clear-coat reflections too (once).
  */
-export function patchCarShader(shader: WebGLProgramParametersWithUniforms): void {
-  shader.fragmentShader = shader.fragmentShader.replace(
-    '#include <aomap_fragment>',
-    `#include <aomap_fragment>
+/**
+ * The occlusion edit. The baked AO already darkens the albedo (the car contract keeps three.js's
+ * vertex-colour multiply), so it is not applied to reflections a second time: environment
+ * reflections take only the roughness-aware specular-occlusion curve, and the clear coat the
+ * baked AO once.
+ */
+export const CAR_AO_GLSL = /* glsl */ `#include <aomap_fragment>
     #if defined( USE_COLOR ) && defined( STANDARD )
     {
       float bakedAo = clamp( vColor.r, 0.0, 1.0 );
       float specAo = clamp( pow( max( dot( geometryNormal, geometryViewDir ), 0.0 ) + bakedAo, exp2( - 16.0 * material.roughness - 1.0 ) ) - 1.0 + bakedAo, 0.0, 1.0 );
-      reflectedLight.indirectSpecular *= specAo * bakedAo;
+      reflectedLight.indirectSpecular *= specAo;
       #ifdef USE_CLEARCOAT
-        clearcoatSpecularIndirect *= bakedAo * bakedAo;
+        clearcoatSpecularIndirect *= bakedAo;
       #endif
     }
-    #endif`,
-  );
+    #endif`;
+
+/**
+ * How much of the baked AO's depth darkens the albedo. three.js multiplies vertex colours into
+ * the base colour, which also darkens direct sunlight in every crevice; three quarters keeps the
+ * contact darkening and lets sunlit and shadow-side detail read.
+ */
+export const BAKED_AO_ALBEDO_STRENGTH = 0.75;
+export const CAR_COLOR_GLSL = /* glsl */ `
+    #if defined( USE_COLOR_ALPHA )
+      diffuseColor *= mix( vec4( 1.0 ), vColor, ${BAKED_AO_ALBEDO_STRENGTH.toFixed(2)} );
+    #elif defined( USE_COLOR )
+      diffuseColor.rgb *= mix( vec3( 1.0 ), vColor, ${BAKED_AO_ALBEDO_STRENGTH.toFixed(2)} );
+    #endif`;
+
+export function patchCarShader(shader: WebGLProgramParametersWithUniforms): void {
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <color_fragment>', CAR_COLOR_GLSL)
+    .replace('#include <aomap_fragment>', CAR_AO_GLSL);
 }
 
 const patched = new WeakSet<object>();

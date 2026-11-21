@@ -11,8 +11,14 @@ import {
 } from 'three';
 import type { CarLivery } from './car-assets';
 
-/** Carbon where the livery mask's B channel says bare carbon (docs/car-asset.md). */
-export const CARBON = '#141518';
+/**
+ * Carbon where the livery mask's B channel says bare carbon. The contract's #141518 is a 0.7 %
+ * reflectance, darker than real carbon fibre (about 3 %); shadow-side carbon went black. This is
+ * the same hue at a realistic albedo.
+ */
+export const CARBON = '#2a2c30';
+/** Tyre rubber's linear albedo (real tread and sidewall rubber is about 2–4 %). */
+export const RUBBER_ALBEDO = 0.03;
 
 /**
  * A tyre compound as `design/compounds.json` describes it: its colour and the tick slots it
@@ -48,13 +54,14 @@ export const COMPOUND_GLSL = /* glsl */ `
   float isTick = step(abs(f), 1.6 * uSlot * uGroups);
   float k = clamp(floor(slotIndex + 0.5), -1.0, 1.0);
   float lit = k < -0.5 ? uLit.x : (k > 0.5 ? uLit.z : uLit.y);
-  vec3 rubber = vec3(0.016);
+  vec3 rubber = vec3(RUBBER);
   vec3 tickCol = mix(rubber, uCompound * 0.85, lit);
   diffuseColor.rgb = mix(rubber, mix(vec3(0.55), tickCol, isTick), marking);
 }
 #endif`;
 
 export const COMPOUND_PARS = /* glsl */ `
+#define RUBBER ${RUBBER_ALBEDO.toFixed(3)}
 uniform vec3 uCompound;
 uniform vec3 uLit;
 uniform float uGroups;

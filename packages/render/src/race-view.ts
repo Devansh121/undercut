@@ -59,6 +59,9 @@ export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   return renderer;
 }
 
+/** Exposure multiplier for the cockpit camera (+0.4 EV). */
+const COCKPIT_EXPOSURE = 2 ** 0.4;
+
 /** Ground height under a car: mean of a front and a rear wheel centre less the tyre radius. */
 function groundUnder(p: CarPose): number {
   return ((p.wheelY[0] as number) + (p.wheelY[3] as number)) / 2 - 0.355;
@@ -589,7 +592,8 @@ export class RaceView {
     this.renderer.info.reset();
     this.gpu.begin();
     this.pipeline.render(this.scene, this.camera, {
-      exposure: this.environment.exposure,
+      // An onboard camera exposes for what fills its frame: +0.4 EV in the cockpit.
+      exposure: this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1),
       speedBlur:
         mode.name === 'chase-near' ||
         mode.name === 'chase-far' ||

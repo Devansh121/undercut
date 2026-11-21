@@ -124,3 +124,27 @@ export function skyRotation(
   const rotationY = Math.atan2(iz, ix) - Math.atan2(wz, wx);
   return { rotationY, sunDirection: [wx, iy, wz] };
 }
+
+/**
+ * Mean albedo of the ground around a car on a circuit (asphalt about 0.08, mown grass about
+ * 0.06/0.11/0.02, weighted toward the asphalt under it), linear RGB.
+ */
+export const GROUND_ALBEDO: readonly [number, number, number] = [0.075, 0.085, 0.065];
+
+/**
+ * Radiance of the ground seen from below the horizon: the light falling on it (sun on a level
+ * surface plus the sky) times the ground albedo, over pi. Replaces a pure-sky HDRI's lower half,
+ * which is a blue continuation of the sky, not the circuit: undersides of the car and shadow-side
+ * surfaces get a green-grey bounce of the right strength.
+ */
+export function groundBounce(
+  meta: Pick<SkyMeta, 'sun' | 'skyIrradiance'>,
+  tod: Pick<TimeOfDay, 'sunScale' | 'skyIntensity'>,
+): [number, number, number] {
+  const s = Math.max(0, Math.sin((meta.sun.elevationDeg * Math.PI) / 180));
+  return [0, 1, 2].map((c) => {
+    const sun = (meta.sun.irradiance[c] as number) * tod.sunScale * tod.skyIntensity * s;
+    const sky = (meta.skyIrradiance[c] as number) * tod.skyIntensity;
+    return ((GROUND_ALBEDO[c] as number) * (sun + sky)) / Math.PI;
+  }) as [number, number, number];
+}
