@@ -128,8 +128,8 @@ const DEFAULT_BRANDS: readonly BrandSpec[] = [
     style: 'chevron',
   },
   {
-    id: 'maretti',
-    name: 'MARETTI',
+    id: 'vassero',
+    name: 'VASSERO',
     sub: 'TORREFAZIONE',
     bg: '#2B1813',
     fg: '#F2E7D5',
