@@ -162,11 +162,18 @@ describe(`soak: ${profile.name}`, () => {
       expect(new Set(results).size).toBe(1);
 
       const rows = (rs[0] as Recorder).last('results')!.results.rows;
-      expect(rows).toHaveLength(HUMANS + AI);
-      expect(rows.filter((r) => r.status !== 'finished' || r.laps !== profile.laps)).toEqual([]);
-      // Each car runs at its own speed, so the order is known: fastest (highest seat) first.
-      expect(rows.map((r) => r.seat)).toEqual([...rows.map((r) => r.seat)].sort((a, b) => b - a));
-      for (const row of rows) expect(row.timeMs).toBe(profile.laps * track.lapMs(row.seat));
+      // Each car runs at its own constant speed, so the classification is known. The
+      // leader (highest seat, fastest) finishes the full distance; every other car takes
+      // the flag on its first crossing at or after the leader's race time, which on the
+      // long run leaves the slowest cars a lap down.
+      const flagMs = profile.laps * track.lapMs(HUMANS + AI - 1);
+      const expected = Array.from({ length: HUMANS + AI }, (_, seat) => {
+        const laps = Math.min(profile.laps, Math.ceil(flagMs / track.lapMs(seat)));
+        return { seat, laps, timeMs: laps * track.lapMs(seat), status: 'finished' };
+      }).sort((a, b) => b.laps - a.laps || a.timeMs - b.timeMs);
+      expect(
+        rows.map((r) => ({ seat: r.seat, laps: r.laps, timeMs: r.timeMs, status: r.status })),
+      ).toEqual(expected);
       const rejected = drivers.flatMap((d) => d.rejections);
       expect(rejected).toEqual([]);
       const flagged = rows
