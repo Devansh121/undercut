@@ -86,6 +86,11 @@ describe('a race on the local Workers runtime', () => {
     }
     expect(drivers.flatMap((d) => d.rejections)).toEqual([]);
 
+    // A member who drops during the results gets the same classification again (finding 4).
+    b.client.dropConnection();
+    await until('back with results', () => b.of('results').length === 2, 10_000);
+    expect(JSON.stringify(b.last('results'))).toBe(JSON.stringify(ra));
+
     // Rematch: back to the lobby with the same members and settings, nobody ready.
     a.client.rematch();
     await until('lobby', () => b.client.room?.phase === 'lobby');

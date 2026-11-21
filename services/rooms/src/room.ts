@@ -9,6 +9,7 @@ import {
   type RoomState,
   type RoomTimings,
 } from '@undercut/protocol';
+import { clientAddress } from './address';
 import type { Env } from './env';
 import { cryptoDeps } from './random';
 
@@ -76,12 +77,21 @@ export class Room extends DurableObject<Env> {
     if (!live) return json({ error: 'not_found' }, 404);
     if (pathname === '/info') return json(this.machine?.info());
     if (pathname === '/ws') {
+      // Ask the room before accepting: a refused socket costs no upgrade and no state.
+      const address = clientAddress(request);
+      const admitted = this.machine?.admit(address, Date.now());
+      if (!admitted?.ok) {
+        return json(
+          { error: admitted?.reason ?? 'busy', detail: 'too many connections; try again' },
+          429,
+        );
+      }
       const { 0: client, 1: server } = new WebSocketPair();
       const conn = crypto.randomUUID();
       this.ctx.acceptWebSocket(server);
       server.serializeAttachment({ conn } satisfies Attachment);
       this.sockets.set(conn, server);
-      await this.run({ type: 'open', conn });
+      await this.run({ type: 'open', conn, address });
       return new Response(null, { status: 101, webSocket: client });
     }
     return json({ error: 'not_found' }, 404);

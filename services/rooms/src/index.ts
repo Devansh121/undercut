@@ -15,6 +15,7 @@ import {
   generateRoomCode,
   normalizeRoomCode,
 } from '@undercut/protocol';
+import { clientAddress } from './address';
 import type { Env } from './env';
 import { CreateLimiter } from './limiter';
 import { randomInt } from './random';
@@ -47,7 +48,7 @@ export function parseCreateLimit(raw: string | undefined): { limit: number; wind
 }
 
 async function createRoom(request: Request, env: Env): Promise<Response> {
-  const address = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const address = clientAddress(request);
   const { limit, windowMs } = parseCreateLimit(env.CREATE_LIMIT);
   const limiter = env.LIMITER.get(env.LIMITER.idFromName(address));
   if (!(await limiter.allow(limit, windowMs))) {
