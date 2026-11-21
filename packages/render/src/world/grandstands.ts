@@ -345,8 +345,24 @@ export function buildStands(frames: readonly StandFrame[]): BufferGeometry {
       b.box(f, 0, L, v0 + 0.06, v0 + 0.48, y, y + 0.4, f.seat);
     }
 
-    // Back wall + darker structural base.
+    // Back wall + darker structural base + rear structural buttress pilasters & horizontal beam.
     b.box(f, 0, L, back, back + 0.35, 0, top + STAND.backWall, CONCRETE_DARK);
+    b.box(f, 0, L, back + 0.35, back + 0.65, top * 0.48, top * 0.48 + 0.42, STEEL);
+    b.box(
+      f,
+      0,
+      L,
+      back + 0.35,
+      back + 0.65,
+      top + STAND.backWall - 0.55,
+      top + STAND.backWall,
+      STEEL,
+    );
+    const backCols = Math.max(2, Math.round(L / 10));
+    for (let k = 0; k <= backCols; k++) {
+      const u = (k / backCols) * (L - 0.5) + 0.25;
+      b.box(f, u - 0.24, u + 0.24, back + 0.35, back + 0.85, 0, top + STAND.backWall, CONCRETE);
+    }
 
     // Sloped side walls following the rake (removes the giant rectangular side-cube silhouette).
     const yFrontSide = STAND.frontWall + 0.95;

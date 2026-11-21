@@ -40,9 +40,9 @@ export const MONZA_AFTERNOON: TimeOfDay = Object.freeze({
   sunScale: 1,
   sunFallback: 0,
   shadowSoftness: 1,
-  exposure: 0.74,
-  fogDensity: 0.00032,
-  fogColour: null,
+  exposure: 0.78,
+  fogDensity: 0.00028,
+  fogColour: '#ddd6c8',
   localLightSlots: 0,
 });
 
@@ -126,10 +126,11 @@ export function skyRotation(
 }
 
 /**
- * Mean albedo of the ground around a car on a circuit (asphalt about 0.08, mown grass about
- * 0.06/0.11/0.02, weighted toward the asphalt under it), linear RGB.
+ * Mean albedo of the ground around a car on a circuit (sunlit asphalt, concrete barriers and
+ * warm grass bounce), linear RGB. Lifts the shadow side and rear diffuser of the car without
+ * flattening direct sunlight.
  */
-export const GROUND_ALBEDO: readonly [number, number, number] = [0.075, 0.085, 0.065];
+export const GROUND_ALBEDO: readonly [number, number, number] = [0.135, 0.14, 0.118];
 
 /**
  * Radiance of the ground seen from below the horizon: the light falling on it (sun on a level

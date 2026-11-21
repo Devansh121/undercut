@@ -122,9 +122,9 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const tl = Math.hypot(t.x, t.z) || 1;
     const tx = t.x / tl;
     const tz = t.z / tl;
-    // Outward: away from the pit lane, on the garage side (left normal is (-tz, tx) in x-z).
-    const ox = -tz * gs;
-    const oz = tx * gs;
+    // Outward: away from the pit lane, on the garage side (left normal is (tz, -tx) in x-z).
+    const ox = tz * gs;
+    const oz = -tx * gs;
     if (prev) u += Math.hypot(p.x - prev.x, p.z - prev.z);
     prev = { x: p.x, z: p.z };
     front.push({ x: p.x, y: track.groundHeightAt(p.x, p.z), z: p.z, ox, oz, tx, tz, u, sPit: sc });
@@ -182,7 +182,8 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     [-4, 0],
   ];
 
-  const flip = gs < 0;
+  // (B - A) x (0, 1, 0) = (-tz, 0, tx), which equals -ox when gs > 0 (left) and +ox when gs < 0 (right).
+  const flip = gs > 0;
   for (let i = 0; i + 1 < front.length; i++) {
     const a = front[i] as (typeof front)[number];
     const b = front[i + 1] as (typeof front)[number];
@@ -219,15 +220,15 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const Bf0 = [b.x, cy0, b.z];
     const Af1 = [a.x, cy1, a.z];
     const Bf1 = [b.x, cy1, b.z];
-    // Canopy front edge, top, underside soffit.
+    // Canopy front edge, top (+Y), underside soffit (-Y).
     if (flip) {
       quad(Ac0, Bc0, Bc1, Ac1, fn, trimFa);
-      quad(Af1, Bf1, Bc1, Ac1, [0, 1, 0], canopyFa);
-      quad(Ac0, Bc0, Bf0, Af0, [0, -1, 0], canopyFa);
+      quad(Ac1, Bc1, Bf1, Af1, [0, 1, 0], canopyFa);
+      quad(Af0, Bf0, Bc0, Ac0, [0, -1, 0], canopyFa);
     } else {
       quad(Bc0, Ac0, Ac1, Bc1, fn, trimFa);
-      quad(Bf1, Af1, Ac1, Bc1, [0, 1, 0], canopyFa);
-      quad(Bc0, Ac0, Af0, Bf0, [0, -1, 0], canopyFa);
+      quad(Bc1, Ac1, Af1, Bf1, [0, 1, 0], canopyFa);
+      quad(Bf0, Af0, Ac0, Bc0, [0, -1, 0], canopyFa);
     }
 
     // Upper-floor roof overhang lip (projects 1.1 m over the glazed hospitality floor).
@@ -244,12 +245,12 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const Bfr1 = [b.x, ry1, b.z];
     if (flip) {
       quad(Ar0, Br0, Br1, Ar1, fn, trimFa);
-      quad(Afr1, Bfr1, Br1, Ar1, [0, 1, 0], roofFa);
-      quad(Ar0, Br0, Bfr0, Afr0, [0, -1, 0], canopyFa);
+      quad(Ar1, Br1, Bfr1, Afr1, [0, 1, 0], roofFa);
+      quad(Afr0, Bfr0, Br0, Ar0, [0, -1, 0], canopyFa);
     } else {
       quad(Br0, Ar0, Ar1, Br1, fn, trimFa);
-      quad(Bfr1, Afr1, Ar1, Br1, [0, 1, 0], roofFa);
-      quad(Br0, Ar0, Afr0, Bfr0, [0, -1, 0], canopyFa);
+      quad(Br1, Ar1, Afr1, Bfr1, [0, 1, 0], roofFa);
+      quad(Bfr0, Afr0, Ar0, Br0, [0, -1, 0], canopyFa);
     }
 
     // Back wall and roof.
@@ -405,9 +406,9 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const tl = Math.hypot(t.x, t.z) || 1;
     const tx = t.x / tl;
     const tz = t.z / tl;
-    // Normal pointing toward the main racing track.
-    const nx = -tz * -gs;
-    const nz = tx * -gs;
+    // Normal pointing toward the main racing track (left normal (tz, -tx) * -gs).
+    const nx = tz * -gs;
+    const nz = -tx * -gs;
     const hit = lap.nearest(p.x, p.z);
     pitWallLine.push({
       x: p.x,
@@ -432,8 +433,8 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const tx = t.x / tl;
     const tz = t.z / tl;
     // Normal pointing toward the racing track (+X front).
-    const nx = -tz * -gs;
-    const nz = tx * -gs;
+    const nx = tz * -gs;
+    const nz = -tx * -gs;
     const hit = lap.nearest(p.x, p.z);
     pitWallSpots.push({
       x: p.x,

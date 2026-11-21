@@ -13,7 +13,7 @@ import {
 import { MeshSurface, createVec3, type Track } from '@undercut/track';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
-import { hash01, type DressingFile, type MappedFeature } from './dressing';
+import type { DressingFile, MappedFeature } from './dressing';
 import type { StandFrame } from './grandstands';
 import type { LapIndex } from './lap-index';
 import type { PitComplexData } from './pit-building';
@@ -268,39 +268,39 @@ export function brandHoardingMaterial(atlas: Texture): MeshStandardMaterial {
  */
 export function catchFencePostsGeometry(): BufferGeometry {
   const b = new PropBuilder();
-  const steel = [0.22, 0.23, 0.245];
+  const steel = [0.24, 0.25, 0.265];
   // Main upright steel I-post at z = -2.0 m (tiling cleanly every 4 m) + top cantilever arm.
-  b.box(-0.07, 0.07, 0.0, 3.25, -2.05, -1.95, steel);
+  b.box(-0.055, 0.055, 0.0, 3.25, -2.04, -1.96, steel);
   // Angled overhang arm projecting toward track (+X).
   b.quad(
-    [-0.04, 3.22, -1.96],
+    [-0.03, 3.22, -1.96],
     [0.54, 3.78, -1.96],
-    [0.54, 3.86, -1.96],
-    [-0.04, 3.3, -1.96],
+    [0.54, 3.85, -1.96],
+    [-0.03, 3.29, -1.96],
     steel,
   );
   b.quad(
     [0.54, 3.78, -2.04],
-    [-0.04, 3.22, -2.04],
-    [-0.04, 3.3, -2.04],
-    [0.54, 3.86, -2.04],
+    [-0.03, 3.22, -2.04],
+    [-0.03, 3.29, -2.04],
+    [0.54, 3.85, -2.04],
     steel,
   );
-  // Top horizontal tie bar.
-  b.box(0.48, 0.56, 3.78, 3.85, -2.0, 2.0, steel);
+  // Top horizontal tie bar (slightly overlapped to stay continuous on curves).
+  b.box(0.49, 0.55, 3.79, 3.85, -2.08, 2.08, steel);
   // Base mounting bracket.
-  b.box(-0.14, 0.14, 0.0, 0.12, -2.1, -1.9, [0.14, 0.145, 0.155]);
+  b.box(-0.12, 0.12, 0.0, 0.12, -2.08, -1.92, [0.14, 0.145, 0.155]);
   return b.build(true);
 }
 
 export function catchFenceMeshGeometry(): BufferGeometry {
   const b = new PropBuilder();
-  // Vertical wire mesh section (y = 0.85..3.25 m, sitting above the concrete/Armco barrier).
+  // Vertical wire mesh section (y = 0.85..3.25 m, 4.16 m wide to stay continuous around curves).
   b.quad(
-    [0.05, 0.85, 2.0],
-    [0.05, 0.85, -2.0],
-    [0.05, 3.25, -2.0],
-    [0.05, 3.25, 2.0],
+    [0.05, 0.85, 2.08],
+    [0.05, 0.85, -2.08],
+    [0.05, 3.25, -2.08],
+    [0.05, 3.25, 2.08],
     [1, 1, 1],
     [
       [0, 0],
@@ -311,10 +311,10 @@ export function catchFenceMeshGeometry(): BufferGeometry {
   );
   // Angled overhang mesh section.
   b.quad(
-    [0.05, 3.25, 2.0],
-    [0.05, 3.25, -2.0],
-    [0.52, 3.82, -2.0],
-    [0.52, 3.82, 2.0],
+    [0.05, 3.25, 2.08],
+    [0.05, 3.25, -2.08],
+    [0.52, 3.82, -2.08],
+    [0.52, 3.82, 2.08],
     [1, 1, 1],
     [
       [0, 0],
@@ -514,8 +514,8 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   group.position.set(p.x, groundY, p.z);
   group.rotation.y = yaw;
 
-  const clearH = 6.1;
-  const topH = 8.4;
+  const clearH = 6.8;
+  const topH = 9.0;
   const halfSpan = span / 2;
 
   // Steel gantry structure.
@@ -535,16 +535,16 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
     sb.box(-0.75, 0.75, 5.2, 5.45, sz - 0.22, sz + 0.22, steel);
   }
   // Main horizontal gantry deck & truss box.
-  sb.box(-1.1, 1.1, clearH, clearH + 0.28, -halfSpan - 0.4, halfSpan + 0.4, dark);
-  sb.box(-1.1, 1.1, topH - 0.25, topH, -halfSpan - 0.4, halfSpan + 0.4, dark);
-  sb.box(-1.05, 1.05, clearH + 0.28, topH - 0.25, -halfSpan, halfSpan, [0.07, 0.075, 0.085]);
-  // Hanging start-light beam bar beneath the gantry centred over the racing lane (offset -midD).
+  sb.box(-1.1, 1.1, clearH, clearH + 0.26, -halfSpan - 0.4, halfSpan + 0.4, dark);
+  sb.box(-1.1, 1.1, topH - 0.24, topH, -halfSpan - 0.4, halfSpan + 0.4, dark);
+  sb.box(-1.05, 1.05, clearH + 0.26, topH - 0.24, -halfSpan, halfSpan, [0.07, 0.075, 0.085]);
+  // Slim hanging start-light beam bar beneath the gantry centred over the racing lane (offset -midD).
   const laneZ = -midD;
-  sb.box(-0.65, 0.15, clearH - 1.15, clearH, laneZ - 4.4, laneZ + 4.4, dark);
+  sb.box(-0.52, 0.12, clearH - 0.65, clearH, laneZ - 4.2, laneZ + 4.2, dark);
   for (let i = 0; i < 5; i++) {
-    const zc = laneZ + (i - 2) * 1.65;
+    const zc = laneZ + (i - 2) * 1.6;
     // Hooded light pod housing facing -X (toward cars on the grid).
-    sb.box(-0.82, -0.1, clearH - 1.48, clearH - 0.28, zc - 0.36, zc + 0.36, [0.035, 0.038, 0.045]);
+    sb.box(-0.72, -0.08, clearH - 1.08, clearH - 0.16, zc - 0.32, zc + 0.32, [0.035, 0.038, 0.045]);
   }
 
   const structGeo = sb.build(true);
@@ -616,14 +616,14 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   // 5 individually addressable start-light lenses (two stacked LED circles per pod, facing -X).
   const podMaterials: MeshStandardMaterial[] = [];
   for (let i = 0; i < 5; i++) {
-    const zc = laneZ + (i - 2) * 1.65;
+    const zc = laneZ + (i - 2) * 1.6;
     const lb = new PropBuilder();
-    for (const ly of [clearH - 1.24, clearH - 0.72]) {
+    for (const ly of [clearH - 0.86, clearH - 0.42]) {
       lb.quad(
-        [-0.84, ly - 0.16, zc - 0.16],
-        [-0.84, ly - 0.16, zc + 0.16],
-        [-0.84, ly + 0.16, zc + 0.16],
-        [-0.84, ly + 0.16, zc - 0.16],
+        [-0.74, ly - 0.14, zc - 0.14],
+        [-0.74, ly - 0.14, zc + 0.14],
+        [-0.74, ly + 0.14, zc + 0.14],
+        [-0.74, ly + 0.14, zc - 0.14],
         [1, 1, 1],
       );
     }
@@ -1128,9 +1128,9 @@ export function placeTracksideFurniture(options: {
     const tl = Math.hypot(t.x, t.z) || 1;
     const tx = t.x / tl;
     const tz = t.z / tl;
-    // Normal pointing INWARD toward the racing surface.
-    const nx = side === 0 ? tz : -tz;
-    const nz = side === 0 ? -tx : tx;
+    // Left normal in x-z (+Y up, +Z south) is (tz, -tx). Inward toward track is (-tz, tx) from left (side 0), (tz, -tx) from right (side 1).
+    const nx = side === 0 ? -tz : tz;
+    const nz = side === 0 ? tx : -tx;
     return {
       x: p.x,
       y: track.groundHeightAt(p.x, p.z),
@@ -1188,7 +1188,7 @@ export function placeTracksideFurniture(options: {
     });
   }
   const usedHoard = new Set<string>();
-  const hoardStep = mobile ? 14 : 6.4;
+  const hoardStep = mobile ? 14 : 6.2;
   for (const run of hoardingRuns) {
     const span = run.s1 >= run.s0 ? run.s1 - run.s0 : L - run.s0 + run.s1;
     for (let ds = 0; ds < span; ds += run.step ?? hoardStep) {
@@ -1197,7 +1197,7 @@ export function placeTracksideFurniture(options: {
       if (usedHoard.has(key)) continue;
       usedHoard.add(key);
       if (nearPitGap(s, run.side)) continue;
-      const b = atBarrier(s, run.side, -0.18);
+      const b = atBarrier(s, run.side, -0.26);
       placeHoarding(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1213,20 +1213,19 @@ export function placeTracksideFurniture(options: {
       if (outerSurf !== MeshSurface.Grass) continue;
       const barD = Math.abs(track.barrier[side][idxS] as number);
       const halfW = Math.abs(track.halfWidth[side][idxS] as number);
-      if (barD - halfW < 4.8) continue;
+      if (barD - halfW < 5.0) continue;
       // Place cleanly on the grass verge, ~2.2 m inside the barrier (never encroaching on the track).
-      const b = atBarrier(s, side, -2.1);
-      // Skip if too close to the road edge.
-      if (barD - 2.1 < halfW + 2.8) continue;
+      const b = atBarrier(s, side, -2.2);
+      if (barD - 2.2 < halfW + 2.8) continue;
       placeVergeBoard(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
   // Grandstand front-wall brand banners (mounted cleanly along the concrete front wall of each stand).
   for (const st of stands) {
     const yawFront = Math.atan2(st.bz, -st.bx);
-    for (let u = 3.5; u < st.length - 3.5; u += 6.4) {
-      const x = st.ox + st.ax * u - st.bx * 0.14;
-      const z = st.oz + st.az * u - st.bz * 0.14;
+    for (let u = 3.5; u < st.length - 3.5; u += 6.2) {
+      const x = st.ox + st.ax * u - st.bx * 0.16;
+      const z = st.oz + st.az * u - st.bz * 0.16;
       placeHoarding(x, st.base + 0.3, z, yawFront, st.s);
     }
   }
@@ -1246,7 +1245,7 @@ export function placeTracksideFurniture(options: {
       placeFence(pt.x, pt.y, pt.z, yaw, pt.s);
     }
   }
-  // Circuit-agnostic spectator catch fencing: main straight both sides + every grandstand frontage + corner outsides.
+  // Circuit-agnostic spectator catch fencing quantized onto a uniform 4 m lap grid (no gaps or overlaps).
   const fenceZones: { s0: number; s1: number; side: 0 | 1 }[] = [
     { s0: mainStartS, s1: mainEndS, side: otherSideIdx },
     { s0: wrapS(track.pit.exitS + 38), s1: mainEndS, side: pitSideIdx },
@@ -1273,17 +1272,28 @@ export function placeTracksideFurniture(options: {
       side: outSide,
     });
   }
-  const usedFence = new Set<string>();
-  const fenceStep = mobile ? 8 : 4;
+  const fenceSlotStep = 4;
+  const slotCount = Math.ceil(L / fenceSlotStep);
+  const fenceMask: [Uint8Array, Uint8Array] = [
+    new Uint8Array(slotCount),
+    new Uint8Array(slotCount),
+  ];
   for (const z of fenceZones) {
     const span = z.s1 >= z.s0 ? z.s1 - z.s0 : L - z.s0 + z.s1;
-    for (let ds = 0; ds < span; ds += fenceStep) {
-      const s = wrapS(z.s0 + ds);
-      const key = `${z.side}:${Math.round(s / 4)}`;
-      if (usedFence.has(key)) continue;
-      usedFence.add(key);
-      if (nearPitGap(s, z.side)) continue;
-      const b = atBarrier(s, z.side, 0.25);
+    for (let ds = 0; ds <= span; ds += fenceSlotStep * 0.5) {
+      const slot = Math.floor(wrapS(z.s0 + ds) / fenceSlotStep) % slotCount;
+      fenceMask[z.side][slot] = 1;
+    }
+  }
+  const mobileSkip = mobile ? 2 : 1;
+  for (const side of [0, 1] as const) {
+    for (let slot = 0; slot < slotCount; slot += mobileSkip) {
+      if (!fenceMask[side][slot]) continue;
+      const s = slot * fenceSlotStep;
+      if (nearPitGap(s, side)) continue;
+      const b = atBarrier(s, side, 0.3);
+      // Skip narrow tight-apex islands where barrier sits right against the kerb.
+      if (b.barD < b.halfW + 1.4) continue;
       placeFence(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1401,10 +1411,13 @@ export function placeTracksideFurniture(options: {
     screens++;
   }
 
+  let lastCamS = -999;
   for (const c of track.corners) {
-    if (hash01(c.number, 23) > 0.65 && c.number !== 1 && c.number !== 8) continue;
-    const inSide: 0 | 1 = c.direction === 'right' ? 1 : 0;
-    const b = atBarrier(c.s, inSide, 5.5);
+    if (c.start - lastCamS < 420) continue;
+    lastCamS = c.start;
+    const outSide: 0 | 1 = c.direction === 'right' ? 0 : 1;
+    // Place outside the barrier behind run-off so towers never obstruct tight chicane inner islands.
+    const b = atBarrier(c.end + 28, outSide, 7.5);
     props.place('camera-tower', {
       x: b.x,
       y: heightAt(b.x, b.z),

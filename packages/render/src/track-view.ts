@@ -60,9 +60,9 @@ export const GRASS_COLOUR = `
         float far = smoothstep(12.0, 60.0, length(vSurfWorld - cameraPosition));
         vec3 coarse = texture2D(map, vMapUv * 0.21 + 0.13).rgb;
         diffuseColor.rgb = mix(diffuseColor.rgb, coarse * diffuseColor.a, far * 0.6);
-        vec3 lush = vec3(0.86, 0.95, 0.8);
-        vec3 dry = vec3(1.1, 1.04, 0.82);
-        diffuseColor.rgb *= mix(lush, dry, smoothstep(0.3, 0.9, macro.r)) * mix(0.84, 1.08, macro.g);
+        vec3 lush = vec3(0.84, 0.86, 0.66);
+        vec3 dry = vec3(1.12, 1.0, 0.72);
+        diffuseColor.rgb *= mix(lush, dry, smoothstep(0.25, 0.88, macro.r)) * mix(0.8, 1.1, macro.g);
       }`;
 
 const MAX_GRID = 24;

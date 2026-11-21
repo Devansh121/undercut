@@ -357,10 +357,10 @@ export function catchFenceTexture(anisotropy = 8): CanvasTexture {
   const ctx = c.getContext('2d') as CanvasRenderingContext2D;
   ctx.clearRect(0, 0, size, size);
 
-  // Fine steel wire diamond grid.
-  ctx.strokeStyle = 'rgba(135, 142, 148, 0.72)';
-  ctx.lineWidth = 2.4;
-  const step = 32;
+  // Fine galvanized steel wire diamond grid (mipmaps cleanly into light translucent mesh).
+  ctx.strokeStyle = 'rgba(168, 174, 180, 0.78)';
+  ctx.lineWidth = 1.45;
+  const step = 16;
   ctx.beginPath();
   for (let i = -size; i <= size * 2; i += step) {
     ctx.moveTo(i, 0);
@@ -370,10 +370,10 @@ export function catchFenceTexture(anisotropy = 8): CanvasTexture {
   }
   ctx.stroke();
 
-  // Horizontal high-tension retaining cables (4 per panel height).
-  ctx.strokeStyle = 'rgba(92, 98, 106, 0.92)';
-  ctx.lineWidth = 5;
-  for (const frac of [0.16, 0.42, 0.68, 0.92]) {
+  // Horizontal high-tension retaining cables (6 crisp dark-steel wires per panel height).
+  ctx.strokeStyle = 'rgba(72, 78, 86, 0.92)';
+  ctx.lineWidth = 2.6;
+  for (const frac of [0.1, 0.26, 0.42, 0.58, 0.74, 0.9]) {
     ctx.beginPath();
     ctx.moveTo(0, size * frac);
     ctx.lineTo(size, size * frac);

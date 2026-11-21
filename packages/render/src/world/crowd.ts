@@ -5,33 +5,35 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from 'three';
 
-/** Clothing colours of the crowd (linear): mostly muted, some team-neutral brights. */
+/** Clothing colours of the crowd (linear): realistic race-day palette with muted neutrals and team-shirt accents. */
 export const CLOTHING: readonly [number, number, number][] = [
-  [0.6, 0.6, 0.58],
-  [0.08, 0.08, 0.09],
-  [0.02, 0.05, 0.16],
-  [0.45, 0.03, 0.02],
-  [0.75, 0.72, 0.62],
-  [0.12, 0.2, 0.08],
-  [0.55, 0.35, 0.02],
-  [0.02, 0.12, 0.3],
-  [0.32, 0.32, 0.34],
-  [0.7, 0.25, 0.02],
-  [0.6, 0.55, 0.05],
-  [0.04, 0.2, 0.22],
+  [0.54, 0.53, 0.5], // off-white tee
+  [0.06, 0.065, 0.075], // charcoal
+  [0.04, 0.08, 0.17], // navy
+  [0.34, 0.045, 0.04], // muted crimson shirt
+  [0.58, 0.54, 0.46], // sand / linen
+  [0.09, 0.15, 0.08], // olive
+  [0.44, 0.28, 0.06], // warm ochre
+  [0.05, 0.14, 0.28], // denim / cobalt
+  [0.24, 0.25, 0.27], // slate grey
+  [0.48, 0.18, 0.05], // terracotta / rust
+  [0.46, 0.42, 0.12], // muted mustard
+  [0.06, 0.16, 0.18], // petrol teal
+  [0.14, 0.14, 0.16], // dark hoodie
+  [0.42, 0.42, 0.41], // light heather grey
 ];
 
 const SKIN: readonly [number, number, number][] = [
-  [0.58, 0.38, 0.27],
-  [0.45, 0.28, 0.18],
-  [0.25, 0.14, 0.08],
-  [0.66, 0.46, 0.35],
+  [0.48, 0.31, 0.22],
+  [0.38, 0.24, 0.16],
+  [0.22, 0.13, 0.08],
+  [0.54, 0.37, 0.28],
 ];
 
 /**
- * A seated spectator, facing +x, about 1.3 m to the top of the head from the seat: torso in the
+ * A seated spectator, facing +x, about 1.25 m to the top of the head from the seat: torso in the
  * instance's clothing colour (vertex colour white marks it), head in a skin tone, legs and arms in
- * dark trousers and the shirt colour. 60 triangles.
+ * dark trousers and the shirt colour.
  */
 export function spectatorGeometry(variant: number): BufferGeometry {
   const pos: number[] = [];
@@ -39,6 +41,12 @@ export function spectatorGeometry(variant: number): BufferGeometry {
   const col: number[] = [];
   const idx: number[] = [];
   const skin = SKIN[variant % SKIN.length] as [number, number, number];
+  const hair =
+    variant % 3 === 0
+      ? [0.04, 0.035, 0.03]
+      : variant % 3 === 1
+        ? [0.11, 0.075, 0.045]
+        : [0.22, 0.18, 0.12];
   const box = (
     x0: number,
     x1: number,
@@ -106,15 +114,16 @@ export function spectatorGeometry(variant: number): BufferGeometry {
     }
   };
   const shirt = [1, 1, 1];
-  const trousers = [0.05, 0.05, 0.06];
+  const trousers = [0.045, 0.05, 0.065];
   // Thighs forward on the seat, shins down in front of it.
-  box(-0.05, 0.42, 0.0, 0.16, -0.19, 0.19, trousers);
-  box(0.32, 0.46, -0.42, 0.0, -0.18, 0.18, trousers);
-  // Torso, slightly reclined, then the head.
-  box(-0.2, 0.08, 0.12, 0.68, -0.21, 0.21, shirt);
-  box(-0.02, 0.24, 0.42, 0.56, -0.26, -0.18, shirt);
-  box(-0.02, 0.24, 0.42, 0.56, 0.18, 0.26, shirt);
-  box(-0.16, 0.06, 0.7, 0.92, -0.1, 0.1, skin);
+  box(-0.04, 0.38, 0.0, 0.14, -0.16, 0.16, trousers);
+  box(0.28, 0.42, -0.4, 0.0, -0.15, 0.15, trousers);
+  // Slimmer reclined torso + shoulders + head with hair/cap crown.
+  box(-0.18, 0.06, 0.12, 0.64, -0.18, 0.18, shirt);
+  box(-0.02, 0.2, 0.36, 0.52, -0.23, -0.15, shirt);
+  box(-0.02, 0.2, 0.36, 0.52, 0.15, 0.23, shirt);
+  box(-0.13, 0.05, 0.66, 0.85, -0.085, 0.085, skin);
+  box(-0.14, 0.05, 0.82, 0.89, -0.09, 0.09, hair);
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
