@@ -23,13 +23,23 @@ const teams = JSON.parse(fs.readFileSync(path.join(root, 'design/teams.json'), '
 
 const shots = [];
 for (const t of teams) shots.push({ name: `livery_${t.id}`, q: { team: t.id, view: 'front34' } });
-for (const v of ['front34', 'rear34', 'side', 'top', 'front']) {
+// the standard stations, straight behind and the chase camera included
+for (const v of ['front34', 'rear34', 'side', 'top', 'front', 'rear', 'chase']) {
   shots.push({ name: `calder_${v}`, q: { team: 'calder', view: v } });
+}
+for (const t of ['kestrel', 'sable', 'meridian']) {
+  shots.push({ name: `rear_${t}`, q: { team: t, view: 'rear' } });
+  shots.push({ name: `chase_${t}`, q: { team: t, view: 'chase' } });
 }
 shots.push({ name: 'closeup_front_wing', q: { team: 'calder', view: 'wing' } });
 shots.push({ name: 'closeup_cockpit', q: { team: 'calder', view: 'cockpit' } });
+shots.push({ name: 'closeup_rear_wing', q: { team: 'norrland', view: 'rearwing' } });
+shots.push({ name: 'closeup_bodywork', q: { team: 'calder', view: 'bodywork' } });
+shots.push({ name: 'closeup_wheel', q: { team: 'quillon', view: 'wheel', compound: 'soft' } });
 shots.push({ name: 'mobile_chase', q: { team: 'kestrel', view: 'chase', lod: 'mobile' } });
 shots.push({ name: 'far_chase', q: { team: 'kestrel', view: 'chase', lod: 'far' } });
+shots.push({ name: 'lod_strip_high_mobile', q: { team: 'terraluce', view: 'strip', px: 160 } });
+shots.push({ name: 'lod_strip_mobile_far', q: { team: 'terraluce', view: 'strip', px: 50 } });
 shots.push({
   name: 'pose_steer_drs_bump_glow',
   q: {
@@ -45,7 +55,7 @@ shots.push({
 });
 shots.push({
   name: 'pose_rear_drs_open',
-  q: { team: 'meridian', view: 'rear34', drs: 1, rain: 1 },
+  q: { team: 'meridian', view: 'rear34', drs: 1, rain: 1, compound: 'hard' },
 });
 
 fs.mkdirSync(outDir, { recursive: true });

@@ -1,27 +1,36 @@
 /* global document */
 // Reference implementation of the car asset contract in docs/car-asset.md: loading, liveries,
-// decals and the animated nodes. Plain ES module over three.js; the game's renderer can port it.
+// markings, tyre compounds and the animated nodes. Plain ES module over three.js; the game's
+// renderer can port it.
 import * as THREE from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CORNERS = ['FL', 'FR', 'RL', 'RR'];
 export const TYRE_RADIUS = 0.36;
-export const COMPOUND_COLOURS = { soft: '#d8322a', medium: '#e6c229', hard: '#eeeeea' };
 
-/** Loads one level of detail. Returns { root, rig }. */
-export async function loadCar(url, { dracoPath }) {
+/**
+ * Loads one or more levels of detail with one shared Draco decoder, which is disposed when the
+ * loads finish or fail (the decoder holds a worker pool). Returns [{ root, rig }] in url order.
+ */
+export async function loadCars(urls, { dracoPath }) {
   const draco = new DRACOLoader().setDecoderPath(dracoPath);
   const loader = new GLTFLoader().setDRACOLoader(draco);
-  const gltf = await loader.loadAsync(url);
-  const root = gltf.scene.getObjectByName('car');
-  root.traverse((o) => {
-    if (o.isMesh) {
-      o.castShadow = true;
-      o.receiveShadow = true;
-    }
-  });
-  return { root, rig: new CarRig(root) };
+  try {
+    const gltfs = await Promise.all(urls.map((u) => loader.loadAsync(u)));
+    return gltfs.map((gltf) => {
+      const root = gltf.scene.getObjectByName('car');
+      root.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+      return { root, rig: new CarRig(root) };
+    });
+  } finally {
+    draco.dispose();
+  }
 }
 
 /** Recolours the painted bodywork from a livery mask (R secondary, G accent, B bare carbon). */
@@ -59,7 +68,7 @@ uniform vec3 uCarbon;`,
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-roughnessFactor = mix( roughnessFactor, 0.42, liveryCarbon );`,
+roughnessFactor = mix( roughnessFactor, 0.5, liveryCarbon );`,
       );
   };
   m.customProgramCacheKey = () => 'car-livery';
@@ -67,24 +76,30 @@ roughnessFactor = mix( roughnessFactor, 0.42, liveryCarbon );`,
   return m;
 }
 
-/** A canvas texture with a race number or a driver code, for the decal carriers. */
-export function markingTexture(text, { fill, outline, font, aspect }) {
-  const h = 256;
-  const w = Math.round(h * aspect);
+/**
+ * The markings canvas for the decal carriers: the race number in the left part (u 0..0.4), the
+ * driver code in the right part (u 0.4..1), both on a transparent background.
+ */
+export function markingsTexture({ number, code, fill, outline, font, canvas = [2048, 512] }) {
+  const [w, h] = canvas;
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const g = c.getContext('2d');
   g.clearRect(0, 0, w, h);
-  g.font = `700 ${Math.round(h * 0.86)}px ${font}`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  g.lineWidth = h * 0.07;
-  g.strokeStyle = outline;
-  g.strokeText(text, w / 2, h * 0.54);
-  g.fillStyle = fill;
-  g.fillText(text, w / 2, h * 0.54);
+  const draw = (text, x0, x1, size) => {
+    g.font = `700 ${Math.round(size)}px ${font}`;
+    g.lineWidth = h * 0.06;
+    g.strokeStyle = outline;
+    g.strokeText(text, (x0 + x1) / 2, h * 0.54);
+    g.fillStyle = fill;
+    g.fillText(text, (x0 + x1) / 2, h * 0.54);
+  };
+  draw(String(number), 0, w * 0.4, h * 0.86);
+  draw(code, w * 0.4, w, h * 0.78);
   const t = new THREE.CanvasTexture(c);
   t.flipY = false; // glTF UV convention: v runs down the image
   t.colorSpace = THREE.SRGBColorSpace;
@@ -103,26 +118,28 @@ export class CarRig {
     this.drs = this.node('drs_flap');
     this.steeringWheel = this.node('steering_wheel');
     this.helmet = this.node('helmet');
-    this.discs = CORNERS.map((c) => this.node(`brake_disc_${c}`)).filter(Boolean);
-    // links: rotate so the rest direction to the outboard joint follows the joint
-    root.updateMatrixWorld(true);
-    this.links = [];
-    root.traverse((o) => {
-      const ud = o.userData;
-      if (!ud.outboard || !ud.follows) return;
-      const follower = this.node(ud.follows);
-      if (!follower) return;
-      const out = new THREE.Vector3().fromArray(ud.outboard); // car frame
-      const attach = follower.worldToLocal(root.localToWorld(out.clone()));
-      const rest = out.clone().sub(o.position);
-      this.links.push({ o, follower, attach, rest: rest.normalize() });
-    });
-    // per-car material copies for brake glow and rain light
-    for (const d of this.discs) {
-      d.traverse((m) => {
-        if (m.isMesh) {
+    // suspension links: one node, morph targets per corner (GLTFLoader may split it into one
+    // mesh per material under a group; every part carries the same targets)
+    const links = this.node('suspension_links');
+    this.linkMeshes = [];
+    this.linkRef = { bump: 0.03, steer: 0.35 };
+    if (links) {
+      const morph = links.userData.morph ?? {};
+      this.linkRef = { bump: morph.bump_ref_m ?? 0.03, steer: morph.steer_ref_rad ?? 0.35 };
+      links.traverse((m) => {
+        if (m.isMesh && m.morphTargetDictionary) this.linkMeshes.push(m);
+      });
+    }
+    // brake glow: the disc material lives on each upright; one copy per corner
+    this.discMats = {};
+    for (const c of CORNERS) {
+      const up = this.node(`upright_${c}`);
+      if (!up) continue;
+      up.traverse((m) => {
+        if (m.isMesh && m.material.name === 'brake_disc') {
           m.material = m.material.clone();
           m.material.emissiveIntensity = 0;
+          this.discMats[c] = m.material;
         }
       });
     }
@@ -148,17 +165,14 @@ export class CarRig {
     });
   }
 
-  /** Race number and driver code on the decal carriers. */
-  setMarkings({ number, code, fill, outline, font }) {
-    this.root.traverse((m) => {
-      if (!m.isMesh || !m.userData.decal) return;
-      const isNumber = m.userData.decal === 'number';
-      const tex = markingTexture(isNumber ? String(number) : code, {
-        fill,
-        outline,
-        font,
-        aspect: isNumber ? 1.6 : 3.4,
-      });
+  /** Race number and driver code on the decal carriers (one mesh, one canvas). */
+  setMarkings(opts) {
+    const decals = this.node('decals');
+    if (!decals) return;
+    const info = decals.userData.decal ?? {};
+    const tex = markingsTexture({ ...opts, canvas: info.canvas ?? [2048, 512] });
+    decals.traverse((m) => {
+      if (!m.isMesh) return;
       m.material = new THREE.MeshPhysicalMaterial({
         map: tex,
         transparent: true,
@@ -173,24 +187,54 @@ export class CarRig {
     });
   }
 
-  /** Compound colour on the sidewall markings only (the markings are the bright texels). */
-  setCompound(name) {
-    const col = new THREE.Color(COMPOUND_COLOURS[name] ?? COMPOUND_COLOURS.medium);
+  /**
+   * Tyre compound, from design/compounds.json: the sidewall ticks in the slots the compound
+   * lists take its colour; unlisted slots are left as rubber; the maker's mark stays neutral.
+   */
+  setCompound(compound, marking) {
+    const col = new THREE.Color(compound.colour);
+    const lit = [-1, 0, 1].map((s) => (compound.slots.includes(s) ? 1 : 0));
+    const groups = marking.groupsPerSidewall;
+    const slot = marking.slotSpacingU;
     const done = new Map();
     this.root.traverse((m) => {
       if (!m.isMesh || m.material.name !== 'tyre') return;
       if (!done.has(m.material)) {
         const mat = m.material.clone();
-        const uniforms = { uCompound: { value: col } };
+        const uniforms = {
+          uCompound: { value: col },
+          uLit: { value: new THREE.Vector3(...lit) },
+          uGroups: { value: groups },
+          uSlot: { value: slot },
+        };
         mat.onBeforeCompile = (shader) => {
           Object.assign(shader.uniforms, uniforms);
           shader.fragmentShader = shader.fragmentShader
-            .replace('#include <common>', '#include <common>\nuniform vec3 uCompound;')
+            .replace(
+              '#include <common>',
+              `#include <common>
+uniform vec3 uCompound;
+uniform vec3 uLit;
+uniform float uGroups;
+uniform float uSlot;`,
+            )
             .replace(
               '#include <map_fragment>',
               `#include <map_fragment>
-float marking = smoothstep( 0.05, 0.4, diffuseColor.r );
-diffuseColor.rgb = mix( vec3( 0.018 ), uCompound * 0.8, marking );`,
+#ifdef USE_MAP
+{
+  float marking = smoothstep( 0.05, 0.35, diffuseColor.r );
+  float f = fract( vMapUv.x * uGroups ) - 0.5;
+  float slotIndex = f / ( uSlot * uGroups );
+  float isTick = step( abs( f ), 1.6 * uSlot * uGroups );
+  float k = clamp( floor( slotIndex + 0.5 ), -1.0, 1.0 );
+  float lit = k < -0.5 ? uLit.x : ( k > 0.5 ? uLit.z : uLit.y );
+  vec3 rubber = vec3( 0.016 );
+  vec3 tickCol = mix( rubber, uCompound * 0.85, lit );
+  vec3 letterCol = vec3( 0.55 );
+  diffuseColor.rgb = mix( rubber, mix( letterCol, tickCol, isTick ), marking );
+}
+#endif`,
             );
         };
         mat.customProgramCacheKey = () => 'car-tyre';
@@ -214,6 +258,17 @@ diffuseColor.rgb = mix( vec3( 0.018 ), uCompound * 0.8, marking );`,
       const s = this.susp[c];
       if (s) s.position.y = this.restY[c] + (p.travel?.[c] ?? 0);
     }
+    for (const m of this.linkMeshes) {
+      const d = m.morphTargetDictionary;
+      for (const c of CORNERS) {
+        if (d[`bump_${c}`] !== undefined)
+          m.morphTargetInfluences[d[`bump_${c}`]] = (p.travel?.[c] ?? 0) / this.linkRef.bump;
+      }
+      for (const c of ['FL', 'FR']) {
+        if (d[`steer_${c}`] !== undefined)
+          m.morphTargetInfluences[d[`steer_${c}`]] = (p.steer ?? 0) / this.linkRef.steer;
+      }
+    }
     if (this.drs) {
       const open = THREE.MathUtils.degToRad(this.drs.userData.open_deg ?? 22);
       this.drs.rotation.z = open * (p.drs ?? 0);
@@ -223,27 +278,15 @@ diffuseColor.rgb = mix( vec3( 0.018 ), uCompound * 0.8, marking );`,
       this.steeringWheel.quaternion.setFromAxisAngle(axis, p.wheelTurn ?? 0);
     }
     if (this.helmet) this.helmet.rotation.y = p.headYaw ?? 0;
-    this.discs.forEach((d, i) => {
-      const heat = p.glow?.[CORNERS[i]] ?? 0;
-      d.traverse((m) => {
-        if (m.isMesh) m.material.emissiveIntensity = 4 * heat * heat;
-      });
-    });
+    for (const c of CORNERS) {
+      const mat = this.discMats[c];
+      const heat = p.glow?.[c] ?? 0;
+      if (mat) mat.emissiveIntensity = 4 * heat * heat;
+    }
     if (this.rainLight) {
       this.rainLight.traverse((m) => {
         if (m.isMesh) m.material.emissiveIntensity = 6 * (p.rain ?? 0);
       });
-    }
-    this.root.updateMatrixWorld(true);
-    const v = new THREE.Vector3();
-    const q = new THREE.Quaternion();
-    for (const L of this.links) {
-      v.copy(L.attach);
-      L.follower.localToWorld(v);
-      this.root.worldToLocal(v);
-      v.sub(L.o.position).normalize();
-      q.setFromUnitVectors(L.rest, v);
-      L.o.quaternion.copy(q);
     }
     this.root.updateMatrixWorld(true);
   }

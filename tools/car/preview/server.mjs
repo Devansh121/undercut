@@ -12,6 +12,7 @@ const ALLOWED = [
   'apps/web/public/assets/car/',
   'design/mock/fonts/',
   'design/teams.json',
+  'design/compounds.json',
 ];
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
