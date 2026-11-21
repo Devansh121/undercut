@@ -45,7 +45,6 @@ function field(seed: number, n: number): Field {
 
 /** Run the field with car k of this race being car perm[k] of the original. */
 function run(f: Field, perm: number[], seed: number): { log: RaceEvent[]; result: SessionResult } {
-  const n = perm.length;
   const circuit = { ...RAIL_CIRCUIT, grid: perm.map((o) => RAIL_CIRCUIT.grid[o]!) };
   const race = new RailRace(
     { kind: 'race', laps: 4 },
@@ -69,7 +68,6 @@ function run(f: Field, perm: number[], seed: number): { log: RaceEvent[]; result
     team: f.teams[o]!,
   }));
   return { log: race.log, result: buildResult(race.control, entrants, seed) };
-  void n;
 }
 
 /** Events with car numbers mapped back to the original cars. */
