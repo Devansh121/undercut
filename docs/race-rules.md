@@ -57,7 +57,7 @@ or 240 s after the flag.
 | Stop in the box | within 3 m along and 2.5 m across the box position, slower than 0.3 m/s | Estimate |
 | Service time | tyres 2.4 s, plus uniform 0–0.8 s per stop, seeded | Estimate: 2.0–2.5 s stationary times are typical |
 | Team-mates sharing a box | the second car waits until the first is serviced | As in the real pit lane |
-| Release | waits while a moving car in the lane is between 20 m behind and 5 m ahead of the box | Estimate (unsafe-release avoidance) |
+| Release | waits while a moving car in the lane is between 60 m behind and 5 m ahead of the box (60 m is about 2.7 s at 80 km/h, the time a car needs to leave its box) | Estimate (unsafe-release avoidance); was 20 m, which released cars into the path of cars coming down the lane |
 | Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish. A penalty awarded during a hold is not part of it: it stays outstanding for the next stop or the finish | [2]; the in-hold case is a decision |
 | Classified | 90 % of the winner's laps, whether or not the car took the flag | [2] |
 | Exact ties in the final classification | the order the cars took the flag (by time, then position before the tick), then the live order; never the car number | Decision |

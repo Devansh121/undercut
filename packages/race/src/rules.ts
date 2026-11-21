@@ -137,7 +137,7 @@ export const DEFAULT_RULES: Readonly<RaceRules> = Object.freeze({
   boxToleranceS: 3,
   boxToleranceD: 2.5,
   stoppedSpeed: 0.3,
-  releaseClearBehind: 20,
+  releaseClearBehind: 60,
   releaseClearAhead: 5,
   serviceSpread: 0.8,
 

@@ -484,10 +484,15 @@ describe('pit lane', () => {
     race.run(60, () => race.control.pitPhase(1) === 'released');
     const release = ofType(race.log, 'pit').find((e) => e.car === 1 && e.stage === 'release')!;
     const box = race.control.pitBox(1)!;
-    // At release no moving car is within 20 m behind or 5 m ahead of the box.
+    // At release no moving car is within the rules' clearance behind or ahead of the box.
     void release;
     const f0 = race.facts[0]!;
-    if (f0.inPitLane) expect(f0.pitS < box.s - 20 || f0.pitS > box.s + 5).toBe(true);
+    const r = race.control.rules;
+    if (f0.inPitLane) {
+      expect(f0.pitS < box.s - r.releaseClearBehind || f0.pitS > box.s + r.releaseClearAhead).toBe(
+        true,
+      );
+    }
   });
 
   it('stacks team-mates: the second car waits until the first is serviced', () => {

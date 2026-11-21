@@ -219,6 +219,11 @@ function printRun(lib, run) {
       `\nTurn one: ${clean} of ${run.cars.length} clean; longest contact ${Math.max(...run.cars.map((c) => c.longestContact)).toFixed(2)} s; ` +
         `spins ${run.cars.reduce((a, c) => a + c.spins, 0)}; past a barrier line ${run.cars.filter((c) => c.beyondBarrier > 0).length}`,
     );
+    const r = run.racing;
+    console.log(
+      `Racing: ${r.overtakes} on-track position changes; closest gap ${r.closestGap.toFixed(2)} s; ` +
+        `at racing speed ${(100 * r.within05).toFixed(1)} % of the time within 0.5 s of the car ahead, ${(100 * r.within10).toFixed(1)} % within 1 s`,
+    );
   }
   const a = run.result.anomalies;
   console.log(
@@ -258,6 +263,7 @@ async function race(options, weekend = false) {
   };
   if (options.spread !== undefined) o.spread = Number(options.spread);
   if (options['no-pit'] !== undefined) o.pitLap = null;
+  if (options['grid-noise'] !== undefined) o.gridNoise = Number(options['grid-noise']);
   fs.mkdirSync(outDir, { recursive: true });
   const runs = [];
   if (weekend) {
@@ -335,7 +341,7 @@ if (name === 'list' || options.help) {
     `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
   );
   console.log(
-    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --no-pit)`,
+    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit)`,
   );
   console.log(
     `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,

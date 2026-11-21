@@ -35,6 +35,11 @@ export interface AiFieldOptions {
   driver?: 'race' | 'reference';
   /** Skill every car starts from before the spread (race drivers). */
   skill?: Partial<RaceSkill>;
+  /**
+   * How far pace is shuffled against the car order (the grid), 0 to 1: 0 gives car 0 the best
+   * pace and the last car the worst; 1 shuffles it about as much as the field is long. Default 0.
+   */
+  gridNoise?: number;
   /** Chance per car of a jump start. Default `JUMP_START_CHANCE`. */
   jumpStartChance?: number;
   rules?: Partial<RaceRules>;
@@ -52,8 +57,18 @@ export function createAiField(o: AiFieldOptions): AiController[] {
   const rng = createRng((o.seed ^ 0x51f15e) >>> 0);
   const jumpChance = o.jumpStartChance ?? JUMP_START_CHANCE;
   const out: AiController[] = [];
+  // Pace rank of each car: its index, shuffled by the grid noise from a stream of its own.
+  const noise = o.gridNoise ?? 0;
+  const gridRng = createRng((o.seed ^ 0x6a1d5) >>> 0);
+  const key = Array.from(
+    { length: o.count },
+    (_, k) => k + noise * o.count * gridRng.range(-0.5, 0.5),
+  );
+  const byKey = key.map((_, k) => k).sort((a, b) => key[a]! - key[b]! || a - b);
+  const rank = new Array<number>(o.count);
+  byKey.forEach((car, r) => (rank[car] = r));
   for (let k = 0; k < o.count; k++) {
-    const f = o.count > 1 ? (spread * k) / (o.count - 1) : 0;
+    const f = o.count > 1 ? (spread * rank[k]!) / (o.count - 1) : 0;
     const seed = (o.seed * 7919 + k * 104729) >>> 0;
     let driver: Driver;
     let lag: number;

@@ -21,6 +21,11 @@ export interface TrafficView {
   count: number;
   /** A blue flag is shown to this car: a car a lap up is close behind. */
   blueFlag: boolean;
+  /**
+   * The racing driver has the car: racing, past its start reaction, not held, not in the pit
+   * lane's hands. Only then can it be stuck.
+   */
+  active: boolean;
 }
 
 export function createTrafficCar(): TrafficCar {
@@ -33,5 +38,6 @@ export function createTrafficView(capacity: number): TrafficView {
     cars: Array.from({ length: capacity }, createTrafficCar),
     count: 0,
     blueFlag: false,
+    active: false,
   };
 }

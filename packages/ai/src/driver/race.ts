@@ -7,6 +7,7 @@ import {
   type ControlInput,
 } from '@undercut/sim';
 import type { DrivingPlan } from '../profile/plan';
+import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
 import type { TrafficCar, TrafficView } from './traffic';
@@ -78,12 +79,34 @@ const IN_PATH = CAR_WIDTH + 0.5;
 /** Room kept between the body and the track edge, m. */
 const EDGE_MARGIN = 0.25;
 /** How fast the driver moves across the track, m/s. */
-const LATERAL_RATE = 0.8;
+const LATERAL_RATE = 1.5;
 /** Gap control: standstill gap, m, speed gain, 1/s, and the deceleration assumed for safety, m/s². */
 const STANDSTILL_GAP = 2;
 const GAP_GAIN = 0.8;
 const SPEED_GAIN = 3;
-const SAFE_DECEL = 15;
+/** Share of this car's braking the gap control counts on, and extra reaction time, s. */
+const BRAKE_SHARE = 0.9;
+const REACT_MARGIN = 0.1;
+/**
+ * Time gap a driver follows at, s, by aggression (0 to 1): close on a straight (a few tenths,
+ * to be ready to pull out and pass), further back through braking zones and corners, out of the
+ * worst of the wake (slipstream and dirty air arrive in the sim later; the habit is here now).
+ */
+const HEADWAY_STRAIGHT = [0.3, 0.15] as const;
+const HEADWAY_CORNER = [0.6, 0.35] as const;
+/** While attacking the car ahead, s: closer, and it brakes on its own plan, not on the other car's. */
+const HEADWAY_ATTACK = 0.12;
+/**
+ * What a driver perceives of the other cars: how far ahead and behind (mirrors), m, and how late,
+ * s (a car is seen where it was that long ago).
+ */
+const SEE_AHEAD = 160;
+const SEE_BEHIND = 40;
+const SEE_DELAY = 0.12;
+/** Curvature from which the line counts as a corner, 1/m (a radius under 150 m). */
+const CORNER_CURVATURE = 1 / 150;
+/** Speed below which a car is still launching (or crawling) and does not start a pass, m/s. */
+const LAUNCHED = 25;
 
 const TWO_PI = 2 * Math.PI;
 const wrapAngle = (a: number): number => a - TWO_PI * Math.floor((a + Math.PI) / TWO_PI);
@@ -130,6 +153,8 @@ export class RaceDriver implements Driver {
   readonly skill: RaceSkill;
   readonly inner: ReferenceDriver;
   private readonly params: CarParams;
+  /** Per line sample: distance to the next braking zone or corner, m (0 inside one). */
+  private readonly cornerAhead: Float64Array;
   private view: TrafficView | null = null;
   private readonly seen: CarTelemetry = createCarTelemetry();
   private rng: Rng;
@@ -144,6 +169,8 @@ export class RaceDriver implements Driver {
   private heldTime = 0;
   private recovering = false;
   private rejoinTime = 0;
+  private stillTime = 0;
+  private backTime = 0;
   private biasX = 0;
   private biasZ = 0;
   private haveSense = false;
@@ -173,6 +200,7 @@ export class RaceDriver implements Driver {
       skill: driverSkillFor(o.skill),
     });
     this.rng = createRng((o.skill.seed ^ 0x9e3779b9) >>> 0);
+    this.cornerAhead = cornerDistances(o.plan);
   }
 
   get ersMode(): ReferenceDriver['ersMode'] {
@@ -201,6 +229,8 @@ export class RaceDriver implements Driver {
     this.heldTime = 0;
     this.recovering = false;
     this.rejoinTime = 0;
+    this.stillTime = 0;
+    this.backTime = 0;
     this.biasX = 0;
     this.biasZ = 0;
     this.haveSense = false;
@@ -220,6 +250,8 @@ export class RaceDriver implements Driver {
     out.heldTime = this.heldTime;
     out.recovering = this.recovering;
     out.rejoinTime = this.rejoinTime;
+    out.stillTime = this.stillTime;
+    out.backTime = this.backTime;
     out.biasX = this.biasX;
     out.biasZ = this.biasZ;
     out.haveSense = this.haveSense;
@@ -257,6 +289,8 @@ export class RaceDriver implements Driver {
     this.heldTime = num('heldTime');
     this.recovering = m.recovering === true;
     this.rejoinTime = num('rejoinTime');
+    this.stillTime = num('stillTime');
+    this.backTime = num('backTime');
     this.biasX = num('biasX');
     this.biasZ = num('biasZ');
     this.haveSense = m.haveSense === true;
@@ -280,7 +314,7 @@ export class RaceDriver implements Driver {
     inner.offset = this.o;
     inner.drive(seen, dt, out);
     this.last.offset = this.o;
-    if (view) this.recover(view, tel, out);
+    if (view) this.recover(view, tel, dt, out);
     return out;
   }
 
@@ -387,16 +421,18 @@ export class RaceDriver implements Driver {
     const v = Math.max(0, tel.speed);
     const s0 = self.s;
     const myO = self.d - this.at(line.d, s0);
-    const sk = this.skill;
-    const aggression = clamp01(sk.aggression);
+    const aggression = clamp01(this.skill.aggression);
     this.bounds(s0, 30 + v * 1.2, this.room);
     const oMin = this.room.lo;
     const oMax = this.room.hi;
-    const reachAhead = Math.max(80, 40 + v * 3);
-    const lookBehind = -(CAR_LENGTH + 2);
-    const approachingCorner = this.cornerSign(s0) !== 0;
+    // Braking zone or corner close ahead: the car in front owns the corner unless this one is
+    // alongside it, and the gap opens out of the wake.
+    const toCorner = this.at(this.cornerAhead, s0);
+    const cornering = toCorner < 30 + v * 0.8;
+    const straightness = Math.max(0, Math.min(1, (toCorner - v) / 150));
 
-    // The car ahead in this car's path, and the cars alongside (or about to be).
+    // The car ahead in this car's path, and the cars alongside (or about to be). Other cars are
+    // seen within mirror and windscreen range, where they were a moment ago.
     let leader: TrafficCar | null = null;
     let leaderDs = Number.POSITIVE_INFINITY;
     let passCar: TrafficCar | null = null;
@@ -405,18 +441,17 @@ export class RaceDriver implements Driver {
     let ns = 0;
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
-      const ds = this.ahead(s0, c.s);
+      const ds = this.ahead(s0, c.s) - c.speed * SEE_DELAY;
       if (c.id === this.passId) {
         passCar = c;
         passDs = ds;
       }
-      if (ds > reachAhead || ds < lookBehind) continue;
+      if (ds > SEE_AHEAD || ds < -SEE_BEHIND) continue;
+      if (ds < -(CAR_LENGTH + 2)) continue;
       const od = c.d - this.at(line.d, c.s);
       const lateral = Math.abs(od - myO);
-      const inPath =
-        lateral < IN_PATH ||
-        Math.abs(od - this.o) < IN_PATH ||
-        (approachingCorner && ds > CAR_LENGTH);
+      const owns = cornering && ds >= 0.6 * CAR_LENGTH && c.id !== this.passId;
+      const inPath = lateral < IN_PATH || Math.abs(od - this.o) < IN_PATH || owns;
       // Ahead and in the way (or overlapping it already): follow it.
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH)) {
         if (ds < leaderDs) {
@@ -453,7 +488,6 @@ export class RaceDriver implements Driver {
         else hi = Math.min(hi, e.od - SIDE_BY_SIDE);
       }
       if (lo <= hi) break;
-      // The rearmost car still in the bands.
       let rear = -1;
       for (let k = 0; k < ns; k++) {
         const e = side[k]!;
@@ -477,20 +511,24 @@ export class RaceDriver implements Driver {
       leaderDs = yieldDs;
     }
 
-    // Passing: start, carry on or give up.
+    // Passing: start on a straight, carry on, or give up (not alongside by the braking zone,
+    // no room, or too long).
     this.cooldown = Math.max(0, this.cooldown - dt);
     const profV = plan.profile.v;
-    if (leader && leaderDs - CAR_LENGTH < 25 && v < this.at(profV, s0) - 1) {
-      this.heldTime += dt;
-    } else this.heldTime = Math.max(0, this.heldTime - 2 * dt);
+    const gapAhead = leader ? leaderDs - CAR_LENGTH : Number.POSITIVE_INFINITY;
+    if (leader && gapAhead < 20 + v * 0.5 && v < this.at(profV, s0) - 1) this.heldTime += dt;
+    else this.heldTime = Math.max(0, this.heldTime - 2 * dt);
     let base = 0;
     if (this.passId >= 0) {
-      if (!passCar || passDs < -(CAR_LENGTH + 2) || this.passTime > 12) {
-        if (passCar && passDs >= -(CAR_LENGTH + 2)) this.cooldown = 4;
+      const lost = !passCar || this.passTime > 15;
+      const done = passCar !== null && passDs < -(CAR_LENGTH + 2);
+      const late = cornering && passCar !== null && passDs >= 0.6 * CAR_LENGTH;
+      if (lost || done || late) {
+        if (!done) this.cooldown = 3;
         this.passId = -1;
       } else {
         this.passTime += dt;
-        const od = passCar.d - this.at(line.d, passCar.s);
+        const od = passCar!.d - this.at(line.d, passCar!.s);
         base = od + this.passSide * SIDE_BY_SIDE;
         const fits = this.passSide > 0 ? base <= oMax : base >= oMin;
         this.passBlocked = fits ? 0 : this.passBlocked + dt;
@@ -501,17 +539,24 @@ export class RaceDriver implements Driver {
         }
       }
     }
-    if (this.passId < 0 && leader && this.cooldown <= 0 && !approachingCorner) {
-      const gap = leaderDs - CAR_LENGTH;
-      const faster = this.at(profV, leader.s) > leader.speed + 3 - 2 * aggression;
-      const held = this.heldTime > 3 - 2 * aggression;
-      if (gap < 30 && (faster || held)) {
+    const launched = v > LAUNCHED;
+    if (
+      this.passId < 0 &&
+      leader &&
+      this.cooldown <= 0 &&
+      !cornering &&
+      launched &&
+      leader !== yieldTo
+    ) {
+      const faster = this.at(profV, leader.s) > leader.speed + 2 - 1.5 * aggression;
+      const held = this.heldTime > 1.5 - aggression;
+      if (gapAhead < 25 + v * 0.25 && (faster || held)) {
         const od = leader.d - this.at(line.d, leader.s);
         const left = od + SIDE_BY_SIDE <= oMax;
         const right = od - SIDE_BY_SIDE >= oMin;
         let side = 0;
         if (left && right) {
-          // The inside of the next corner beyond the car ahead, else the nearer side.
+          // The inside of the next corner, else the side the car is already on.
           const k = this.cornerSign(leader.s);
           side = k !== 0 ? k : myO >= od ? 1 : -1;
         } else if (left) side = 1;
@@ -537,37 +582,55 @@ export class RaceDriver implements Driver {
     // The target offset: as close to the base as the cars alongside and the edges allow.
     const target = Math.max(lo, Math.min(hi, base));
     const yielding = yieldTo !== null;
-    // Keep the grid lane while traction is limited during the launch.
-    this.o = v < 10 ? myO : this.approach(this.o, target, dt);
+    // Off the line at walking pace (the launch, a crawl in traffic) the car holds its lane
+    // unless it is going round a car.
+    this.o = v < 10 && this.passId < 0 ? myO : this.approach(this.o, target, dt);
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
     let limit = Number.POSITIVE_INFINITY;
     if (leader) {
-      const gap = leaderDs - CAR_LENGTH;
+      const gap = gapAhead;
       const vl = Math.max(0, leader.speed);
-      const headway = 0.8 + 0.3 * (1 - aggression);
+      const attacking = leader.id === this.passId;
+      const tS = HEADWAY_STRAIGHT[0] + (HEADWAY_STRAIGHT[1] - HEADWAY_STRAIGHT[0]) * aggression;
+      const tC = HEADWAY_CORNER[0] + (HEADWAY_CORNER[1] - HEADWAY_CORNER[0]) * aggression;
+      const headway = attacking ? HEADWAY_ATTACK : tC + (tS - tC) * straightness;
       const want = STANDSTILL_GAP + v * headway;
       const vSafe = vl + (gap - want) * GAP_GAIN;
+      // Never closer than could be stopped from if the car ahead braked now as hard as this one
+      // can, noticed after this driver's perception and reaction delay (Gipps' safe speed).
+      const b = this.brakeAt(v);
+      const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
       const room = gap - STANDSTILL_GAP;
-      const vKin = room > 0 ? Math.sqrt(vl * vl + 2 * SAFE_DECEL * room) : vl - 1;
+      const vKin =
+        room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl - 1;
       let vOk = Math.min(vSafe, vKin);
       // Going round a car that is (nearly) stopped: creep past once the held offset clears it.
       const od = leader.d - this.at(line.d, leader.s);
-      if (leader.id === this.passId && Math.abs(od - this.o) >= IN_PATH && gap > 1.5) {
+      if (attacking && Math.abs(od - this.o) >= IN_PATH && gap > 1.5) {
         vOk = Math.max(vOk, Math.min(5, gap));
       }
       limit = SPEED_GAIN * (vOk - v);
     }
     limit = Math.min(limit, this.offLineLimit(s0, v));
+    // Never ask for more than the brakes give: past the tyres' limit the wheels lock, and the
+    // lock-up feel backs the pedal off further than the demand would have.
+    limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
     this.inner.accelLimit = limit;
 
     const last = this.last;
     last.target = target;
     last.leader = leader ? leader.id : -1;
-    last.gap = leader ? leaderDs - CAR_LENGTH : Number.POSITIVE_INFINITY;
+    last.gap = gapAhead;
     last.accelLimit = limit;
     last.passing = this.passId;
     last.yielding = yielding;
+  }
+
+  /** The deceleration this car can be counted on for at speed `v`, m/s² (on its own plan's grip). */
+  private brakeAt(v: number): number {
+    const model = this.plan.model;
+    return BRAKE_SHARE * (model.brake(v, 1) + model.drag(v, false));
   }
 
   /** Move the held offset toward `target` at the lateral rate. */
@@ -582,8 +645,8 @@ export class RaceDriver implements Driver {
     const k = this.plan.line.curvature;
     for (let x = 0; x <= 300; x += 6) {
       const c = this.at(k, s + x);
-      if (c > 1 / 150) return 1;
-      if (c < -1 / 150) return -1;
+      if (c > CORNER_CURVATURE) return 1;
+      if (c < -CORNER_CURVATURE) return -1;
     }
     return 0;
   }
@@ -603,7 +666,7 @@ export class RaceDriver implements Driver {
       const sx = s0 + x;
       const k = this.at(plan.line.curvature, sx);
       const tight = k * o;
-      let f = Math.abs(k) > 1 / 150 ? 0.85 : 0.985;
+      let f = 0.985;
       if (tight > 0) f *= Math.sqrt(Math.max(0.4, 1 - 1.2 * tight));
       const vMax = this.at(plan.profile.v, sx) * f;
       if (v <= vMax) continue;
@@ -625,18 +688,32 @@ export class RaceDriver implements Driver {
     return false;
   }
 
-  // ---- Recovery after a spin ----
+  // ---- Recovery after a spin or a crash ----
 
-  private recover(view: TrafficView, tel: CarTelemetry, out: ControlInput): void {
+  /**
+   * A car facing the wrong way at low speed, or stuck stopped, turns back the right way: it waits
+   * while cars come past, turns forward on full lock, and backs away on the opposite lock when it
+   * is pressed against something; then it rejoins off line.
+   */
+  private recover(view: TrafficView, tel: CarTelemetry, dt: number, out: ControlInput): void {
     const line = this.plan.line;
     const s0 = view.self.s;
     const track = this.plan.track;
     const heading = line.heading[Math.round(track.wrap(s0) / track.lap.step) % line.count]!;
     const err = wrapAngle(tel.yaw - heading);
     const v = tel.speed;
-    if (!this.recovering && Math.abs(err) > 1.4 && Math.abs(v) < 12) this.recovering = true;
+    const queued = this.last.leader >= 0 && this.last.gap < 15;
+    this.stillTime = view.active && Math.abs(v) < 0.7 && !queued ? this.stillTime + dt : 0;
+    if (!this.recovering && view.active) {
+      if (Math.abs(err) > 1.4 && Math.abs(v) < 12) this.recovering = true;
+      else if (this.stillTime > 3) {
+        this.recovering = true;
+        this.backTime = 1.5;
+      }
+    }
     if (this.recovering && Math.abs(err) < 0.35 && v > 2) {
       this.recovering = false;
+      this.backTime = 0;
       // Rejoin from where the car is, easing back to the line.
       this.o = view.self.d - this.at(line.d, s0);
       this.rejoinTime = 4;
@@ -645,16 +722,58 @@ export class RaceDriver implements Driver {
     if (!this.recovering) return;
     out.drs = false;
     out.overtake = false;
-    out.gearShift = tel.gear < 1 && !tel.shifting ? 1 : 0;
+    const turn = Math.abs(err) < 0.35 ? 0 : err > 0 ? -1 : 1;
     if (this.carApproaching(view, s0, view.self.d, 150) && Math.abs(err) > 0.8) {
       // Wait for the gap: stopped, out of the way.
       out.steer = 0;
       out.throttle = 0;
       out.brake = 1;
+      out.gearShift = 0;
       return;
     }
-    out.steer = err > 0 ? -1 : 1;
-    out.throttle = v < 4 ? 0.3 : 0;
-    out.brake = v > 7 ? 0.4 : 0;
+    if (this.backTime > 0) {
+      // Backing away: into reverse, opposite lock (in reverse it turns the car the same way).
+      this.backTime -= dt;
+      out.steer = -turn;
+      out.brake = 0;
+      out.gearShift = tel.gear >= 0 && !tel.shifting && Math.abs(v) < 1 ? -1 : 0;
+      out.throttle = tel.gear < 0 && v > -4 ? 0.35 : 0;
+      if (this.backTime <= 0) this.stillTime = 0;
+      return;
+    }
+    // Pressed against something going forward: back away.
+    if (this.stillTime > 1.5) {
+      this.backTime = 2.5;
+      this.stillTime = 0;
+    }
+    out.steer = turn;
+    out.gearShift = tel.gear < 1 && !tel.shifting && Math.abs(v) < 1 ? 1 : 0;
+    out.throttle = tel.gear >= 1 && v < 4 ? 0.3 : 0;
+    out.brake = v > 7 || v < -0.5 ? 0.4 : 0;
   }
+}
+
+/**
+ * For each line sample, the distance to the next sample in a braking zone or a corner (radius
+ * under 150 m), m; 0 inside one.
+ */
+function cornerDistances(plan: DrivingPlan): Float64Array {
+  const n = plan.line.count;
+  const step = plan.track.lap.step;
+  const k = plan.line.curvature;
+  const phase = plan.profile.phase;
+  const out = new Float64Array(n);
+  const hot = (i: number): boolean =>
+    phase[i] === Phase.Brake || Math.abs(k[i]!) > CORNER_CURVATURE;
+  let first = -1;
+  for (let i = 0; i < n; i++) if (hot(i)) first = first < 0 ? i : first;
+  if (first < 0) return out.fill(Number.POSITIVE_INFINITY);
+  // Walk backwards twice round the lap from a corner sample.
+  let dist = 0;
+  for (let m = 0; m < 2 * n; m++) {
+    const i = (((first - m) % n) + n) % n;
+    dist = hot(i) ? 0 : dist + step;
+    out[i] = dist;
+  }
+  return out;
 }

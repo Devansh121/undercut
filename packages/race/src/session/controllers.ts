@@ -66,7 +66,14 @@ export interface ControllerState {
 interface PitLaneState {
   mode: 'none' | 'in' | 'out';
   follower: FollowerState;
+  /** Seconds stopped in the lane short of the box (bumped off the path), s. */
+  still?: number;
 }
+
+/** Seconds stopped short of the box before a car gives the stop up and drives out. */
+const PIT_STALL = 3;
+/** How far past the track edge a car in the pit lane still counts as traffic, m. */
+const PIT_SEEN = 3;
 
 function hold(out: ControlInput, steer = 0): void {
   out.steer = steer;
@@ -94,6 +101,7 @@ class PitLaneDriving {
   mode: PitMode = 'none';
   /** Metres before the pit lane leaves the lap at which the car turns for it. */
   readonly takeover: number;
+  private still = 0;
 
   constructor(params: CarParams, takeover = 120) {
     this.follower = new PathFollower(params);
@@ -102,15 +110,17 @@ class PitLaneDriving {
 
   reset(): void {
     this.mode = 'none';
+    this.still = 0;
     this.follower.reset();
   }
 
   getState(): PitLaneState {
-    return { mode: this.mode, follower: this.follower.getState() };
+    return { mode: this.mode, follower: this.follower.getState(), still: this.still };
   }
 
   setState(s: PitLaneState): void {
     this.mode = s.mode;
+    this.still = s.still ?? 0;
     this.follower.setState(s.follower);
   }
 
@@ -141,6 +151,16 @@ class PitLaneDriving {
           this.follower.setPath(pitInPath(ctx.track, ctx.circuit, f.s, f.d, box), true);
         }
       }
+    }
+    // Stopped in the lane short of the box and not held (knocked off the path by another car):
+    // drive on out, and come in again next lap.
+    const stopped = this.mode === 'in' && phase === 'lane' && ctx.telemetry.speed < 0.5;
+    this.still = stopped ? this.still + ctx.dt : 0;
+    if (this.still > PIT_STALL) {
+      this.still = 0;
+      this.mode = 'out';
+      this.follower.reset();
+      this.follower.setPath(pitOutPath(ctx.track, ctx.circuit, f.pitS, f.pitD), false);
     }
     if (this.mode === 'in' && phase === 'lane' && !c.pitRequested(i)) {
       // Missed the box (or the stop was cancelled): drive on out.
@@ -243,9 +263,16 @@ export class AiController implements CarController {
     view.self.d = me.d;
     view.self.speed = me.speed;
     let n = 0;
+    const track = ctx.track;
     for (let j = 0; j < field.length; j++) {
       const f = field[j]!;
-      if (j === ctx.car || f.inPitLane) continue;
+      if (j === ctx.car) continue;
+      // A car in the pit lane is seen only where the lane meets the track (entry and exit):
+      // behind the pit wall it is no traffic.
+      if (f.inPitLane) {
+        const edge = track.halfWidthAt(track.wrap(f.s), f.d >= 0 ? 0 : 1);
+        if (Math.abs(f.d) > edge + PIT_SEEN) continue;
+      }
       const c = view.cars[n++]!;
       c.id = j;
       c.s = f.s;
@@ -253,7 +280,16 @@ export class AiController implements CarController {
       c.speed = f.speed;
     }
     view.count = n;
-    view.blueFlag = ctx.control.blueFlag(ctx.car) >= 0;
+    const c = ctx.control;
+    view.blueFlag = c.blueFlag(ctx.car) >= 0;
+    const out0 = c.lightsOutAt;
+    view.active =
+      (c.phase === 'green' || c.phase === 'chequered') &&
+      c.cars[ctx.car]!.status === 'running' &&
+      !c.held(ctx.car) &&
+      this.pit.mode === 'none' &&
+      c.pitPhase(ctx.car) === 'none' &&
+      (out0 === null || ctx.time >= out0 + this.reaction);
     driver.sense(view);
   }
 
