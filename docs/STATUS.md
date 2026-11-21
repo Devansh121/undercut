@@ -153,6 +153,15 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
 
+### Decided for you — cockpit pass and crew polish
+
+- The cockpit had about 400 triangles of headroom on High and Mobile. Its new wheel, hands and padding are paid for by the floor (32 stations along it instead of 40; it is seen edge-on or not at all) and the DRS flap (10 spanwise stations instead of 22; it is straight). The car build now fails above 120k / 40k / 12k.
+- Gloves are a light grey suede material rather than team paint: the team's dark primary made the hands black lumps against the black wheel, by day and at night.
+- Carbon tows are 3 mm (3K-class twill) instead of 6 mm. The carbon carries fibre anisotropy (`KHR_materials_anisotropy` with a twill direction map); the presets without clear coat (Mobile, Lite) turn it off for shader cost.
+- Squashed metric UVs on carbon are re-projected at export and stored at 14 bits instead of 12 (+4 % car size): the anisotropy otherwise met zero tangent frames and turned the frame black. The car shader also guards a zero frame.
+- On Mobile the wheel's push buttons are left off: the phone's driver cluster covers the wheel face, and the triangles went to smoother hands.
+- Seated figures sit at one height across LODs (0.424–0.425 m); the props build fails on a mismatch over 6 mm.
+
 ### Decided for you — modular prop kit
 
 - Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
