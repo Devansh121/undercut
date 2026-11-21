@@ -2,8 +2,12 @@
 """Top-down plan and profiles of a committed track file, for looking at it.
 
 Usage:
-  python3 tools/track-pipeline/plot.py <circuit> [--out DIR] [--svg]
+  python3 tools/track-pipeline/plot.py <circuit> [--out DIR] [--svg] [--vertical A:B]
   npm run track:plot -- <circuit>
+
+--vertical A:B adds <circuit>-vertical.png: the side elevation from s = A to B with its grade and
+the vertical acceleration a car at 300 km/h would feel from the vertical curvature (positive into
+the ground: compressions; negative: crests).
 
 Reads packages/track/data/<circuit>.json and writes PNG images to docs/evidence/m4-tracks/
 (Monza: docs/evidence/m1-track/; SVG too with --svg): the whole plan, close-ups of the corner groups, the pit lane and grid, and the
@@ -326,6 +330,75 @@ def profile_svg(tr, title, values, unit, fmt, marks, zero=False, band=None):
     return "\n".join(out)
 
 
+def vertical_svg(tr, data, a, b, speed_kmh=300.0):
+    """Side elevation, grade and the vertical acceleration at a speed over s in [a, b]."""
+    n, st = tr.n, tr.step
+    y = data["centreline"]["y"]
+    datum = data["origin"]["datum"]
+    # Grade from central differences, vertical curvature from the grade over +/- 10 m.
+    g = [(y[(i + 1) % n] - y[i - 1]) / (2 * st) for i in range(n)]
+    w = max(1, int(round(10 / st)))
+    kv = [(g[(i + w) % n] - g[i - w]) / (2 * w * st) / (1 + g[i] ** 2) ** 1.5 for i in range(n)]
+    v = speed_kmh / 3.6
+    acc = [v * v * k / 9.80665 for k in kv]
+    idx = list(range(int(a / st), int(b / st) + 1))
+    W, pad, H = 1600, 70, 300
+    panels = [
+        ("elevation above EGM2008 (m)", [y[i % n] + datum for i in idx], "%.0f"),
+        ("grade (%)", [100 * g[i % n] for i in idx], "%.0f"),
+        ("vertical acceleration at %.0f km/h (g, + into the ground)" % speed_kmh, [acc[i % n] for i in idx], "%.1f"),
+    ]
+    total = HEAD + len(panels) * H
+    out = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d">' % (W, total), '<rect width="100%%" height="100%%" fill="%s"/>' % BG]
+    lo_e, hi_e = min(panels[0][1]), max(panels[0][1])
+    title = "%s: side elevation from s %.0f to %.0f m, grade and vertical acceleration (range %.1f m)" % (data["name"], a, b, hi_e - lo_e)
+    out.append('<text x="%d" y="34" font-family="DejaVu Sans" font-size="18" font-weight="bold" fill="%s">%s</text>' % (pad, TEXT, title))
+
+    def X(s):
+        return pad + (W - 2 * pad) * (s - a) / (b - a)
+
+    for p, (label, vals, fmt) in enumerate(panels):
+        top = HEAD + p * H + 30
+        bot = HEAD + (p + 1) * H - 30
+        lo, hi = min(vals), max(vals)
+        if p > 0:
+            m = max(abs(lo), abs(hi))
+            lo, hi = -m, m
+        span = (hi - lo) or 1
+
+        def Y(val, lo=lo, span=span, top=top, bot=bot):
+            return bot - (bot - top) * (val - lo) / span
+
+        out.append('<text x="%d" y="%d" font-family="DejaVu Sans" font-size="13" fill="#aab3ad">%s</text>' % (pad, top - 8, label))
+        for k in range(5):
+            val = lo + span * k / 4
+            out.append('<line x1="%d" x2="%d" y1="%.1f" y2="%.1f" stroke="#3a423d"/>' % (pad, W - pad, Y(val), Y(val)))
+            out.append('<text x="%d" y="%.1f" font-family="DejaVu Sans" font-size="12" fill="#aab3ad" text-anchor="end">%s</text>' % (pad - 6, Y(val) + 4, fmt % val))
+        for s in range(int(a // 250 * 250), int(b) + 1, 250):
+            if s < a:
+                continue
+            out.append('<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" stroke="#3a423d"/>' % (X(s), X(s), top, bot))
+            if p == len(panels) - 1:
+                out.append('<text x="%.1f" y="%d" font-family="DejaVu Sans" font-size="12" fill="#aab3ad" text-anchor="middle">%d</text>' % (X(s), bot + 18, s))
+        for c in data["corners"]:
+            if a <= c["s"] <= b:
+                out.append('<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" stroke="#ffd23f" stroke-dasharray="3 4"/>' % (X(c["s"]), X(c["s"]), top, bot))
+                if p == 0:
+                    out.append('<text x="%.1f" y="%d" font-family="DejaVu Sans" font-size="12" font-weight="bold" fill="#ffd23f" text-anchor="middle">T%d %s</text>' % (X(c["s"]), top + 14, c["number"], c["name"]))
+        pts = " ".join("%.1f,%.1f" % (X(i * st), Y(val)) for i, val in zip(idx, vals))
+        out.append('<polyline points="%s" fill="none" stroke="#3ad6ff" stroke-width="1.8"/>' % pts)
+        if p == len(panels) - 1:
+            hi_i = max(range(len(vals)), key=lambda k: vals[k])
+            lo_i = min(range(len(vals)), key=lambda k: vals[k])
+            for k, word in ((hi_i, "compression"), (lo_i, "crest")):
+                s = idx[k] * st
+                out.append('<text x="%.1f" y="%.1f" font-family="DejaVu Sans" font-size="12" font-weight="bold" fill="#ff9f1c" text-anchor="middle">%s %+.2f g at s %.0f</text>' % (
+                    X(s), Y(vals[k]) + (-8 if vals[k] > 0 else 18), word, vals[k], s))
+    out.append('<text x="%d" y="%d" font-family="DejaVu Sans" font-size="12" fill="#aab3ad" text-anchor="end">s (m)</text>' % (W - pad, total - 4))
+    out.append("</svg>")
+    return "\n".join(out)
+
+
 def write(svg_text, path, keep_svg):
     svg_path = path + ".svg"
     with open(svg_path, "w") as f:
@@ -397,6 +470,9 @@ def main(argv):
     band = [(c[2] * tr.step, c[3] * tr.step, "#3d3a1e") for c in found]
     title = "%s: signed curvature (1/m, left positive), smoothed %.0f m; shaded: %d corners found by the curvature rule" % (name, (data["source"].get("cornerRule") or corner_rule.DEFAULT_RULE)["smoothSigma"], len(found))
     write(profile_svg(tr, title, ks, "1/m", lambda v: "%.3f" % v, marks, zero=True, band=band), os.path.join(out_dir, cid + "-curvature"), keep_svg)
+    if "--vertical" in argv:
+        a, b = (float(v) for v in argv[argv.index("--vertical") + 1].split(":"))
+        write(vertical_svg(tr, data, a, b), os.path.join(out_dir, cid + "-vertical"), keep_svg)
     return 0
 
 
