@@ -78,6 +78,42 @@ export function compoundUniforms(c: CompoundLook): Record<string, { value: unkno
   };
 }
 
+/**
+ * Painted-surface detail, in the car's own frame (the mesh's local position; the body mesh is
+ * the car frame): restrained roughness variation (±10 % over 10–40 cm patches) and road dirt
+ * low on the rear of the car (diffuser, rear of the sidepods and floor edges), which darkens and
+ * roughens the paint. Call after the livery edits, which define `liveryCarbon`.
+ */
+export function addPaintDetail(shader: { vertexShader: string; fragmentShader: string }): void {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vCarPos;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCarPos = position;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+      varying vec3 vCarPos;
+      float paintHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float paintNoise(vec3 x) {
+        vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(paintHash(i), paintHash(i + vec3(1, 0, 0)), f.x), mix(paintHash(i + vec3(0, 1, 0)), paintHash(i + vec3(1, 1, 0)), f.x), f.y),
+                   mix(mix(paintHash(i + vec3(0, 0, 1)), paintHash(i + vec3(1, 0, 1)), f.x), mix(paintHash(i + vec3(0, 1, 1)), paintHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+      }`,
+    )
+    .replace(
+      '#include <roughnessmap_fragment>',
+      `#include <roughnessmap_fragment>
+      {
+        float pn = paintNoise(vCarPos * 2.5) * 0.65 + paintNoise(vCarPos * 9.0) * 0.35;
+        roughnessFactor = clamp(roughnessFactor * (0.9 + 0.2 * pn), 0.05, 1.0);
+        float dirt = smoothstep(-0.4, -2.3, vCarPos.x) * (1.0 - smoothstep(0.2, 0.75, vCarPos.y));
+        dirt *= (0.55 + 0.45 * paintNoise(vCarPos * 5.0)) * (1.0 - liveryCarbon * 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.8 + vec3(0.014, 0.012, 0.009), dirt * 0.65);
+        roughnessFactor = mix(roughnessFactor, 0.62, dirt * 0.5);
+      }`,
+    );
+}
+
 /** Shader fragment that turns the mask in `map` into paint (shared by single and fleet cars). */
 export const LIVERY_GLSL = /* glsl */ `
   vec3 liv = LIVERY_SAMPLE;
@@ -121,6 +157,7 @@ export function liveryMaterial(
         '#include <roughnessmap_fragment>',
         '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.5, liveryCarbon);',
       );
+    addPaintDetail(shader);
   };
   m.customProgramCacheKey = () => 'car-livery';
   m.userData.livery = uniforms;

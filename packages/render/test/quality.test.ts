@@ -62,3 +62,13 @@ describe('effectiveQuality (what the GPU can actually do)', () => {
     }
   });
 });
+
+describe('film grain', () => {
+  it('is a per-preset amount, subtle, and off wherever grain and vignette are off', () => {
+    for (const name of QUALITY_NAMES) {
+      const q = QUALITY[name];
+      expect(q.grain).toBeLessThanOrEqual(0.005);
+      if (!q.grainVignette) expect(q.grain).toBe(0);
+    }
+  });
+});

@@ -189,7 +189,7 @@ export class RenderPipeline {
         toneMappingExposure: { value: 1 },
         speedBlur: { value: 0 },
         vignette: { value: 0.22 },
-        grain: { value: quality.grainVignette ? 0.012 : 0 },
+        grain: { value: quality.grainVignette ? quality.grain : 0 },
         time: { value: 0 },
         resolution: { value: new Vector2(1, 1) },
       },

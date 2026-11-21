@@ -176,6 +176,20 @@ export class CarModel {
       const m = liveryMaterial(paint, mask, livery);
       this.owned.push(m);
       replaceMaterial(this.asset, paint, m);
+      // The gloves on the steering wheel share the paint mesh material: fabric, not clear coat.
+      const wheel = this.asset.getObjectByName('steering_wheel');
+      if (wheel) {
+        const gloves = liveryMaterial(paint, mask, livery) as MeshStandardMaterial & {
+          clearcoat?: number;
+        };
+        gloves.roughness = 0.85;
+        if (gloves.clearcoat !== undefined) gloves.clearcoat = 0;
+        this.owned.push(gloves);
+        wheel.traverse((o) => {
+          const mesh = o as Mesh;
+          if (mesh.isMesh && mesh.material === m) mesh.material = gloves;
+        });
+      }
     }
     const tyre = findMaterial(this.asset, 'tyre');
     if (tyre) {

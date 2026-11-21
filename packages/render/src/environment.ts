@@ -102,7 +102,11 @@ void main() {
   // Analytic derivatives avoid the seam where atan wraps.
   vec2 duvx = dFdx(uv); vec2 duvy = dFdy(uv);
   duvx.x -= floor(duvx.x + 0.5); duvy.x -= floor(duvy.x + 0.5);
-  vec3 col = textureGrad(tSky, uv, duvx, duvy).rgb * skyScale;
+  vec3 col = textureGrad(tSky, uv, duvx, duvy).rgb;
+  // Dither by about one 8-bit sRGB step of the stored image (converted to linear) so the
+  // quantised cloud gradients do not show as bands after exposure and the tone map.
+  float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+  col = max(col + dn * (2.2 / 255.0) * pow(col + 1e-4, vec3(0.545)), 0.0) * skyScale;
   #ifdef SUN_DISC
   float mu = dot(dir, sunDirection);
   if (mu > sunCos) {

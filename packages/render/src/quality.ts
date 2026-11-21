@@ -57,6 +57,8 @@ export interface Quality {
   /** Kerbs and barriers cast shadows. */
   readonly sceneryShadows: boolean;
   readonly grainVignette: boolean;
+  /** Film-grain amplitude (fraction of the signal in the shadows); 0 for none. */
+  readonly grain: number;
   /** Radial blur at the frame edge at speed. */
   readonly speedBlur: boolean;
   /** Frame-time target for dynamic resolution (0: off) and the lowest render scale. */

@@ -30,6 +30,7 @@ import {
   LIVERY_GLSL,
   MEDIUM_COMPOUND,
   compoundUniforms,
+  addPaintDetail,
   drawMarkings,
   type CompoundLook,
 } from './livery';
@@ -291,8 +292,9 @@ export class CarFleet {
           )
           .replace(
             '#include <roughnessmap_fragment>',
-            '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.42, liveryCarbon);',
+            '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.5, liveryCarbon);',
           );
+        addPaintDetail(shader);
       }
     };
     m.customProgramCacheKey = () =>
