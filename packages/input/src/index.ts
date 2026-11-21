@@ -28,3 +28,4 @@ export {
   type TouchLayout,
 } from './sources/touch';
 export { InputSystem, type InputEvent, type InputFrame, type InputSystemOptions } from './system';
+export { NEUTRAL_INPUT, type ControlInput } from '@undercut/sim';
