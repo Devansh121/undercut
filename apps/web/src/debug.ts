@@ -14,8 +14,12 @@
  *   __undercut.pause() / resume() / restartLap() / resetToTrack()
  *   __undercut.capture()                     // state + telemetry + HUD text + recent events
  *   __undercut.frameTimes() / resetFrameTimes()
+ *   __undercut.gridCars(19)                  // static cars on the grid slots, every livery
+ *   __undercut.tvCamera(x, y, z, fov)        // trackside camera at a world point (stations)
+ *   __undercut.quality() / setQuality('ultra')
  */
 import type { CameraName } from '@undercut/render';
+import { isQuality } from './game/quality-setting';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
 
@@ -36,6 +40,34 @@ export interface DebugApi {
   frameTimes(): number[];
   resetFrameTimes(): void;
   renderStats(): Record<string, unknown>;
+  /** Static cars on the grid slots (0 clears them). */
+  gridCars(count: number): void;
+  /** The trackside camera at a world point, vertical field of view in degrees. */
+  tvCamera(
+    x: number,
+    y: number,
+    z: number,
+    fov: number,
+    aim?: { x: number; y: number; z: number },
+  ): void;
+  quality(): string;
+  setQuality(name: string): Promise<void>;
+  /** World point at lap (s, d), height h above the ground, and the track edges there. */
+  trackPoint(
+    s: number,
+    d?: number,
+    h?: number,
+  ): {
+    x: number;
+    y: number;
+    z: number;
+    left: number;
+    right: number;
+    kerbLeft: boolean;
+    kerbRight: boolean;
+  };
+  /** A static car in pit box `box` wearing livery `livery` (stations). */
+  pitCar(box: number, livery: number): { x: number; y: number; z: number; yaw: number } | null;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
   /** Known state without a reload, for tests sharing one session. */
@@ -154,6 +186,29 @@ export function installDebugApi(
     audioStatus,
     audioCapability,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
+    gridCars: (count) => need().gridCars(count),
+    tvCamera: (x, y, z, fov, aim) => need().view.setTvCamera(x, y, z, fov, aim),
+    quality: () => need().quality,
+    trackPoint: (s, d = 0, h = 0) => {
+      const t = need().session.track;
+      const p = { x: 0, y: 0, z: 0 };
+      t.lap.pointAt(s, d, p);
+      const i = Math.round(s / t.lap.step) % t.lap.count;
+      return {
+        x: p.x,
+        y: t.heightAt(s, d) + h,
+        z: p.z,
+        left: t.halfWidthAt(s, 0),
+        right: t.halfWidthAt(s, 1),
+        kerbLeft: (t.kerb[0][i] ?? -1) >= 0,
+        kerbRight: (t.kerb[1][i] ?? -1) >= 0,
+      };
+    },
+    pitCar: (box, livery) => need().view.addPitCar(box, livery),
+    setQuality: async (name) => {
+      if (!isQuality(name)) throw new Error(`unknown preset ${name}`);
+      await need().setQuality(name);
+    },
     quit: () => need().quit(),
   };
 }

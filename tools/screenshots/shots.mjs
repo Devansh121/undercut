@@ -3,8 +3,11 @@
 //
 //   npm run build && npm run shots -- monza            every station, both sizes
 //   npm run shots -- monza --only grid,cockpit         some stations
-//   npm run shots -- monza --perf                      also a 30 s frame-time run at 1080p High
+//   npm run shots -- monza --perf                      also frame-time runs (drive, full grid) at
+//                                                      1080p High and 844x390 Mobile, vsync off
+//   npm run shots -- monza --moving                    also a 10 s recording cut into frame strips
 //   npm run shots -- monza --lap                       also a full scripted lap and its HUD
+//   npm run shots -- monza --no-shots --perf           only the frame-time runs
 //
 // Output: artifacts/screenshots/<git-sha>/<station>-<w>x<h>.png and report.json. The GPU is
 // shared by every agent on the machine, so the script re-runs itself under
@@ -58,16 +61,106 @@ const GPU_ARGS = [
 ];
 
 /**
- * Stations: each sets the car up through the debug API, then freezes the sim (time scale 0) for
- * the capture. `drive` runs the keyboard autopilot until the car reaches `untilS`.
+ * Stations: each sets the scene up through the debug API, then freezes the sim (time scale 0)
+ * for the capture. Driving stations run the keyboard autopilot (or a held input) from a lap
+ * position until the car reaches `untilS`. See docs/render.md for what each one is for.
  */
+const drive =
+  (from, kmh, untilS, opts = {}) =>
+  async (page) => {
+    await page.evaluate(
+      ({ from, kmh, opts }) => {
+        const u = globalThis.__undercut;
+        u.teleport(from, opts.d ?? 0, kmh);
+        if (opts.hold) u.drive(opts.hold);
+        else u.autopilot(true);
+        u.setTimeScale(2);
+      },
+      { from, kmh, opts },
+    );
+    await page.waitForFunction((until) => globalThis.__undercut.state().s >= until, untilS, {
+      timeout: 60_000,
+      polling: 50,
+    });
+  };
+
 const STATIONS = [
-  { name: 'grid', camera: 'chase-near', setup: { restart: true, settle: 0.4 } },
-  { name: 'chicane-braking', camera: 'chase-near', setup: { from: 380, kmh: 300, untilS: 545 } },
-  { name: 'fast-corner', camera: 'chase-far', setup: { from: 900, kmh: 250, untilS: 1060 } },
-  { name: 'cockpit', camera: 'cockpit', setup: { from: 4980, kmh: 200, untilS: 5180 } },
-  { name: 'tcam', camera: 'tcam', setup: { from: 1450, kmh: 280, untilS: 1700 } },
-  { name: 'straight', camera: 'chase-near', setup: { from: 60, kmh: 290, untilS: 330, drs: true } },
+  {
+    // The full field from in front of the pole slot, twenty cars in ten liveries.
+    name: 'grid-front',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        const eye = u.trackPoint(5812, 3.5, 1.7);
+        const aim = u.trackPoint(5716, -0.5, 0.6);
+        u.tvCamera(eye.x, eye.y, eye.z, 24, aim);
+      });
+    },
+    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+  },
+  { name: 'chicane-braking', camera: 'chase-near', run: drive(380, 300, 545) },
+  { name: 'fast-corner', camera: 'chase-far', run: drive(900, 250, 1060) },
+  { name: 'cockpit', camera: 'cockpit', run: drive(4980, 200, 5180) },
+  { name: 'tcam', camera: 'tcam', run: drive(1450, 280, 1700) },
+  { name: 'straight', camera: 'chase-near', run: drive(5300, 260, 5640) },
+  {
+    // A low trackside long lens on the car riding the exit kerb of the first chicane.
+    name: 'tv-kerb',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        let s = 640;
+        for (let k = 600; k < 760; k += 2) {
+          if (u.trackPoint(k).kerbLeft) {
+            s = k + 6;
+            break;
+          }
+        }
+        const p = u.trackPoint(s);
+        u.teleport(s, p.left + 0.35, 110);
+        u.drive({ throttle: 0.4, steer: 0 });
+        u.setTimeScale(1);
+        globalThis.__kerbS = s;
+      });
+      await page.waitForTimeout(250);
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.setTimeScale(0);
+        const s = u.state().s;
+        const eye = u.trackPoint(s + 34, u.trackPoint(s).left + 5.5, 1.25);
+        u.tvCamera(eye.x, eye.y, eye.z, 11);
+      });
+    },
+  },
+  {
+    // A parked car in the pit lane, close.
+    name: 'pit-lane',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(5000, 0, 0);
+        u.setTimeScale(0);
+        const b = u.pitCar(4, 6);
+        if (!b) return;
+        // Ahead and to one side of the nose, at standing eye height.
+        const fx = Math.cos(b.yaw);
+        const fz = -Math.sin(b.yaw);
+        const eye = { x: b.x + fx * 4.2 - fz * 2.6, y: b.y + 1.45, z: b.z + fz * 4.2 + fx * 2.6 };
+        u.tvCamera(eye.x, eye.y, eye.z, 38, {
+          x: b.x + fx * 0.3,
+          y: b.y + 0.45,
+          z: b.z + fz * 0.3,
+        });
+      });
+    },
+    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+  },
 ];
 
 const VIEWPORTS = [
@@ -152,28 +245,14 @@ async function openGame(browser, vp, extraQuery = '', launchShot = null) {
 }
 
 async function runStation(page, station) {
-  const s = station.setup;
-  await page.evaluate((cam) => globalThis.__undercut.camera(cam), station.camera);
-  if (s.restart) {
-    await page.evaluate(() => globalThis.__undercut.restartLap());
-    await page.waitForTimeout(s.settle * 1000);
-  } else {
-    await page.evaluate(({ from, kmh, drs }) => {
-      const u = globalThis.__undercut;
-      u.teleport(from, 0, kmh);
-      // DRS shot: flat out down the straight with the flap requested; else the autopilot.
-      if (drs) u.drive({ throttle: 1, drs: true, steer: 0 });
-      else u.autopilot(true);
-      u.setTimeScale(2);
-    }, s);
-    await page.waitForFunction((until) => globalThis.__undercut.state().s >= until, s.untilS, {
-      timeout: 60_000,
-      polling: 50,
-    });
-  }
+  await page.evaluate(
+    (cam) => globalThis.__undercut.camera(cam),
+    station.camera === 'tv' ? 'chase-near' : station.camera,
+  );
+  await station.run(page);
   await page.evaluate(() => globalThis.__undercut.setTimeScale(0));
   // Let the cameras settle on the frozen car for a few frames (they run on real time).
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
 }
 
 async function shots(browser, report) {
@@ -217,10 +296,12 @@ async function shots(browser, report) {
         hud: capture.hud,
       });
       console.log(`  ${path.relative(root, file)}`);
+      if (station.after) await station.after(page);
       await page.evaluate(() => {
         const u = globalThis.__undercut;
         u.autopilot(false);
         u.drive(null);
+        u.camera('chase-near');
         u.setTimeScale(1);
       });
     }
@@ -250,43 +331,158 @@ function summarise(times) {
   };
 }
 
-async function perf(report, uncapped) {
+/**
+ * Frame-time runs on the GPU with vsync off (so the numbers are what the GPU can do): the
+ * scripted drive (autopilot from Ascari to the line) and the full grid in view (twenty cars,
+ * cameras and sim running, cars static). At 1080p on High and 844x390 on Mobile.
+ */
+const PERF_VIEWPORTS = [
+  {
+    label: '1920x1080',
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
+    quality: 'high',
+  },
+  {
+    label: '844x390',
+    viewport: { width: 844, height: 390 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+    quality: 'mobile',
+  },
+];
+
+async function perf(report) {
   const browser = await chromium.launch({
-    args: [...GPU_ARGS, ...(uncapped ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])],
+    args: [...GPU_ARGS, '--disable-gpu-vsync', '--disable-frame-rate-limit'],
   });
   try {
-    const vp = {
-      label: '1920x1080',
-      viewport: { width: 1920, height: 1080 },
-      deviceScaleFactor: 1,
-      isMobile: false,
-      hasTouch: false,
-      quality: 'high',
-    };
-    const { context, page } = await openGame(browser, vp);
-    await page.evaluate(() => {
-      const u = globalThis.__undercut;
-      u.camera('chase-near');
-      u.teleport(5300, 0, 250);
-      u.autopilot(true);
-    });
-    await page.waitForTimeout(3000);
-    await page.evaluate(() => globalThis.__undercut.resetFrameTimes());
-    await page.waitForTimeout(30_000);
-    const times = await page.evaluate(() => globalThis.__undercut.frameTimes());
-    const stats = await page.evaluate(() => globalThis.__undercut.renderStats());
-    const gpu = await page.evaluate(() => {
-      const gl = globalThis.document.createElement('canvas').getContext('webgl2');
-      const ext = gl?.getExtension('WEBGL_debug_renderer_info');
-      return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown';
-    });
-    const summary = { ...summarise(times), vsync: !uncapped, gpu, render: stats };
-    report.perf.push(summary);
-    console.log(`  perf ${uncapped ? 'uncapped' : 'vsync'}: ${JSON.stringify(summary)}`);
-    await context.close();
+    for (const vp of PERF_VIEWPORTS) {
+      const quality = option('perf-quality') ?? vp.quality;
+      const { context, page } = await openGame(browser, { ...vp, quality });
+      for (const run of ['drive', 'grid']) {
+        await page.evaluate((run) => {
+          const u = globalThis.__undercut;
+          u.autopilot(false);
+          u.drive(null);
+          u.gridCars(0);
+          if (run === 'drive') {
+            u.camera('chase-near');
+            u.teleport(4300, 0, 250);
+            u.autopilot(true);
+          } else {
+            // From the last slot looking up the grid: nineteen cars ahead, all in view.
+            u.restartLap();
+            u.gridCars(19);
+            u.camera('chase-far');
+            u.drive({ throttle: 0, brake: 1, steer: 0 });
+          }
+        }, run);
+        await page.waitForTimeout(3000);
+        await page.evaluate(() => globalThis.__undercut.resetFrameTimes());
+        await page.waitForTimeout(Number(option('perf-seconds') ?? 20) * 1000);
+        const times = await page.evaluate(() => globalThis.__undercut.frameTimes());
+        const stats = await page.evaluate(() => globalThis.__undercut.renderStats());
+        const gpu = await page.evaluate(() => {
+          const gl = globalThis.document.createElement('canvas').getContext('webgl2');
+          const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+          return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown';
+        });
+        const file = path.join(outDir, `perf-${run}-${vp.label}.png`);
+        await page.screenshot({ path: file });
+        const summary = {
+          run,
+          viewport: vp.label,
+          quality,
+          ...summarise(times),
+          gpu,
+          render: stats,
+          file: path.relative(root, file),
+        };
+        report.perf.push(summary);
+        console.log(`  perf ${run} ${vp.label} ${quality}: ${JSON.stringify(summary)}`);
+      }
+      await context.close();
+    }
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Ten seconds of driving recorded as video (chase cam through the first chicane), cut into a
+ * one-per-second strip and a strip of consecutive frames to judge shimmer on kerbs and edges.
+ */
+async function moving(browser, report) {
+  const vp = VIEWPORTS[0];
+  const videoDir = path.join(outDir, 'video');
+  fs.mkdirSync(videoDir, { recursive: true });
+  const context = await browser.newContext({
+    viewport: vp.viewport,
+    deviceScaleFactor: 1,
+    recordVideo: { dir: videoDir, size: vp.viewport },
+  });
+  const page = await context.newPage();
+  await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=${vp.quality}`);
+  await page.waitForFunction(() => Boolean(globalThis.__undercut));
+  await page.evaluate(() => globalThis.__undercut.start());
+  await page.waitForFunction(() => globalThis.document.documentElement.dataset.ready !== undefined);
+  await page.evaluate(() => {
+    const u = globalThis.__undercut;
+    u.camera('chase-near');
+    u.teleport(150, 0, 280);
+    u.autopilot(true);
+  });
+  const t0 = Date.now();
+  await page.waitForTimeout(12_000);
+  const video = page.video();
+  await context.close();
+  const src = await video.path();
+  const mp4 = path.join(outDir, 'moving-1440x900.mp4');
+  const start = Math.max(0, (Date.now() - t0) / 1000 - 12 + 2).toFixed(2);
+  const ff = (a) => spawnSync('ffmpeg', ['-y', '-loglevel', 'error', ...a], { stdio: 'inherit' });
+  ff([
+    '-ss',
+    start,
+    '-i',
+    src,
+    '-t',
+    '10',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-crf',
+    '20',
+    mp4,
+  ]);
+  const strip = path.join(outDir, 'moving-strip.jpg');
+  ff(['-i', mp4, '-vf', 'fps=1,scale=480:-1,tile=5x2', '-frames:v', '1', '-q:v', '3', strip]);
+  // Eight consecutive frames from the middle, cropped to the lower half where kerbs and lines are.
+  const burst = path.join(outDir, 'moving-burst.jpg');
+  ff([
+    '-ss',
+    '5',
+    '-i',
+    mp4,
+    '-vf',
+    'crop=1440:450:0:450,scale=720:-1,tile=2x4',
+    '-frames:v',
+    '1',
+    '-q:v',
+    '3',
+    burst,
+  ]);
+  report.moving = {
+    video: path.relative(root, mp4),
+    strip: path.relative(root, strip),
+    burst: path.relative(root, burst),
+  };
+  console.log(`  ${path.relative(root, strip)}`);
+  fs.rmSync(videoDir, { recursive: true, force: true });
 }
 
 async function lap(browser, report) {
@@ -322,20 +518,18 @@ async function lap(browser, report) {
 }
 
 const server = startServer();
-const report = { sha, circuit, shots: [], perf: [], lap: null, errors: [] };
+const report = { sha, circuit, shots: [], perf: [], lap: null, moving: null, errors: [] };
 try {
   await waitForServer(server);
   const browser = await chromium.launch({ args: GPU_ARGS });
   try {
     if (!flag('no-shots')) await shots(browser, report);
     if (flag('lap')) await lap(browser, report);
+    if (flag('moving')) await moving(browser, report);
   } finally {
     await browser.close();
   }
-  if (flag('perf')) {
-    await perf(report, false);
-    await perf(report, true);
-  }
+  if (flag('perf')) await perf(report);
 } finally {
   await stopServer(server);
   fs.writeFileSync(path.join(outDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
