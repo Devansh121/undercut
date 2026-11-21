@@ -1,0 +1,79 @@
+import { DrivingLine } from '@undercut/ai';
+import { MONZA } from '../../../ai/validation/lib/index';
+import type { DeviceKind } from '../../src/actions';
+import { assistsFor, type AssistConfig, type AssistOverrides } from '../../src/driver-aids';
+import { CLUMSY, type HumanTraits } from './human';
+import { newcomerPlan, runPlayer } from './player-lap';
+
+export const PLAN = newcomerPlan(MONZA);
+/** The game's driving line on the same plan: the disciplined driver's cues and the braking help. */
+export const GUIDE = new DrivingLine(PLAN);
+
+/** Every assist off, automatic gears kept (a keyboard player cannot shift and steer at once). */
+export const ASSISTS_OFF: AssistConfig = {
+  tractionControl: 0,
+  abs: 0,
+  autoGears: true,
+  steering: 0,
+  stability: 0,
+  braking: 0,
+};
+
+export interface Tally {
+  laps: number;
+  spinsPerLap: number;
+  wallSpinsPerLap: number;
+  /** Seconds per lap off the track or spun (a spin counts its cost, `SPIN_COST`). */
+  offPerLap: number;
+  /** Seconds per lap the steer reaching the car differed from the driver's by more than 0.15. */
+  overridePerLap: number;
+  meanLap: number;
+}
+
+/** `seeds` × `laps` laps by a human on `device` with `assists` (the preset with overrides). */
+export function tally(
+  device: DeviceKind,
+  assists: AssistConfig | AssistOverrides,
+  seeds: number,
+  laps: number,
+  traits: HumanTraits = CLUMSY,
+): Tally {
+  const config =
+    'braking' in assists && 'steering' in assists && 'abs' in assists
+      ? (assists as AssistConfig)
+      : assistsFor(device, assists);
+  let n = 0;
+  let spins = 0;
+  let walls = 0;
+  let off = 0;
+  let override = 0;
+  let time = 0;
+  for (let seed = 1; seed <= seeds; seed++) {
+    const r = runPlayer({
+      setup: MONZA,
+      device,
+      traits,
+      assists: config,
+      seed,
+      laps,
+      plan: PLAN,
+      cues: GUIDE,
+      guide: GUIDE,
+    });
+    n += r.laps;
+    spins += r.spins.length;
+    walls += r.wallSpins;
+    off += r.offTicks / 240;
+    override += r.overrideTicks / 240;
+    for (const t of r.lapTimes) time += t;
+  }
+  const per = (x: number): number => x / Math.max(n, 1);
+  return {
+    laps: n,
+    spinsPerLap: per(spins),
+    wallSpinsPerLap: per(walls),
+    offPerLap: per(off),
+    overridePerLap: per(override),
+    meanLap: per(time),
+  };
+}

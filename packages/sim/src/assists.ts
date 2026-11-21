@@ -56,29 +56,45 @@ const ABS_RECOVER = 5;
 const DIRECT_CUT = 3;
 /** Automatic gearbox: shift up at this rpm; shift down when the lower gear lands below it. */
 const UPSHIFT_RPM = 11800;
-/** Stability assist tuning (temporary for measurement). */
-export const ESC_TUNING = {
-  ESC_MIN_SPEED: 8,
-  ESC_REFERENCE_LAG: 0.12,
-  ESC_GRIP: 1,
-  ESC_OVER_DEADBAND: 0.04,
-  ESC_OVER_DEADBAND_SHARE: 0.08,
-  ESC_UNDER_DEADBAND: 0.08,
-  ESC_UNDER_DEADBAND_SHARE: 0.25,
-  ESC_OVER_GAIN: 2.5,
-  ESC_UNDER_GAIN: 1.2,
-  ESC_MAX_OVER: 0.6,
-  ESC_MAX_UNDER: 0.3,
-  ESC_DRIVE_SPAN: 0.25,
-  ESC_RISE: 10,
-  ESC_FALL: 20,
-  ESC_LOCK: 1.2,
-  ESC_REAR_GATE: 0.85,
-  ESC_FRONT_GATE: 1,
-  ESC_BETA_GATE: 0.07,
-  ESC_BETA_LIMIT: 0.1,
-  ESC_BETA_GAIN: 3,
-};
+/**
+ * Stability assist (`ESC.*`). Speeds in m/s, yaw rates in rad/s, angles in rad, wheel brake as a
+ * share of that wheel's full braking torque.
+ */
+const ESC = Object.freeze({
+  /** Below this speed yaw control means nothing. */
+  minSpeed: 8,
+  /** Time constant of the reference yaw rate: how fast the car's yaw can follow the wheel, s. */
+  referenceLag: 0.12,
+  /** Share of the tyres' peak lateral grip the reference may ask for. */
+  grip: 1,
+  /** Yaw-rate error tolerated before a wheel is braked: fixed plus a share of the reference. */
+  overDeadband: 0.04,
+  overDeadbandShare: 0.08,
+  underDeadband: 0.08,
+  underDeadbandShare: 0.25,
+  /** Wheel brake per rad/s of error past the deadband, and the most one wheel gets. */
+  overGain: 2.5,
+  underGain: 1.2,
+  maxOver: 0.6,
+  maxUnder: 0.3,
+  /** Drive taken away: all of it (down to neutral) by this much error past the deadband. */
+  driveSpan: 0.25,
+  /** How fast a wheel brake builds and releases, share per second. */
+  rise: 10,
+  fall: 20,
+  /** A braked wheel past this multiple of the peak slip ratio has its stability brake cut. */
+  lock: 1.2,
+  /**
+   * An axle counts as at its grip: rear slip angle at this share of the peak (or body sideslip
+   * past `betaGate`) for oversteer, front slip angle at this share for understeer.
+   */
+  rearGate: 0.85,
+  betaGate: 0.07,
+  frontGate: 1,
+  /** Sideslip past this and growing is oversteer whatever the steering asks; per rad past it. */
+  betaLimit: 0.1,
+  betaGain: 3,
+});
 
 /** Time constant of the reference yaw rate: how fast the car's yaw can follow the wheel, s. */
 
@@ -256,17 +272,16 @@ function stabilityControl(
   let under = 0;
   let target = -1;
   let amount = 0;
-  if (v >= ESC_TUNING.ESC_MIN_SPEED) {
+  if (v >= ESC.minSpeed) {
     const p = car.model.params;
     const m = computeMass(car.model, car.fuelMass, escMass).total;
     const curve = car.model.curve;
     const grip =
-      (ESC_TUNING.ESC_GRIP * curve.muY * (m * 9.80665 + car.downforceFront + car.downforceRear)) /
-      m;
+      (ESC.grip * curve.muY * (m * 9.80665 + car.downforceFront + car.downforceRear)) / m;
     const rMax = grip / v;
     const asked = (v * out.steer * p.geometry.maxSteerAngle) / p.geometry.wheelbase;
     const ref = asked > rMax ? rMax : asked < -rMax ? -rMax : asked;
-    memory.refYaw += (ref - memory.refYaw) * Math.min(1, dt / ESC_TUNING.ESC_REFERENCE_LAG);
+    memory.refYaw += (ref - memory.refYaw) * Math.min(1, dt / ESC.referenceLag);
     const r = car.yawRate;
     const e = r - memory.refYaw;
     const refMag = Math.abs(memory.refYaw);
@@ -277,36 +292,29 @@ function stabilityControl(
     const rearTan = Math.max(Math.abs(car.slipTan[2]!), Math.abs(car.slipTan[3]!));
     const frontTan = Math.max(Math.abs(car.slipTan[0]!), Math.abs(car.slipTan[1]!));
     const beta = Math.abs(Math.atan2(car.vy, v));
-    const rearGone =
-      rearTan >= ESC_TUNING.ESC_REAR_GATE * peakTan || beta > ESC_TUNING.ESC_BETA_GATE;
-    const frontGone = frontTan >= ESC_TUNING.ESC_FRONT_GATE * peakTan;
+    const rearGone = rearTan >= ESC.rearGate * peakTan || beta > ESC.betaGate;
+    const frontGone = frontTan >= ESC.frontGate * peakTan;
     // Sideslip past the limit and still growing counts as oversteer whatever the steering asks
     // (a driver holding lock while the car swaps ends).
     const betaSigned = Math.atan2(car.vy, v);
-    const betaOver =
-      betaSigned * r < 0 ? ESC_TUNING.ESC_BETA_GAIN * (beta - ESC_TUNING.ESC_BETA_LIMIT) : 0;
+    const betaOver = betaSigned * r < 0 ? ESC.betaGain * (beta - ESC.betaLimit) : 0;
     const yawOver =
-      e * r > 0 && rearGone
-        ? Math.abs(e) - (ESC_TUNING.ESC_OVER_DEADBAND + ESC_TUNING.ESC_OVER_DEADBAND_SHARE * refMag)
-        : 0;
+      e * r > 0 && rearGone ? Math.abs(e) - (ESC.overDeadband + ESC.overDeadbandShare * refMag) : 0;
     if (yawOver > 0 || betaOver > 0) {
       over = Math.max(yawOver, betaOver);
       // Too much rotation to the left: brake the front right, and the reverse.
       target = r > 0 ? 1 : 0;
-      amount = Math.min(ESC_TUNING.ESC_MAX_OVER, ESC_TUNING.ESC_OVER_GAIN * over);
+      amount = Math.min(ESC.maxOver, ESC.overGain * over);
     } else if (e * memory.refYaw < 0 && frontGone) {
-      under =
-        Math.abs(e) -
-        (ESC_TUNING.ESC_UNDER_DEADBAND + ESC_TUNING.ESC_UNDER_DEADBAND_SHARE * refMag);
+      under = Math.abs(e) - (ESC.underDeadband + ESC.underDeadbandShare * refMag);
       if (under > 0) {
         // Not turning left enough: brake the rear left, and the reverse.
         target = memory.refYaw > 0 ? 2 : 3;
-        amount = Math.min(ESC_TUNING.ESC_MAX_UNDER, ESC_TUNING.ESC_UNDER_GAIN * under);
+        amount = Math.min(ESC.maxUnder, ESC.underGain * under);
       }
     }
     // A wheel the extra brake would lock gets none.
-    if (target >= 0 && -car.slipRatio[target]! > ESC_TUNING.ESC_LOCK * curve.peakSlipRatio)
-      amount = 0;
+    if (target >= 0 && -car.slipRatio[target]! > ESC.lock * curve.peakSlipRatio) amount = 0;
   } else {
     memory.refYaw = car.yawRate;
   }
@@ -314,17 +322,14 @@ function stabilityControl(
   for (let i = 0; i < 4; i++) {
     const want = i === target ? amount : 0;
     const now = wb[i]!;
-    wb[i] =
-      want > now
-        ? Math.min(want, now + ESC_TUNING.ESC_RISE * dt)
-        : Math.max(want, now - ESC_TUNING.ESC_FALL * dt);
+    wb[i] = want > now ? Math.min(want, now + ESC.rise * dt) : Math.max(want, now - ESC.fall * dt);
     if (wb[i]! > 0) any = true;
   }
   out.wheelBrake = any ? wb : undefined;
 
   if (over > 0 || under > 0) {
     const neutral = neutralThrottle(car);
-    const keep = clamp01(1 - Math.max(over, under) / ESC_TUNING.ESC_DRIVE_SPAN);
+    const keep = clamp01(1 - Math.max(over, under) / ESC.driveSpan);
     if (out.throttle > neutral) out.throttle = neutral + (out.throttle - neutral) * keep;
     else if (over > 0 && out.brake < 0.02) out.throttle = neutral;
   }

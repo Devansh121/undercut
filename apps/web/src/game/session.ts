@@ -32,7 +32,14 @@ import {
   type WorldCar,
 } from '@undercut/sim';
 import type { DeviceKind } from '@undercut/input';
-import { applyDriverAids, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
+import {
+  applyDriverAids,
+  assistsFor,
+  type AssistConfig,
+  type AssistOverrides,
+  type GuidePosition,
+  type SpeedGuide,
+} from './assists';
 import type { Ghost } from './ghost';
 import { GhostRecorder, decodeGhost, encodeGhost } from './ghost';
 import type { CircuitRecord, RecordUpdate } from './records';
@@ -68,6 +75,8 @@ export interface DriveSessionOptions {
   today?: string;
   /** Track-limit counter; defaults to `TrackLimits` on this track. */
   limits?: WheelsOffCounter;
+  /** Advised speeds round the circuit (the driving line), for the braking help. */
+  guide?: SpeedGuide;
 }
 
 /**
@@ -111,12 +120,14 @@ export class DriveSession {
   private readonly sample = createSurfaceSample();
   private readonly telemetry: CarTelemetry = createCarTelemetry();
   private readonly today: string;
+  private readonly guidePosition: GuidePosition | null;
   private readonly poseLimits: InvariantLimits;
   private safetyResetsValue = 0;
   private wallHitsValue = 0;
 
   constructor(options: DriveSessionOptions) {
     this.track = options.track;
+    this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
     this.params = options.params ?? createCarParams('low');
     this.today = options.today ?? '';
     this.pending = {
@@ -170,6 +181,7 @@ export class DriveSession {
 
   /** The player's input for this tick, with the device's assists, written into the car. */
   private drive(out: ControlInput): void {
+    if (this.guidePosition) this.guidePosition.s = this.s;
     applyDriverAids(
       this.deviceValue,
       this.assistValue,
@@ -178,6 +190,7 @@ export class DriveSession {
       this.pending,
       this.world.step,
       out,
+      this.guidePosition ?? undefined,
     );
   }
 

@@ -5,4 +5,6 @@ export {
   assistsFor,
   type AssistConfig,
   type AssistOverrides,
+  type GuidePosition,
+  type SpeedGuide,
 } from '@undercut/input';

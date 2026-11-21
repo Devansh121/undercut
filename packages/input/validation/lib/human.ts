@@ -185,6 +185,28 @@ export class Human {
     this.delayTicks = Math.round(this.reaction * 240);
   }
 
+  /**
+   * The car was put back on the track: forget everything seen and pressed before (delay
+   * buffers, keys, a lift in progress), as a player lets go of everything and starts again.
+   * The lap and its mistakes carry on.
+   */
+  reset(): void {
+    this.seenSlide.fill(0);
+    this.wantThrottle.fill(0);
+    this.wantBrake.fill(0);
+    this.head = 0;
+    this.key = 0;
+    this.keyHeld = 0;
+    this.throttleKey = 0;
+    this.throttleHeld = 0;
+    this.brakeKey = 0;
+    this.brakeHeld = 0;
+    this.stick = 0;
+    this.noise = 0;
+    this.liftLeft = 0;
+    this.hint.index = -1;
+  }
+
   /** A new lap: a new set of mistakes, one per corner. */
   private newLap(): void {
     const t = this.options.traits;

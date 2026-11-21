@@ -33,11 +33,21 @@ import {
   type QualityName,
   type ToneMap,
 } from '@undercut/render';
+import {
+  DRIVING_LINE_SCALE,
+  DrivingLine,
+  buildPlan,
+  decodeEnvelope,
+  type EnvelopeArtefact,
+} from '@undercut/ai';
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
+// The AI's racing line and measured vehicle envelope, for the rubbered line and the driving
+// line's advised speeds (braking help).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
+import monzaEnvelope from '../../../packages/ai/data/monza-low.envelope.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
@@ -206,7 +216,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = Track.fromJSON(monza);
   const records = o.records;
   const record = await records.load(track.id);
-  const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
+  const line = racingLineOffsets(track.lap.count);
+  const drivingLine = line
+    ? new DrivingLine(
+        buildPlan(track, line, decodeEnvelope(monzaEnvelope as EnvelopeArtefact), {
+          scale: DRIVING_LINE_SCALE,
+        }),
+      )
+    : null;
+  const session = new DriveSession({
+    track,
+    seed: o.seed,
+    record,
+    today: o.today,
+    ...(drivingLine ? { guide: drivingLine } : {}),
+  });
   const params = session.params;
   const mass = computeMass(session.car.state.model, TIME_TRIAL_FUEL, {
     total: 0,
@@ -229,7 +253,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     trackRear: params.geometry.trackRear,
     tyreRadius: params.tyre.rollingRadius,
   };
-  const line = racingLineOffsets(track.lap.count);
   const loadView = async (quality: QualityName, screen: LoadingScreen): Promise<RaceView> => {
     for (;;) {
       try {
@@ -355,13 +378,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'stability',
         label: 'Stability help',
-        description: 'Catches rear slides with steering and pedal corrections.',
+        description: 'Brakes one wheel and trims the engine when the car starts to slide or push.',
         choices: [
           { value: 0, label: 'Off' },
           { value: 1, label: 'On' },
         ],
         get: () => session.assists.stability ?? 0,
         set: (v) => session.setAssist('stability', Number(v)),
+      },
+      {
+        id: 'braking',
+        label: 'Braking help',
+        description: 'Brakes for the corner ahead when you arrive faster than the driving line.',
+        choices: levels,
+        get: () => session.assists.braking,
+        set: (v) => session.setAssist('braking', Number(v)),
       },
       {
         id: 'gears',

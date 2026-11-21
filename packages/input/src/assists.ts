@@ -26,7 +26,7 @@ export const ASSIST_PRESETS: Readonly<Record<DeviceKind, Readonly<AssistPreset>>
   keyboard: Object.freeze({
     steering: 'medium',
     stability: true,
-    braking: 'off',
+    braking: 'low',
     abs: 'on',
     tractionControl: 'medium',
     gears: 'automatic',
