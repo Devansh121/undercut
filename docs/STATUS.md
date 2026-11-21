@@ -30,6 +30,12 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 3. DRS on the main straight: after Parabolica press F once the DRS box on the HUD turns white (zone open), watch it go green and the rear flap open, and note the extra top speed; the first brake press closes it.
 4. On a phone in landscape, open the `Wi-Fi:` HTTPS address: steer with the left pad, pedals on the right. Everything should fit around the controls.
 
+## Known gaps
+
+- Physics: the reference driver laps Monza in 1:29.9; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The car is short of cornering grip. Calibration is in progress; the gap is recorded in `docs/physics-validation.md` section 7 and pinned by a test, not hidden.
+- Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
+- Sound: measured, never heard. The listening queue is in `docs/audio.md`.
+
 ## Decided for you
 
 - MIT copyright holder written as "Devansh121".
