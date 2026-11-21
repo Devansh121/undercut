@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CLOSE, DEFAULT_SETTINGS, type MemberView, type RoomView } from '@undercut/protocol';
 import { endedBy, roomNotices, stageOf } from '../../src/online/view';
 
-function member(id: string, name: string, seat: number, over: Partial<MemberView> = {}): MemberView {
+function member(
+  id: string,
+  name: string,
+  seat: number,
+  over: Partial<MemberView> = {},
+): MemberView {
   return {
     id,
     name,
@@ -98,7 +103,9 @@ describe('roomNotices', () => {
 
   it('reports a member dropping and coming back', () => {
     const before = room();
-    const gone = room({ members: [member('m1', 'Ana', 0), member('m2', 'Ben', 1, { connected: false })] });
+    const gone = room({
+      members: [member('m1', 'Ana', 0), member('m2', 'Ben', 1, { connected: false })],
+    });
     expect(roomNotices(before, gone, 'm1')).toEqual(['Ben lost the connection']);
     expect(roomNotices(gone, before, 'm1')).toEqual(['Ben is back']);
   });

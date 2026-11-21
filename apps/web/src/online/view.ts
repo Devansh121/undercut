@@ -9,7 +9,8 @@ import { CLOSE, type ClosedEvent, type RoomView } from '@undercut/protocol';
  * ends. `loading`: the grid is forming (each client loads the circuit). `starting`: formation and
  * start lights. `racing` includes the finish window after the chequered flag.
  */
-export type Stage = 'lobby' | 'countdown' | 'loading' | 'starting' | 'racing' | 'results' | 'closed';
+export type Stage =
+  'lobby' | 'countdown' | 'loading' | 'starting' | 'racing' | 'results' | 'closed';
 
 export function stageOf(room: RoomView): Stage {
   switch (room.phase) {
