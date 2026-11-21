@@ -339,13 +339,22 @@ export class TrackPath {
     let ok = false;
     for (let k = 0; k < MAX_WALK; k++) {
       this.solve(i, px, pz);
-      let to = i;
-      if (this.st < 0) to = i === 0 ? (this.closed ? this.segments - 1 : -1) : i - 1;
-      else if (this.st > 1) to = i + 1 === this.segments ? (this.closed ? 0 : -1) : i + 1;
-      else {
+      if (this.st >= 0 && this.st <= 1) {
         ok = true;
         break;
       }
+      const to =
+        this.st < 0
+          ? i === 0
+            ? this.closed
+              ? this.segments - 1
+              : -1
+            : i - 1
+          : i + 1 === this.segments
+            ? this.closed
+              ? 0
+              : -1
+            : i + 1;
       if (to < 0 || to === prev) {
         // Off the end of an open path, or stuck between two segments: keep this one.
         ok = to < 0;

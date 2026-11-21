@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { TrackDataError, validateTrackData } from '../src/data';
 import { createVec3 } from '../src/path';
 import { HIGH_KERB, SURFACE_PROPERTIES, TrackSurface } from '../src/surface';
-import { LEFT, RIGHT, Track, VERGE_FALL, createGround } from '../src/track';
+import { LEFT, Track, VERGE_FALL, createGround } from '../src/track';
 import { syntheticTrackData } from './fixtures';
 
 describe('validateTrackData', () => {
