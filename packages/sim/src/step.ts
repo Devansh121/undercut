@@ -1,5 +1,5 @@
-import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
-import { createSurfaceSample } from './contracts';
+import type { ControlInput, SurfaceSampler } from './contracts';
+import { PATCH_HINTS, createPatchSample, samplePatch, tyreVerticalForce } from './contact';
 import type { Environment } from './environment';
 import type { AeroParams, EngineParams } from './params';
 import { ErsMode, computeMass, gearRatio, type CarState, type MassState } from './state';
@@ -33,7 +33,8 @@ const ERS_MODES = [
 
 // Per-step scratch. Module-level so the hot loop never allocates; the sim is single-threaded.
 const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
-const sample = createSurfaceSample();
+const patch = createPatchSample();
+const damp = { damping: 0 };
 const tf = createTyreForce();
 const gh = new Float64Array(4);
 const ghRate = new Float64Array(4);
@@ -138,21 +139,29 @@ function substep(
     wheelX[i] = bx;
     bodyX[i] = i < 2 ? mass.sprungA : -mass.sprungB;
     const by = model.wheelLeft[i]!;
-    surface.sample(
+    // The contact patch envelops the ground (contact.ts); the front patch turns with the steer.
+    const yawW = i < 2 ? s.yaw + s.steerAngle : s.yaw;
+    samplePatch(
+      surface,
       s.x + bx * c - by * sn,
       s.z - bx * sn - by * c,
-      s.hints[i] as SurfaceHint,
-      sample,
+      i < 2 ? Math.cos(yawW) : c,
+      i < 2 ? -Math.sin(yawW) : -sn,
+      i < 2 ? tyre.patchWidthFront : tyre.patchWidthRear,
+      tyre.patchLength,
+      s.patchHints,
+      i * PATCH_HINTS,
+      patch,
     );
-    const height = sample.height;
+    const height = patch.height;
     ghRate[i] = (height - s.groundY[i]!) / h;
     gh[i] = height;
     s.groundY[i] = height;
-    grip[i] = sample.grip * s.gripScale[i]!;
-    rollDrag[i] = sample.drag;
-    nx += sample.normalX;
-    ny += sample.normalY;
-    nz += sample.normalZ;
+    grip[i] = patch.grip * s.gripScale[i]!;
+    rollDrag[i] = patch.drag;
+    nx += patch.normalX;
+    ny += patch.normalY;
+    nz += patch.normalZ;
   }
   const nInv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
   nx *= nInv;
@@ -168,13 +177,10 @@ function substep(
   const ct = tyre.verticalDamping;
   for (let i = 0; i < 4; i++) {
     const comp = gh[i]! + tyre.freeRadius - s.wheelY[i]!;
-    let f = 0;
-    if (comp > 0) {
-      f = kt * comp + ct * (ghRate[i]! - s.wheelVy[i]!);
-      if (f < 0) f = 0;
-    }
+    const f = tyreVerticalForce(comp, ghRate[i]! - s.wheelVy[i]!, kt, ct, tyre.dampingOnset, damp);
     tyreZ[i] = f;
     s.load[i] = f;
+    s.tyreDamping[i] = damp.damping;
   }
   for (let i = 0; i < 4; i++) {
     const front = i < 2;
@@ -261,6 +267,8 @@ function substep(
     skidY -= scale * vpy;
     skidYaw += px * -scale * vpy + yl * scale * vpx;
   }
+
+  s.plankForce = skidHeave;
 
   // ---- Tyre slip and force (transient contact-patch deflection). ----
   const curve = model.curve;

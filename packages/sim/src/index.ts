@@ -58,6 +58,16 @@ export {
 } from './state';
 export { FL, FR, RL, RR, createCarModel, type CarModel } from './model';
 export {
+  PATCH_ACROSS,
+  PATCH_ALONG,
+  PATCH_HINTS,
+  PATCH_POINTS,
+  createPatchSample,
+  samplePatch,
+  tyreVerticalForce,
+  type PatchSample,
+} from './contact';
+export {
   MAX_SUBSTEP,
   aeroCoefficients,
   beginErsLap,
