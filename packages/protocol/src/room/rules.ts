@@ -33,6 +33,12 @@ export interface RoomTimings {
   roomLingerMs: number;
   /** A created room nobody joins closes after this long. */
   emptyRoomTtlMs: number;
+  /**
+   * A room closes once it is this old, at the first moment it is in the lobby: a race
+   * running at the cap finishes and shows its results first. Infinite by default; the
+   * public deployment sets it so a forgotten tab cannot keep a room alive for days.
+   */
+  maxRoomAgeMs: number;
 }
 
 export const DEFAULT_TIMINGS: RoomTimings = {
@@ -52,6 +58,7 @@ export const DEFAULT_TIMINGS: RoomTimings = {
   joinTimeoutMs: 10_000,
   roomLingerMs: 30_000,
   emptyRoomTtlMs: 10 * 60_000,
+  maxRoomAgeMs: Number.POSITIVE_INFINITY,
 };
 
 const ms = int(0, 24 * 3600_000);
@@ -74,6 +81,7 @@ const timingsPatch: Check<Partial<RoomTimings>> = object(
     joinTimeoutMs: int(100, 600_000),
     roomLingerMs: ms,
     emptyRoomTtlMs: ms,
+    maxRoomAgeMs: int(60_000, 7 * 24 * 3600_000),
   },
 );
 
