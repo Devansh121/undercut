@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
-// Projects map onto CI jobs: `unit`, `physics` and `rooms`, and the nightly `soak`.
+// Projects map onto CI jobs: `unit`, `physics` and `rooms`, and the nightly `soak` and
+// `rooms-soak` (`npm run test:soak` runs both). Names must be unique.
 // Run one with `vitest run --project <name>` (see the npm scripts).
 export default defineConfig({
   test: {
@@ -28,7 +29,7 @@ export default defineConfig({
         },
       },
       {
-        // Nightly only (npm run test:soak): long runs of the reference driver.
+        // Nightly only (npm run test:soak:sim): long runs of the reference driver.
         test: {
           name: 'soak',
           environment: 'node',
@@ -54,9 +55,9 @@ export default defineConfig({
         },
       },
       {
-        // Nightly: the same soak at full length (`npm run test:soak`).
+        // Nightly: the rooms soak at full length (`npm run test:soak:rooms`).
         test: {
-          name: 'soak',
+          name: 'rooms-soak',
           environment: 'node',
           include: ['tools/netsim/**/*.runtime.test.ts'],
           globalSetup: ['services/rooms/test/global-setup.ts'],
