@@ -82,9 +82,12 @@ export {
   type CarTelemetry,
 } from './telemetry';
 export {
+  ASSIST_SNAPSHOT_LENGTH,
   NO_ASSISTS,
   applyAssists,
   createAssistState,
+  restoreAssists,
+  snapshotAssists,
   speedSensitiveSteer,
   type AssistSettings,
   type AssistState,

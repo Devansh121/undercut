@@ -42,7 +42,10 @@ const DIRECT_CUT = 3;
 const UPSHIFT_RPM = 11800;
 const DOWNSHIFT_TARGET_RPM = 10800;
 
-/** Memory the assists carry between ticks. Plain numbers, so it snapshots with the car. */
+/**
+ * Memory the assists carry between ticks. Kept apart from the physics state: snapshot it with
+ * `snapshotAssists` next to `snapshotCar` so a restored car continues with the same interventions.
+ */
 export interface AssistState {
   /** Throttle and brake multipliers in [0, 1]. */
   tcScale: number;
@@ -53,6 +56,27 @@ export interface AssistState {
 
 export function createAssistState(): AssistState {
   return { tcScale: 1, absScale: 1, shiftHold: 0 };
+}
+
+/** Length of an assist snapshot in numbers. */
+export const ASSIST_SNAPSHOT_LENGTH = 3;
+
+/** Copy the assist memory into `out` (allocated if absent). */
+export function snapshotAssists(memory: AssistState, out?: Float64Array): Float64Array {
+  const buf = out ?? new Float64Array(ASSIST_SNAPSHOT_LENGTH);
+  if (buf.length < ASSIST_SNAPSHOT_LENGTH) throw new RangeError('snapshot buffer too short');
+  buf[0] = memory.tcScale;
+  buf[1] = memory.absScale;
+  buf[2] = memory.shiftHold;
+  return buf;
+}
+
+/** Overwrite the assist memory from a snapshot taken by `snapshotAssists`. */
+export function restoreAssists(memory: AssistState, snapshot: ArrayLike<number>): void {
+  if (snapshot.length < ASSIST_SNAPSHOT_LENGTH) throw new RangeError('snapshot too short');
+  memory.tcScale = snapshot[0]!;
+  memory.absScale = snapshot[1]!;
+  memory.shiftHold = snapshot[2]!;
 }
 
 /**

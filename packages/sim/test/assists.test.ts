@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ASSIST_SNAPSHOT_LENGTH,
+  FLAT_SURFACE,
   NEUTRAL_INPUT,
   NO_ASSISTS,
   REFERENCE_CAR,
   applyAssists,
   createAssistState,
   createCarState,
+  createEnvironment,
+  restoreAssists,
+  restoreCar,
+  snapshotAssists,
+  snapshotCar,
   speedSensitiveSteer,
+  stepCar,
   type ControlInput,
 } from '../src/index';
 
@@ -87,5 +95,38 @@ describe('assists', () => {
     for (let i = 1; i < scales.length; i++) expect(scales[i]!).toBeLessThan(scales[i - 1]!);
     expect(scales[4]!).toBeGreaterThan(0.12);
     expect(speedSensitiveSteer(-0.5, 60)).toBe(-speedSensitiveSteer(0.5, 60));
+  });
+
+  it('snapshot with the car and continue a traction-controlled launch bit for bit', () => {
+    const env = createEnvironment();
+    const settings = { tractionControl: 2, abs: 0, autoGears: true };
+    const floor = driver({ throttle: 1 });
+    const car = createCarState(REFERENCE_CAR, { fuel: 105 });
+    const memory = createAssistState();
+    const out = driver({});
+    const tick = (c: typeof car, m: typeof memory) => {
+      applyAssists(settings, m, c, floor, DT, out);
+      stepCar(c, out, FLAT_SURFACE, DT, env);
+      return out.throttle;
+    };
+    for (let i = 0; i < 60; i++) tick(car, memory);
+    expect(memory.tcScale).toBeLessThan(1); // TC is intervening at the snapshot
+    const carSnap = snapshotCar(car);
+    const assistSnap = snapshotAssists(memory);
+    expect(assistSnap.length).toBe(ASSIST_SNAPSHOT_LENGTH);
+    const original = Array.from({ length: 120 }, () => tick(car, memory));
+
+    const restoredCar = createCarState(REFERENCE_CAR);
+    const restoredMemory = createAssistState();
+    restoreCar(restoredCar, carSnap);
+    restoreAssists(restoredMemory, assistSnap);
+    const resumed = Array.from({ length: 120 }, () => tick(restoredCar, restoredMemory));
+    expect(resumed).toEqual(original);
+    expect(Array.from(snapshotCar(restoredCar))).toEqual(Array.from(snapshotCar(car)));
+
+    // Without the assist memory the same driver input gives a different throttle.
+    const fresh = createCarState(REFERENCE_CAR);
+    restoreCar(fresh, carSnap);
+    expect(tick(fresh, createAssistState())).not.toBe(original[0]);
   });
 });
