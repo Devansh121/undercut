@@ -73,6 +73,12 @@ export class Biquad {
       z2 = b2 * x - a2 * y;
       output[i] = y;
     }
+    // Inputs are validated upstream; if a non-finite value got in anyway, do not let it live
+    // on in the filter memory (x - x is NaN for NaN and for ±Infinity).
+    if (z1 - z1 !== 0 || z2 - z2 !== 0) {
+      z1 = 0;
+      z2 = 0;
+    }
     this.z1 = z1;
     this.z2 = z2;
   }

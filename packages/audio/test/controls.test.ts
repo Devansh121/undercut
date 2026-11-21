@@ -35,11 +35,11 @@ describe('car state', () => {
     expect(unpackCarState(packed, defaultCarState())).toEqual(s);
   });
 
-  it('turns non-finite numbers into zero', () => {
+  it('packs values as they are; validation happens in the core (invalid-input.test.ts)', () => {
     const s = { ...defaultCarState(), engineSpeed: Number.NaN, speed: Number.POSITIVE_INFINITY };
     const packed = packCarState(s, new Float64Array(CAR_STATE_LENGTH));
-    expect(packed[F.engineSpeed]).toBe(0);
-    expect(packed[F.speed]).toBe(0);
+    expect(packed[F.engineSpeed]).toBeNaN();
+    expect(packed[F.speed]).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

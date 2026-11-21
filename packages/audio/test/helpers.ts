@@ -30,7 +30,7 @@ export interface Clip {
 export function render(
   core: AudioCore,
   seconds: number,
-  state: (t: number) => AudioCarState | undefined,
+  state: (t: number) => AudioCarState | Float64Array | undefined,
   options: { updateRate?: number; block?: number; startFrame?: number } = {},
 ): Clip {
   const total = Math.round(seconds * FS);

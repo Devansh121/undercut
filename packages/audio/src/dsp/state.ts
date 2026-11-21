@@ -43,6 +43,31 @@ export interface AudioCarState {
   bottoming: number;
 }
 
+/**
+ * Supported range of each packed field, `[min, max]`. The core clamps to these; a
+ * non-finite value keeps the field's last valid value. Engine speed stops at 15 000 rpm,
+ * the highest speed the band-limited pulse tables are built for.
+ */
+export const CAR_STATE_RANGE: Readonly<Record<CarStateField, readonly [number, number]>> = {
+  engineOn: [0, 1],
+  engineSpeed: [0, (15_000 * 2 * Math.PI) / 60],
+  throttle: [0, 1],
+  load: [0, 1],
+  gear: [-1, 8],
+  shifting: [0, 1],
+  shiftDirection: [-1, 1],
+  revLimiter: [0, 1],
+  pitLimiter: [0, 1],
+  boost: [0, 1],
+  ersPower: [-200_000, 200_000],
+  speed: [0, 150],
+  slipFront: [0, 2],
+  slipRear: [0, 2],
+  kerb: [0, 1],
+  kerbFrequency: [0, 200],
+  bottoming: [0, 1],
+};
+
 /** A parked car with the engine off. */
 export function defaultCarState(): AudioCarState {
   return {
@@ -115,32 +140,30 @@ export const F = {
 } as const satisfies { readonly [K in CarStateField]: number };
 
 /**
- * Pack into `out` (length CAR_STATE_LENGTH). Booleans become 0 or 1, non-finite numbers 0.
+ * Pack into `out` (length CAR_STATE_LENGTH). Booleans become 0 or 1; numbers are copied as
+ * they are (stored in a Float64Array, anything non-numeric becomes NaN). The audio core
+ * validates and clamps every field when it receives a state, in either form.
  * Written field by field: named loads keep this allocation-free on the audio thread.
  */
 export function packCarState(state: AudioCarState, out: Float64Array): Float64Array {
   out[F.engineOn] = state.engineOn ? 1 : 0;
-  out[F.engineSpeed] = finite(state.engineSpeed);
-  out[F.throttle] = finite(state.throttle);
-  out[F.load] = finite(state.load);
-  out[F.gear] = finite(state.gear);
+  out[F.engineSpeed] = state.engineSpeed;
+  out[F.throttle] = state.throttle;
+  out[F.load] = state.load;
+  out[F.gear] = state.gear;
   out[F.shifting] = state.shifting ? 1 : 0;
-  out[F.shiftDirection] = finite(state.shiftDirection);
+  out[F.shiftDirection] = state.shiftDirection;
   out[F.revLimiter] = state.revLimiter ? 1 : 0;
   out[F.pitLimiter] = state.pitLimiter ? 1 : 0;
-  out[F.boost] = finite(state.boost);
-  out[F.ersPower] = finite(state.ersPower);
-  out[F.speed] = finite(state.speed);
-  out[F.slipFront] = finite(state.slipFront);
-  out[F.slipRear] = finite(state.slipRear);
-  out[F.kerb] = finite(state.kerb);
-  out[F.kerbFrequency] = finite(state.kerbFrequency);
-  out[F.bottoming] = finite(state.bottoming);
+  out[F.boost] = state.boost;
+  out[F.ersPower] = state.ersPower;
+  out[F.speed] = state.speed;
+  out[F.slipFront] = state.slipFront;
+  out[F.slipRear] = state.slipRear;
+  out[F.kerb] = state.kerb;
+  out[F.kerbFrequency] = state.kerbFrequency;
+  out[F.bottoming] = state.bottoming;
   return out;
-}
-
-function finite(x: number): number {
-  return Number.isFinite(x) ? x : 0;
 }
 
 /** Inverse of `packCarState`, writing into an existing object. */

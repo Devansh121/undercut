@@ -210,10 +210,13 @@ export class AudioCore {
       const ge = g[1] as number;
       const gf = g[2] as number;
       const gu = g[3] as number;
-      mixL[i] =
+      const l =
         ((engL[i] as number) * ge + (fxL[i] as number) * gf + (uiL[i] as number) * gu) * master;
-      mixR[i] =
+      const r =
         ((engR[i] as number) * ge + (fxR[i] as number) * gf + (uiR[i] as number) * gu) * master;
+      // Last line of defence for the DC blocker and limiter state: never pass on NaN or ±Inf.
+      mixL[i] = l - l === 0 ? l : 0;
+      mixR[i] = r - r === 0 ? r : 0;
     }
     this.dcLeft.processBlock(mixL, mixL, n);
     this.dcRight.processBlock(mixR, mixR, n);
