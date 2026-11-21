@@ -963,3 +963,17 @@ describe('review findings', () => {
     expect(200 - refused).toBeLessThanOrEqual(LIMITS.admission.capacity);
   });
 });
+
+describe('admission', () => {
+  it('never swallows what a due deadline would send (admit does not run the clock)', () => {
+    const { h } = inPhase('formation');
+    const start = h.state.start!;
+    h.clear();
+    // The first light is due; a socket asks to connect before any tick ran.
+    expect(h.machine.admit('late', start.lightsStartAt + 1)).toEqual({ ok: true });
+    h.now = start.lightsStartAt + 1;
+    h.open('c9', 'late');
+    expect(h.state.phase).toBe('lights');
+    expect(h.all('c1', 'room').some((r) => r.room.phase === 'lights')).toBe(true);
+  });
+});

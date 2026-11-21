@@ -726,11 +726,13 @@ export class RoomMachine {
     address: string,
     now: number,
   ): { ok: true } | { ok: false; reason: 'room_closed' | 'busy' } {
-    this.now = Math.max(this.now, now);
-    this.advance();
+    // Reads the state as it is and runs no deadlines: anything due is handled, and its
+    // messages sent, by the `open` event that follows.
     const reason = this.refusal(address);
     if (reason) return { ok: false, reason };
-    if (!take(this.admission, LIMITS.admission, this.now)) return { ok: false, reason: 'busy' };
+    if (!take(this.admission, LIMITS.admission, Math.max(this.now, now))) {
+      return { ok: false, reason: 'busy' };
+    }
     return { ok: true };
   }
 
