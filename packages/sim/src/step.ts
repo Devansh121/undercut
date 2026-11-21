@@ -461,20 +461,17 @@ function stepPowertrain(
   deploy = direct + fromStore;
   let toStore = mguh - direct;
   let harvest = 0;
-  // Brake-by-wire: the pedal asks for a rear torque out of friction plus MGU-K harvest; the
-  // harvest is used first and friction makes up the rest, up to its own limit.
+  // Brake-by-wire: the pedal sets the torque each axle should get, independent of whether the
+  // MGU-K can harvest. On the rear axle the MGU-K delivers what it can and friction supplies the
+  // rest, so a full store, a spent harvest allowance or an open clutch changes only the split.
   const frontBrake = (brake * p.brakes.maxTorque * s.brakeBias) / 2;
-  const rearFrictionCap = p.brakes.maxTorque * (1 - s.brakeBias);
-  let harvestCap = 0;
-  if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5) {
+  const rearRequest = brake * p.brakes.maxTorque * (1 - s.brakeBias);
+  if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5 && we > 1) {
     const room = Math.max(0, (ers.storeWindow - s.ersStore) / h - toStore);
     const lapRoom = Math.max(0, (ers.harvestPerLap - s.ersHarvestLap) / h);
-    harvestCap = Math.min(ers.mgukPower, ers.mgukTorque * we, room, lapRoom);
-  }
-  const harvestCapWheels = we > 1 ? (harvestCap / we) * Math.abs(G) : 0;
-  const rearDemand = brake * (rearFrictionCap + harvestCapWheels);
-  if (harvestCapWheels > 0) {
-    harvest = harvestCap * Math.min(1, rearDemand / harvestCapWheels);
+    const cap = Math.min(ers.mgukPower, ers.mgukTorque * we, room, lapRoom);
+    // Torque at the rear wheels for crank power P is P / we · |G|; never more than requested.
+    harvest = Math.min(cap, (rearRequest * we) / Math.abs(G));
   }
   toStore = Math.min(toStore, Math.max(0, (ers.storeWindow - s.ersStore) / h - harvest));
   s.ersStore += (toStore + harvest - fromStore) * h;
@@ -486,7 +483,7 @@ function stepPowertrain(
   const harvestAtWheels = we > 1 ? (harvest / we) * Math.abs(G) : 0;
 
   // Brakes (friction torque per wheel) plus rolling resistance as a torque on the wheel.
-  const rearBrake = Math.min(rearFrictionCap, Math.max(0, rearDemand - harvestAtWheels)) / 2;
+  const rearBrake = Math.max(0, rearRequest - harvestAtWheels) / 2;
   const crr = tyre.rollingResistance * R;
 
   // Front wheels: free spin with Coulomb friction from brake and rolling resistance.

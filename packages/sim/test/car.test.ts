@@ -230,6 +230,31 @@ describe('ERS', () => {
     expect(() => setErsMode(car, 7 as ErsMode)).toThrow(RangeError);
   });
 
+  it('brakes the same whether or not the MGU-K can harvest (brake-by-wire)', () => {
+    const stop = (store: number) => {
+      const car = createCarState(REFERENCE_CAR, { speed: 200 / 3.6, fuel: 50, ersStore: store });
+      const decel: number[] = [];
+      const regen: number[] = [];
+      for (let i = 0; i < 0.6 / DT; i++) {
+        stepCar(car, input({ brake: 0.3 }), FLAT_SURFACE, DT, env);
+        decel.push(car.accelX);
+        regen.push(car.mgukPower);
+      }
+      return { decel, regen, car };
+    };
+    const free = stop(2e6); // room to harvest the whole stop
+    const full = stop(4e6); // store full: no harvest at all
+    const filling = stop(4e6 - 30e3); // the store fills a quarter of a second in
+    expect(Math.min(...free.regen)).toBeLessThan(-100e3);
+    expect(Math.max(...full.regen.map(Math.abs))).toBe(0);
+    expect(filling.regen[10]!).toBeLessThan(-100e3);
+    expect(filling.regen[filling.regen.length - 1]!).toBe(0);
+    for (let i = 0; i < free.decel.length; i++) {
+      expect(Math.abs(full.decel[i]! - free.decel[i]!)).toBeLessThan(0.02 * g);
+      expect(Math.abs(filling.decel[i]! - free.decel[i]!)).toBeLessThan(0.02 * g);
+    }
+  });
+
   it('harvests under braking up to 2 MJ per lap and never past the store window', () => {
     const car = createCarState(REFERENCE_CAR, { speed: 80, gear: 8, ersStore: 0 });
     for (let lap = 0; lap < 12; lap++) {
