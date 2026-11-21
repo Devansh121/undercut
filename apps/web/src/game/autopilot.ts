@@ -176,3 +176,31 @@ export class AutopilotControlSource implements ControlSource {
     for (const code of Object.values(KEYS)) this.input.keyboard.keyUp(code);
   }
 }
+
+/** A fixed ControlInput set by a test or tool through the debug API. */
+export class ScriptedControlSource implements ControlSource {
+  private readonly frame: DriverFrame;
+  private pendingShift: -1 | 0 | 1 = 0;
+
+  constructor(device: DriverFrame['device'] = 'keyboard') {
+    this.frame = {
+      control: { steer: 0, throttle: 0, brake: 0, gearShift: 0, drs: false, overtake: false, pitLimiter: false },
+      device,
+      lookBack: false,
+      events: [],
+    };
+  }
+
+  /** Merge `control` into the held demand. A gear shift is sent for one tick only. */
+  set(control: Partial<DriverFrame['control']>): void {
+    const { gearShift, ...rest } = control;
+    Object.assign(this.frame.control, rest);
+    if (gearShift) this.pendingShift = gearShift;
+  }
+
+  sample(): DriverFrame {
+    (this.frame.control as { gearShift: -1 | 0 | 1 }).gearShift = this.pendingShift;
+    this.pendingShift = 0;
+    return this.frame;
+  }
+}
