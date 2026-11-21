@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 
 /**
  * Verifies that circuit dressing loads cleanly in a real browser race session and populates the
