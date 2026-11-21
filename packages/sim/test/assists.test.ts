@@ -114,6 +114,24 @@ describe('assists', () => {
     expect(out.gearShift).toBe(0);
   });
 
+  it('traction control lets a stopped car reverse despite forward slip left in the tyres', () => {
+    // A car braked to rest keeps its contact-patch deflection (it only relaxes with speed), so
+    // the rear tyres can read forward slip at a standstill. In reverse that is not wheelspin.
+    const settings = { tractionControl: 2, abs: 0, autoGears: false };
+    const car = createCarState(REFERENCE_CAR, { gear: -1 });
+    car.slipRatio.set([0, 0, 0.78, 0.23]);
+    const memory = createAssistState();
+    const out = driver({});
+    for (let i = 0; i < 240; i++)
+      applyAssists(settings, memory, car, driver({ throttle: 0.5 }), DT, out);
+    expect(out.throttle).toBe(0.5);
+    // Wheelspin backwards in reverse is still caught.
+    car.slipRatio.set([0, 0, -0.4, -0.4]);
+    for (let i = 0; i < 5; i++)
+      applyAssists(settings, memory, car, driver({ throttle: 1 }), DT, out);
+    expect(out.throttle).toBeLessThan(0.5);
+  });
+
   it('speed-sensitive steering keeps full lock when slow and shrinks it with speed', () => {
     expect(speedSensitiveSteer(1, 5)).toBe(1);
     const scales = [20, 40, 60, 80, 100].map((v) => speedSensitiveSteer(1, v));

@@ -109,8 +109,11 @@ export function applyAssists(
   let tcCut = 1;
   if (tcLimit !== Infinity && throttle > 0) {
     let excess = -Infinity;
+    // Driving slip is in the direction the gearbox drives: negative in reverse. Slip the other
+    // way is braking or deflection left in a stopped tyre, never wheelspin.
+    const drive = car.gear < 0 ? -1 : 1;
     for (let i = 2; i < 4; i++) {
-      if (car.slipRatio[i]! <= 0) continue;
+      if (car.slipRatio[i]! * drive <= 0) continue;
       excess = Math.max(excess, combinedSlip(car, curve, i) - tcLimit);
     }
     if (excess > 0) memory.tcScale -= TC_GAIN * excess * dt;
