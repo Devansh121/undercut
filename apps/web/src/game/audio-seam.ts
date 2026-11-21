@@ -1,30 +1,12 @@
+import type { AudioCarState } from '@undercut/audio';
+
 /**
- * The seam for engine and tyre audio. `packages/audio` was not on master when M1 drive was
- * built, so the drive screen publishes this state every frame to a sink that does nothing yet.
- * Wiring the audio engine is: implement `CarAudioSink`, resume its AudioContext on the first
- * gesture, and pass it as `onCarAudioState` (pause and tab-hide arrive as `paused: true`).
+ * The seam between the drive screen and engine audio. Every frame the drive screen maps the
+ * player's car to an `AudioCarState` (`toAudioCarState`) and hands it to the sink with whether
+ * the session is paused (pause and tab-hide suspend sound). The page wires the sink to the
+ * audio engine (`apps/web/src/audio.ts`); without one the game is silent.
  */
-export interface CarAudioState {
-  /** Engine speed, rpm. */
-  rpm: number;
-  /** Throttle as applied, 0–1 (engine load follows it). */
-  throttle: number;
-  gear: number;
-  shifting: boolean;
-  /** Forward speed, m/s. */
-  speed: number;
-  /** MGU-K power, W: positive deploying (whine), negative harvesting. */
-  mgukPower: number;
-  /** Largest tyre slip ratio and slip angle magnitude across the four tyres (scrub). */
-  slipRatio: number;
-  slipAngle: number;
-  /** Surface under the car (SurfaceKind) for kerb and gravel noise. */
-  surface: number;
-  /** The session is paused or the tab is hidden: audio should suspend. */
-  paused: boolean;
-}
+export type CarAudioSink = (state: Readonly<AudioCarState>, paused: boolean) => void;
 
-export type CarAudioSink = (state: Readonly<CarAudioState>) => void;
-
-/** The default sink until the audio engine lands. */
+/** The default sink: no sound. */
 export const silentAudio: CarAudioSink = () => {};

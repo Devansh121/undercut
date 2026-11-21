@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@undercut/audio": "0.0.0",
     "@undercut/core": "0.0.0",
     "@undercut/input": "0.0.0",
     "@undercut/render": "0.0.0",

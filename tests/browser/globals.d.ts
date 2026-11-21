@@ -15,6 +15,8 @@ interface UndercutDebugApi {
   capture(): Record<string, unknown>;
   frameTimes(): number[];
   quit(): void;
+  /** Audio engine status, or 'none' before it is created. */
+  audioStatus(): string;
   /** What the steering-wheel display last drew, or null before the cockpit was shown. */
   dashboard(): { gear: string; speed: string; revs: number } | null;
   /** The player's car's projected bounding box in CSS pixels. */

@@ -9,6 +9,7 @@ import {
   navigatorRumble,
 } from '@undercut/input/dom';
 import type { QualityName } from '@undercut/render';
+import { PageAudio } from './audio';
 import { debugEnabled, installDebugApi } from './debug';
 import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
@@ -27,9 +28,12 @@ const params = new URLSearchParams(window.location.search);
 const touch = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // One record store for the page, so records kept in memory (storage blocked, or ?storage=memory)
 // survive quitting to the launch screen and starting again.
+const webStorage = new WebStorageAdapter();
 const records = new RecordStore(
-  params.get('storage') === 'memory' ? memoryStorage() : durableStorage(new WebStorageAdapter()),
+  params.get('storage') === 'memory' ? memoryStorage() : durableStorage(webStorage),
 );
+// Engine sound for the page: created on the first gesture, saved volumes beside the settings.
+const audio = new PageAudio(webStorage);
 const input = new InputSystem({
   readGamepads: navigatorGamepads(),
   rumble: navigatorRumble(),
@@ -60,7 +64,11 @@ function showLaunch(): void {
   launch = mountLaunchScreen(app as HTMLElement, {
     buildHash: __BUILD_HASH__,
     record: null,
-    onStart: () => void start(),
+    onStart: () => {
+      // The Start click is the gesture that may start audio.
+      audio.gesture();
+      void start();
+    },
   });
   void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
   // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
@@ -94,6 +102,8 @@ async function start(): Promise<DriveHandle> {
         host: app as HTMLElement,
         input,
         records,
+        audio,
+        onCarAudioState: audio.sink,
         quality: chooseQuality(),
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
@@ -120,5 +130,6 @@ if (debugEnabled()) {
     () => drive,
     start,
     () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
+    () => audio.status,
   );
 }

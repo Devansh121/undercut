@@ -38,6 +38,8 @@ export interface DebugApi {
   renderStats(): Record<string, unknown>;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
+  /** Audio engine status ('none' before the first gesture creates it). */
+  audioStatus(): string;
   /** What the steering-wheel display last drew (cockpit camera), or null. */
   dashboard(): { gear: string; speed: string; revs: number } | null;
   /** The player's car's projected bounding box, CSS px. */
@@ -62,6 +64,7 @@ export function installDebugApi(
   getDrive: () => DriveHandle | null,
   start: () => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
+  audioStatus: () => string,
 ): void {
   const need = (): DriveHandle => {
     const d = getDrive();
@@ -139,6 +142,7 @@ export function installDebugApi(
     carScreenRect: () => need().view.carScreenRect(),
     dashboard: () => need().view.dashboard,
     rendererInfo,
+    audioStatus,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),
   };

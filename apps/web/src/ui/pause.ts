@@ -13,6 +13,14 @@ export interface PauseSetting<T extends string | number = string | number> {
   set(value: T): void;
 }
 
+/** A 0–1 level shown as a percentage, adjusted in tenths. */
+export interface PauseSlider {
+  id: string;
+  label: string;
+  get(): number;
+  set(value: number): void;
+}
+
 export interface PauseActions {
   resume(): void;
   restartLap(): void;
@@ -32,9 +40,18 @@ export class PauseMenu {
     string,
     { setting: PauseSetting; buttons: HTMLButtonElement[] }
   >();
+  private readonly sliders = new Map<
+    string,
+    { slider: PauseSlider; input: HTMLInputElement; output: HTMLOutputElement }
+  >();
   private focusIndex = 0;
 
-  constructor(actions: PauseActions, settings: PauseSetting[], note: () => string) {
+  constructor(
+    actions: PauseActions,
+    settings: PauseSetting[],
+    note: () => string,
+    sliders: PauseSlider[] = [],
+  ) {
     const root = el('div', 'pause');
     root.dataset.testid = 'pause-menu';
     root.setAttribute('role', 'dialog');
@@ -100,6 +117,31 @@ export class PauseMenu {
       this.rows.set(setting.id, { setting, buttons });
     }
 
+    for (const slider of sliders) {
+      const row = el('label', 'pause__setting pause__slider');
+      row.dataset.slider = slider.id;
+      const name = el('span', 'pause__key', slider.label);
+      const control = el('span', 'range');
+      const input = el('input', 'range__input');
+      input.type = 'range';
+      input.min = '0';
+      input.max = '1';
+      input.step = '0.1';
+      input.setAttribute('aria-label', slider.label);
+      const output = el('output', 'range__value num');
+      input.addEventListener('input', () => {
+        slider.set(Number(input.value));
+        this.sync();
+      });
+      // Keys step the slider natively (the input layer ignores keys typed into a form control);
+      // gamepad left and right arrive as menu actions in `navigate`.
+      control.append(input, output);
+      row.append(name, control);
+      grid.append(row);
+      this.focusables.push(input);
+      this.sliders.set(slider.id, { slider, input, output });
+    }
+
     const quit = el('button', 'pause__quit');
     quit.type = 'button';
     quit.dataset.action = 'quit';
@@ -133,6 +175,12 @@ export class PauseMenu {
 
   /** Reflect each setting's current value. */
   sync(): void {
+    for (const { slider, input, output } of this.sliders.values()) {
+      const v = Math.round(slider.get() * 10) / 10;
+      input.value = String(v);
+      input.style.setProperty('--v', `${v * 100}%`);
+      output.textContent = `${Math.round(v * 100)}%`;
+    }
     for (const { setting, buttons } of this.rows.values()) {
       const current = String(setting.get());
       for (const b of buttons) {
@@ -172,6 +220,14 @@ export class PauseMenu {
       }
       case 'menuLeft':
       case 'menuRight': {
+        const slid = [...this.sliders.values()].find((x) => x.input === active);
+        if (slid) {
+          const step = action === 'menuRight' ? 0.1 : -0.1;
+          const next = Math.round(Math.min(1, Math.max(0, slid.slider.get() + step)) * 10) / 10;
+          slid.slider.set(next);
+          this.sync();
+          return true;
+        }
         const row = rowOf(active);
         if (!row) return false;
         const values = row.setting.choices.map((c) => c.value);

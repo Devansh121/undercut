@@ -1200,3 +1200,79 @@ button {
 .hud .num.is-empty {
   color: var(--c-text-3);
 }
+
+/* Volume sliders in the pause menu: drawn from the tokens, not the browser's control. */
+.range {
+  display: inline-grid;
+  grid-template-columns: 120px 40px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.range__input {
+  --v: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range__input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--c-text-1) var(--v), var(--c-ink-4) var(--v));
+}
+
+.range__input::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--c-text-1) var(--v), var(--c-ink-4) var(--v));
+}
+
+.range__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c-text-1);
+  box-shadow: 0 0 0 4px var(--c-ink-1);
+}
+
+.range__input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c-text-1);
+  box-shadow: 0 0 0 4px var(--c-ink-1);
+}
+
+.range__input:focus-visible {
+  outline: none;
+}
+
+.range__input:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 4px var(--c-ink-1),
+    0 0 0 6px var(--c-brand);
+}
+
+.range__value {
+  font-weight: 600;
+  font-size: var(--fs-14);
+  text-align: right;
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .range {
+    grid-template-columns: 96px 36px;
+  }
+  .range__value {
+    font-size: var(--fs-12);
+  }
+}

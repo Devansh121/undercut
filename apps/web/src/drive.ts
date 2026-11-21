@@ -4,7 +4,7 @@
  * session and loop (game/) to the renderer (@undercut/render), the HUD and menus (ui/), the
  * input layer, storage and the audio seam.
  */
-import { MeshSurface, Track } from '@undercut/track';
+import { Track } from '@undercut/track';
 import {
   ErsMode,
   computeMass,
@@ -25,7 +25,10 @@ import {
 } from '@undercut/render';
 import teams from '../../../design/teams.json';
 import monza from '@undercut/track/data/monza.json';
-import { silentAudio, type CarAudioSink, type CarAudioState } from './game/audio-seam';
+import { defaultCarState } from '@undercut/audio';
+import { silentAudio, type CarAudioSink } from './game/audio-seam';
+import { toAudioCarState } from './game/audio-map';
+import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
   InputControlSource,
@@ -65,6 +68,14 @@ export function rendererInfo(): { geometries: number; textures: number; programs
   };
 }
 
+/** What the drive screen needs from the page's audio: lifecycle and the volume sliders. */
+export interface DriveAudio {
+  /** A session is driving (true) or paused, hidden or gone (false). */
+  setActive(active: boolean): void;
+  readonly volumes: Readonly<Record<AudioSettingKey, number>>;
+  setVolume(key: AudioSettingKey, value: number): void;
+}
+
 export interface DriveOptions {
   canvas: HTMLCanvasElement;
   host: HTMLElement;
@@ -75,7 +86,10 @@ export interface DriveOptions {
   seed: number;
   today: string;
   onQuit(): void;
+  /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
+  /** Session lifecycle and volumes for the page's audio engine; absent for no audio. */
+  audio?: DriveAudio;
 }
 
 export interface DriveHandle {
@@ -216,6 +230,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     ],
     () =>
       `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}`,
+    o.audio
+      ? (
+          [
+            ['master', 'Volume'],
+            ['engine', 'Engine'],
+            ['effects', 'Effects'],
+          ] as const
+        ).map(([id, label]) => ({
+          id,
+          label,
+          get: () => o.audio?.volumes[id] ?? 0,
+          set: (v: number) => o.audio?.setVolume(id, v),
+        }))
+      : [],
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
@@ -288,6 +316,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   }
 
   function openPause(): void {
+    o.audio?.setActive(false);
     if (!pause.open) {
       input.setContext('menu');
       pause.show();
@@ -303,6 +332,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     delete document.documentElement.dataset.paused;
     input.setContext('driving');
     loop.resume();
+    o.audio?.setActive(true);
     last = null;
   }
 
@@ -314,18 +344,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // Frame loop.
   const pose = createCarPose();
   const ghostPose = createCarPose();
-  const audio: CarAudioState = {
-    rpm: 0,
-    throttle: 0,
-    gear: 0,
-    shifting: false,
-    speed: 0,
-    mgukPower: 0,
-    slipRatio: 0,
-    slipAngle: 0,
-    surface: MeshSurface.Asphalt,
-    paused: false,
-  };
+  const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
   let last: number | null = null;
@@ -465,36 +484,31 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     hud.update(h);
     overlay?.update();
 
-    // Audio seam.
-    audio.rpm = t.engineRpm;
-    audio.throttle = t.throttle;
-    audio.gear = t.gear;
-    audio.shifting = t.shifting;
-    audio.speed = t.speed;
-    audio.mgukPower = t.mgukPower;
-    let sr = 0;
-    let sa = 0;
-    for (let i = 0; i < 4; i++) {
-      sr = Math.max(sr, Math.abs(t.slipRatio[i] as number));
-      sa = Math.max(sa, Math.abs(t.slipAngle[i] as number));
-    }
-    audio.slipRatio = sr;
-    audio.slipAngle = sa;
-    audio.surface = session.surfaceUnderCar();
-    audio.paused = !playing || document.visibilityState === 'hidden';
-    sink(audio);
+    // Engine and road sound, through the audio seam.
+    toAudioCarState(
+      {
+        state: car.state,
+        telemetry: t,
+        pitLimiter: car.input.pitLimiter,
+        kerbRoughness: session.kerbUnderWheels(),
+      },
+      audioState,
+    );
+    sink(audioState, !playing || document.visibilityState === 'hidden');
 
     handle = requestAnimationFrame(frame);
   };
 
   input.setContext('driving');
   loop.start();
+  o.audio?.setActive(true);
   handle = requestAnimationFrame(frame);
   document.documentElement.dataset.ready = '';
 
   function quit(): void {
     if (quitting) return;
     quitting = true;
+    o.audio?.setActive(false);
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
     clusterObserver.disconnect();

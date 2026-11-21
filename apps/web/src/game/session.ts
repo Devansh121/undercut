@@ -21,11 +21,21 @@ import {
   type CarState,
   type CarTelemetry,
   type ControlInput,
-  type SurfaceKind,
+  SurfaceKind,
+  computeMass,
+  type MassState,
+  type SurfaceHint,
   type World,
   type WorldCar,
 } from '@undercut/sim';
-import { TrackSurface, createPathPoint, createVec3, type Pose, type Track } from '@undercut/track';
+import {
+  HIGH_KERB,
+  TrackSurface,
+  createPathPoint,
+  createVec3,
+  type Pose,
+  type Track,
+} from '@undercut/track';
 import type { DeviceKind } from '@undercut/input';
 import { assistSteer, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
 import type { Ghost } from './ghost';
@@ -91,6 +101,21 @@ export class DriveSession {
   private readonly hint = { index: -1 };
   private readonly q = createPathPoint();
   private readonly sampleHint = createSurfaceHint();
+  private readonly wheelHints = [
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+  ];
+  private readonly mass: MassState = {
+    total: 0,
+    sprung: 0,
+    a: 0,
+    b: 0,
+    sprungA: 0,
+    sprungB: 0,
+    yawInertia: 0,
+  };
   private readonly sample = createSurfaceSample();
   private readonly telemetry: CarTelemetry = createCarTelemetry();
   private sValue = 0;
@@ -194,6 +219,32 @@ export class DriveSession {
 
   readTelemetry(): CarTelemetry {
     return readCarTelemetry(this.car.state, this.telemetry);
+  }
+
+  /**
+   * How rough the kerbs under the wheels are, 0–1: the largest kerb roughness at the four
+   * contact points as a share of a raised sausage kerb's. Zero off kerbs. For kerb rumble.
+   */
+  kerbUnderWheels(): number {
+    const st = this.car.state;
+    const m = computeMass(st.model, st.fuelMass, this.mass);
+    const c = Math.cos(st.yaw);
+    const sn = Math.sin(st.yaw);
+    let rough = 0;
+    for (let i = 0; i < 4; i++) {
+      const bx = i < 2 ? m.a : -m.b;
+      const by = st.model.wheelLeft[i] as number;
+      this.world.surface.sample(
+        st.x + bx * c - by * sn,
+        st.z - bx * sn - by * c,
+        this.wheelHints[i] as SurfaceHint,
+        this.sample,
+      );
+      if (this.sample.kind === SurfaceKind.Kerb) {
+        rough = Math.max(rough, this.sample.roughness / HIGH_KERB.roughness);
+      }
+    }
+    return Math.min(1, rough);
   }
 
   /** Surface kind under the car's reference point. */
