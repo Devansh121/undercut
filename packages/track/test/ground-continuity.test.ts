@@ -1,6 +1,8 @@
 import { createSurfaceHint, createSurfaceSample } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
 import monza from '../data/monza.json';
+import singapore from '../data/singapore.json';
+import spa from '../data/spa.json';
 import { createVec3 } from '../src/path';
 import { TrackSurface } from '../src/surface';
 import { LEFT, RIGHT, Track, VERGE_FALL } from '../src/track';
@@ -10,7 +12,11 @@ import { steepestKerbSlope } from './fixtures';
  * Every circuit whose data is on master. Add new ones here: the walk below is the contract
  * that the ground a car can reach has no steps in it.
  */
-const CIRCUITS: readonly { name: string; data: unknown }[] = [{ name: 'Monza', data: monza }];
+const CIRCUITS: readonly { name: string; data: unknown }[] = [
+  { name: 'Monza', data: monza },
+  { name: 'Spa', data: spa },
+  { name: 'Singapore', data: singapore },
+];
 
 /** How far past the barrier line the walk goes: a car corner can never be further out. */
 const MARGIN = 0.5;

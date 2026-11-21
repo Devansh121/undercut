@@ -133,13 +133,13 @@ const stepBound = (track: Track): number => (steepestKerbSlope(track) + VERGE_FA
 describe('Spa: projection and ground inside the barriers', { timeout: 120_000 }, () => {
   const track = Track.fromJSON(spa);
 
-  it.fails(`${UNTIL_19} round-trips (6579, 13.664322) near the Bus Stop (review of PR #18)`, () => {
+  it(`${UNTIL_19} round-trips (6579, 13.664322) near the Bus Stop (review of PR #18)`, () => {
     const r = roundTrip(track, 6579, 13.664322);
     expect(r.miss, r.got).toBeLessThan(1e-6);
     expect(r.err, r.got).toBeLessThan(1e-6);
   });
 
-  it.fails(
+  it(
     `${UNTIL_19} round-trips every point inside the barriers, with and without a hint`,
     () => {
       const { worst, where, cases } = denseRoundTrips(track);
@@ -148,7 +148,7 @@ describe('Spa: projection and ground inside the barriers', { timeout: 120_000 },
     },
   );
 
-  it.fails(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
+  it(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
     const { worst, where } = groundSteps(track);
     expect(worst, where).toBeLessThan(stepBound(track));
   });
@@ -157,7 +157,7 @@ describe('Spa: projection and ground inside the barriers', { timeout: 120_000 },
 describe('Singapore: projection and ground inside the barriers', { timeout: 120_000 }, () => {
   const track = Track.fromJSON(singapore);
 
-  it.fails(
+  it(
     `${UNTIL_19} round-trips (257, -25.974) in the turn 1 escape road (review of PR #18)`,
     () => {
       const r = roundTrip(track, 257, -25.974);
@@ -166,7 +166,7 @@ describe('Singapore: projection and ground inside the barriers', { timeout: 120_
     },
   );
 
-  it.fails(
+  it(
     `${UNTIL_19} round-trips every point inside the barriers, with and without a hint`,
     () => {
       const { worst, where, cases } = denseRoundTrips(track);
@@ -175,7 +175,7 @@ describe('Singapore: projection and ground inside the barriers', { timeout: 120_
     },
   );
 
-  it.fails(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
+  it(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
     const { worst, where } = groundSteps(track);
     expect(worst, where).toBeLessThan(stepBound(track));
   });
