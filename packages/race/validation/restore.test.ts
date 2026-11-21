@@ -68,8 +68,14 @@ describe('session snapshots over the real sim', () => {
     if (c.phase === 'lights' && c.lightsCount >= 3) take('lights');
     if (c.racing(0) && a.time > 40) take('race');
     // Turning for the pit lane at the end of lap 1 (the follower takes over 120 m before it).
-    const f1 = a.carFacts(1);
-    if (a.time > 60 && c.pitRequested(1) && c.pitPhase(1) === 'none' && f1.s > 5140 && f1.s < 5235)
+    const car1 = a.carFacts(1);
+    if (
+      a.time > 60 &&
+      c.pitRequested(1) &&
+      c.pitPhase(1) === 'none' &&
+      car1.s > 5140 &&
+      car1.s < 5235
+    )
       take('pitApproach');
     if (c.pitPhase(1) === 'service') take('service');
     log.push(step(a));

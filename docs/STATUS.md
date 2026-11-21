@@ -23,6 +23,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - `window.__undercut` debug API with `?debug=1` (see `apps/web/src/debug.ts`), a keyboard-only autopilot used to prove a full lap, and `npm run shots -- monza` (screenshot stations on the real GPU, `tools/screenshots/`).
 - M0 foundation: npm workspaces, TypeScript strict, Vite client, rooms service on the local Workers runtime, CI with eight required checks, the one-command run.
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
+- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. Headless and soak-tested; the lobby and in-race UI come next. See `docs/netcode.md`.
 
 ## Try this
 
@@ -88,7 +89,26 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Records and ghosts persist in Web Storage until IndexedDB lands in M6; when storage is blocked or full they last for the session and the HUD says so.
 - Engine load sent to the audio engine is the throttle the car applies (after traction control), not a torque ratio; turbo demand is that load times an engine-speed ramp from 6000 to 10 500 rpm; kerb rumble assumes ridges 0.25 m apart; plank scrape starts below 2 mm of floor height. All estimates, to be tuned by ear.
 - Default volumes: master 80 %, engine 100 %, effects 80 %.
+- Car geometry compressed with Draco, not meshopt (Blender writes Draco natively); car textures are WebP, not KTX2, until the client has a Basis transcoder path (ADR 0005).
+- Livery by texture masks in a shared atlas (R secondary, G accent, B bare carbon), not vertex colours, so thin pin lines stay sharp; one designed mask per team (ADR 0005).
+- Two livery patterns were reshaped after a lookalike check: the diagonal split now has the primary colour forward, and the sidepod block is a flank panel only.
+- Tyre compounds use an invented scheme (`design/compounds.json`): soft magenta with three ticks, medium orange with two, hard steel blue with one; the maker's mark appears once per sidewall. The HUD mock tokens follow it.
+- Car suspension links are one mesh with morph targets (bump per corner, steer per front corner) rather than one rotating node per link, to keep draw calls near 40 on High.
+- The far car LOD has no suspension links, uprights or decals; it is 10.6k triangles against the 12k budget.
+
+- Online rooms (M5): a disconnected or silent player's car becomes a ghost (others drive through it) instead of being handed to the host's AI, until the player resumes within 60 s or the car retires.
+- Online rooms: a player who leaves before lights out is replaced by an AI car so the grid stays full; after the start their car retires.
+- Online rooms: the lights-out time, including the random hold, is sent to every client before the first light, as the brief asks; a modified client could know the hold, and jump starts are still caught from snapshots.
+- Online rooms: the host role passes to the longest-connected human as soon as the host disconnects or goes silent for 6 s; a host who comes back is a guest.
+- Online rooms: penalties are time penalties (jump start 5 s; track limits 5 s per report after three warnings), not drive-throughs.
+- Online rooms: room creation is limited to 30 per 10 minutes per client address; codes are six characters with no vowels or look-alikes.
+- The soak runs in real time (the Durable Object clock cannot be accelerated): 3 laps in the `rooms` CI job, 12 laps nightly.
+- Online rooms: lap claims carry race time on the server clock, with a 1 s allowance for clock-sync error; a claim ahead of the server's own elapsed race time is refused.
+- Online rooms: a host whose own car has finished or retired is still watched while its AI race, and only snapshots count as signs of life (a hidden tab keeps pinging but stops driving).
+- Online rooms: at most 32 sockets per room, 16 not yet joined, 4 not yet joined per address, admitted at 5 per second after a burst of 30; refused upgrades get HTTP 429.
+- Car snapshots: the top two bits of the flags byte carry a teleport counter (the unused `finished` flag was dropped to make room), so the record stays 56 bytes.
 
 ## Optional, needs you
 
 - A Cloudflare account to deploy the rooms Worker, and a static host for the client. Neither blocks a milestone; everything runs locally.
+  Deploying the rooms service would take: a Cloudflare account on the Workers plan that includes Durable Objects with SQLite storage; `npx wrangler login`, then `npx wrangler deploy --config services/rooms/wrangler.jsonc` (the migrations `v1` and `v2` create the `Room` and `CreateLimiter` classes); optionally a route so the Worker answers `/rooms/*` on the game's own domain. If the client is served from a different origin, set the rooms URL setting (`settings.roomsUrl`, or `VITE_ROOMS_URL` at build time) to `https://<worker host>/rooms`. Nothing has been deployed.
