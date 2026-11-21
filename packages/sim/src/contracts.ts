@@ -3,8 +3,9 @@
  *
  * - `ControlInput` is what a driver asks of the car on one sim tick. The input layer (human
  *   devices plus assists) and the AI drivers both produce it; the vehicle model consumes it.
- * - `SurfaceSampler` is how the vehicle model reads the ground. The track package implements it;
- *   the sim ships a flat implementation for tests and validation manoeuvres.
+ * - `SurfaceSampler` is how the vehicle model reads the ground and, optionally, the barriers.
+ *   The track package implements it; the sim ships a flat implementation (no barriers) for tests
+ *   and validation manoeuvres.
  */
 
 /** One tick of driver demand. All fields are already filtered, assisted and clamped. */
@@ -115,10 +116,35 @@ export function createSurfaceSample(): SurfaceSample {
   };
 }
 
+/**
+ * Where a point stands relative to the barriers: filled in place by `SurfaceSampler.wall`. The
+ * drivable area is everything on the near side of every barrier (track, run-off, pit lane).
+ */
+export interface WallSample {
+  /**
+   * Distance of the point past the nearest barrier face, m: positive behind the barrier (where
+   * no part of a car may be), zero or negative on the drivable side.
+   */
+  depth: number;
+  /** Unit horizontal normal of that face, world frame, pointing back into the drivable area. */
+  normalX: number;
+  normalZ: number;
+}
+
+export function createWallSample(): WallSample {
+  return { depth: Number.NEGATIVE_INFINITY, normalX: 0, normalZ: 0 };
+}
+
 /** Ground query used by the vehicle model: called per wheel per tick, so it must not allocate. */
 export interface SurfaceSampler {
   /** Fills `out` for the world point (x, z). `hint` belongs to this query point. */
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void;
+  /**
+   * Barrier query for the world point (x, z), called per body corner per substep; must not
+   * allocate. Samplers without barriers (open flat ground, test surfaces) leave it out and the
+   * car is never stopped. `hint` belongs to this query point, as for `sample`.
+   */
+  wall?(x: number, z: number, hint: SurfaceHint, out: WallSample): void;
 }
 
 /** Infinite flat asphalt at y = 0. For unit tests and straight-line validation manoeuvres. */

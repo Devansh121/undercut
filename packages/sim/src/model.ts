@@ -48,6 +48,22 @@ export const GROUND_STEP_RISE = 0.15;
 export const CONTACT_LIFT_MARGIN = 0.05;
 export const FLOOR_LIFT_DEPTH = 0.05;
 
+/**
+ * The body's footprint for barrier contact, m: nose ahead of the front axle, tail behind the
+ * rear axle, half the overall width. Estimate for a 5.6 m car on a 3.6 m wheelbase at the 2 m
+ * width limit; the front wing's end plates and the rear wing set the corners.
+ */
+export const BODY_NOSE = 1.2;
+export const BODY_TAIL = 0.8;
+export const BODY_HALF_WIDTH = 1.0;
+/**
+ * Barrier contact: restitution of the normal speed, and friction of the body sliding along the
+ * barrier. Estimates: a carbon body against concrete or steel keeps little of its normal speed
+ * (crush and tyre barriers keep less), and scrubs at about μ 0.5.
+ */
+export const WALL_RESTITUTION = 0.1;
+export const WALL_FRICTION = 0.5;
+
 /** Tyre deflection at which the rim reaches the ground, m. */
 export function tyreBottomDeflection(tyre: TyreParams): number {
   return TYRE_BOTTOM_FRACTION * (tyre.freeRadius - RIM_RADIUS);

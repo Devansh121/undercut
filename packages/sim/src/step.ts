@@ -1,13 +1,18 @@
 import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
-import { createSurfaceSample } from './contracts';
+import { createSurfaceSample, createWallSample } from './contracts';
 import type { Environment } from './environment';
 import {
+  BODY_HALF_WIDTH,
+  BODY_NOSE,
+  BODY_TAIL,
   BUMP_STOP_GAP,
   CONTACT_LIFT_MARGIN,
   DROOP_STOP_GAP,
   FLOOR_LIFT_DEPTH,
   GROUND_STEP_RISE,
   STOP_RATE,
+  WALL_FRICTION,
+  WALL_RESTITUTION,
   tyreBottomDeflection,
 } from './model';
 import type { AeroParams, EngineParams } from './params';
@@ -43,6 +48,7 @@ const ERS_MODES = [
 // Per-step scratch. Module-level so the hot loop never allocates; the sim is single-threaded.
 const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
 const sample = createSurfaceSample();
+const wallSample = createWallSample();
 const tf = createTyreForce();
 const gh = new Float64Array(4);
 const ghRate = new Float64Array(4);
@@ -73,7 +79,36 @@ export function stepCar(
   const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-9));
   const h = dt / n;
   applyDriverRequests(state, input);
+  state.wallImpactSpeed = 0;
+  state.wallContact = 0;
   for (let k = 0; k < n; k++) substep(state, input, surface, h, env);
+}
+
+const cornerMass: MassState = {
+  total: 0,
+  sprung: 0,
+  a: 0,
+  b: 0,
+  sprungA: 0,
+  sprungB: 0,
+  yawInertia: 0,
+};
+
+/**
+ * World (x, z) of the body's four footprint corners (front left, front right, rear left, rear
+ * right) into `out` as x0, z0, x1, z1, ... Allocation-free.
+ */
+export function bodyCorners(state: CarState, out: Float64Array): Float64Array {
+  const m = computeMass(state.model, state.fuelMass, cornerMass);
+  const c = Math.cos(state.yaw);
+  const sn = Math.sin(state.yaw);
+  for (let k = 0; k < 4; k++) {
+    const bx = k < 2 ? m.a + BODY_NOSE : -m.b - BODY_TAIL;
+    const by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    out[2 * k] = state.x + bx * c - by * sn;
+    out[2 * k + 1] = state.z - bx * sn - by * c;
+  }
+  return out;
 }
 
 /** Begin a new ERS lap: the timing line (or pit entry) resets the per-lap counters. */
@@ -380,6 +415,9 @@ function substep(
   s.accelX = specificX;
   s.accelY = specificY;
 
+  // ---- Barriers. ----
+  if (surface.wall) wallContact(s, surface, m, mass.yawInertia, mass.a, mass.b);
+
   // ---- Sprung and unsprung vertical motion. ----
   // The ground forces' overturning moment, h·ΣF about the whole car's CoG height, splits in
   // two. The sprung mass, whose CoG sits at hs, takes its share through the links at the ground
@@ -427,6 +465,68 @@ function substep(
     if (a > Math.PI) a -= 2 * Math.PI;
     else if (a < -Math.PI) a += 2 * Math.PI;
     s.wheelAngle[i] = a;
+  }
+}
+
+/**
+ * Barrier contact at the body's four footprint corners, resolved every substep. A corner behind
+ * a barrier face is pushed back onto it (the whole car moves; position only). If that corner is
+ * moving into the face, a planar impulse at the corner removes its normal speed (keeping
+ * WALL_RESTITUTION of it) and a friction impulse, at most WALL_FRICTION times the normal one,
+ * scrubs its speed along the face. Applied at the corner, both impulses also change the yaw
+ * rate, so a car that hits at an angle swings round and slides along the barrier. The largest
+ * normal speed met on the step is kept as the impact speed. No damage here.
+ */
+function wallContact(
+  s: CarState,
+  surface: SurfaceSampler,
+  m: number,
+  inertia: number,
+  a: number,
+  b: number,
+): void {
+  for (let k = 0; k < 4; k++) {
+    const c = Math.cos(s.yaw);
+    const sn = Math.sin(s.yaw);
+    const bx = k < 2 ? a + BODY_NOSE : -b - BODY_TAIL;
+    const by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    // Corner offset from the CoG in the world frame.
+    const rx = bx * c - by * sn;
+    const rz = -bx * sn - by * c;
+    surface.wall!(s.x + rx, s.z + rz, s.wallHints[k] as SurfaceHint, wallSample);
+    const depth = wallSample.depth;
+    if (!(depth > 0)) continue;
+    const nx = wallSample.normalX;
+    const nz = wallSample.normalZ;
+    s.x += depth * nx;
+    s.z += depth * nz;
+    s.wallContact = 1;
+    // Corner velocity, world frame: v + ω × r with ω about +Y.
+    const vwx = s.vx * c - s.vy * sn;
+    const vwz = -s.vx * sn - s.vy * c;
+    const w = s.yawRate;
+    const px = vwx + w * rz;
+    const pz = vwz - w * rx;
+    const vn = px * nx + pz * nz;
+    if (vn >= 0) continue;
+    if (-vn > s.wallImpactSpeed) s.wallImpactSpeed = -vn;
+    // Tangent along the face and the corner's sliding speed on it.
+    const tx = -nz;
+    const tz = nx;
+    const vt = px * tx + pz * tz;
+    const rn = rz * nx - rx * nz;
+    const rt = rz * tx - rx * tz;
+    const jn = (-(1 + WALL_RESTITUTION) * vn) / (1 / m + (rn * rn) / inertia);
+    let jt = -vt / (1 / m + (rt * rt) / inertia);
+    const jmax = WALL_FRICTION * jn;
+    if (jt > jmax) jt = jmax;
+    else if (jt < -jmax) jt = -jmax;
+    const jx = jn * nx + jt * tx;
+    const jz = jn * nz + jt * tz;
+    // Back to the car's frame: forward and left components of the impulse.
+    s.vx += (jx * c - jz * sn) / m;
+    s.vy += (-jx * sn - jz * c) / m;
+    s.yawRate += (rz * jx - rx * jz) / inertia;
   }
 }
 

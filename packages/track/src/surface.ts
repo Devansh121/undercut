@@ -3,9 +3,16 @@ import {
   type SurfaceHint,
   type SurfaceSample,
   type SurfaceSampler,
+  type WallSample,
 } from '@undercut/sim';
 import { createPathPoint, createVec3 } from './path';
-import { createGround, type Track } from './track';
+import { LEFT, RIGHT, createGround, type Track } from './track';
+
+/**
+ * Gap between the pit lane's garage-side edge and the garage wall, m: the wall `Track` builds
+ * for the renderer stands this far out.
+ */
+export const GARAGE_WALL_GAP = 0.5;
 
 /** Friction, rolling drag and texture of a surface. */
 export interface SurfaceProperties {
@@ -88,5 +95,84 @@ export class TrackSurface implements SurfaceSampler {
     out.kind = kind;
     out.s = s;
     out.d = d;
+  }
+
+  /**
+   * Barriers as the car meets them. The drivable area is the union of two regions:
+   *
+   * - the lap: |d| up to the barrier offset on that side, interpolated along s. Where the offset
+   *   changes along s (the pit wall's nose, a run of barrier set back) the face is slanted, and
+   *   the normal follows the face: the gradient of |d| − barrier(s), not just the lap normal;
+   * - the pit lane, where it runs alongside: in its own frame, from its track-side edge to the
+   *   garage wall (the lane's garage-side edge plus GARAGE_WALL_GAP).
+   *
+   * Between the two, along the pit straight, lie the pit wall and its verge: behind a barrier
+   * from both sides. Depth is the distance past the nearer region's edge, so a car on either
+   * side of the pit wall is pushed back to its own side.
+   */
+  wall(x: number, z: number, hint: SurfaceHint, out: WallSample): void {
+    const track = this.track;
+    const lap = track.lap;
+    const segs = lap.segments;
+    let pitIndex = -1;
+    if (hint.index >= 0) {
+      this.lapHint.index = hint.index % segs;
+      pitIndex = Math.floor(hint.index / segs) - 1;
+    } else {
+      this.lapHint.index = -1;
+    }
+    const q = track.project(x, z, this.lapHint, this.q);
+    const s = q.s;
+    const d = q.d;
+    const side = d >= 0 ? LEFT : RIGHT;
+    const sign = side === LEFT ? 1 : -1;
+    lap.seek(s);
+    const i0 = lap.cursor;
+    const j = lap.next(i0);
+    const off = track.barrier[side];
+    const b = off[i0]! + (off[j]! - off[i0]!) * lap.cursorT;
+    const db = (off[j]! - off[i0]!) / lap.chord[i0]!;
+    const t = lap.tangent(s, this.t);
+    const tx = t.x;
+    const tz = t.z;
+    // Left normal (tz, -tx). Along s at offset d, a metre of s is (1 - κd) metres of ground.
+    let m = 1 - track.curvatureAt(s) * d;
+    if (m < 0.05) m = 0.05;
+    // Gradient of f = |d| - b(s) in the world, and the inward normal -∇f / |∇f|.
+    const gx = sign * tz - (db / m) * tx;
+    const gz = -sign * tx - (db / m) * tz;
+    const gl = Math.sqrt(gx * gx + gz * gz);
+    let depth = (sign * d - b) / gl;
+    let nx = -gx / gl;
+    let nz = -gz / gl;
+
+    const near = track.pitNear[lap.sampleIndex(s)]!;
+    if (depth > 0 && near >= 0 && side === track.pitSide) {
+      const pit = track.pit;
+      this.pitHint.index = pitIndex >= 0 ? pitIndex : Math.min(near, pit.path.segments - 1);
+      const pq = pit.path.project(x, z, this.pitHint, this.pq);
+      pitIndex = this.pitHint.index;
+      if (pq.s >= 0 && pq.s <= pit.length) {
+        // gs: which way the garages lie in the pit frame (+1 left of the lane's direction).
+        const gs = pit.side === 'left' ? 1 : -1;
+        const hwG = pit.halfWidth(pq.s, gs > 0 ? LEFT : RIGHT) + GARAGE_WALL_GAP;
+        const hwT = pit.halfWidth(pq.s, gs > 0 ? RIGHT : LEFT);
+        const garage = gs * pq.d - hwG;
+        const trackSide = -gs * pq.d - hwT;
+        const pitDepth = garage > trackSide ? garage : trackSide;
+        if (pitDepth < depth) {
+          const pn = pit.path.normal(pq.s, this.t);
+          // Inward from the garage wall is away from the garages, and vice versa.
+          const toward = garage > trackSide ? -gs : gs;
+          depth = pitDepth;
+          nx = toward * pn.x;
+          nz = toward * pn.z;
+        }
+      }
+    }
+    hint.index = this.lapHint.index + segs * (pitIndex + 1);
+    out.depth = depth;
+    out.normalX = nx;
+    out.normalZ = nz;
   }
 }

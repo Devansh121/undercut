@@ -37,6 +37,13 @@ export class CarState {
     createSurfaceHint(),
     createSurfaceHint(),
   ];
+  /** Barrier search hints, one per body corner (front left, front right, rear left, rear right). */
+  readonly wallHints: readonly SurfaceHint[] = [
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+  ];
 
   // Planar motion.
   x = 0;
@@ -97,6 +104,12 @@ export class CarState {
    */
   groundSteps = 0;
   contactLifts = 0;
+  /**
+   * Barrier contact on the last step: the largest speed into a barrier at a contact, m/s (0 when
+   * nothing hit), and 1 while any body corner touches a barrier. For damage and audio later.
+   */
+  wallImpactSpeed = 0;
+  wallContact = 0;
 
   // Per wheel, in FL, FR, RL, RR order.
   readonly wheelSpeed = new Float64Array(4);
@@ -180,6 +193,8 @@ const SCALAR_KEYS = [
   'externalTorque',
   'groundSteps',
   'contactLifts',
+  'wallImpactSpeed',
+  'wallContact',
 ] as const satisfies readonly (keyof CarState)[];
 
 const WHEEL_KEYS = [
@@ -226,6 +241,7 @@ export function restoreCar(state: CarState, snapshot: ArrayLike<number>): void {
     for (let i = 0; i < 4; i++) arr[i] = snapshot[k++] as number;
   }
   for (const hint of state.hints) hint.index = -1;
+  for (const hint of state.wallHints) hint.index = -1;
 }
 
 export interface CarStartOptions {
