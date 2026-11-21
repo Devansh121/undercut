@@ -40,6 +40,13 @@ export class OnlineFlow {
       random: Math.random,
     });
     this.screens = new RoomScreens(this.session, code, () => this.close());
+    void fetch('/network-info')
+      .then((r) => r.json())
+      .then((info: { origins?: unknown }) => {
+        if (Array.isArray(info.origins) && info.origins.every((o) => typeof o === 'string'))
+          this.screens.setNetworkOrigins(info.origins);
+      })
+      .catch(() => undefined);
     this.session.on('change', () => this.changed());
     this.session.on('notice', (n) => this.screens.say(n));
     this.changed();

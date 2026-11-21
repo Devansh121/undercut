@@ -1,5 +1,5 @@
 import { el } from '../ui/dom';
-import { displayCode, inviteLink } from './invite';
+import { displayCode, inviteLink, networkOrigin } from './invite';
 import type { OnlineSession } from './session';
 
 /** Room screens share the game's typography and buttons; all data comes from the session. */
@@ -8,6 +8,11 @@ export class RoomScreens {
   private name = 'Driver';
   private code: string;
   private notice = '';
+  private origins: string[] = [];
+  setNetworkOrigins(origins: string[]): void {
+    this.origins = origins;
+    this.show();
+  }
   constructor(
     private readonly session: OnlineSession,
     code: string | null,
@@ -53,13 +58,21 @@ export class RoomScreens {
         button('Back', this.back),
       );
     } else {
-      const invite = inviteLink(location.href, s.code!);
+      const invite = inviteLink(
+        location.href,
+        s.code!,
+        networkOrigin(location.href, this.origins) ?? undefined,
+      );
       const link = el('a', '', invite);
       link.href = invite;
       link.dataset.testid = 'invite';
       content.append(
         link,
         button('Copy invite', () => {
+          if (!navigator.clipboard) {
+            this.say('Select the invite link to copy it');
+            return;
+          }
           void navigator.clipboard
             ?.writeText(invite)
             .then(() => this.say('Invite copied'))

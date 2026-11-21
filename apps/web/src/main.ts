@@ -64,7 +64,6 @@ let drive: DriveHandle | null = null;
 let driveModule: DriveModule | null = null;
 let launch: LaunchScreen | null = null;
 let starting: Promise<DriveHandle> | null = null;
-let menuHandle = 0;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -84,19 +83,44 @@ function showLaunch(): void {
     },
   });
   void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
+}
+
+function pollMenus(): void {
   // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
   let last: number | null = null;
   const poll = (now: number): void => {
-    if (drive || starting) return;
+    if (drive || starting) {
+      requestAnimationFrame(poll);
+      last = now;
+      return;
+    }
     const dt = last === null ? 0 : (now - last) / 1000;
     last = now;
     const f = input.sample(dt, 0);
     for (const e of f.events) {
       // A focused button already clicks on Enter; gamepads need the accept passed on.
-      const native = f.device === 'keyboard' && document.activeElement?.tagName === 'BUTTON';
+      const native =
+        f.device === 'keyboard' &&
+        ['BUTTON', 'INPUT', 'A'].includes(document.activeElement?.tagName ?? '');
       if (e.type === 'action' && e.action === 'menuAccept' && !native) {
-        if (document.activeElement instanceof HTMLButtonElement) document.activeElement.click();
+        if (
+          document.activeElement instanceof HTMLElement &&
+          document.activeElement !== document.body
+        )
+          document.activeElement.click();
         else launch?.start();
+      }
+      if (
+        e.type === 'action' &&
+        (e.action === 'menuLeft' || e.action === 'menuRight') &&
+        f.device === 'gamepad'
+      ) {
+        const field = document.activeElement;
+        if (field instanceof HTMLInputElement && field.type === 'number' && !field.disabled) {
+          if (e.action === 'menuRight') field.stepUp();
+          else field.stepDown();
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       }
       if (e.type === 'action' && (e.action === 'menuDown' || e.action === 'menuUp')) {
         const buttons = [
@@ -108,9 +132,9 @@ function showLaunch(): void {
         ]?.focus();
       }
     }
-    menuHandle = requestAnimationFrame(poll);
+    requestAnimationFrame(poll);
   };
-  menuHandle = requestAnimationFrame(poll);
+  requestAnimationFrame(poll);
 }
 
 function showOnline(code: string | null): void {
@@ -127,7 +151,7 @@ async function start(extension?: DriveExtension, quit?: () => void): Promise<Dri
   if (drive) return drive;
   if (starting) return starting;
   launch?.setLoading(true);
-  cancelAnimationFrame(menuHandle);
+
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -172,6 +196,7 @@ async function start(extension?: DriveExtension, quit?: () => void): Promise<Dri
 }
 
 showLaunch();
+pollMenus();
 const invite = codeFromUrl(location.href);
 if (invite) showOnline(invite);
 if (debugEnabled()) {

@@ -216,6 +216,14 @@ export class OnlineRace implements DriveExtension {
     const c = this.client;
     const room = c.room;
     const session = ctx.session;
+    const policy = room?.settings.assists;
+    if (policy) {
+      if (!policy.abs && session.assists.abs) session.setAssist('abs', 0);
+      if (!policy.tractionControl && session.assists.tractionControl)
+        session.setAssist('tractionControl', 0);
+      if (!policy.autoGears && session.assists.autoGears) session.setAssist('autoGears', false);
+      if (!policy.steeringAssist && session.assists.steering) session.setAssist('steering', 0);
+    }
     const now = c.serverNow();
     const start = room?.start ?? null;
     this.report.start = start;

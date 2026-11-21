@@ -10,6 +10,8 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M5 online client: Online rooms on the launch screen, create or join by invite, ready countdown, server-clock start lights, remote cars and minimap, official results and rematch. A desktop host and landscape phone guest complete the two-browser acceptance test against the local service.
+
 - M3 race core: a pure `packages/race` runs the race rules for every session type (time trial, practice, qualifying, race, race weekend, championship): five-light start with a seeded hold and jump starts, timing from the circuit's control line with mini-sector gaps, track limits with strikes and penalties, yellow, blue, chequered and black-and-white flags, race DRS, ERS laps, pit stops with the limiter, boxes, service time and penalties served, results and points, JSON snapshots, and a stuck-car watchdog. AI cars launch, race (as ghosts to each other: no contact yet), make their pit stops and finish. Rules and values: `docs/race-rules.md`.
 - Headless races: `npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1` (and `weekend`) prints the classification, the event log and the watchdog's findings and writes JSON to `artifacts/telemetry/`. Twenty cars run about 22× faster than real time.
 - Time trial now runs on the race engine. Laps are timed from Monza's control line (320.5 m before the start line), so the rolling start sits 160 m before it. Records kept before this change were timed from the start line and are dropped once.
@@ -43,6 +45,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
+
 - Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
 - Physics: the reference controller laps Monza in 1:24.969; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The quasi-steady full-envelope profile on its line predicts 1:23.4, so the gap is mostly car, line and track model, not driving. It is recorded in `docs/physics-validation.md` section 7.6 and pinned by a test, not hidden.
 - Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
@@ -50,6 +54,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Rooms soak, long (nightly): the first scheduled run (44897291625, commit 670438a) timed out waiting for results. From the laps each client had reported, all eight stopped within the same second, 157.9 to 159.0 s after lights out (the leader finishes at 170.4 s). All ended in status `closed` while the room stayed in `racing`. The host's last view showed the seven guests away and disconnected and itself still connected, and nobody was left to report laps. It does not reproduce locally: two full runs on c5f393a (one pinned to two cores) pass with a 176 s race, 195 s wall time, no away events and no errors, so the 252 s budget is not the cause. `closed` can only come from a terminal close code: a reconnect backoff would need at least 99 s to run out, and only about 91 s had passed. So the service most likely ended the guests' sockets on purpose (too many strikes, resume refused, or replaced). The CI log has no close codes and no service log, so the code is unknown. The timeout message now includes each client's close codes, errors, last status changes and the service log's last lines, so the next failing run will name the cause.
 
 ## Decided for you
+
+- Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
+- Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
+- Start agreement is measured using calculated local lights-out times and the sum of clock error bounds; actual car release waits for the next rendered frame and can be late under load.
 
 - MIT copyright holder written as "Devansh121".
 - npm workspaces instead of pnpm, because pnpm is not installed.
