@@ -56,7 +56,7 @@ Renders (Cycles, OptiX, 256 samples, AgX, studio HDRI from Poly Haven for lighti
 
 Build and export take under 1 s; build plus the two renders take about 30 s.
 
-Gaps seen in the proof, to fix in M2: the endplate faces are flat (no bowing, slots or footplate curl); the flaps' spanwise wave is a little stylised; carbon and the livery band are procedural Blender shaders, which do not survive glTF export, so in the game they become a tiling carbon detail texture and a livery mask (see below); no baked AO yet.
+Gaps seen in the proof, to fix in M2: the endplate faces are flat (no bowing, slots or footplate curl); the elements' spanwise waves are too large and the nose crosses them diagonally, so the assembly reads as sculpted rather than regulation-shaped (see the proportion checks in the M2 plan); carbon and the livery band are procedural Blender shaders, which do not survive glTF export, so in the game they become a tiling carbon detail texture and a livery mask (see below); no baked AO yet.
 
 ## Consequences
 
@@ -68,6 +68,8 @@ Gaps seen in the proof, to fix in M2: the endplate faces are flat (no bowing, sl
 ## Plan for the full car in M2
 
 **Parts, in build order:** monocoque and cockpit opening with halo; nose and front wing (this proof, finished); front and rear suspension (aerofoil-section wishbones, push/pull rods, track rods) and uprights with brake ducts; 18-inch wheels with low-profile tyres, sidewall lettering and wheel covers; sidepods with inlets and the undercut; engine cover with airbox, roll hoop and cooling louvres; floor with edge wings, under-floor fences and diffuser; rear wing with beam wing, endplates, DRS flap and actuator pod; rear crash structure and rain light; mirrors; steering wheel with display; driver helmet and shoulders; T-cam and antennae.
+
+**Proportion checks before detail:** the proof wing avoids primitives, but its elements carry large sinusoidal waves and the nose crosses them diagonally, so it reads as a sculpture rather than a current front wing. In M2 every part is shaped against orthographic proportion checks (plan, side and front) written into its script as dimensions taken from the technical regulations' bounding boxes (overall width, element count and chord limits, endplate and nose envelopes, wheelbase, ride heights), and the script asserts them on every build. Each part is then reviewed from three-quarter front, side and top renders, compared with the regulation outlines, before work moves to the next part.
 
 **Triangle budget:**
 
