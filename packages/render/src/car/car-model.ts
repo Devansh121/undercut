@@ -496,7 +496,8 @@ export class CarModel {
     // values change and only while the cockpit view shows it.
     const display = new PlaneGeometry(0.1, 0.0625);
     display.rotateY(-Math.PI / 2);
-    display.translate(-0.016, 0.003, 0);
+    // Clear of the grip plate's face (half its 25 mm thickness plus the 4 mm bevel).
+    display.translate(-0.0185, 0.003, 0);
     if (this.dash) {
       const screen = new Mesh(this.g(display), this.dash.material);
       screen.name = 'wheel-display';

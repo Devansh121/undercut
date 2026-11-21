@@ -166,6 +166,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     resume: () => resume(),
     restartLap: () => {
       onEvents(loop.restartLap());
+      pilot.pilot.reset();
       resume();
     },
     resetToTrack: () => {

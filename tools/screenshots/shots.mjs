@@ -296,6 +296,9 @@ async function lap(browser, report) {
     const u = globalThis.__undercut;
     u.camera('chase-far');
     u.autopilot(true);
+    // Restart in the same call, so the lap does not depend on how many neutral ticks ran
+    // before the autopilot took over: the run is then the same every time.
+    u.restartLap();
     u.setTimeScale(4);
   });
   await page.waitForFunction(() => globalThis.__undercut.state().lastLap !== null, null, {
