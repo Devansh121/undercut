@@ -3,6 +3,7 @@ export { ClockSync, type ClockSample } from './clock';
 export {
   DEFAULT_REMOTE_CAR_OPTIONS,
   RemoteCarBuffer,
+  discontinuous,
   type RemoteCarMode,
   type RemoteCarOptions,
   type RemoteCarView,

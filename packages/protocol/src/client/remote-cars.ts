@@ -5,7 +5,9 @@
  * delay is sized from measured transit time and jitter
  * of every sender. When snapshots stop, the car is extrapolated from its velocity for
  * a bounded time, then held in place, then faded out: the game treats a held or
- * fading car as a ghost (no collisions).
+ * fading car as a ghost (no collisions). A teleport (the sender's reset counter changes,
+ * or a jump its velocities cannot explain) is never interpolated across: the car stays
+ * where it was until the reset's timestamp, then appears at the new place.
  */
 import type { CarSnapshot } from '../snapshot';
 
@@ -109,6 +111,22 @@ function interpolate(a: CarSnapshot, b: CarSnapshot, t: number): CarSnapshot {
       lerp(a.wheelSpin[3], b.wheelSpin[3], t),
     ],
   };
+}
+
+/** Slack on top of the distance the velocities can explain, metres. */
+const JUMP_SLACK_M = 5;
+
+/**
+ * Two snapshots that must not be joined by a curve: the sender bumped its reset
+ * counter, or (if that snapshot was lost along with the bump being seen) the car moved
+ * much further than either velocity allows in the time between them.
+ */
+export function discontinuous(a: CarSnapshot, b: CarSnapshot): boolean {
+  if (a.resets !== b.resets) return true;
+  const dt = Math.abs(b.t - a.t) / 1000;
+  const speed = Math.max(Math.hypot(a.vx, a.vy, a.vz), Math.hypot(b.vx, b.vy, b.vz));
+  const moved = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  return moved > 1.5 * speed * dt + JUMP_SLACK_M;
 }
 
 function extrapolate(c: CarSnapshot, ms: number): CarSnapshot {
@@ -234,6 +252,11 @@ export class RemoteCarBuffer {
       while (i > 0 && (h[i - 1] as CarSnapshot).t > renderTime) i--;
       const a = h[i - 1] as CarSnapshot;
       const b = h[i] as CarSnapshot;
+      if (discontinuous(a, b)) {
+        // A teleport: keep the old place until the moment of the reset, then snap.
+        const at = renderTime < b.t ? a : b;
+        return { ...at, mode: 'interpolated', opacity: 1, aheadMs: 0 };
+      }
       const t = b.t === a.t ? 1 : (renderTime - a.t) / (b.t - a.t);
       return { ...interpolate(a, b, t), mode: 'interpolated', opacity: 1, aheadMs: 0 };
     }

@@ -44,6 +44,7 @@ export function car(seat: number, over: Partial<CarSnapshot> = {}): CarSnapshot 
   return {
     seat,
     flags: 0,
+    resets: 0,
     tick: 1,
     t: T0,
     x: 0,
@@ -133,9 +134,9 @@ export class Harness {
     this.apply(this.machine.handle({ type: 'tick' }, this.now));
   }
 
-  open(conn: string): Outbound[] {
+  open(conn: string, address = 'test'): Outbound[] {
     this.box(conn);
-    return this.apply(this.machine.handle({ type: 'open', conn }, this.now));
+    return this.apply(this.machine.handle({ type: 'open', conn, address }, this.now));
   }
 
   raw(conn: string, data: string): Outbound[] {

@@ -53,6 +53,7 @@ export function carAt(
   return {
     seat,
     flags: 0,
+    resets: 0,
     tick,
     t,
     x: R * Math.cos(a),

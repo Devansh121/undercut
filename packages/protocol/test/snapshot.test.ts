@@ -18,7 +18,8 @@ function randomCar(seed: number): CarSnapshot {
   const r = createRng(seed);
   return {
     seat: r.int(0, MAX_CARS - 1),
-    flags: r.int(0, 127),
+    flags: r.int(0, 63),
+    resets: r.int(0, 3),
     tick: r.int(0, 2 ** 32 - 1),
     t: EPOCH + r.range(0, 3 * 3600_000),
     x: r.range(-3000, 3000),
@@ -79,7 +80,7 @@ describe('snapshot codec', () => {
       const decoded = decodeUpFrame(encodeUpFrame([car], EPOCH), EPOCH);
       if (!decoded.ok) throw new Error(decoded.detail);
       const back = decoded.frame.cars[0] as CarSnapshot;
-      for (const key of ['seat', 'flags', 'tick', 'gear', 'lap'] as const) {
+      for (const key of ['seat', 'flags', 'resets', 'tick', 'gear', 'lap'] as const) {
         if (back[key] !== car[key]) failures.push(`${key}: ${car[key]} -> ${back[key]}`);
       }
       for (const [key, bound] of Object.entries(BOUNDS)) {
@@ -171,6 +172,41 @@ describe('snapshot codec', () => {
       if (i % 3 === 0 && bytes.length > 1) bytes[0] = 1;
       expect(() => decodeUpFrame(bytes, EPOCH)).not.toThrow();
       expect(() => decodeDownFrame(bytes, EPOCH)).not.toThrow();
+    }
+  });
+
+  it('keeps angle errors within half a step across the +-pi seam (review finding 8)', () => {
+    const step = Math.PI / 32768;
+    const circular = (a: number, b: number) => {
+      const d = Math.abs(a - b) % (2 * Math.PI);
+      return Math.min(d, 2 * Math.PI - d);
+    };
+    const angles: number[] = [];
+    for (const edge of [Math.PI, -Math.PI]) {
+      for (let k = -40; k <= 40; k++) angles.push(edge + k * 1e-6);
+      for (const e of [1e-7, 1e-9, step / 2, step / 2 - 1e-9, step / 2 + 1e-9]) {
+        angles.push(edge - e, edge + e);
+      }
+    }
+    let worst = 0;
+    for (const a of angles) {
+      const decoded = decodeUpFrame(
+        encodeUpFrame([{ ...randomCar(1), yaw: a, pitch: a, roll: a }], EPOCH),
+        EPOCH,
+      );
+      if (!decoded.ok) throw new Error(decoded.detail);
+      const back = decoded.frame.cars[0] as CarSnapshot;
+      for (const v of [back.yaw, back.pitch, back.roll]) worst = Math.max(worst, circular(a, v));
+    }
+    expect(worst).toBeLessThanOrEqual(step / 2 + 1e-12);
+  });
+
+  it('carries a two-bit reset counter beside the flags', () => {
+    for (let resets = 0; resets < 8; resets++) {
+      const car = { ...randomCar(2), flags: 0b111111, resets };
+      const decoded = decodeUpFrame(encodeUpFrame([car], EPOCH), EPOCH);
+      if (!decoded.ok) throw new Error(decoded.detail);
+      expect(decoded.frame.cars[0]).toMatchObject({ flags: 0b111111, resets: resets % 4 });
     }
   });
 });

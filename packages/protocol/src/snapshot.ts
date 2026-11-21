@@ -6,7 +6,7 @@
  *
  *   field            wire    unit                 range                  error
  *   seat             u8      index                0..19                  exact
- *   flags            u8      bit set              see CAR_FLAG           exact
+ *   flags, resets    u8      bits 0-5: CAR_FLAG; bits 6-7: reset counter  exact
  *   tick             u32     sender sim tick      0..2^32-1              exact
  *   t                u32     ms after room epoch  0..49.7 days           0.5 ms
  *   x, y, z          i32     mm                   +-2147 km              0.5 mm
@@ -21,8 +21,15 @@
  *   lap              u16     laps completed       0..65535               exact
  *   s                u32     mm along centreline  0..4294 km             0.5 mm
  *
- * Values outside a range are clamped, and non-finite values encode as 0, so the encoder
- * never throws on bad sim output. Frames:
+ * Angles are rounded to the nearest step and wrapped in 16-bit space, so values next to
+ * +pi and -pi stay within half a step of the truth measured round the circle. Values
+ * outside a range are clamped, and non-finite values encode as 0, so the encoder never
+ * throws on bad sim output.
+ *
+ * `resets` counts teleports (reset to track, pit-box placement) modulo 4. A receiver
+ * that sees it change between two snapshots must not interpolate across them.
+ *
+ * Frames:
  *
  *   up   (client to server): u8 kind=1, u8 count, count x record
  *   down (server to client): u8 kind=2, u8 count, u32 server receive time (ms after
@@ -48,12 +55,17 @@ export const CAR_FLAG = {
   limiter: 8,
   ersDeploy: 16,
   retired: 32,
-  finished: 64,
 } as const;
+
+/** Bits of the flags byte that carry CAR_FLAG; the top two carry `resets`. */
+const FLAG_MASK = 0x3f;
 
 export interface CarSnapshot {
   seat: number;
+  /** CAR_FLAG bits (0 to 63). */
   flags: number;
+  /** Teleport counter, modulo 4: bump it whenever the car is placed rather than driven. */
+  resets: number;
   /** Sender's fixed-step tick. Later snapshots have higher ticks. */
   tick: number;
   /** Sender's estimate of server time (ms since the Unix epoch) for this state. */
@@ -101,17 +113,29 @@ function wrap(a: number): number {
   return v - twoPi * Math.floor((v + Math.PI) / twoPi);
 }
 
+/**
+ * An angle as a signed 16-bit step count. Rounding just below +pi gives 32768, which
+ * is the same direction as -32768: wrap it rather than clamp it to 32767.
+ */
+function angle16(a: number): number {
+  const q = Math.round(wrap(a) * ANGLE_SCALE);
+  return ((q + 32768) & 0xffff) - 32768;
+}
+
 function writeCar(view: DataView, o: number, c: CarSnapshot, epoch: number): void {
   view.setUint8(o, clampInt(c.seat, 0, 255));
-  view.setUint8(o + 1, clampInt(c.flags, 0, 255));
+  view.setUint8(
+    o + 1,
+    (clampInt(c.flags, 0, 255) & FLAG_MASK) | ((clampInt(c.resets, 0, 0xffff) & 3) << 6),
+  );
   view.setUint32(o + 2, clampInt(c.tick, 0, 0xffffffff), true);
   view.setUint32(o + 6, clampInt(c.t - epoch, 0, 0xffffffff), true);
   view.setInt32(o + 10, clampInt(c.x * 1000, -0x80000000, 0x7fffffff), true);
   view.setInt32(o + 14, clampInt(c.y * 1000, -0x80000000, 0x7fffffff), true);
   view.setInt32(o + 18, clampInt(c.z * 1000, -0x80000000, 0x7fffffff), true);
-  view.setInt16(o + 22, clampInt(wrap(c.yaw) * ANGLE_SCALE, -32768, 32767), true);
-  view.setInt16(o + 24, clampInt(wrap(c.pitch) * ANGLE_SCALE, -32768, 32767), true);
-  view.setInt16(o + 26, clampInt(wrap(c.roll) * ANGLE_SCALE, -32768, 32767), true);
+  view.setInt16(o + 22, angle16(c.yaw), true);
+  view.setInt16(o + 24, angle16(c.pitch), true);
+  view.setInt16(o + 26, angle16(c.roll), true);
   view.setInt16(o + 28, clampInt(c.vx * 100, -32768, 32767), true);
   view.setInt16(o + 30, clampInt(c.vy * 100, -32768, 32767), true);
   view.setInt16(o + 32, clampInt(c.vz * 100, -32768, 32767), true);
@@ -131,7 +155,8 @@ function writeCar(view: DataView, o: number, c: CarSnapshot, epoch: number): voi
 function readCar(view: DataView, o: number, epoch: number): CarSnapshot {
   return {
     seat: view.getUint8(o),
-    flags: view.getUint8(o + 1),
+    flags: view.getUint8(o + 1) & FLAG_MASK,
+    resets: view.getUint8(o + 1) >> 6,
     tick: view.getUint32(o + 2, true),
     t: epoch + view.getUint32(o + 6, true),
     x: view.getInt32(o + 10, true) / 1000,

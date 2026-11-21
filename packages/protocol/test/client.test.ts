@@ -124,7 +124,9 @@ class Loopback implements Transport {
     const id = `k${++this.next}`;
     this.handlers.set(id, handlers);
     this.timers.setTimeout(() => {
-      this.deliver(this.machine.handle({ type: 'open', conn: id }, this.serverNow()));
+      this.deliver(
+        this.machine.handle({ type: 'open', conn: id, address: 'loopback' }, this.serverNow()),
+      );
       handlers.onOpen();
     }, this.latency);
     const send = (event: { type: 'text'; data: string } | { type: 'binary'; data: Uint8Array }) =>
@@ -300,6 +302,33 @@ describe('RemoteCarBuffer', () => {
     expect(b.dropped).toBe(1);
     const v = b.sampleSeat(1, 1.5 * 33)!;
     expect(v.mode).toBe('interpolated');
+  });
+
+  it('holds, then snaps, across a reset instead of sweeping through the gap (finding 7)', () => {
+    const b = new RemoteCarBuffer();
+    const at = (t: number, x: number, resets: number) =>
+      car(1, { t, tick: Math.round(t), x, z: 0, vx: 0, vz: 0, resets });
+    b.push(at(0, 0, 0), 50);
+    b.push(at(33, 0, 0), 83);
+    b.push(at(66, 100, 1), 116); // reset to track: 100 m away, stationary
+    b.push(at(99, 100, 1), 149);
+    for (let t = 34; t < 66; t += 4) expect(b.sampleSeat(1, t)!.x).toBe(0);
+    expect(b.sampleSeat(1, 66)!.x).toBe(100);
+    expect(b.sampleSeat(1, 80)!.x).toBe(100);
+  });
+
+  it('treats a jump the velocities cannot explain as a reset even without the counter', () => {
+    const b = new RemoteCarBuffer();
+    const at = (t: number, x: number) => car(1, { t, tick: Math.round(t), x, vx: 80 });
+    b.push(at(0, 0), 50);
+    b.push(at(33, 2.64), 83);
+    b.push(at(66, 300), 116); // 297 m in 33 ms at 80 m/s
+    b.push(at(99, 302.64), 149);
+    for (let t = 34; t < 66; t += 4) expect(b.sampleSeat(1, t)!.x).toBeLessThan(5.3);
+    expect(b.sampleSeat(1, 70)!.x).toBeGreaterThan(300);
+    // An ordinary 33 ms step at 80 m/s still interpolates smoothly.
+    const mid = b.sampleSeat(1, 16.5)!.x;
+    expect(mid).toBeCloseTo(1.32, 2);
   });
 
   it('stays bounded in size', () => {
