@@ -11,10 +11,10 @@ export function watchProblems(page: Page): string[] {
   return problems;
 }
 
-/** Load the launch screen with the debug API and press Start with a real click. */
+/** Load the launch screen with the debug API and start Time Trial with a real click. */
 export async function coldStart(page: Page, quality: 'lite' | 'mobile'): Promise<void> {
   await page.goto(`/?debug=1&quality=${quality}`);
-  await page.getByRole('button', { name: /Start/ }).click();
+  await page.getByRole('button', { name: 'Time Trial', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await expect(page.locator('[data-testid=hud]')).toBeVisible();
 }
