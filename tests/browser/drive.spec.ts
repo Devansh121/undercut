@@ -222,6 +222,16 @@ test.describe('drive', () => {
     await page.screenshot({ path: testInfo.outputPath('car-at-barrier.png') });
     const rest = await pose();
     expect(rest.safetyResets).toBe(start.safetyResets);
+    // Parked against the barrier with the keyboard's default assists (automatic gears): Q twice
+    // selects reverse through neutral, and the car backs away.
+    const gear = async (): Promise<number> =>
+      page.evaluate(() => window.__undercut!.telemetry().gear as number);
+    await page.evaluate(() => window.__undercut?.drive({ brake: 0, throttle: 0, gearShift: -1 }));
+    await expect.poll(gear).toBe(0);
+    await page.evaluate(() => window.__undercut?.drive({ gearShift: -1 }));
+    await expect.poll(gear).toBe(-1);
+    await page.evaluate(() => window.__undercut?.drive({ throttle: 0.5 }));
+    await expect.poll(async () => (await pose()).speed, { timeout: 10_000 }).toBeLessThan(-1);
     await page.evaluate(() => window.__undercut?.drive(null));
     expect(problems).toEqual([]);
   });
