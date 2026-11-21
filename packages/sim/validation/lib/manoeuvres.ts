@@ -14,6 +14,7 @@ import {
   ThresholdBrakeDriver,
   YawRateSteer,
   shiftForSpeed,
+  trailOffCap,
 } from './drivers';
 import {
   CIRCUITS,
@@ -173,7 +174,15 @@ export interface BrakingResult {
 export const BIAS_RANGE = [0.52, 0.54, 0.56, 0.58, 0.6, 0.62] as const;
 
 export function braking(
-  o: RunOptions & { circuit: Circuit; v1: number; v2: number; bias: number; fuel?: number },
+  o: RunOptions & {
+    circuit: Circuit;
+    v1: number;
+    v2: number;
+    bias: number;
+    fuel?: number;
+    /** 'event' (default) trails off into the corner; 'threshold' brakes flat out to v2. */
+    profile?: 'event' | 'threshold';
+  },
 ): BrakingResult {
   const c = CIRCUITS[o.circuit];
   const h = new Harness({
@@ -182,41 +191,53 @@ export function braking(
     speed: o.v1,
     airDensity: c.airDensity,
     brakeBias: o.bias,
-    ersMode: ErsMode.Balanced,
-    // The store is part-used at the end of a straight, so the MGU-K can harvest.
+    // Every published event ends a DRS straight with the MGU-K deploying; the store is
+    // part-used by then, so the MGU-K can harvest under the brakes.
+    ersMode: ErsMode.Overtake,
     ersStore: 2e6,
     recordEvery: harnessRecord(o),
     ...paramsOf(o),
   });
-  // Settle the suspension under the aero load at v1 for half a second.
-  const hold = new SpeedHold(o.v1);
-  while (h.time < 0.5) {
+  // Settle the suspension under the aero load while holding v1 with the throttle, DRS open,
+  // then brake on the first tick that is within 0.05 km/h of v1.
+  h.input.drs = true;
+  const hold = new SpeedHold(o.v1, 2, 4, 0.8);
+  while (h.time < 0.5 || Math.abs(h.car.vx - o.v1) > 0.05 * KMH) {
+    if (h.time > 5) throw new Error(`cannot hold ${(o.v1 / KMH).toFixed(1)} km/h to brake from it`);
     hold.tick(h);
     h.step();
   }
-  // Brake from exactly v1 (the hold leaves it within a few hundredths of a km/h).
   const startDistance = h.car.distance;
   const startTime = h.time;
   const startSpeed = h.car.vx;
   const driver = new ThresholdBrakeDriver();
+  if ((o.profile ?? 'event') === 'event') driver.cap = (v) => trailOffCap(v, o.v1, o.v2);
   const ma = new MovingAverage(PEAK_WINDOW);
   let peak = 0;
+  let prevSpeed = startSpeed;
+  let prevDistance = startDistance;
+  let prevTime = startTime;
   while (h.car.vx > o.v2 && h.time - startTime < 10) {
+    prevSpeed = h.car.vx;
+    prevDistance = h.car.distance;
+    prevTime = h.time;
     driver.tick(h);
     h.step();
     const avg = ma.push(-h.tel.longG);
     if (ma.full && avg > peak) peak = avg;
   }
-  const distance = h.car.distance - startDistance;
+  // Interpolate the crossing of v2 inside the last step.
+  const f = prevSpeed > h.car.vx ? (prevSpeed - o.v2) / (prevSpeed - h.car.vx) : 1;
+  const distance = prevDistance + f * (h.car.distance - prevDistance) - startDistance;
   const r: BrakingResult = {
     circuit: o.circuit,
     v1: startSpeed,
-    v2: h.car.vx,
+    v2: o.v2,
     bias: o.bias,
     distance,
-    time: h.time - startTime,
+    time: prevTime + f * (h.time - prevTime) - startTime,
     peakG: peak,
-    meanG: (startSpeed * startSpeed - h.car.vx * h.car.vx) / (2 * distance) / G,
+    meanG: (startSpeed * startSpeed - o.v2 * o.v2) / (2 * distance) / G,
   };
   if (h.trace) r.trace = h.trace;
   return r;
@@ -238,7 +259,13 @@ export function bestBraking(
 export function peakDeceleration(speed: number, circuit: Circuit = 'monza'): number {
   let best = 0;
   for (const bias of BIAS_RANGE) {
-    const r = braking({ circuit, v1: speed, v2: Math.max(speed - 60 * KMH, 20 * KMH), bias });
+    const r = braking({
+      circuit,
+      v1: speed,
+      v2: Math.max(speed - 60 * KMH, 20 * KMH),
+      bias,
+      profile: 'threshold',
+    });
     best = Math.max(best, r.peakG);
   }
   return best;
@@ -369,7 +396,9 @@ export function stepSteer(
 
 export interface LiftOffResult {
   speed: number;
+  /** Lateral acceleration asked for (a share of the measured limit), and held before the lift. */
   latG: number;
+  achievedLatG: number;
   /** Largest yaw-rate rise after the lift, as a fraction of the yaw rate before it. */
   yawRateRise: number;
   maxSideslipDeg: number;
@@ -378,16 +407,18 @@ export interface LiftOffResult {
 }
 
 /**
- * Lift-off in a steady corner: hold a corner at `fraction` of the limit, then snap the throttle
- * shut with the wheel held still. The car may tighten its line, but must not spin.
+ * Lift-off in a steady corner: hold a corner at `fraction` of the car's measured lateral limit
+ * at that speed, then snap the throttle shut with the wheel held still. The car may tighten
+ * its line, but must not spin.
  */
 export function liftOffInCorner(
-  o: RunOptions & { trim?: AeroTrim; speed?: number; latG?: number } = {},
+  o: RunOptions & { trim?: AeroTrim; speed?: number; fraction?: number } = {},
 ): LiftOffResult {
   const speed = o.speed ?? 150 * KMH;
-  const latG = o.latG ?? 2.4;
+  const trim = o.trim ?? 'medium';
+  const latG = (o.fraction ?? 0.8) * limitAt(o, trim, speed);
   const h = new Harness({
-    trim: o.trim ?? 'medium',
+    trim,
     fuel: 50,
     speed,
     ersMode: ErsMode.None,
@@ -396,10 +427,13 @@ export function liftOffInCorner(
   });
   const hold = new SpeedHold(speed);
   const steer = new YawRateSteer((latG * G) / speed);
+  const window = new MovingAverage(Math.round(0.5 / STEP));
+  let achieved = 0;
   while (h.time < 3) {
     hold.tick(h);
     steer.tick(h);
     h.step();
+    achieved = window.push(h.tel.latG);
   }
   const before = h.car.yawRate;
   const held = h.input.steer;
@@ -416,6 +450,7 @@ export function liftOffInCorner(
   const r: LiftOffResult = {
     speed,
     latG,
+    achievedLatG: achieved,
     yawRateRise: peak / before - 1,
     maxSideslipDeg: maxBeta / DEG,
     spun: maxBeta > 20 * DEG,
@@ -482,14 +517,23 @@ function assistRun(
   applyAssists(settings, memory, h.car, driver, STEP, h.input);
 }
 
+/** Assist checks start from a corner at this share of the car's own lateral limit. */
+export const ASSIST_CORNER_FRACTION = 0.85;
+
+/** Sustained lateral limit in g for the assist checks' car and speed (50 kg fuel). */
+function limitAt(o: RunOptions, trim: AeroTrim, speed: number): number {
+  return lateralLimit({ ...paramsOf(o), trim, speed, fuel: 50 }).maxLatG;
+}
+
 /**
- * Full throttle out of a slow corner (80 km/h, about 1.8 g) with the wheel held still, with
- * and without traction control.
+ * Full throttle out of a slow corner (80 km/h, at 85 % of the car's lateral limit there) with
+ * the wheel held still, with and without traction control.
  */
 export function throttleOutOfSlowCorner(
   o: RunOptions & { tractionControl: number },
 ): AssistCheckResult {
   const speed = 80 * KMH;
+  const latG = ASSIST_CORNER_FRACTION * limitAt(o, 'high', speed);
   const h = new Harness({
     trim: 'high',
     fuel: 50,
@@ -499,7 +543,7 @@ export function throttleOutOfSlowCorner(
     ...paramsOf(o),
   });
   const hold = new SpeedHold(speed);
-  const steer = new YawRateSteer((1.8 * G) / speed);
+  const steer = new YawRateSteer((latG * G) / speed);
   while (h.time < 2) {
     hold.tick(h);
     steer.tick(h);
@@ -528,9 +572,13 @@ export function throttleOutOfSlowCorner(
   return r;
 }
 
-/** Full brake while turning (200 km/h, about 3 g) with the wheel held, with and without ABS. */
+/**
+ * Full brake while turning (200 km/h, at 85 % of the car's lateral limit there) with the wheel
+ * held, with and without ABS.
+ */
 export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckResult {
   const speed = 200 * KMH;
+  const latG = ASSIST_CORNER_FRACTION * limitAt(o, 'medium', speed);
   const h = new Harness({
     trim: 'medium',
     fuel: 50,
@@ -540,7 +588,7 @@ export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckR
     ...paramsOf(o),
   });
   const hold = new SpeedHold(speed);
-  const steer = new YawRateSteer((3 * G) / speed);
+  const steer = new YawRateSteer((latG * G) / speed);
   while (h.time < 2) {
     hold.tick(h);
     steer.tick(h);
@@ -564,6 +612,52 @@ export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckR
     maxSideslipDeg: maxBeta / DEG,
     spun: maxBeta > 20 * DEG,
     endSpeedKmh: h.car.vx * 3.6,
+  };
+  if (h.trace) r.trace = h.trace;
+  return r;
+}
+
+export interface AbsStopResult {
+  abs: number;
+  minSlip: number;
+  distance: number;
+  spun: boolean;
+  trace?: Trace;
+}
+
+/** Full pedal in a straight line from 300 to 100 km/h, high-downforce trim, with ABS 0–3. */
+export function absStraightStop(o: RunOptions & { abs: number }): AbsStopResult {
+  const h = new Harness({
+    trim: 'high',
+    fuel: 50,
+    speed: 300 * KMH,
+    ersMode: ErsMode.Balanced,
+    ersStore: 2e6,
+    recordEvery: harnessRecord(o),
+    ...paramsOf(o),
+  });
+  const hold = new SpeedHold(300 * KMH, 2, 4, 0.9);
+  while (h.time < 0.5) {
+    hold.tick(h);
+    h.step();
+  }
+  const driver: ControlInput = { ...NEUTRAL_INPUT, brake: 1 };
+  const settings = { tractionControl: 0, abs: o.abs, autoGears: true };
+  const memory = createAssistState();
+  const start = h.car.distance;
+  let minSlip = 0;
+  let maxBeta = 0;
+  while (h.time < 6 && h.car.vx > 100 * KMH) {
+    assistRun(h, settings, driver, memory);
+    h.step();
+    for (let i = 0; i < 4; i++) minSlip = Math.min(minSlip, h.car.slipRatio[i]!);
+    maxBeta = Math.max(maxBeta, Math.abs(Math.atan2(h.car.vy, Math.max(Math.abs(h.car.vx), 1))));
+  }
+  const r: AbsStopResult = {
+    abs: o.abs,
+    minSlip,
+    distance: h.car.distance - start,
+    spun: maxBeta > 20 * DEG,
   };
   if (h.trace) r.trace = h.trace;
   return r;

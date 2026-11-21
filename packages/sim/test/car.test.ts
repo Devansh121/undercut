@@ -17,9 +17,11 @@ import {
   createEnvironment,
   engineFullLoadTorque,
   fuelFlow,
+  lateralMu,
   radToRpm,
   restoreCar,
   rpmToRad,
+  setErsMode,
   snapshotCar,
   stepCar,
   type CarState,
@@ -64,7 +66,6 @@ describe('car parameters', () => {
     expect(p.ers.mgukPower).toBe(120e3);
     expect(p.ers.deployPerLap).toBe(4e6);
     expect(p.ers.harvestPerLap).toBe(2e6);
-    expect(p.brakes.maxTorque).toBeCloseTo(10.3e3, -2);
     expect(Object.isFrozen(p.tyre)).toBe(true);
   });
 
@@ -108,7 +109,33 @@ describe('power unit', () => {
     run(car, input({ throttle: 1 }), 1);
     expect(radToRpm(car.engineSpeed)).toBeLessThan(12400);
     expect(radToRpm(car.engineSpeed)).toBeGreaterThan(10500);
-    expect(50 - car.fuelMass).toBeCloseTo(100 / 3600, 3);
+    // Never above the regulated 100 kg/h, and within 0.1 % of it at full load.
+    const burnt = 50 - car.fuelMass;
+    expect(burnt).toBeLessThanOrEqual(100 / 3600 + 1e-12);
+    expect(burnt).toBeGreaterThan((100 / 3600) * 0.999);
+  });
+
+  it('never burns more than the regulated flow at any engine speed', () => {
+    for (const [speed, gear] of [
+      [30, 3],
+      [45, 4],
+      [55, 5],
+    ] as const) {
+      const car = createCarState(REFERENCE_CAR, { speed, gear, fuel: 50 });
+      let previous = car.fuelMass;
+      for (let i = 0; i < 240; i++) {
+        stepCar(car, input({ throttle: 1 }), FLAT_SURFACE, DT, env);
+        const limit = fuelFlow(REFERENCE_CAR.engine, radToRpm(car.engineSpeed) + 200);
+        expect((previous - car.fuelMass) / DT).toBeLessThanOrEqual(limit + 1e-12);
+        previous = car.fuelMass;
+      }
+    }
+  });
+
+  it('burns only idle fuel at rest with the throttle closed', () => {
+    const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+    run(car, input(), 10);
+    expect(50 - car.fuelMass).toBeCloseTo(REFERENCE_CAR.engine.idleFlow * 10, 9);
   });
 
   it('shifts up in the doc shift time and refuses an over-revving downshift', () => {
@@ -134,6 +161,36 @@ describe('power unit', () => {
     expect(car.gear).toBe(-1);
     run(car, input({ throttle: 0.3 }), 2);
     expect(car.vx).toBeLessThan(-1);
+  });
+});
+
+describe('brakes', () => {
+  it('take their capacity from the hydraulics and discs, not from an operating point', () => {
+    const b = REFERENCE_CAR.brakes;
+    // Pedal force through the pedal ratio onto the master cylinders; the front share of that
+    // pressure on the front pistons, two pad faces at the effective radius, two front wheels,
+    // expressed as a total over the bias split.
+    const pressurePerBias = (b.pedalForce * b.pedalRatio) / b.masterCylinderArea;
+    const front = 2 * 2 * b.padFriction * pressurePerBias * b.frontPistonArea * b.frontRadius;
+    const capacity = createCarModel(REFERENCE_CAR).brakeCapacity;
+    expect(capacity).toBeCloseTo(front, 6);
+    expect(capacity).toBeGreaterThan(17e3);
+    expect(capacity).toBeLessThan(19e3);
+  });
+
+  it('can lock the tyres at full pedal from 330 km/h in high-downforce trim', () => {
+    const car = createCarState(createCarParams('high'), {
+      speed: 330 / 3.6,
+      fuel: 50,
+      ersStore: 4e6,
+    });
+    let lowest = 0;
+    for (let i = 0; i < 0.4 / DT; i++) {
+      stepCar(car, input({ brake: 1 }), FLAT_SURFACE, DT, env);
+      for (let w = 0; w < 4; w++) lowest = Math.min(lowest, car.slipRatio[w]!);
+    }
+    // Past the peak at 10 % slip: the tyres, not the brakes, limit the stop.
+    expect(lowest).toBeLessThan(-0.3);
   });
 });
 
@@ -164,11 +221,74 @@ describe('ERS', () => {
     expect(car.ersDeployLap).toBe(0);
   });
 
+  it('deploys on the overtake button where the mode alone would not, within the limits', () => {
+    const start = () =>
+      createCarState(createCarParams('low'), {
+        speed: 310 / 3.6,
+        fuel: 10,
+        ersMode: ErsMode.Balanced,
+        ersStore: 3e6,
+      });
+    const released = start();
+    run(released, input({ throttle: 1 }), 0.1);
+    expect(released.mgukPower).toBe(0); // Balanced stops deploying above 300 km/h
+    const pressed = start();
+    run(pressed, input({ throttle: 1, overtake: true }), 0.1);
+    expect(pressed.mgukPower).toBeCloseTo(120e3, 6);
+    // With the lap's store allowance used, only the MGU-H's direct feed remains.
+    const spent = start();
+    spent.ersDeployLap = 4e6;
+    run(spent, input({ throttle: 1, overtake: true }), 0.1);
+    expect(spent.mgukPower).toBeGreaterThan(0);
+    expect(spent.mgukPower).toBeLessThanOrEqual(spent.mguhPower + 1e-6);
+    expect(spent.ersDeployLap).toBe(4e6);
+  });
+
+  it('sets the deployment mode through the public API', () => {
+    const car = createCarState(createCarParams('low'), {
+      speed: 310 / 3.6,
+      fuel: 10,
+      ersStore: 3e6,
+    });
+    setErsMode(car, ErsMode.Overtake);
+    run(car, input({ throttle: 1 }), 0.1);
+    expect(car.mgukPower).toBeCloseTo(120e3, 6);
+    setErsMode(car, ErsMode.None);
+    run(car, input({ throttle: 1, overtake: false }), 0.1);
+    expect(car.mgukPower).toBe(0);
+    expect(() => setErsMode(car, 7 as ErsMode)).toThrow(RangeError);
+  });
+
+  it('brakes the same whether or not the MGU-K can harvest (brake-by-wire)', () => {
+    const stop = (store: number) => {
+      const car = createCarState(REFERENCE_CAR, { speed: 200 / 3.6, fuel: 50, ersStore: store });
+      const decel: number[] = [];
+      const regen: number[] = [];
+      for (let i = 0; i < 0.6 / DT; i++) {
+        stepCar(car, input({ brake: 0.3 }), FLAT_SURFACE, DT, env);
+        decel.push(car.accelX);
+        regen.push(car.mgukPower);
+      }
+      return { decel, regen, car };
+    };
+    const free = stop(2e6); // room to harvest the whole stop
+    const full = stop(4e6); // store full: no harvest at all
+    const filling = stop(4e6 - 30e3); // the store fills a quarter of a second in
+    expect(Math.min(...free.regen)).toBeLessThan(-100e3);
+    expect(Math.max(...full.regen.map(Math.abs))).toBe(0);
+    expect(filling.regen[10]!).toBeLessThan(-100e3);
+    expect(filling.regen[filling.regen.length - 1]!).toBe(0);
+    for (let i = 0; i < free.decel.length; i++) {
+      expect(Math.abs(full.decel[i]! - free.decel[i]!)).toBeLessThan(0.02 * g);
+      expect(Math.abs(filling.decel[i]! - free.decel[i]!)).toBeLessThan(0.02 * g);
+    }
+  });
+
   it('harvests under braking up to 2 MJ per lap and never past the store window', () => {
     const car = createCarState(REFERENCE_CAR, { speed: 80, gear: 8, ersStore: 0 });
     for (let lap = 0; lap < 12; lap++) {
       drive(car, input({ throttle: 1 }), 6);
-      drive(car, input({ brake: 0.5 }), 6, () => car.vx < 30);
+      drive(car, input({ brake: 0.3 }), 6, () => car.vx < 30);
       expect(car.ersHarvestLap).toBeLessThanOrEqual(2e6 + 1e-6);
       expect(car.ersStore).toBeLessThanOrEqual(4e6 + 1e-6);
       expect(car.ersStore).toBeGreaterThanOrEqual(-1e-6);
@@ -274,6 +394,39 @@ describe('chassis and suspension', () => {
     expect(turn.roll).toBeGreaterThan(0);
   });
 
+  // Whole-car equilibrium with aero and rolling resistance off: the overturning moment of the
+  // ground forces about the CoG height, h·ΣF, must come back as load transfer, all of it.
+  const noAero = createCarParams('medium', {
+    aero: { clA: 0, cdA: 0 },
+    tyre: { rollingResistance: 0 },
+  });
+  const h = noAero.mass.cgHeight;
+  const L = noAero.geometry.wheelbase;
+
+  it('transfers exactly ΣFx·h/L between the axles under braking', () => {
+    const rest = createCarState(noAero, { fuel: 50 });
+    const staticFront = rest.load[0]! + rest.load[1]!;
+    const car = createCarState(noAero, { speed: 40, gear: 5, fuel: 50 });
+    run(car, input({ brake: 0.3 }), 0.8);
+    const fx = 850 * car.accelX;
+    expect(fx).toBeLessThan(-8000);
+    const transfer = car.load[0]! + car.load[1]! - staticFront;
+    expect(transfer / ((-fx * h) / L)).toBeCloseTo(1, 2);
+  });
+
+  it('transfers exactly ΣFy·h across the car in a steady corner', () => {
+    const car = createCarState(noAero, { speed: 20, gear: 2, fuel: 50 });
+    for (let i = 0; i < 3 / DT; i++) {
+      const throttle = Math.min(1, Math.max(0, 0.3 + 0.5 * (20 - car.vx)));
+      stepCar(car, input({ steer: 0.3, throttle }), FLAT_SURFACE, DT, env);
+    }
+    const fy = 850 * car.accelY;
+    expect(fy).toBeGreaterThan(8000);
+    let moment = 0;
+    for (let i = 0; i < 4; i++) moment += car.load[i]! * car.model.wheelLeft[i]!;
+    expect(-moment / (fy * h)).toBeCloseTo(1, 2);
+  });
+
   it('compresses onto the springs as downforce builds', () => {
     const car = createCarState(REFERENCE_CAR, { speed: 30, gear: 4, fuel: 50 });
     const slow = car.rideHeightFront;
@@ -282,6 +435,38 @@ describe('chassis and suspension', () => {
     expect(car.rideHeightFront).toBeLessThan(slow - 0.008);
     expect(car.downforceFront + car.downforceRear).toBeGreaterThan(15e3);
   });
+});
+
+describe('tyre force limit at low speed', () => {
+  const curve = createCarModel(REFERENCE_CAR).curve;
+  const ellipse = (car: CarState, i: number) => {
+    const fz = car.load[i]!;
+    if (fz <= 0) return 0;
+    const dy = lateralMu(curve, fz) * fz * car.gripScale[i]!;
+    const dx = dy * curve.muXRatio;
+    return (car.forceX[i]! / dx) ** 2 + (car.forceY[i]! / dy) ** 2;
+  };
+
+  for (const [vx, vy] of [
+    [0.5, 0.5],
+    [1, -1],
+    [0.2, 0.3],
+    [0, 0.5],
+    [-0.5, 0.4],
+    [3, 2],
+    [0, 0],
+  ] as const) {
+    it(`keeps every tyre inside its friction ellipse sliding at (${vx}, ${vy}) m/s`, () => {
+      const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+      car.vx = vx;
+      car.vy = vy;
+      car.wheelSpeed.fill(0);
+      for (let k = 0; k < 48; k++) {
+        stepCar(car, input({ brake: 1 }), FLAT_SURFACE, 1 / 960, env);
+        for (let i = 0; i < 4; i++) expect(ellipse(car, i)).toBeLessThanOrEqual(1 + 1e-9);
+      }
+    });
+  }
 });
 
 describe('snapshots', () => {

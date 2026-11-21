@@ -23,20 +23,21 @@ nothing across friction and contact discontinuities; a fully implicit solve over
 far more code and cost for the same answers.
 
 **Measured** on the owner's laptop (AMD Ryzen 7 7435HS, Node 20.19, one core, other agents
-running), `npm run telemetry -- bench`, physics suite at each setting:
+running), `npm run telemetry -- bench`, physics suite at each setting (re-measured after the
+review fixes: tyre-limited brakes, full load transfer):
 
-| Substep | Substeps per 240 Hz step | One car, × real time (3 runs) | Physics suite (61 checks) |
+| Substep | Substeps per 240 Hz step | One car, × real time (3 runs) | Physics suite (72 checks) |
 | --- | --- | --- | --- |
-| 1/240 s | 1 | 2880–2930× | 55 fail: lateral sweeps and fuzz blow up |
-| 1/480 s | 2 | 750–1330× | 4 fail: ABS-in-turn slide doubles, braking values drift |
-| **1/960 s** | **4** | **530–880×** | **all pass** |
-| 1/1920 s | 8 | 340–500× | top speed, acceleration and lateral identical to 2 decimals; braking distances 1–1.5 % shorter, so recorded gaps would need re-recording |
+| 1/240 s | 1 | 2290–2450× | 57 fail: braking and launch blow up (a 337→89 km/h stop takes 857 m) |
+| 1/480 s | 2 | 830–1130× | 10 fail: braking distances 2–3 % long, Monza T1 2025 distance out of band |
+| **1/960 s** | **4** | **540–800×** | **all pass** |
+| 1/1920 s | 8 | 450–475× | top speed, acceleration and lateral unchanged; braking distances 1–1.5 % shorter and peaks within 0.03 g, so the recorded gaps would need re-recording |
 
-At 1/960 s one 240 Hz step of one car costs about 0.005 ms and of 20 cars about 0.07 ms, so a
+At 1/960 s one 240 Hz step of one car costs about 0.005 ms and of 20 cars about 0.075 ms, so a
 60 Hz frame (four steps) of a full field costs about 0.3 ms in Node. The target was 150× real
-time for one car; the chosen step gives 530–880× depending on machine load.
+time for one car; the chosen step gives 540–800× depending on machine load.
 
-**Consequences.** Changing `MAX_SUBSTEP` changes the braking numbers by about 1 %; the
+**Consequences.** Changing `MAX_SUBSTEP` changes the braking numbers by 1–1.5 %; the
 known-gap assertions in the physics suite will flag it, and the gaps are then re-recorded with
 the Results section. The step-size table above is reproducible by editing `MAX_SUBSTEP` in
 `packages/sim/src/step.ts` and running the benchmark and `npm run test:physics`.

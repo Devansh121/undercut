@@ -25,6 +25,7 @@ export {
   AERO_MEDIUM,
   AERO_TRIMS,
   REFERENCE_CAR,
+  brakeCapacity,
   createCarParams,
   radToRpm,
   rpmToRad,
@@ -50,6 +51,7 @@ export {
   createCarState,
   gearRatio,
   restoreCar,
+  setErsMode,
   snapshotCar,
   type CarStartOptions,
   type MassState,
@@ -81,9 +83,12 @@ export {
   type CarTelemetry,
 } from './telemetry';
 export {
+  ASSIST_SNAPSHOT_LENGTH,
   NO_ASSISTS,
   applyAssists,
   createAssistState,
+  restoreAssists,
+  snapshotAssists,
   speedSensitiveSteer,
   type AssistSettings,
   type AssistState,

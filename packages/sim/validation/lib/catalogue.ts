@@ -1,6 +1,7 @@
 import type { AeroTrim } from '../../src/index';
 import { CIRCUITS, KMH, type Trace } from './harness';
 import {
+  absStraightStop,
   braking,
   bestBraking,
   bestStandingStart,
@@ -68,7 +69,7 @@ function row(label: string, result: number, unit: string, digits = 2): ReportRow
 function targetRow(id: string, value: number, digits = 2): ReportRow {
   const t = TARGETS[id]!;
   return {
-    label: t.label,
+    label: t.fit ? `${t.label} (the fit)` : t.label,
     result: num(value, digits),
     unit: t.unit,
     target: t.stated,
@@ -251,26 +252,24 @@ export const MANOEUVRES: Readonly<Record<string, Manoeuvre>> = {
   },
 
   'lift-off': {
-    describe: 'Lift-off mid-corner at 150 km/h (1.5, 2.4, 3.0 g) and 250 km/h (3.5 g)',
+    describe: 'Lift-off mid-corner at 60, 80 and 95 % of the limit at 150 km/h, 90 % at 250 km/h',
     run() {
       const rows: ReportRow[] = [];
       const traces: Report['traces'] = [];
       const out: unknown[] = [];
-      for (const [v, g] of [
-        [150, 1.5],
-        [150, 2.4],
-        [150, 3.0],
-        [250, 3.5],
+      for (const [v, f] of [
+        [150, 0.6],
+        [150, 0.8],
+        [150, 0.95],
+        [250, 0.9],
       ] as const) {
-        const r = liftOffInCorner({ speed: v * KMH, latG: g, record: true });
-        rows.push(
-          row(`${v} km/h at ${g} g: yaw-rate rise after lift`, r.yawRateRise * 100, '%', 1),
-          {
-            ...row(`${v} km/h at ${g} g: max sideslip`, r.maxSideslipDeg, 'deg'),
-            verdict: r.spun ? 'fail' : 'pass',
-          },
-        );
-        traces.push({ name: `lift-off-${v}-${g}`, trace: r.trace! });
+        const r = liftOffInCorner({ speed: v * KMH, fraction: f, record: true });
+        const at = `${v} km/h, ${num(r.achievedLatG)} g (${f * 100} % of limit)`;
+        rows.push(row(`${at}: yaw-rate rise after lift`, r.yawRateRise * 100, '%', 1), {
+          ...row(`${at}: max sideslip`, r.maxSideslipDeg, 'deg'),
+          verdict: r.spun ? 'fail' : 'pass',
+        });
+        traces.push({ name: `lift-off-${v}-${f * 100}`, trace: r.trace! });
         out.push({ ...r, trace: undefined });
       }
       return {
@@ -300,7 +299,7 @@ export const MANOEUVRES: Readonly<Record<string, Manoeuvre>> = {
 
   assists: {
     describe:
-      'Keyboard sanity: full throttle out of a slow corner (TC 0–3), full brake in a turn (ABS 0–3)',
+      'Keyboard sanity: throttle out of a slow corner (TC 0–3), brake in a turn and in a straight line (ABS 0–3)',
     run() {
       const rows: ReportRow[] = [];
       const traces: Report['traces'] = [];
@@ -331,6 +330,20 @@ export const MANOEUVRES: Readonly<Record<string, Manoeuvre>> = {
           verdict: level === 0 ? '' : r.spun ? 'fail' : 'pass',
         });
         traces.push({ name: `assists-abs-${level}`, trace: r.trace! });
+        out.push({ ...r, trace: undefined });
+      }
+      for (const level of [0, 1, 2, 3]) {
+        const r = absStraightStop({ abs: level, record: true });
+        rows.push({
+          ...row(
+            `straight stop 300→100 km/h, high trim, ABS ${level}: distance (min slip ${num(r.minSlip)})`,
+            r.distance,
+            'm',
+            1,
+          ),
+          verdict: level === 0 ? '' : r.minSlip > -0.3 && !r.spun ? 'pass' : 'fail',
+        });
+        traces.push({ name: `assists-abs-straight-${level}`, trace: r.trace! });
         out.push({ ...r, trace: undefined });
       }
       return {

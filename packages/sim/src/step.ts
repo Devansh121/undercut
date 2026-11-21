@@ -42,6 +42,7 @@ const rollDrag = new Float64Array(4);
 const tyreZ = new Float64Array(4);
 const bodyZ = new Float64Array(4);
 const bodyX = new Float64Array(4);
+const unsprungZ = new Float64Array(4);
 const wheelX = new Float64Array(4);
 const aero = { front: 0, rear: 0, drag: 0 };
 
@@ -301,8 +302,17 @@ function substep(
     let fy = tf.fy;
     const w = 1 - speed / tyre.lowSpeed;
     if (w > 0 && tyreZ[i]! > 0) {
-      fx = clamp(fx + (w * tyre.carcassDampingX * (ux - oldX)) / h, -tf.dx, tf.dx);
-      fy = clamp(fy + (w * tyre.carcassDampingY * (uy - oldY)) / h, -tf.dy, tf.dy);
+      fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
+      fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
+      // The damped force obeys the same combined friction limit as the steady force.
+      const ex = fx / tf.dx;
+      const ey = fy / tf.dy;
+      const e = ex * ex + ey * ey;
+      if (e > 1) {
+        const k = 1 / Math.sqrt(e);
+        fx *= k;
+        fy *= k;
+      }
     }
     s.forceX[i] = fx;
     s.forceY[i] = fy;
@@ -314,7 +324,7 @@ function substep(
   }
 
   // ---- Power unit, ERS, brakes, wheel spin. ----
-  stepPowertrain(s, throttle, brake, h);
+  stepPowertrain(s, throttle, brake, input.overtake, h);
 
   // ---- Planar chassis (semi-implicit Euler). ----
   const extX = s.externalForceX * c - s.externalForceZ * sn;
@@ -339,9 +349,15 @@ function substep(
   s.accelY = specificY;
 
   // ---- Sprung and unsprung vertical motion. ----
-  // Ground-level forces act below the sprung CoG: the sprung share of them pitches and rolls
-  // the body through the springs, so load transfer comes out of the suspension.
-  const arm = p.mass.cgHeight * (ms / m);
+  // The ground forces' overturning moment, h·ΣF about the whole car's CoG height, splits in
+  // two. The sprung mass, whose CoG sits at hs, takes its share through the links at the ground
+  // and so through the springs. The unsprung masses' inertia acts at the wheel centres and goes
+  // straight to the tyres. With hs = (m·h − mu·r) / ms the two add up to exactly h·ΣF.
+  const mu = m - ms;
+  const rw = p.tyre.rollingRadius;
+  const hs = (m * p.mass.cgHeight - mu * rw) / ms;
+  const linkX = (ms / m) * groundX - (mu / m) * (dragX + extX);
+  const linkY = (ms / m) * groundY - (mu / m) * extY;
   let heave = skidHeave - dfFront - dfRear;
   let pitchM = skidPitch - dfFront * mass.sprungA + dfRear * mass.sprungB;
   let rollM = skidRoll;
@@ -351,8 +367,18 @@ function substep(
     pitchM += f * bodyX[i]!;
     rollM += f * model.wheelLeft[i]!;
   }
-  pitchM += arm * groundX;
-  rollM += arm * groundY;
+  pitchM += hs * linkX;
+  rollM += hs * linkY;
+  // Unsprung inertia couples, as equal and opposite vertical forces on the wheels.
+  const pitchU = ((mu / m) * (groundX + dragX + extX) * rw) / p.geometry.wheelbase / 2;
+  const muFront = 2 * p.mass.unsprungFront;
+  const muRear = 2 * p.mass.unsprungRear;
+  const rollUF = ((muFront / m) * (groundY + extY) * rw) / p.geometry.trackFront;
+  const rollUR = ((muRear / m) * (groundY + extY) * rw) / p.geometry.trackRear;
+  unsprungZ[0] = pitchU + rollUF;
+  unsprungZ[1] = pitchU - rollUF;
+  unsprungZ[2] = -pitchU + rollUR;
+  unsprungZ[3] = -pitchU - rollUR;
   const heaveAcc = heave / ms - gNormal;
   s.heaveRate += h * heaveAcc;
   s.pitchRate += (h * pitchM) / p.mass.pitchInertia;
@@ -362,8 +388,8 @@ function substep(
   s.roll += h * s.rollRate;
   s.accelVertical = heaveAcc + gNormal;
   for (let i = 0; i < 4; i++) {
-    const mu = i < 2 ? p.mass.unsprungFront : p.mass.unsprungRear;
-    s.wheelVy[i] = s.wheelVy[i]! + h * ((tyreZ[i]! - bodyZ[i]!) / mu - gNormal);
+    const mw = i < 2 ? p.mass.unsprungFront : p.mass.unsprungRear;
+    s.wheelVy[i] = s.wheelVy[i]! + h * ((tyreZ[i]! - bodyZ[i]! + unsprungZ[i]!) / mw - gNormal);
     s.wheelY[i] = s.wheelY[i]! + h * s.wheelVy[i]!;
     let a = s.wheelAngle[i]! + h * s.wheelSpeed[i]!;
     if (a > Math.PI) a -= 2 * Math.PI;
@@ -373,7 +399,13 @@ function substep(
 }
 
 /** Engine, clutch, gearbox, differential, ERS and brakes for one substep. */
-function stepPowertrain(s: CarState, throttle: number, brake: number, h: number): void {
+function stepPowertrain(
+  s: CarState,
+  throttle: number,
+  brake: number,
+  overtake: boolean,
+  h: number,
+): void {
   const p = s.model.params;
   const eng = p.engine;
   const ers = p.ers;
@@ -415,9 +447,11 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   if (s.fuelMass <= 0 && te > 0) te = 0;
   const icePower = te > 0 ? te * we : 0;
 
-  // Fuel at the regulated flow for the power produced.
+  // Fuel: idle consumption blended into the demand, never above the regulated flow.
   if (s.fuelMass > 0) {
-    const burn = thr * fuelFlow(eng, N) + eng.idleFlow;
+    const limit = fuelFlow(eng, N);
+    const demand = eng.idleFlow + thr * (limit - eng.idleFlow);
+    const burn = demand < limit ? demand : limit;
     s.fuelMass = Math.max(0, s.fuelMass - burn * h);
   }
 
@@ -427,7 +461,9 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   const engaged = G !== 0 && !shifting && we > rpm(eng.clutchFullRpm);
   // The MGU-H recovers exhaust energy under load; at idle or on the overrun there is none.
   const mguh = thr > 0 ? Math.min(ers.mguhPower, (ers.mguhPower * icePower) / eng.peakPower) : 0;
-  const mode = ERS_MODES[s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
+  // The overtake button overrides the selected mode while held; the limits below still apply.
+  const mode =
+    ERS_MODES[overtake ? ErsMode.Overtake : s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
   const wantsDeploy =
     s.mgukLocked === 0 &&
     engaged &&
@@ -442,20 +478,17 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   deploy = direct + fromStore;
   let toStore = mguh - direct;
   let harvest = 0;
-  // Brake-by-wire: the pedal asks for a rear torque out of friction plus MGU-K harvest; the
-  // harvest is used first and friction makes up the rest, up to its own limit.
-  const frontBrake = (brake * p.brakes.maxTorque * s.brakeBias) / 2;
-  const rearFrictionCap = p.brakes.maxTorque * (1 - s.brakeBias);
-  let harvestCap = 0;
-  if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5) {
+  // Brake-by-wire: the pedal sets the torque each axle should get, independent of whether the
+  // MGU-K can harvest. On the rear axle the MGU-K delivers what it can and friction supplies the
+  // rest, so a full store, a spent harvest allowance or an open clutch changes only the split.
+  const frontBrake = (brake * s.model.brakeCapacity * s.brakeBias) / 2;
+  const rearRequest = brake * s.model.brakeCapacity * (1 - s.brakeBias);
+  if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5 && we > 1) {
     const room = Math.max(0, (ers.storeWindow - s.ersStore) / h - toStore);
     const lapRoom = Math.max(0, (ers.harvestPerLap - s.ersHarvestLap) / h);
-    harvestCap = Math.min(ers.mgukPower, ers.mgukTorque * we, room, lapRoom);
-  }
-  const harvestCapWheels = we > 1 ? (harvestCap / we) * Math.abs(G) : 0;
-  const rearDemand = brake * (rearFrictionCap + harvestCapWheels);
-  if (harvestCapWheels > 0) {
-    harvest = harvestCap * Math.min(1, rearDemand / harvestCapWheels);
+    const cap = Math.min(ers.mgukPower, ers.mgukTorque * we, room, lapRoom);
+    // Torque at the rear wheels for crank power P is P / we · |G|; never more than requested.
+    harvest = Math.min(cap, (rearRequest * we) / Math.abs(G));
   }
   toStore = Math.min(toStore, Math.max(0, (ers.storeWindow - s.ersStore) / h - harvest));
   s.ersStore += (toStore + harvest - fromStore) * h;
@@ -467,7 +500,7 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   const harvestAtWheels = we > 1 ? (harvest / we) * Math.abs(G) : 0;
 
   // Brakes (friction torque per wheel) plus rolling resistance as a torque on the wheel.
-  const rearBrake = Math.min(rearFrictionCap, Math.max(0, rearDemand - harvestAtWheels)) / 2;
+  const rearBrake = Math.max(0, rearRequest - harvestAtWheels) / 2;
   const crr = tyre.rollingResistance * R;
 
   // Front wheels: free spin with Coulomb friction from brake and rolling resistance.

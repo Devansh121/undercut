@@ -60,6 +60,22 @@ export class LaunchDriver {
 }
 
 /**
+ * The pedal profile for the published braking events, fixed once for all of them: full pedal
+ * (still eased off whenever a wheel passes the threshold slip) until the speed is within the
+ * last `fromFraction` of the drop from v1 to v2, then a cap falling linearly with speed to
+ * `endPedal` at v2, as the driver trails off the brake into the corner. Not tuned per event.
+ */
+export const TRAIL_OFF = Object.freeze({ fromFraction: 0.25, endPedal: 0.3 });
+
+/** Pedal cap at speed `v` for a stop from `v1` to `v2` (any consistent unit). */
+export function trailOffCap(v: number, v1: number, v2: number): number {
+  const start = v2 + TRAIL_OFF.fromFraction * (v1 - v2);
+  if (v >= start) return 1;
+  const t = Math.max(0, (v - v2) / (start - v2));
+  return TRAIL_OFF.endPedal + (1 - TRAIL_OFF.endPedal) * t;
+}
+
+/**
  * Threshold braking without ABS: full pedal, eased off whenever the most-locked wheel passes
  * the target slip, as a driver (or the AI pedal control) does to avoid lock-up.
  */
@@ -74,6 +90,8 @@ export class ThresholdBrakeDriver {
     readonly gain = 400,
     readonly recover = 6,
   ) {}
+  /** Upper limit on the pedal at the current speed (1 = none); see `trailOffCap`. */
+  cap: (speed: number) => number = () => 1;
   tick(h: Harness): void {
     let slip = 0;
     for (let i = 0; i < 4; i++) slip = Math.min(slip, h.car.slipRatio[i]!);
@@ -82,7 +100,7 @@ export class ThresholdBrakeDriver {
     if (excess > 0) this.pedal -= this.gain * excess * STEP;
     else this.pedal += this.recover * STEP;
     this.pedal = Math.min(1, Math.max(0, this.pedal));
-    h.input.brake = Math.min(this.applied, this.pedal);
+    h.input.brake = Math.min(this.applied, this.pedal, this.cap(h.car.vx));
     h.input.throttle = 0;
     shiftForSpeed(h, true, 11000);
   }
@@ -90,11 +108,12 @@ export class ThresholdBrakeDriver {
 
 /** Throttle (and if needed brake) to hold a forward speed. */
 export class SpeedHold {
-  private integral = 0;
   constructor(
     public target: number,
     readonly kp = 0.6,
     readonly ki = 0.4,
+    /** Starting throttle held by the integrator (a feedforward guess). */
+    private integral = 0,
   ) {}
   tick(h: Harness): void {
     const err = this.target - h.car.vx;
