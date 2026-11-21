@@ -1,4 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
+import { DEFAULT_CIRCUIT } from '@undercut/protocol';
+
+// Keep DOM/network traces; continuous raster captures compete with two software renderers.
+// Explicit lobby/lights/track screenshots below supply the visual evidence.
+test.use({ trace: { mode: 'retain-on-failure', screenshots: false } });
 
 test('two players race, rematch, leave and migrate the host', async ({
   browser,
@@ -33,33 +38,48 @@ test('two players race, rematch, leave and migrate the host', async ({
     await guest.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect.poll(async () => (await state(host)).state?.members.length).toBe(2);
     await host.getByLabel('Laps', { exact: true }).fill('1');
-    // Keep real server time and the real lap crossing path; shorten only the referee's
-    // physical floor because debug placement skips the long middle of the circuit.
-    await host.evaluate(() => {
-      const circuit = window.__undercut!.online().state!.room!.settings.circuit;
-      window.__undercut!.onlineSettings({
-        circuit: { ...circuit, minLapMs: 1000, minSectorMs: [] },
-      });
-    });
-    await expect
-      .poll(async () => (await state(guest)).state?.room?.settings.circuit.minLapMs)
-      .toBe(1000);
+    expect((await state(host)).state!.room!.settings.circuit).toEqual(DEFAULT_CIRCUIT);
     await host.screenshot({ path: info.outputPath('lobby-desktop.png') });
     await guest.screenshot({ path: info.outputPath('lobby-phone.png') });
     await guest.getByRole('button', { name: 'Ready', exact: true }).click();
     await host.getByRole('button', { name: 'Ready to start', exact: true }).click();
+    await Promise.all(
+      (
+        [
+          [host, 'desktop'],
+          [guest, 'phone'],
+        ] as const
+      ).map(async ([page, label]) => {
+        await expect(page.locator('.online-lights__lamp.is-lit').first()).toBeVisible({
+          timeout: 90_000,
+        });
+        await expect(page.locator('.online-race__net')).toBeHidden();
+        await page.screenshot({ path: info.outputPath('lights-' + label + '.png') });
+      }),
+    );
     for (const page of [host, guest]) {
       await expect
         .poll(async () => (await state(page)).race?.released, { timeout: 90_000 })
         .toBe(true);
+      await expect(page.locator('.online-lights')).toBeHidden();
+      await expect(page.locator('.online-standing')).toBeVisible();
     }
     const a = (await state(host)).race!;
     const b = (await state(guest)).race!;
     expect(a.start!.lightsOutAt).toBe(b.start!.lightsOutAt);
-    expect(Math.abs(a.lightsOutLocalEpoch! - b.lightsOutLocalEpoch!)).toBeLessThanOrEqual(
-      a.clockErrorMs! + b.clockErrorMs!,
+    expect(Math.abs(a.releasedSimEpoch! - b.releasedSimEpoch!)).toBeLessThanOrEqual(
+      a.clockErrorMs! + b.clockErrorMs! + 1000 / 240,
     );
+    for (const r of [a, b]) {
+      expect(r.releasedServerAt!).toBeGreaterThanOrEqual(r.start!.lightsOutAt);
+      expect(r.releasedServerAt! - r.start!.lightsOutAt).toBeLessThan(1000 / 240);
+    }
     console.log('Online clock agreement', JSON.stringify({ host: a, guest: b }));
+    // Drive through the line only after the normal physical timing floor has elapsed.
+    const floor = (await state(host)).state!.room!.settings.circuit.minLapMs;
+    await expect
+      .poll(async () => (await state(host)).race?.elapsedRaceMs ?? 0, { timeout: 90_000 })
+      .toBeGreaterThan(floor + 1000);
     for (const [page, label] of [
       [host, 'desktop'],
       [guest, 'phone'],
@@ -73,7 +93,7 @@ test('two players race, rematch, leave and migrate the host', async ({
       await expect
         .poll(async () => (await state(page)).race?.claims.length, { timeout: 20_000 })
         .toBe(1);
-      await expect.poll(async () => (await state(page)).race?.timing.length).toBe(1);
+      await expect.poll(async () => (await state(page)).race?.timing[0]?.status).toBe('accepted');
     }
     for (const page of [host, guest])
       await expect(page.getByTestId('online-results')).toBeVisible({ timeout: 30_000 });
@@ -90,6 +110,12 @@ test('two players race, rematch, leave and migrate the host', async ({
     await expect.poll(async () => (await state(guest)).state?.isHost).toBe(true);
     await guest.getByRole('button', { name: 'Leave room', exact: true }).click();
     expect(errors).toEqual([]);
+  } catch (error) {
+    console.log(
+      'Online failure',
+      JSON.stringify({ host: await state(host), guest: await state(guest), errors }),
+    );
+    throw error;
   } finally {
     await hostContext.close();
     await guestContext.close();

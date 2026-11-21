@@ -27,7 +27,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - `window.__undercut` debug API with `?debug=1` (see `apps/web/src/debug.ts`), a keyboard-only autopilot used to prove a full lap, and `npm run shots -- monza` (screenshot stations on the real GPU, `tools/screenshots/`).
 - M0 foundation: npm workspaces, TypeScript strict, Vite client, rooms service on the local Workers runtime, CI with eight required checks, the one-command run.
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
-- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. Headless and soak-tested; the lobby and in-race UI come next. See `docs/netcode.md`.
+- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. The lobby and race UI now use the same client library as the headless soak. See `docs/netcode.md`.
 
 ## Try this
 
@@ -58,7 +58,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 - Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
 - Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
-- Start agreement is measured using calculated local lights-out times and the sum of clock error bounds; actual car release waits for the next rendered frame and can be late under load.
+- Start release happens at the first fixed simulation tick on or after server lights-out. Each frame maps its catch-up ticks to the elapsed server-clock interval, so ticks before lights-out remain held even when rendering stalls. The acceptance test compares the actual released ticks within one 240 Hz tick plus clock error, using the normal referee floors.
 
 - MIT copyright holder written as "Devansh121".
 - npm workspaces instead of pnpm, because pnpm is not installed.

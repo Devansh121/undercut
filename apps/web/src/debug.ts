@@ -22,7 +22,7 @@ import type { CameraName } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
-import type { OnlineState, OnlineSession } from './online/session';
+import type { OnlineState } from './online/session';
 import type { OnlineRaceReport } from './online/race';
 
 export interface DebugApi {
@@ -30,7 +30,6 @@ export interface DebugApi {
     state: OnlineState | null;
     race: OnlineRaceReport | null;
   };
-  onlineSettings(patch: Parameters<OnlineSession['changeSettings']>[0]): void;
   start(): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
@@ -158,7 +157,6 @@ export function installDebugApi(
   };
   window.__undercut = {
     online: () => ({ state: null, race: null }),
-    onlineSettings: () => undefined,
     start: async () => {
       if (!getDrive()) await start();
     },

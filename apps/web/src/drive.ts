@@ -131,7 +131,11 @@ export interface DriveExtension {
   /** Pause menu quit label. */
   quitLabel?: string;
   wrapControl?(source: ControlSource): ControlSource;
+  /** Before fixed ticks: elapsed wall time accepted by this frame. */
+  beforeFrame?(elapsed: number): void;
   attach?(ctx: DriveExtensionContext): void;
+  /** Scene and first-frame shaders are ready. */
+  ready?(): void;
   events?(events: readonly SessionEvent[]): void;
   /** Each frame after the sim stepped and before drawing; returns other cars for the map. */
   frame?(f: { dt: number; pose: CarPose; paused: boolean }): HudState['others'];
@@ -570,7 +574,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message: null,
   };
 
-  const frame = (now: number): void => {
+  const frame = (): void => {
+    const now = performance.now();
     if (quitting) return;
     const dt = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
     if (last !== null) {
@@ -580,6 +585,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     last = now;
 
     if (session.phase === 'running') {
+      ext?.beforeFrame?.(dt);
       const r = loop.frame(dt);
       onEvents(r.events);
       lookBack = r.lookBack;
@@ -691,6 +697,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     );
     sink(audioState, !playing || document.visibilityState === 'hidden');
 
+    ext?.ready?.();
     handle = requestAnimationFrame(frame);
   };
 

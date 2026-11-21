@@ -21,6 +21,7 @@ import type { HudState } from '../ui/hud';
 import { poseFromView, toSnapshot } from './car-state';
 import { seatLivery } from './liveries';
 import { LineCounter } from './progress';
+import { StartGate } from './start-gate';
 import { RaceHud } from './race-hud';
 import { lapClaim, lightsOn, liveOrder } from './race-rules';
 import { RemoteCarSmoother } from './smoother';
@@ -45,8 +46,13 @@ export interface OnlineRaceReport {
   start: StartSchedule | null;
   /** Lights out converted to this browser's clock, as wall-clock ms (comparable across tabs). */
   lightsOutLocalEpoch: number | null;
-  /** When the car was actually let go, wall-clock ms; later by up to a frame. */
+  /** Wall-clock observation of the first released tick (may run in a catch-up batch). */
   releasedEpoch: number | null;
+  /** Local epoch of that simulation tick, from its server-clock mapping. */
+  releasedSimEpoch: number | null;
+  releasedServerAt: number | null;
+  releasedSimTime: number | null;
+  elapsedRaceMs: number;
   /** Clock-sync error bound when the car was let go, ms. */
   clockErrorMs: number | null;
   laps: number;
@@ -89,6 +95,8 @@ export class OnlineRace implements DriveExtension {
   private ctx: DriveExtensionContext | null = null;
   private wheelDrop = [0.35, 0.35, 0.35, 0.35];
   private released = false;
+  private loadedSent = false;
+  private readonly gate = new StartGate();
   private resets = 0;
   private lastRaceMs = 0;
   private goUntil = 0;
@@ -137,6 +145,10 @@ export class OnlineRace implements DriveExtension {
       start: room.start,
       lightsOutLocalEpoch: null,
       releasedEpoch: null,
+      releasedSimEpoch: null,
+      releasedServerAt: null,
+      releasedSimTime: null,
+      elapsedRaceMs: 0,
       clockErrorMs: null,
       laps: 0,
       claims: [],
@@ -149,7 +161,41 @@ export class OnlineRace implements DriveExtension {
   }
 
   wrapControl(source: ControlSource): ControlSource {
-    return new StartHold(source, () => !this.released);
+    return new StartHold(source, () => this.heldForTick());
+  }
+
+  beforeFrame(elapsed: number): void {
+    const ctx = this.ctx;
+    const now = this.client.serverNow();
+    if (!ctx || now === null) return;
+    this.gate.beginFrame(
+      now,
+      elapsed,
+      ctx.loop.alpha * ctx.session.world.step,
+      ctx.session.world.time,
+    );
+  }
+
+  private heldForTick(): boolean {
+    if (this.released) return false;
+    const ctx = this.ctx;
+    const c = this.client;
+    const start = c.room?.start;
+    if (!ctx || !start || c.serverNow() === null) return true;
+    const tickAt = this.gate.tickAt(ctx.session.world.time);
+    if (tickAt < start.lightsOutAt) return true;
+    this.released = true;
+    this.goUntil = start.lightsOutAt + 1500;
+    this.report.released = true;
+    this.report.releasedServerAt = tickAt;
+    this.report.releasedSimTime = ctx.session.world.time;
+    const local = c.localTimeOf(tickAt);
+    this.report.releasedSimEpoch = local === null ? null : this.epochOf(local);
+    this.report.releasedEpoch = this.epochOf(performance.now());
+    const lightsLocal = c.localTimeOf(start.lightsOutAt);
+    this.report.lightsOutLocalEpoch = lightsLocal === null ? null : this.epochOf(lightsLocal);
+    this.report.clockErrorMs = c.clock.error;
+    return false;
   }
 
   attach(ctx: DriveExtensionContext): void {
@@ -171,7 +217,17 @@ export class OnlineRace implements DriveExtension {
         ctx.say({ tag: 'Track limits', text: `Warning ${m.warnings}`, tone: 'invalid' }, 3);
       }),
     );
-    if (c.room?.phase === 'grid') c.markLoaded();
+  }
+
+  ready(): void {
+    const room = this.client.room;
+    if (room?.phase !== 'grid' || this.loadedSent) return;
+    const me = room.members.find((m) => m.seat === this.seat);
+    const peers = room.members.filter((m) => m.seat !== this.seat && m.connected).length;
+    // Remote-car materials compile on their first draw too. A ready car must have
+    // rendered the other connected players, not just its own body and the track.
+    if (me && !me.loaded && this.report.remote.length >= peers)
+      this.loadedSent = this.client.markLoaded();
   }
 
   detach(): void {
@@ -227,17 +283,6 @@ export class OnlineRace implements DriveExtension {
     const now = c.serverNow();
     const start = room?.start ?? null;
     this.report.start = start;
-
-    // The start: let go on the first frame at or after the server's lights out.
-    if (!this.released && start && now !== null && now >= start.lightsOutAt) {
-      this.released = true;
-      this.goUntil = now + 1500;
-      const local = c.localTimeOf(start.lightsOutAt);
-      this.report.released = true;
-      this.report.lightsOutLocalEpoch = local === null ? null : this.epochOf(local);
-      this.report.releasedEpoch = this.epochOf(performance.now());
-      this.report.clockErrorMs = c.clock.error;
-    }
 
     // Laps: one claim per forward crossing of the timing line, timed on the server clock.
     const crossing = this.counter.update(session.s, session.world.time);
@@ -394,6 +439,10 @@ export class OnlineRace implements DriveExtension {
   snapshot(): OnlineRaceReport {
     return {
       ...this.report,
+      elapsedRaceMs: Math.max(
+        0,
+        (this.client.serverNow() ?? 0) - (this.client.room?.start?.lightsOutAt ?? Infinity),
+      ),
       claims: [...this.report.claims],
       timing: [...this.report.timing],
       smoother: { ...this.smoother.stats },

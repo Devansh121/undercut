@@ -427,3 +427,17 @@ relayed frames, so starvation shows up as such rather than as a netcode error.
 The simulator treats snapshots as an unreliable stream (delayed independently, so jitter
 reorders them; dropped; duplicated) and control messages as TCP does (in order, once;
 loss becomes a retransmission delay), because that is what a WebSocket gives.
+
+### Game start scheduling
+
+The online control gate evaluates each fixed simulation tick before applying its controls.
+At the start of a frame, the game maps the accumulated interval (elapsed wall time plus
+fractional tick remainder) onto the synced server clock. Catch-up ticks before
+`lightsOutAt` stay on the brakes; the first tick starting at or after it releases controls.
+This prevents a delayed render callback from holding an entire catch-up interval past
+lights-out or releasing the earlier ticks prematurely. The debug report records that
+actual tick's sim time and mapped server/local epoch, rather than substituting the
+announced lights-out time. The two-client scheduling bound is one 240 Hz tick
+(4.167 ms) plus the sum of their clock-sync errors. Rendering can present the resulting
+state later; after a stall beyond the 250 ms clamp the game cannot catch up the discarded
+time. Such a start fails the scheduling assertion rather than expanding the bound.

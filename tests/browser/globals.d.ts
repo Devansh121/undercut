@@ -1,5 +1,4 @@
 import type { OnlineState } from '../../apps/web/src/online/session';
-import type { CircuitInfo } from '@undercut/protocol';
 
 declare global {
   /** The debug API the drive tests use (apps/web/src/debug.ts), typed loosely for tests. */
@@ -8,15 +7,18 @@ declare global {
       state: OnlineState | null;
       race: {
         released: boolean;
+        releasedEpoch: number | null;
+        releasedSimEpoch: number | null;
+        releasedServerAt: number | null;
+        elapsedRaceMs: number;
         start: { lightsOutAt: number } | null;
         lightsOutLocalEpoch: number | null;
         clockErrorMs: number | null;
         remote: unknown[];
         claims: unknown[];
-        timing: unknown[];
+        timing: { status: string }[];
       } | null;
     };
-    onlineSettings(patch: { circuit: CircuitInfo }): void;
     start(): Promise<void>;
     state(): Record<string, unknown>;
     telemetry(): Record<string, unknown>;

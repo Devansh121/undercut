@@ -75,7 +75,7 @@
 }
 @media (max-height: 500px) {
   .online-race {
-    top: calc(var(--safe-t) + 32px);
+    top: calc(var(--safe-t) + 96px);
     gap: var(--sp-1);
   }
   .online-lights {
