@@ -10,6 +10,7 @@ import {
   computeMass,
   createCarPose,
   interpolateCarPose,
+  type CarPose,
   type CarTelemetry,
   type ControlInput,
 } from '@undercut/sim';
@@ -61,11 +62,12 @@ import {
   KeyboardAutopilot,
   ScriptedControlSource,
 } from './game/autopilot';
-import { GameLoop } from './game/loop';
+import { GameLoop, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
 import { Hud, type HudMessage, type HudState } from './ui/hud';
+import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
@@ -123,6 +125,44 @@ export interface DriveOptions {
   audio?: DriveAudio;
   /** No saved or requested preset: benchmark the first seconds and pick one. */
   autoQuality?: boolean;
+  /** A mode on top of the drive screen (online racing). */
+  extension?: DriveExtension;
+}
+
+/**
+ * A mode layered on the drive screen without changing it: online racing. It places the car,
+ * can hold it (wrapping the control source), hears the session's events, runs once a frame
+ * before drawing, and adds its own overlay. With an extension the screen keeps no records and
+ * shows no ghost, and the pause menu has no lap restart.
+ */
+export interface DriveExtension {
+  /** Loading screen detail, e.g. "Online race". */
+  label: string;
+  /** Start standing at lap (s, d) instead of the rolling start. */
+  startAt?: { s: number; d: number };
+  /** The player's car's look; default the first team's. */
+  livery?: CarLivery;
+  /** Pause menu quit label. */
+  quitLabel?: string;
+  wrapControl?(source: ControlSource): ControlSource;
+  /** Before fixed ticks: elapsed wall time accepted by this frame. */
+  beforeFrame?(elapsed: number): void;
+  attach?(ctx: DriveExtensionContext): void;
+  /** Scene and first-frame shaders are ready. */
+  ready?(): void;
+  events?(events: readonly SessionEvent[]): void;
+  /** Each frame after the sim stepped and before drawing; returns other cars for the map. */
+  frame?(f: { dt: number; pose: CarPose; paused: boolean }): HudState['others'];
+  detach?(): void;
+}
+
+export interface DriveExtensionContext {
+  session: DriveSession;
+  loop: GameLoop;
+  /** The current view (it is rebuilt on a quality switch or a context restore). */
+  view(): RaceView;
+  host: HTMLElement;
+  say(message: HudMessage, seconds?: number): void;
 }
 
 /** Thrown when the player backs out of a failed load; the launch screen comes back. */
@@ -234,8 +274,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     sprungB: 0,
     yawInertia: 0,
   });
+  const ext = o.extension;
   const all = liveries(TEAM_ID);
-  const playerLivery = all[0];
+  const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
   const renderer = pageRenderer;
@@ -293,7 +334,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const tod =
     TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ?? MONZA_AFTERNOON;
   let quality = o.quality;
-  const loading = mountLoadingScreen(o.host, track.name, 'Time trial');
+  const loading = mountLoadingScreen(o.host, track.name, ext?.label ?? 'Time trial');
   let view: RaceView;
   try {
     view = await loadView(quality, loading);
@@ -309,27 +350,31 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     new KeyboardAutopilot(track, params),
     () => session.car.state,
   );
-  const loop = new GameLoop(session, human);
+  const wrap = (source: ControlSource): ControlSource => ext?.wrapControl?.(source) ?? source;
+  if (ext?.startAt) session.teleport(ext.startAt.s, ext.startAt.d, 0);
+  const loop = new GameLoop(session, wrap(human));
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
-  const hud = new Hud(plan);
+  const hud = new Hud(plan, ext?.label ?? 'Time trial');
   const results = new ResultsStrip();
   let quitting = false;
+  const restartLap = (): void => {
+    onEvents(loop.restartLap());
+    pilot.pilot.reset();
+    resume();
+  };
   const actions = {
     resume: () => resume(),
-    restartLap: () => {
-      onEvents(loop.restartLap());
-      pilot.pilot.reset();
-      resume();
-    },
+    ...(ext ? {} : { restartLap }),
     resetToTrack: () => {
       onEvents(loop.resetToTrack());
       resume();
     },
     quit: () => quit(),
+    ...(ext?.quitLabel ? { quitLabel: ext.quitLabel } : {}),
   };
   const levels = [
     { value: 0, label: 'Off' },
@@ -411,6 +456,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
+    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
@@ -442,6 +488,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
+  // The storage warning goes first; the first-start controls hint follows it.
+  let queued: HudMessage | null = takeFirstStartHint()
+    ? {
+        tag: 'Controls',
+        text: controlsHint(input.profile.bindings, input.activeDevice),
+        tone: 'info',
+      }
+    : null;
   if (!records.persistent)
     say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
 
@@ -457,6 +511,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           lastLap = { time: e.result.time, cls: e.result.class };
           break;
         case 'record':
+          if (ext) break;
           void records.save(e.circuit, e.update).then(() => {
             if (!records.persistent)
               say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
@@ -475,6 +530,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           break;
       }
     }
+    ext?.events?.(events);
   }
 
   function openPause(): void {
@@ -553,7 +609,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message: null,
   };
 
-  const frame = (now: number): void => {
+  const frame = (): void => {
+    const now = performance.now();
     if (quitting) return;
     const dt = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
     if (last !== null) {
@@ -563,6 +620,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     last = now;
 
     if (session.phase === 'running') {
+      ext?.beforeFrame?.(dt);
       const r = loop.frame(dt);
       impacts.observe(r.wallImpact, dt);
       onEvents(r.events);
@@ -576,10 +634,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
+      const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
         if (e.type !== 'action') continue;
+        if (e.action === 'menuAccept' && native) continue;
+        if (pause.navigate(e.action)) continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
-        else pause.navigate(e.action);
       }
       lookBack = false;
     }
@@ -591,13 +652,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       messageLeft -= dt;
       if (messageLeft <= 0) message = null;
     }
+    if (!message && queued) {
+      say(queued, 6);
+      queued = null;
+    }
     results.tick(dt);
 
     const car = session.car;
     interpolateCarPose(car.previousPose, car.pose, loop.alpha, pose);
     const t = session.readTelemetry();
     const renderTime = loop.renderTime;
-    const ghostOn = session.ghostPoseAt(renderTime, ghostPose);
+    const ghostOn = !ext && session.ghostPoseAt(renderTime, ghostPose);
+    const others = ext?.frame?.({ dt, pose, paused: !playing });
     const revLights =
       t.engineRpm >= REV_FLASH
         ? 16
@@ -658,6 +724,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     h.ghostX = ghostOn ? ghostPose.x : null;
     h.ghostZ = ghostOn ? ghostPose.z : null;
     h.message = message;
+    if (others) h.others = others;
     hud.update(h);
     overlay?.update();
 
@@ -681,9 +748,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
     );
 
+    ext?.ready?.();
     handle = requestAnimationFrame(frame);
   };
 
+  ext?.attach?.({
+    session,
+    loop,
+    view: () => view,
+    host: o.host,
+    say: (m, seconds) => say(m, seconds),
+  });
   input.setContext('driving');
   loop.start();
   o.audio?.setActive(true);
@@ -786,6 +861,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     clusterObserver.disconnect();
     window.removeEventListener('resize', measureCluster);
     loop.quit();
+    ext?.detach?.();
     overlay?.destroy();
     view.dispose();
     input.setContext('menu');
@@ -800,7 +876,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const setSource = (next: typeof source): void => {
     if (source === 'pilot' && next !== 'pilot') pilot.release();
     source = next;
-    loop.setSource(next === 'human' ? human : next === 'script' ? scripted : pilot);
+    loop.setSource(wrap(next === 'human' ? human : next === 'script' ? scripted : pilot));
   };
 
   return {
@@ -837,7 +913,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     setCamera: (name) => view.setCamera(name),
     pause: doPause,
     resume,
-    restartLap: actions.restartLap,
+    restartLap: () => {
+      if (!ext) restartLap();
+    },
     resetToTrack: actions.resetToTrack,
     teleport: (s, d, speed) => {
       onEvents(session.teleport(s, d, speed));
@@ -877,7 +955,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       loop.timeScale = 1;
       view.setSkyProbe(null);
       view.setCamera('chase-near');
-      actions.restartLap();
+      if (!ext) restartLap();
       results.hide();
       message = null;
     },

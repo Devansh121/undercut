@@ -117,7 +117,7 @@ function sendStatus(res, status) {
  * Request and upgrade handlers that serve the built client from `root` and pass
  * `/rooms` (HTTP and WebSocket) through to the rooms service on 127.0.0.1.
  */
-export function createHandlers({ root, roomsPort }) {
+export function createHandlers({ root, roomsPort, networkOrigins = [] }) {
   const absRoot = path.resolve(root);
   const sockets = new Set();
 
@@ -220,7 +220,10 @@ export function createHandlers({ root, roomsPort }) {
 
   const request = (scheme) => (req, res) => {
     try {
-      if (isRoomsPath(req.url)) proxyHttp(req, res, scheme);
+      if (req.url === '/network-info') {
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ origins: networkOrigins }));
+      } else if (isRoomsPath(req.url)) proxyHttp(req, res, scheme);
       else serveFile(req, res);
     } catch {
       // Last line of defence: no request may take the server down.
