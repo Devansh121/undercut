@@ -380,14 +380,16 @@ export class RoadVoice implements Voice {
     m[L.wind] = (m[L.wind] as number) + e;
     this.flap.renderAdd(this.nE, wind, n, m, L.drs);
 
-    const vg = view.first;
+    const vg = view.start;
+    const off = view.offset;
     const vs = view.step;
     const r0 = vg[G.road] as number;
     const rs = vs[G.road] as number;
     const w0 = vg[G.wind] as number;
     const ws = vs[G.wind] as number;
     for (let i = 0; i < n; i++)
-      out[i] = (road[i] as number) * (r0 + rs * i) + (wind[i] as number) * (w0 + ws * i);
+      out[i] =
+        (road[i] as number) * (r0 + rs * (off + i)) + (wind[i] as number) * (w0 + ws * (off + i));
   }
 
   /** Per-sample envelopes and excitation signals for this chunk. */
@@ -493,8 +495,8 @@ export class RoadVoice implements Voice {
       this.gScrubR[i] = this.scrubR * judder;
       if (this.squealLive) {
         // A locked or spinning tyre howls or rasps instead of squealing.
-        const keepF = (1 - 0.85 * lockF) * (1 - 0.6 * spinF);
-        const keepR = (1 - 0.85 * lockR) * (1 - 0.6 * spinR);
+        const keepF = (1 - 0.85 * lockF) * (1 - 0.85 * spinF);
+        const keepR = (1 - 0.85 * lockR) * (1 - 0.85 * spinR);
         this.squealF += (slideF * keepF * moving - this.squealF) * this.kSlip;
         this.squealR += (slideR * keepR * moving - this.squealR) * this.kSlip;
         if (sf < 1 && sr < 1 && this.squealF + this.squealR < 1e-7) {

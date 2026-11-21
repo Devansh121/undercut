@@ -6,8 +6,8 @@ import { Noise } from './noise';
 const LEVEL = {
   grassRumble: 0.55,
   grassSwish: 0.16,
-  gravelRoar: 0.35,
-  gravelGrain: 0.5,
+  gravelRoar: 0.25,
+  gravelGrain: 1.1,
   gravelCrunch: 0.3,
 };
 
@@ -15,9 +15,9 @@ const LEVEL = {
  * The ground off the racing surface: grass and gravel, each by the share of contact points on
  * it, and by speed. (Asphalt is the road voice's rolling noise; kerbs are their own layer.)
  *
- * - **Grass:** a soft low rumble (noise below 140 Hz) with a broad swish around 1.1 kHz, both
+ * - **Grass:** a soft low rumble (noise below 140 Hz) with a soft swish around 750 Hz, both
  *   modulated by slow random bumpiness (a value redrawn at about 12 Hz and smoothed), rising
- *   with speed to the power 0.8.
+ *   with speed to the power 0.8. Dull on purpose: grass is soft.
  * - **Gravel:** a low roar (below 180 Hz) plus grains: random impulses whose rate rises with
  *   speed (300 + 60 × v per second, so about 3300 per second at 180 km/h), each of random
  *   strength, through a 3.2 kHz resonance (stones on the floor and tub) and a 700 Hz one
@@ -42,7 +42,6 @@ export class SurfaceLayers {
   private readonly grains = new Float64Array(CHUNK);
   private readonly work = new Float64Array(CHUNK);
   private readonly work2 = new Float64Array(CHUNK);
-  private readonly bumpDraw = new Float64Array(1);
   private grass = 0;
   private gravel = 0;
   private bump = 0;
@@ -58,7 +57,7 @@ export class SurfaceLayers {
     this.dt = 1 / sampleRate;
     const bq = () => new Biquad(sampleRate);
     this.grassLow = bq().lowpass(140, 0.7);
-    this.grassSwish = bq().bandpass(1100, 0.6);
+    this.grassSwish = bq().bandpass(750, 0.8);
     this.gravelLow = bq().lowpass(180, 0.7);
     this.gravelHigh = bq().bandpass(3200, 1.5);
     this.gravelMid = bq().bandpass(700, 1);
@@ -115,9 +114,9 @@ export class SurfaceLayers {
       if (g === 0 && this.grass < 1e-7) this.grass = 0;
       if (r === 0 && this.gravel < 1e-7) this.gravel = 0;
       if (++this.bumpCount >= this.bumpPeriod) {
+        // Taken from this sample's noise, so it does not depend on how blocks are split.
         this.bumpCount = 0;
-        this.noiseB.draw(this.bumpDraw, 1);
-        this.bumpTarget = this.bumpDraw[0] as number;
+        this.bumpTarget = 0.5 * ((nB[i] as number) + 1);
       }
       this.bump += (this.bumpTarget - this.bump) * this.kBump;
       const vr = speedRel[i] as number;

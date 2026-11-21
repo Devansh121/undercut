@@ -40,16 +40,18 @@ export interface ViewBalance {
 }
 
 /**
- * Design values. No measured balance between onboard and external microphones is published;
+ * Design values. At full load the intake layer is about 12 dB under the exhaust before the
+ * view; the cockpit and T-cam gains bring it level with or above the exhaust, the chase camera
+ * leaves it about 15 dB under. No measured balance between onboard and external microphones is published;
  * these follow what broadcast onboard and trackside footage makes plain (intake and turbo up
  * front, exhaust behind, distance dulling the top end) and keep every view inside the loudness
  * window. Listening queue item: whether the cockpit is too dull.
  */
 export const VIEW_BALANCE: Readonly<Record<AudioView, ViewBalance>> = {
-  cockpit: { gains: [0.6, 1.5, 1.3, 1.4, 1.0, 1.3], exhaustCutoff: 3200 },
-  tcam: { gains: [0.75, 1.6, 0.9, 1.2, 0.8, 0.9], exhaustCutoff: 6000 },
-  chase: { gains: [1.0, 0.6, 0.6, 0.8, 0.75, 0.6], exhaustCutoff: 14_000 },
-  trackside: { gains: [0.8, 0.3, 0.3, 0.45, 0.5, 0.25], exhaustCutoff: 4500 },
+  cockpit: { gains: [0.55, 2.2, 1.6, 1.5, 1.0, 1.3], exhaustCutoff: 3200 },
+  tcam: { gains: [0.65, 2.4, 0.9, 1.25, 0.8, 0.9], exhaustCutoff: 6000 },
+  chase: { gains: [1.0, 0.7, 0.6, 0.8, 0.75, 0.6], exhaustCutoff: 14_000 },
+  trackside: { gains: [0.85, 0.4, 0.3, 0.45, 0.5, 0.25], exhaustCutoff: 4500 },
 };
 
 /** Time constant of a view change, s: long enough not to click, short enough to follow a cut. */
@@ -58,21 +60,22 @@ const VIEW_GLIDE = 0.08;
 /**
  * The current balance, gliding towards the selected view. It moves once per control chunk of
  * the core's clock; inside a chunk each group's gain ramps linearly, so a view change never
- * steps. `first[g]` and `step[g]` describe the part of the chunk being rendered, and depend
- * only on the sample clock, not on how the host splits its blocks.
+ * steps. Group g's gain at sample i of the part being rendered is
+ * `start[g] + step[g] * (offset + i)`: written that way (not as a running sum) it is the same
+ * number however the host splits its blocks.
  */
 export class ViewMix {
-  /** Gain of each group at the first sample of the part being rendered. */
-  readonly first = new Float64Array(VIEW_GROUPS);
-  /** Per-sample increment of each group's gain. */
+  /** Gain of each group at the first sample of the chunk. */
+  readonly start = new Float64Array(VIEW_GROUPS);
+  /** Per-sample increment of each group's gain across the chunk. */
   readonly step = new Float64Array(VIEW_GROUPS);
+  /** Frames of the current chunk already rendered. */
+  offset = 0;
   /** Exhaust low-pass cut-off for this chunk, Hz. */
   exhaustCutoff = 14_000;
-  private readonly start = new Float64Array(VIEW_GROUPS);
   private readonly target = new Float64Array(VIEW_GROUPS);
   private readonly value = new Float64Array(VIEW_GROUPS);
   private cutoffTarget = 14_000;
-  private offset = 0;
   private readonly k: number;
   private current: AudioView = 'chase';
 
@@ -81,7 +84,6 @@ export class ViewMix {
     this.set(view);
     this.value.set(this.target);
     this.start.set(this.target);
-    this.first.set(this.target);
     this.exhaustCutoff = this.cutoffTarget;
   }
 
@@ -97,7 +99,7 @@ export class ViewMix {
     this.cutoffTarget = b.exhaustCutoff;
   }
 
-  /** Before rendering `n` frames: a new chunk starts when `aligned`. */
+  /** Before rendering: a new chunk starts when `aligned`. */
   begin(aligned: boolean): void {
     if (aligned) {
       const k = this.k;
@@ -112,8 +114,6 @@ export class ViewMix {
       this.exhaustCutoff *= Math.pow(this.cutoffTarget / this.exhaustCutoff, k);
       this.offset = 0;
     }
-    for (let g = 0; g < VIEW_GROUPS; g++)
-      this.first[g] = (this.start[g] as number) + (this.step[g] as number) * this.offset;
   }
 
   /** After rendering `n` frames. */

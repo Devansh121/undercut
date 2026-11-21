@@ -20,11 +20,11 @@ import { Burst } from './burst';
  */
 export class OverrunBurble {
   static readonly DEPTH = 0.55;
-  static readonly CHANCE = 0.12;
+  static readonly CHANCE = 0.2;
   static readonly FLOOR = 0.35;
   static readonly FRESH_DECAY = 1.8;
   /** Afterfire level, thousandths (integer: see `Burst.trigger`). */
-  static readonly LEVEL_MILLI = 140;
+  static readonly LEVEL_MILLI = 450;
 
   /** Burble strength now, 0–1. */
   strength = 0;

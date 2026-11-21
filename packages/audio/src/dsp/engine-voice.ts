@@ -43,11 +43,11 @@ const LEVEL = {
   clackMilli: 120,
   /** Upshift crack at full load, thousandths. */
   crackMilli: 380,
-  gearWhine: 0.0045,
+  gearWhine: 0.012,
 };
 /** Firing events after an upshift's cut whose pulses carry the crack (stronger by this). */
 const CRACK_EVENTS = 3;
-const CRACK_BOOST = 0.35;
+const CRACK_BOOST = 0.2;
 
 /**
  * The power-unit voice: a 1.6 L V6 four-stroke, turbocharged, with an MGU-K.
@@ -256,7 +256,8 @@ export class EngineVoice implements Voice {
     const ex = this.exBuf;
     const fx = this.fxBuf;
     const mech = this.mechBuf;
-    const vg = view.first;
+    const vg = view.start;
+    const off = view.offset;
     const vs = view.step;
 
     // Exhaust: the pulse train through the fixed exhaust resonances, then the view's path.
@@ -269,7 +270,7 @@ export class EngineVoice implements Voice {
     this.exhaustLp.processBlock(ex, ex, n);
     let g0 = vg[G.exhaust] as number;
     let gs = vs[G.exhaust] as number;
-    for (let i = 0; i < n; i++) out[i] = (ex[i] as number) * (g0 + gs * i);
+    for (let i = 0; i < n; i++) out[i] = (ex[i] as number) * (g0 + gs * (off + i));
 
     // Intake: the airbox resonance, fed in proportion to load.
     e = 0;
@@ -285,7 +286,7 @@ export class EngineVoice implements Voice {
     gs = vs[G.intake] as number;
     for (let i = 0; i < n; i++) {
       const v = tmp[i] as number;
-      out[i] = (out[i] as number) + v * (g0 + gs * i);
+      out[i] = (out[i] as number) + v * (g0 + gs * (off + i));
       e += v * v;
     }
     m[L.intake] = (m[L.intake] as number) + e;
@@ -308,7 +309,7 @@ export class EngineVoice implements Voice {
     gs = vs[G.mechanical] as number;
     for (let i = 0; i < n; i++) {
       const v = tmp[i] as number;
-      out[i] = (out[i] as number) + v * (g0 + gs * i);
+      out[i] = (out[i] as number) + v * (g0 + gs * (off + i));
       e += v * v;
     }
     m[L.combustion] = (m[L.combustion] as number) + e;
@@ -324,7 +325,8 @@ export class EngineVoice implements Voice {
       if (this.ersLive) this.renderErs(controls, wh, n, m);
       g0 = vg[G.whine] as number;
       gs = vs[G.whine] as number;
-      for (let i = 0; i < n; i++) out[i] = (out[i] as number) + (wh[i] as number) * (g0 + gs * i);
+      for (let i = 0; i < n; i++)
+        out[i] = (out[i] as number) + (wh[i] as number) * (g0 + gs * (off + i));
     }
 
     // Exhaust transients: overrun pops, afterfire burble and the upshift crack.
@@ -337,7 +339,8 @@ export class EngineVoice implements Voice {
     this.fxLp.processBlock(fx, fx, n);
     g0 = vg[G.exhaust] as number;
     gs = vs[G.exhaust] as number;
-    for (let i = 0; i < n; i++) out[i] = (out[i] as number) + (fx[i] as number) * (g0 + gs * i);
+    for (let i = 0; i < n; i++)
+      out[i] = (out[i] as number) + (fx[i] as number) * (g0 + gs * (off + i));
 
     // Drivetrain: gear whine and the gearbox clack.
     this.whine.renderAdd(
@@ -355,7 +358,7 @@ export class EngineVoice implements Voice {
     g0 = vg[G.mechanical] as number;
     gs = vs[G.mechanical] as number;
     for (let i = 0; i < n; i++)
-      out[i] = (out[i] as number) + (mech[i] as number) * (g0 + gs * i);
+      out[i] = (out[i] as number) + (mech[i] as number) * (g0 + gs * (off + i));
   }
 
   /** The per-sample part: envelopes, crank phase, firing events and the cylinder pulse sums. */
