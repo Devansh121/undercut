@@ -50,7 +50,7 @@ import {
   type PitComplexData,
 } from './pit-building';
 import { buildSurfaceDecals } from './surface-decals';
-import { buildTerrain, TERRAIN_HIGH, TERRAIN_MOBILE } from './terrain';
+import { buildTerrain, TERRAIN_HIGH, TERRAIN_LITE, TERRAIN_MOBILE } from './terrain';
 import { treeAtlas } from './tree-atlas';
 import { treeCards, treeMaterials, type TreeMaterials } from './trees';
 
@@ -61,7 +61,7 @@ export interface WorldQuality {
   /** Atlas pixels per species. */
   treeTile: number;
   /** Fine terrain cells near the circuit ('high' 10 m, 'mobile' 24 m). */
-  terrain: 'high' | 'mobile';
+  terrain: 'high' | 'mobile' | 'lite';
   wind: boolean;
   /** Fraction of seats with a spectator. */
   crowd: number;
@@ -194,7 +194,7 @@ export class CircuitWorld {
       grid,
       this.lap,
       o.drivable,
-      wq.terrain === 'high' ? TERRAIN_HIGH : TERRAIN_MOBILE,
+      wq.terrain === 'high' ? TERRAIN_HIGH : wq.terrain === 'lite' ? TERRAIN_LITE : TERRAIN_MOBILE,
     );
     this.heightAt = terrain.heightAt;
     step('terrain');
@@ -342,7 +342,7 @@ export class CircuitWorld {
     this.geometries.push(canopyGeo, mechGeo, engGeo);
     this.materials.push(canopyMat, crewMat);
 
-    const far = quality.world.terrain === 'mobile' ? 360 : 750;
+    const far = quality.world.terrain === 'high' ? 750 : 360;
     props.define({
       id: 'pit-wall-canopy',
       castShadow: quality.sceneryShadows,
@@ -509,8 +509,10 @@ export class CircuitWorld {
     let woods = 0;
     dressing.mapped.wood.forEach((f, n) => (woods += fillArea(f, 1, 20, 1000 + n * 7)));
     dressing.mapped.scrub.forEach((f, n) => (woods += fillArea(f, 0.35, 9, 5000 + n * 7)));
+    // Without the structures (Lite, software-WebGL tests) the woods alone: one tree shader.
+    const woodsOnly = !wq.structures;
     let rows = 0;
-    for (const f of dressing.mapped.treeRow) {
+    for (const f of woodsOnly ? [] : dressing.mapped.treeRow) {
       const p = f.p;
       for (let i = 0; i + 3 < p.length; i += 2) {
         const ax = p[i] as number;
@@ -526,7 +528,7 @@ export class CircuitWorld {
     }
     let singles = 0;
     const tp = dressing.mapped.tree;
-    for (let i = 0; i + 1 < tp.length; i += 2) {
+    for (let i = 0; !woodsOnly && i + 1 < tp.length; i += 2) {
       if (hash01(i, 99) > Math.max(0.2, wq.treeDensity)) continue;
       if (place('tree-park', tp[i] as number, tp[i + 1] as number, 17)) singles++;
     }
@@ -650,7 +652,7 @@ export class CircuitWorld {
   /** Start gantry, bridges, historic banking, trackside furniture and place-dependent surface decals. */
   private placeFurnitureAndDecals(o: CircuitWorldOptions): void {
     const { track, dressing, quality, props } = o;
-    const mobile = quality.world.terrain === 'mobile';
+    const mobile = quality.world.terrain !== 'high';
     const tileW = mobile ? 256 : 512;
     const tileH = mobile ? 64 : 128;
     const brandTex = brandAtlas(

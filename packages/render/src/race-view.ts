@@ -294,8 +294,10 @@ export class RaceView {
           return d;
         })
       : Promise.resolve(null);
+    // The prop kit is only placed with the structures (not on Lite or `worldDetail: 'lite'`).
+    const structures = (options.worldDetail === 'lite' ? QUALITY.lite.world : q.world).structures;
     const kitP =
-      options.dressingUrl && isPropCatalog(options.propCatalog)
+      options.dressingUrl && structures && isPropCatalog(options.propCatalog)
         ? PropKitAssets.load(loader, options.propCatalog, q, options.dracoPath)
         : Promise.resolve(null);
     // Settle all of them before deciding: a car that finishes after another file failed is

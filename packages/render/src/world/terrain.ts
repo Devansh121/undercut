@@ -29,6 +29,12 @@ export const TERRAIN_HIGH: TerrainOptions = {
   blendNear: 120,
   blendFar: 450,
 };
+/** Lite (software-WebGL tests): coarse ground, still exact under the track. */
+export const TERRAIN_LITE: TerrainOptions = {
+  ...TERRAIN_HIGH,
+  innerCell: 48,
+  growth: 1.5,
+};
 export const TERRAIN_MOBILE: TerrainOptions = {
   ...TERRAIN_HIGH,
   innerCell: 24,
