@@ -14,7 +14,8 @@ function isEditable(target: EventTarget | null): boolean {
  * Feed keyboard events into the input system. Keys are read by `event.code`, so bindings follow
  * key positions, not the layout's letters. While driving, bound keys do not scroll the page.
  * Every held key is released when the window loses focus or the page is hidden, so nothing
- * stays pressed after alt-tab. Returns a function that detaches the listeners.
+ * stays pressed after alt-tab (pair it with `attachFocusGuard`, which also suspends gamepads).
+ * Returns a function that detaches the listeners.
  */
 export function attachKeyboard(system: InputSystem, win: Window = window): () => void {
   const doc = win.document;

@@ -43,6 +43,76 @@ async function settle(page: Page, ticks = 24): Promise<void> {
   await expect.poll(async () => (await snap(page)).tick).toBeGreaterThanOrEqual(start + ticks);
 }
 
+/** Replace navigator.getGamepads with one scriptable standard pad, driven by window.fakePad. */
+async function installFakePad(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type Pad = {
+      index: number;
+      id: string;
+      connected: boolean;
+      mapping: string;
+      timestamp: number;
+      axes: number[];
+      buttons: { pressed: boolean; touched: boolean; value: number }[];
+    };
+    const pads: (Pad | null)[] = [null, null, null, null];
+    const control = {
+      connect(id: string) {
+        const pad: Pad = {
+          index: 0,
+          id,
+          connected: true,
+          mapping: 'standard',
+          timestamp: 0,
+          axes: [0, 0, 0, 0],
+          buttons: Array.from({ length: 17 }, () => ({
+            pressed: false,
+            touched: false,
+            value: 0,
+          })),
+        };
+        pads[0] = pad;
+        window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
+      },
+      disconnect() {
+        const pad = pads[0];
+        pads[0] = null;
+        window.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: pad }));
+      },
+      button(i: number, value: number) {
+        const pad = pads[0];
+        if (pad) pad.buttons[i] = { pressed: value > 0.5, touched: value > 0, value };
+      },
+      axis(i: number, value: number) {
+        const pad = pads[0];
+        if (pad) pad.axes[i] = value;
+      },
+    };
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () =>
+        pads.map((p) => (p ? { ...p, axes: [...p.axes], buttons: [...p.buttons] } : null)),
+    });
+    (window as unknown as { fakePad: typeof control }).fakePad = control;
+  });
+}
+
+function pad(page: Page, script: string): Promise<void> {
+  return page.evaluate(`window.fakePad.${script}`) as Promise<void>;
+}
+
+/** Fake the page being hidden or shown, then fire visibilitychange. */
+async function setHidden(page: Page, hidden: boolean): Promise<void> {
+  await page.evaluate((h) => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => (h ? 'hidden' : 'visible'),
+    });
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
+
 test.describe('input lab, desktop', () => {
   test.beforeEach(() => {
     test.skip(test.info().project.name !== 'desktop', 'keyboard and gamepad run on desktop');
@@ -141,75 +211,24 @@ test.describe('input lab, desktop', () => {
     page,
   }) => {
     const errors = watchErrors(page);
-    await page.addInitScript(() => {
-      type Pad = {
-        index: number;
-        id: string;
-        connected: boolean;
-        mapping: string;
-        timestamp: number;
-        axes: number[];
-        buttons: { pressed: boolean; touched: boolean; value: number }[];
-      };
-      const pads: (Pad | null)[] = [null, null, null, null];
-      const control = {
-        connect(id: string) {
-          const pad: Pad = {
-            index: 0,
-            id,
-            connected: true,
-            mapping: 'standard',
-            timestamp: 0,
-            axes: [0, 0, 0, 0],
-            buttons: Array.from({ length: 17 }, () => ({
-              pressed: false,
-              touched: false,
-              value: 0,
-            })),
-          };
-          pads[0] = pad;
-          window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
-        },
-        disconnect() {
-          const pad = pads[0];
-          pads[0] = null;
-          window.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: pad }));
-        },
-        button(i: number, value: number) {
-          const pad = pads[0];
-          if (pad) pad.buttons[i] = { pressed: value > 0.5, touched: value > 0, value };
-        },
-        axis(i: number, value: number) {
-          const pad = pads[0];
-          if (pad) pad.axes[i] = value;
-        },
-      };
-      Object.defineProperty(navigator, 'getGamepads', {
-        configurable: true,
-        value: () =>
-          pads.map((p) => (p ? { ...p, axes: [...p.axes], buttons: [...p.buttons] } : null)),
-      });
-      (window as unknown as { fakePad: typeof control }).fakePad = control;
-    });
+    await installFakePad(page);
     await open(page);
-    const pad = (script: string): Promise<void> =>
-      page.evaluate(`window.fakePad.${script}`) as Promise<void>;
 
-    await pad(`connect('Test pad (STANDARD GAMEPAD)')`);
+    await pad(page, `connect('Test pad (STANDARD GAMEPAD)')`);
     await expect
       .poll(async () => (await snap(page)).log)
       .toContain('Gamepad connected: Test pad (STANDARD GAMEPAD)');
     // Connecting is not using: the keyboard keeps the prompts until the pad is pressed.
     expect((await snap(page)).device).toBe('keyboard');
 
-    await pad('button(0, 1)');
+    await pad(page, 'button(0, 1)');
     await expect.poll(async () => (await snap(page)).device).toBe('gamepad');
     await expect(page.locator('[data-field=device]')).toHaveText('Gamepad');
-    await pad('button(0, 0)');
+    await pad(page, 'button(0, 0)');
 
-    await pad('axis(0, -0.5)');
-    await pad('button(7, 0.6)');
-    await pad('button(6, 0.3)');
+    await pad(page, 'axis(0, -0.5)');
+    await pad(page, 'button(7, 0.6)');
+    await pad(page, 'button(6, 0.3)');
     await settle(page);
     const control = (await snap(page)).control;
     expect(control.steer).toBeCloseTo(applyAxisCurve(0.5, DEFAULT_GAMEPAD_SHAPING.stick), 9);
@@ -218,19 +237,64 @@ test.describe('input lab, desktop', () => {
     await expect(page.locator('[data-field=rt]')).toHaveText('60 %');
 
     // RB held across many ticks is one gear shift.
-    await pad('button(5, 1)');
+    await pad(page, 'button(5, 1)');
     await settle(page, 60);
-    await pad('button(5, 0)');
+    await pad(page, 'button(5, 0)');
     await settle(page);
     expect((await snap(page)).shifts.up).toBe(1);
 
-    await pad('disconnect()');
+    await pad(page, 'disconnect()');
     await expect
       .poll(async () => (await snap(page)).log)
       .toContain('Gamepad disconnected: Test pad (STANDARD GAMEPAD)');
     await expect.poll(async () => (await snap(page)).device).toBe('keyboard');
     await expect.poll(async () => (await snap(page)).control.throttle).toBe(0);
     expect(errors).toEqual([]);
+  });
+
+  test('a held gamepad trigger stops on blur and on a hidden page, and needs a release after', async ({
+    page,
+  }) => {
+    await installFakePad(page);
+    await open(page);
+    await pad(page, `connect('Test pad (STANDARD GAMEPAD)')`);
+    await pad(page, 'button(7, 1)');
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(1);
+
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(0);
+    await settle(page);
+    expect((await snap(page)).control.throttle).toBe(0);
+    // While unfocused the pad is not read at all, even after a release and a new press.
+    await pad(page, 'button(7, 0)');
+    await settle(page);
+    await pad(page, 'button(7, 1)');
+    await settle(page);
+    expect((await snap(page)).control.throttle).toBe(0);
+    // Focus back with the trigger still held: it stays off until let go.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await settle(page);
+    expect((await snap(page)).control.throttle).toBe(0);
+    await pad(page, 'button(7, 0)');
+    await settle(page);
+    await pad(page, 'button(7, 1)');
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(1);
+
+    // RB held through a hidden page is not a new gear shift when the page comes back.
+    await pad(page, 'button(5, 1)');
+    await expect.poll(async () => (await snap(page)).shifts.up).toBe(1);
+    await setHidden(page, true);
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(0);
+    await pad(page, 'button(5, 0)');
+    await settle(page);
+    await pad(page, 'button(5, 1)');
+    await settle(page);
+    expect((await snap(page)).shifts.up).toBe(1);
+    await setHidden(page, false);
+    await settle(page);
+    const s = await snap(page);
+    expect(s.control.throttle).toBe(0);
+    expect(s.shifts.up).toBe(1);
   });
 
   test('fits the viewport with no touch overlay on a desktop', async ({ page }) => {
@@ -316,6 +380,72 @@ test.describe('input lab, phone', () => {
     await touch('touchEnd', [steered]);
     await expect.poll(async () => (await snap(page)).control.steer).toBe(0);
     expect(errors).toEqual([]);
+  });
+
+  test('blur, pointer cancel and lost capture each release only what they should', async ({
+    page,
+    context,
+  }) => {
+    await open(page);
+    // Record which pointer id each control received.
+    await page.evaluate(() => {
+      const ids: Record<string, number> = {};
+      document.addEventListener(
+        'pointerdown',
+        (e) => {
+          const el = (e.target as Element).closest<HTMLElement>('[data-control]');
+          if (el?.dataset.control) ids[el.dataset.control] = e.pointerId;
+        },
+        true,
+      );
+      (window as unknown as { ids: Record<string, number> }).ids = ids;
+    });
+    const steer = await box(page, 'steer');
+    const throttle = await box(page, 'throttle');
+    const cdp = await context.newCDPSession(page);
+    const touch = (
+      type: 'touchStart' | 'touchMove' | 'touchEnd',
+      points: { x: number; y: number; id: number }[],
+    ) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+    const origin = { x: steer.x + steer.width / 2, y: steer.y + steer.height / 2, id: 1 };
+    const steered = { ...origin, x: origin.x - DEFAULT_TOUCH_SHAPING.stickRadius };
+    const pedal = { x: throttle.x + throttle.width / 2, y: throttle.y + 8, id: 2 };
+    const holdBoth = async (): Promise<void> => {
+      await touch('touchStart', [origin]);
+      await touch('touchStart', [origin, pedal]);
+      await touch('touchMove', [steered, pedal]);
+      await expect.poll(async () => (await snap(page)).control.throttle).toBe(1);
+      await expect.poll(async () => (await snap(page)).control.steer).toBe(1);
+    };
+    const liftAll = () => touch('touchEnd', [steered, pedal]);
+    const cancel = (control: string, type: 'pointercancel' | 'lostpointercapture') =>
+      page.evaluate(
+        ([c, t]) => {
+          const id = (window as unknown as { ids: Record<string, number> }).ids[c as string] ?? -1;
+          const el = document.querySelector(`[data-control=${c}]`);
+          el?.dispatchEvent(new PointerEvent(t as string, { pointerId: id, bubbles: true }));
+        },
+        [control, type],
+      );
+
+    // Blur releases every touch.
+    await holdBoth();
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(0);
+    expect((await snap(page)).control.steer).toBe(0);
+    await liftAll();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+    // Pointer cancel on the throttle releases it and leaves the stick.
+    await holdBoth();
+    await cancel('throttle', 'pointercancel');
+    await expect.poll(async () => (await snap(page)).control.throttle).toBe(0);
+    expect((await snap(page)).control.steer).toBe(1);
+
+    // Lost capture on the stick releases it.
+    await cancel('steer', 'lostpointercapture');
+    await expect.poll(async () => (await snap(page)).control.steer).toBe(0);
+    await liftAll();
   });
 
   test('draws the touch overlay inside the viewport, clear of the lab panels', async ({ page }) => {

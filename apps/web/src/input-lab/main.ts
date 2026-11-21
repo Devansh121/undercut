@@ -19,6 +19,7 @@ import {
 } from '@undercut/input';
 import {
   WebStorageAdapter,
+  attachFocusGuard,
   attachKeyboard,
   mountTouchOverlay,
   navigatorGamepads,
@@ -44,6 +45,7 @@ const input = new InputSystem({
   touchCapable,
 });
 attachKeyboard(input);
+attachFocusGuard(input);
 
 const view = buildView(GAME_NAME);
 mount.replaceChildren(...view.root.children);
