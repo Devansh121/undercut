@@ -77,6 +77,7 @@ function showLaunch(): void {
     buildHash: __BUILD_HASH__,
     onOnline: () => showOnline(null),
     record: null,
+    controls: { bindings: () => input.profile.bindings, device: () => input.activeDevice },
     onStart: () => {
       // The Start click is the gesture that may start audio.
       audio.gesture();
@@ -104,12 +105,14 @@ function pollMenus(): void {
         f.device === 'keyboard' &&
         ['BUTTON', 'INPUT', 'A'].includes(document.activeElement?.tagName ?? '');
       if (e.type === 'action' && e.action === 'menuAccept' && !native) {
+        // The focused control (an online screen field, the controls list's Back) takes it;
+        // with nothing focused the launch screen starts, as on master.
         if (
           document.activeElement instanceof HTMLElement &&
           document.activeElement !== document.body
         )
           document.activeElement.click();
-        else launch?.start();
+        else launch?.accept();
       }
       if (
         e.type === 'action' &&
@@ -126,12 +129,13 @@ function pollMenus(): void {
       if (e.type === 'action' && (e.action === 'menuDown' || e.action === 'menuUp')) {
         const buttons = [
           ...app!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a'),
-        ];
+        ].filter((b) => !b.closest('[inert]'));
         const at = buttons.indexOf(document.activeElement as HTMLElement);
         buttons[
           (at + (e.action === 'menuDown' ? 1 : buttons.length - 1)) % buttons.length
         ]?.focus();
       }
+      if (e.type === 'action' && e.action === 'menuBack' && f.device !== 'keyboard') launch?.back();
     }
     requestAnimationFrame(poll);
   };

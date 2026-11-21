@@ -41,7 +41,9 @@
     "track:bench": "vitest bench --run --project unit packages/track/bench",
     "car:build": "node tools/car/build.mjs",
     "car:preview": "node tools/car/preview/capture.mjs",
-    "shots": "node tools/screenshots/shots.mjs"
+    "shots": "node tools/screenshots/shots.mjs",
+    "props:build": "node tools/props/build.mjs",
+    "props:preview": "node tools/props/capture.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -139,7 +139,8 @@ export function spectrogramPng(r: Rendered, title: string): Uint8Array {
 
   // Time axis.
   const seconds = n / r.sampleRate;
-  for (let s = 0; s <= Math.floor(seconds); s++) {
+  const tick = Math.max(1, 5 * Math.ceil(seconds / 100));
+  for (let s = 0; s <= Math.floor(seconds); s += tick) {
     const x = LEFT + Math.round((s / seconds) * PLOT_W);
     for (let y = TOP + PLOT_H; y < TOP + PLOT_H + 6; y++) put(x, y, GRID);
     drawText(

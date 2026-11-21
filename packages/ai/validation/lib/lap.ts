@@ -93,6 +93,8 @@ export interface LapRunOptions {
   maxTime?: number;
   /** A wall clock (ms) to time the driver's ticks with; the runner itself never reads one. */
   clock?: () => number;
+  /** Observe each completed timed-lap tick; callers must copy mutable state. */
+  onSample?: (car: WorldCar, telemetry: CarTelemetry, time: number) => void;
   /** Published stops to measure the same way, by corner number: [from, to] km/h. */
   stops?: Readonly<Record<number, readonly [number, number]>>;
 }
@@ -386,6 +388,10 @@ export function runLaps(o: LapRunOptions): LapRunResult {
         cur.maxLateralError = Math.max(cur.maxLateralError, e);
         errSq += e * e;
         errN++;
+      }
+      if (o.onSample) {
+        readCarTelemetry(st, tel, world.environment.gravity);
+        o.onSample(car, tel, t - lapStart);
       }
       // s unwrapped from the timing line, so a lap's record never jumps back at s = 0.
       rs.push(timing + track.forwardDistance(timing, s));

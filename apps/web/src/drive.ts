@@ -41,7 +41,7 @@ import monza from '@undercut/track/data/monza.json';
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
-import { toAudioCarState } from './game/audio-map';
+import { ImpactEvents, toAudioCarState } from './game/audio-map';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
@@ -54,6 +54,7 @@ import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
 import { Hud, type HudMessage, type HudState } from './ui/hud';
+import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
@@ -324,6 +325,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const wrap = (source: ControlSource): ControlSource => ext?.wrapControl?.(source) ?? source;
   if (ext?.startAt) session.teleport(ext.startAt.s, ext.startAt.d, 0);
   const loop = new GameLoop(session, wrap(human));
+  // Barrier impacts for the audio seam, from the hardest strike of each frame.
+  const impacts = new ImpactEvents();
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
@@ -425,6 +428,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
+    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
@@ -456,6 +460,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
+  // The storage warning goes first; the first-start controls hint follows it.
+  let queued: HudMessage | null = takeFirstStartHint()
+    ? {
+        tag: 'Controls',
+        text: controlsHint(input.profile.bindings, input.activeDevice),
+        tone: 'info',
+      }
+    : null;
   if (!records.persistent)
     say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
 
@@ -582,6 +594,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (session.phase === 'running') {
       ext?.beforeFrame?.(dt);
       const r = loop.frame(dt);
+      impacts.observe(r.wallImpact, dt);
       onEvents(r.events);
       lookBack = r.lookBack;
       for (const action of r.actions) {
@@ -593,10 +606,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
+      const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
         if (e.type !== 'action') continue;
+        if (e.action === 'menuAccept' && native) continue;
+        if (pause.navigate(e.action)) continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
-        else pause.navigate(e.action);
       }
       lookBack = false;
     }
@@ -607,6 +623,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (message) {
       messageLeft -= dt;
       if (messageLeft <= 0) message = null;
+    }
+    if (!message && queued) {
+      say(queued, 6);
+      queued = null;
     }
     results.tick(dt);
 
@@ -685,12 +705,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         state: car.state,
         telemetry: t,
+        surface: session.world.surface,
+        impactSpeed: impacts.speed,
+        impactSerial: impacts.serial,
         pitLimiter: car.input.pitLimiter,
         kerbRoughness: session.kerbUnderWheels(),
       },
       audioState,
     );
-    sink(audioState, !playing || document.visibilityState === 'hidden');
+    const camera = view.cameraName;
+    sink(
+      audioState,
+      !playing || document.visibilityState === 'hidden',
+      camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
+    );
 
     ext?.ready?.();
     handle = requestAnimationFrame(frame);
