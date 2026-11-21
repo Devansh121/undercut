@@ -14,3 +14,5 @@ design/
 packages/track/data/*.json
 # Racing-line and envelope artefacts are written byte for byte by tools/ai/build.mjs.
 packages/ai/data/*.json
+# The asset index is written byte for byte by tools/assets/build_textures.py (its sha256 is in the manifest).
+apps/web/public/assets/index.json

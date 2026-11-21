@@ -54,5 +54,397 @@
     "licence": "ODbL-1.0",
     "changes": "Derived database built by tools/track-pipeline/build.py monza: OSM circuit relation 284565 and pit way 38168747 chained, projected, smoothed and resampled every 2 m; s scaled to 5793 m; heights from the Copernicus GLO-30 tile with a 300 m opening, 90 m average and 20 m Gaussian; gravel and barriers from OSM ways near the track; authored widths, banking, kerbs, run-off kinds, barrier types and offsets, pit widths, limit lines, boxes and grid. Notices in packages/track/data/LICENSE-DATA.md",
     "sha256": "5f4eed49e1aec79e78d6cca406260f1932df6d3983caae1ad0252f1fd35df75b"
+  },
+  {
+    "file": "apps/web/public/assets/env/monza_afternoon/sky_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
+    "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 2048 x 1024, divided by 15.04486, sRGB-encoded with a one-code-value triangular dither, WebP quality 95, by tools/assets/build_textures.py",
+    "sha256": "98054075553a587087297f6d6b32e95fc04df751b59c5a226af75f6fb9ad6194"
+  },
+  {
+    "file": "apps/web/public/assets/env/monza_afternoon/sky_4096.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
+    "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 4096 x 2048, divided by 15.04486, sRGB-encoded with a one-code-value triangular dither, WebP quality 95, by tools/assets/build_textures.py",
+    "sha256": "c508ffcff94d8425b5d6b49f23c57b7b5f228b2b6b546a60530607f3f23f3669"
+  },
+  {
+    "file": "apps/web/public/assets/env/night/sky_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloppenheim_07_puresky_4k.hdr",
+    "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 1024 x 512, divided by 1.58493, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "778f6f8b60eb38f83a2c93a319c9aac330b37a9fbb4707e3f3836dbc459b1845"
+  },
+  {
+    "file": "apps/web/public/assets/env/night/sky_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloppenheim_07_puresky_4k.hdr",
+    "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 2048 x 1024, divided by 1.58493, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "0cb7495645a1840aa969e6a1b5856797a11f728bf86e81e6dec2f4e7f8d18f6f"
+  },
+  {
+    "file": "apps/web/public/assets/env/overcast/sky_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_overcast_puresky_4k.hdr",
+    "author": "Greg Zaal (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 1024 x 512, divided by 5.99971, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "19a5839c8bc0dfebf91f1e10a713791d3c1c5353cc10bb02aaf6fda26e93f32f"
+  },
+  {
+    "file": "apps/web/public/assets/env/overcast/sky_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_overcast_puresky_4k.hdr",
+    "author": "Greg Zaal (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 2048 x 1024, divided by 5.99971, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "6b2621d5dcc9cabaef1b9efceaad16c4e8a5d0b8992a47fbb25e9f7e869960cc"
+  },
+  {
+    "file": "apps/web/public/assets/index.json",
+    "source_url": "tools/assets/build_textures.py (this repository)",
+    "author": "UNDERCUT contributors",
+    "licence": "MIT",
+    "changes": "Generated index of the environment textures and skies",
+    "sha256": "f2dbdcefcf827b99d441372d144e4f82a36000f7f117592e4faeaa44df1c411d"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/arm_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_arm_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "40f282e4ae1bb855981b892291dba75ff29b0f7bef5771ed525adb6982b8da52"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/arm_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_arm_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 2048 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "f7d4ed0f3c5573bdc29b919a30cb5b71f8bc216fc57c49b300b260ffee013e23"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/diff_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_diff_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "04a711bcbf81b973e345f4412452b678a33da371808ba1e9302095d6893c0578"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/diff_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_diff_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 2048 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "9400988d295fc3f10479a825acb8e7a21c58cc0942632b1dfff2b47fff21b6c5"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/nor_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "c44c4853426959ca3fd12fd86599db9daaeaebd9ddb26516149b60d01adb787b"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt/nor_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_track/asphalt_track_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 2048 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "9d7dd9becc79f92e3193edaad62621e62ef4d7464eb429a7e84fd3df62f9be21"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/arm_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_arm_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "f5ddd51121130ac30b96d45ec481a87579686280093c44941fe1ec015001f485"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/arm_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_arm_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "54a3f94d20bf2913492450e8556a35d0d4965014bfb7ac5461fd5f8cfa58b89c"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/diff_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_diff_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "65cef35b0e616a20831a9a743aed73ca7cee71af0f22bf5df2013df88a62d58e"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/diff_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_diff_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "c11b5767be0403882372dfbbfeeda4366b4f4d8c3c5db0ea43ef4062c0f47492"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/nor_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "f7225d25ab46c5754ca1834aaf9e2b7d851e413e0c1ecdcde310e7fc17507c9d"
+  },
+  {
+    "file": "apps/web/public/assets/tex/asphalt_worn/nor_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "097509c1bf59dbca2ade78ba2c2a8390aa2b90de3b56d87e35243b0a53899580"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/arm_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_arm_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "9c72988efb3ff837e75816c7b6a710a41feea0f59afa272cc9b3f0fcf6eb4a6c"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/arm_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_arm_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "3a8deeb2fb76b9424a82ca20b69fb1f14d90012665481a128d9fd19be990a945"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/diff_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_diff_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "d4ca70cb1fb35efbe3d79c72ec5eaf66cb8d3f5d4fb6a319ef82c95f97a8fe06"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/diff_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_diff_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "3bd16a6f0d1a9a3fedbd9c9fbb29a08d16c8d9a09bc2111759d67373668e8bae"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/nor_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "57f7b0098e21cda8bd37c97dcd949fd01aea825a861f30385e7487283e22cf8a"
+  },
+  {
+    "file": "apps/web/public/assets/tex/concrete/nor_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_2k.jpg",
+    "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "c6d20101339f1203a53ace94eec15a23da58f2a8ed6fed3ad8e9ccade56d556b"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/arm_1024.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "Packed ambient occlusion, roughness and zero metalness into RGB, resized to 1024 px with Lanczos, encoded as WebP quality 76 by tools/assets/build_textures.py",
+    "sha256": "eae9eb2155904cd9df7c61ced4f5709119f32ea748cb5e099f23363c8da5cd2a"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/arm_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "Packed ambient occlusion, roughness and zero metalness into RGB, resized to 512 px with Lanczos, encoded as WebP quality 76 by tools/assets/build_textures.py",
+    "sha256": "b71b522c9fb87e7fe5e5b44938e92ccd31917c556d893260e798fb22a76c9056"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/diff_1024.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "9e383044bc33f3b1ea88431ddecb58b3eab6abdcd692cce780f09ab7911ad0e0"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/diff_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "a3ce760d4b232a093352b895db228c963725d40f951d76c3545eafe851ac3b5f"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/nor_1024.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, normals renormalised, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "b65051212dbc1e922c993fd5a1d43ef2678bb16809f33362e7c5eacfb8c527b4"
+  },
+  {
+    "file": "apps/web/public/assets/tex/grass/nor_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Grass001_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "1c860d6c700864c4d3b4fb353334ece0dbf5d7355ddf8bd75bab773b010f4f18"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/arm_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_arm_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "c72dead71df2180434beef78d16b105b7f097165bfb245158fb5e79a28d96a2f"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/arm_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_arm_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 78 by tools/assets/build_textures.py",
+    "sha256": "818d38157fde24da6daa489d6204d160500fb40732489bfa3baece3d0c3a206a"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/diff_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_diff_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "a0ebf62bb15322b191613069279188b3af9acab3e35bd82d9fb8fc5c9598d893"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/diff_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_diff_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "4650d1179f161f7a7189e1a5f18f42ff2d21715225fabef34259e4cf14167edd"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/nor_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_nor_gl_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 1024 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "fdc7a2f68e67d52bddeb5ff4873f537002d9799b2223a57c9691e9ba9f62b031"
+  },
+  {
+    "file": "apps/web/public/assets/tex/gravel/nor_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_stones/gravel_stones_nor_gl_2k.jpg",
+    "author": "Amal Kumar (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 84 by tools/assets/build_textures.py",
+    "sha256": "9f9add022c3608ee0da70b0db2cb87d3b902bd5d0358290deeabb50fbdd3d430"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/arm_256.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_arm_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 256 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "16196ac45399b5ab3ed3568134ecf26b2131824fe452da842b19f53ed6f9ce76"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/arm_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_arm_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "54b537aeaab30c2cfdead17299010d123c93efa205abc8ec3db14018be9e9176"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/diff_256.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_diff_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 256 px with Lanczos, encoded as WebP quality 82 by tools/assets/build_textures.py",
+    "sha256": "375aa0c7dddd06e2cf81907993a24c7aed7054357d3ea54cbf6c167ffe9b93b2"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/diff_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_diff_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 82 by tools/assets/build_textures.py",
+    "sha256": "d817cd8164d0f16de97cc390daa0570220fe9c3987a376736e4eb31d118d5d16"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/nor_256.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_nor_gl_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 256 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "f03c6966bd499eacc4d0811eecb1b1962ee9354e780177fd783346dbc0679e2a"
+  },
+  {
+    "file": "apps/web/public/assets/tex/metal/nor_512.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_nor_gl_2k.jpg",
+    "author": "Rob Tuytel (Poly Haven)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "0e3241ac52087d58fa80f4d150d4945d77836223734dd4269193a25dd444feb3"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/arm_256.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "Packed ambient occlusion, roughness and zero metalness into RGB, resized to 256 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "d0c8ff6736a8e8a37f172686f78071e4db4593e9cb1d7e98c268ab02c2c015c5"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/arm_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "Packed ambient occlusion, roughness and zero metalness into RGB, resized to 512 px with Lanczos, encoded as WebP quality 80 by tools/assets/build_textures.py",
+    "sha256": "65c7bd665d7465dc264641745d4e1b8d27844c247355f988a212280c776d5925"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/diff_256.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 256 px with Lanczos, encoded as WebP quality 82 by tools/assets/build_textures.py",
+    "sha256": "1989570e15571383ce68871169e354ddcc9b4372b6b7f5ff97c0e97aeba3c486"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/diff_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, encoded as WebP quality 82 by tools/assets/build_textures.py",
+    "sha256": "64b4291d487bb9b6249430775fc4b173d6ab65681ceecccfbd53e0ecc644f2b8"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/nor_256.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 256 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "06112b953e07ad6fe7ed90de45e25026f916b72069d5f5a8e7ca9af09033b715"
+  },
+  {
+    "file": "apps/web/public/assets/tex/rubber/nor_512.webp",
+    "source_url": "https://ambientcg.com/get?file=Rubber004_1K-JPG.zip",
+    "author": "Lennart Demes (ambientCG)",
+    "licence": "CC0-1.0",
+    "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
+    "sha256": "a1d8eac4f77ef467a7e2abcb3e516a43c985dcd31184bc7fbf6923a04c74d1d4"
   }
 ]

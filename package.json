@@ -26,6 +26,7 @@
     "audio:render": "node tools/audio/render.mjs",
     "audio:browser-check": "node tools/audio/browser-check/run.mjs",
     "check:assets": "node tools/assets/check-licences.mjs",
+    "assets:build": "python3 tools/assets/build_textures.py",
     "check:secrets": "bash tools/ci/gitleaks.sh",
     "telemetry": "node tools/telemetry/cli.mjs",
     "ai:build": "node tools/ai/build.mjs",
