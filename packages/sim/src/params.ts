@@ -105,10 +105,14 @@ export interface SuspensionParams {
   /** Extra roll damping per axle on the travel difference, N·s/m (doc 1.6 roll ratio 0.6–0.8). */
   rollDamperFront: number;
   rollDamperRear: number;
-  /** Plank and skid contact when the floor reaches the ground. Estimate. */
+  /**
+   * Plank and floor-edge contact when the floor reaches the ground, per axle. Estimate. The
+   * skid points sit at the floor edges, `floorHalfWidth` either side of the centreline.
+   */
   plankStiffness: number;
   plankDamping: number;
   plankFriction: number;
+  floorHalfWidth: number;
 }
 
 export interface AeroParams {
@@ -363,6 +367,7 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     plankStiffness: 2e6,
     plankDamping: 2e4,
     plankFriction: 0.3,
+    floorHalfWidth: 0.7, // estimate: the floor is about 1.4 m wide inside a 2 m car
   },
   aero: { ...AERO_MEDIUM },
   engine: {

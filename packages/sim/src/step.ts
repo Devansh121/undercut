@@ -83,11 +83,18 @@ function applyDriverRequests(s: CarState, input: ControlInput): void {
   const target = s.gear + (input.gearShift > 0 ? 1 : -1);
   const top = p.gearbox.ratios.length;
   if (target > top || target < -1) return;
-  const carrier = (s.wheelSpeed[2]! + s.wheelSpeed[3]!) / 2;
   if (target === -1 && Math.abs(s.vx) > 1) return;
-  if (target >= 1 && target < s.gear) {
+  // Gearbox output speed as the ECU judges it: locked rear wheels must not hide road speed.
+  const R = p.tyre.rollingRadius;
+  const carrier = Math.max(
+    Math.abs(s.wheelSpeed[2]! + s.wheelSpeed[3]!) / 2,
+    Math.abs(s.wheelSpeed[0]! + s.wheelSpeed[1]!) / 2,
+    Math.abs(s.vx) / R,
+  );
+  if (target >= 1) {
+    // Over-rev protection: refuse any shift that would put the engine past the limiter.
     const after = Math.abs(gearRatio(p, target) * carrier);
-    if (after > rpm(p.engine.revLimit)) return; // over-rev protection refuses the downshift
+    if (after > rpm(p.engine.revLimit)) return;
   }
   s.shiftTarget = target;
   s.shiftTimer = target > s.gear ? p.gearbox.upshiftTime : p.gearbox.downshiftTime;
@@ -197,15 +204,13 @@ function substep(
     bodyZ[r] = bodyZ[r]! - f;
   }
 
-  // ---- Ride heights, aero, plank. ----
+  // ---- Ride heights, aero, floor contact. ----
   const groundF = (gh[0]! + gh[1]!) / 2;
   const groundR = (gh[2]! + gh[3]!) / 2;
   const rideF = s.y + mass.sprungA * s.pitch - groundF;
   const rideR = s.y - mass.sprungB * s.pitch - groundR;
   s.rideHeightFront = rideF;
   s.rideHeightRear = rideR;
-  const rideRateF = s.heaveRate + mass.sprungA * s.pitchRate - (ghRate[0]! + ghRate[1]!) / 2;
-  const rideRateR = s.heaveRate - mass.sprungB * s.pitchRate - (ghRate[2]! + ghRate[3]!) / 2;
 
   const drsTarget = input.drs && s.drsLatched === 0 ? 1 : 0;
   if (drsTarget > s.drsPosition) {
@@ -221,11 +226,40 @@ function substep(
   s.downforceFront = dfFront;
   s.downforceRear = dfRear;
   s.dragForce = drag;
-  let plankF = 0;
-  let plankR = 0;
-  if (rideF < 0) plankF = Math.max(0, -susp.plankStiffness * rideF - susp.plankDamping * rideRateF);
-  if (rideR < 0) plankR = Math.max(0, -susp.plankStiffness * rideR - susp.plankDamping * rideRateR);
-  const plankDrag = susp.plankFriction * (plankF + plankR) * (s.vx / (Math.abs(s.vx) + 0.1));
+  // Floor contact: skid points at the floor edges by each axle. They take the plank's
+  // bottoming in heave and stop the body rolling past the point where the floor edge scrapes.
+  let skidHeave = 0;
+  let skidPitch = 0;
+  let skidRoll = 0;
+  let skidX = 0;
+  let skidY = 0;
+  let skidYaw = 0;
+  const halfWidth = susp.floorHalfWidth;
+  for (let k = 0; k < 4; k++) {
+    const front = k < 2;
+    const yl = k % 2 === 0 ? halfWidth : -halfWidth;
+    const xb = front ? mass.sprungA : -mass.sprungB;
+    const l = front ? 0 : 2;
+    const half = front ? model.wheelLeft[0]! : model.wheelLeft[2]!;
+    const across = yl / (2 * half);
+    const ground = (gh[l]! + gh[l + 1]!) / 2 + across * (gh[l]! - gh[l + 1]!);
+    const height = s.y + xb * s.pitch + yl * s.roll - ground;
+    if (height >= 0) continue;
+    const groundRate = (ghRate[l]! + ghRate[l + 1]!) / 2 + across * (ghRate[l]! - ghRate[l + 1]!);
+    const rate = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - groundRate;
+    const n = -0.5 * susp.plankStiffness * height - 0.5 * susp.plankDamping * rate;
+    if (n <= 0) continue;
+    skidHeave += n;
+    skidPitch += n * xb;
+    skidRoll += n * yl;
+    const px = front ? mass.a : -mass.b;
+    const vpx = s.vx - s.yawRate * yl;
+    const vpy = s.vy + s.yawRate * px;
+    const scale = (susp.plankFriction * n) / (Math.sqrt(vpx * vpx + vpy * vpy) + 0.1);
+    skidX -= scale * vpx;
+    skidY -= scale * vpy;
+    skidYaw += px * -scale * vpy + yl * scale * vpx;
+  }
 
   // ---- Tyre slip and force (transient contact-patch deflection). ----
   const curve = model.curve;
@@ -286,14 +320,15 @@ function substep(
   const extX = s.externalForceX * c - s.externalForceZ * sn;
   const extY = -s.externalForceX * sn - s.externalForceZ * c;
   const dragX = s.vx >= 0 ? -drag : drag;
-  const groundX = sumX - plankDrag;
+  const groundX = sumX + skidX;
+  const groundY = sumY + skidY;
   const specificX = (groundX + dragX + extX) / m;
-  const specificY = (sumY + extY) / m;
+  const specificY = (groundY + extY) / m;
   const ax = specificX + gravX + s.yawRate * s.vy;
   const ay = specificY + gravY - s.yawRate * s.vx;
   s.vx += h * ax;
   s.vy += h * ay;
-  s.yawRate += (h * (yawMoment + s.externalTorque)) / mass.yawInertia;
+  s.yawRate += (h * (yawMoment + skidYaw + s.externalTorque)) / mass.yawInertia;
   s.x += h * (s.vx * c - s.vy * sn);
   s.z += h * (-s.vx * sn - s.vy * c);
   s.yaw += h * s.yawRate;
@@ -307,10 +342,9 @@ function substep(
   // Ground-level forces act below the sprung CoG: the sprung share of them pitches and rolls
   // the body through the springs, so load transfer comes out of the suspension.
   const arm = p.mass.cgHeight * (ms / m);
-  let heave = plankF + plankR - dfFront - dfRear;
-  let pitchM =
-    -dfFront * mass.sprungA + dfRear * mass.sprungB + plankF * mass.sprungA - plankR * mass.sprungB;
-  let rollM = 0;
+  let heave = skidHeave - dfFront - dfRear;
+  let pitchM = skidPitch - dfFront * mass.sprungA + dfRear * mass.sprungB;
+  let rollM = skidRoll;
   for (let i = 0; i < 4; i++) {
     const f = bodyZ[i]!;
     heave += f;
@@ -318,7 +352,7 @@ function substep(
     rollM += f * model.wheelLeft[i]!;
   }
   pitchM += arm * groundX;
-  rollM += arm * sumY;
+  rollM += arm * groundY;
   const heaveAcc = heave / ms - gNormal;
   s.heaveRate += h * heaveAcc;
   s.pitchRate += (h * pitchM) / p.mass.pitchInertia;
@@ -391,7 +425,8 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   // toward the 4 MJ per-lap deployment limit (doc 1.3).
   if (s.mgukLocked !== 0 && s.vx >= ers.startDeploySpeed) s.mgukLocked = 0;
   const engaged = G !== 0 && !shifting && we > rpm(eng.clutchFullRpm);
-  const mguh = Math.min(ers.mguhPower, (ers.mguhPower * icePower) / eng.peakPower);
+  // The MGU-H recovers exhaust energy under load; at idle or on the overrun there is none.
+  const mguh = thr > 0 ? Math.min(ers.mguhPower, (ers.mguhPower * icePower) / eng.peakPower) : 0;
   const mode = ERS_MODES[s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
   const wantsDeploy =
     s.mgukLocked === 0 &&
