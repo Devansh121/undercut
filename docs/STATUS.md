@@ -53,7 +53,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
   - The kit's grandstands, pit building, pit wall, start gantry, crew, bridges and barriers are not placed yet; the world's own builders stand in for them.
   - The race engine's `lights` events do not reach the app (Time Trial has no lights phase); the start gantry follows the online start only. A local race mode should call `startLightMask` from its `lights` events the same way.
   - Tests still to add: the 24 m minimum catch-fence run; `PropRegistry.update` makes a closure per chunk each frame (`props/registry.ts`).
-- Browser CI: Lite builds the world as ground and a few trees (no structures); the full Mobile world is tested once in `tests/browser/world-dressing.spec.ts`, and the High lifecycle with the full world runs on the GPU (`npm run shots -- monza --lifecycle`).
+- Browser CI: Lite (and `?world=lite`) loads no dressing, so the software-WebGL tests run on the track package's own ground as before; the full Mobile world is tested once in `tests/browser/world-dressing.spec.ts` (placement counts, the dressing and prop files against the budget inventory, quitting), and the High lifecycle with the full world runs on the GPU (`npm run shots -- monza --lifecycle`).
 
 - Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
 

@@ -56,6 +56,11 @@ import { treeCards, treeMaterials, type TreeMaterials } from './trees';
 
 /** What a preset draws of the world (presets.json, `world`). */
 export interface WorldQuality {
+  /**
+   * Load the circuit's dressing at all. Off on Lite (software-WebGL tests): the circuit sits on
+   * the track package's own ground, as without a dressing file.
+   */
+  enabled: boolean;
   /** Fraction of the full tree density placed (1 on High). */
   treeDensity: number;
   /** Atlas pixels per species. */

@@ -25,6 +25,7 @@
     "speedBlur": true,
     "dynamicResolution": { "targetMs": 16.67, "min": 0.75 },
     "world": {
+      "enabled": true,
       "treeDensity": 1,
       "treeTile": 512,
       "terrain": "high",
@@ -61,6 +62,7 @@
     "speedBlur": true,
     "dynamicResolution": { "targetMs": 16.67, "min": 0.7 },
     "world": {
+      "enabled": true,
       "treeDensity": 1,
       "treeTile": 512,
       "terrain": "high",
@@ -97,6 +99,7 @@
     "speedBlur": true,
     "dynamicResolution": { "targetMs": 16.67, "min": 0.65 },
     "world": {
+      "enabled": true,
       "treeDensity": 0.7,
       "treeTile": 512,
       "terrain": "high",
@@ -133,6 +136,7 @@
     "speedBlur": false,
     "dynamicResolution": { "targetMs": 16.67, "min": 0.6 },
     "world": {
+      "enabled": true,
       "treeDensity": 0.35,
       "treeTile": 256,
       "terrain": "mobile",
@@ -169,6 +173,7 @@
     "speedBlur": false,
     "dynamicResolution": { "targetMs": 0, "min": 1 },
     "world": {
+      "enabled": false,
       "treeDensity": 0.01,
       "treeTile": 128,
       "terrain": "lite",

@@ -21,8 +21,8 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
     if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
   });
 
-  // The prop models the world loads, against the budget's first-race inventory (the rest of
-  // the inventory is checked by transfer.spec.ts on Lite's world subset).
+  // The dressing file and the prop models the world loads, against the budget's first-race
+  // inventory (the rest of it is checked by transfer.spec.ts, whose Lite session loads neither).
   const inventory = JSON.parse(
     fs.readFileSync(path.resolve('apps/web/dist/first-race.json'), 'utf8'),
   ) as { presets: Record<string, { files: Record<string, number> }> };
@@ -31,7 +31,7 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   const pending: Promise<void>[] = [];
   page.on('requestfinished', (request) => {
     const url = new URL(request.url());
-    if (!url.pathname.startsWith('/assets/props/')) return;
+    if (!/^\/assets\/(props\/|monza\.dressing-)/.test(url.pathname)) return;
     pending.push(
       (async () => {
         props.set(url.pathname.slice(1), (await request.sizes()).responseBodySize);
@@ -44,7 +44,9 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   await page.getByRole('button', { name: /Start/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await Promise.all(pending);
-  const wanted = Object.keys(expected).filter((f) => f.startsWith('assets/props/'));
+  const wanted = Object.keys(expected).filter((f) =>
+    /^assets\/(props\/|monza\.dressing-.*\.json$)/.test(f),
+  );
   expect(wanted.length).toBeGreaterThan(0);
   expect([...props.keys()].sort()).toEqual(wanted.sort());
   for (const [rel, bytes] of props) expect(bytes, `${rel}: bytes on the wire`).toBe(expected[rel]);
@@ -68,5 +70,9 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
     window.__undercut?.setStartLights(0);
   });
 
+  // Quitting releases the world without errors (GL balance with the full world is checked on
+  // the GPU by npm run shots -- monza --lifecycle).
+  await page.evaluate(() => window.__undercut?.quit());
+  await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
   expect(errors).toEqual([]);
 });

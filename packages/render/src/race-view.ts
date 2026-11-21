@@ -288,16 +288,18 @@ export class RaceView {
       }),
     );
     const carP = CarAssets.load(loader, q, teams, options.dracoPath);
-    const dressingP = options.dressingUrl
-      ? loader.json<unknown>(options.dressingUrl).then((d) => {
+    // Lite (and `worldDetail: 'lite'`) loads no dressing: the track package's own ground.
+    const worldQ = options.worldDetail === 'lite' ? QUALITY.lite.world : q.world;
+    const dressingUrl = worldQ.enabled ? options.dressingUrl : null;
+    const dressingP = dressingUrl
+      ? loader.json<unknown>(dressingUrl).then((d) => {
           if (!isDressingFile(d)) throw new Error('not a dressing file');
           return d;
         })
       : Promise.resolve(null);
-    // The prop kit is only placed with the structures (not on Lite or `worldDetail: 'lite'`).
-    const structures = (options.worldDetail === 'lite' ? QUALITY.lite.world : q.world).structures;
+    // The prop kit is only placed with the structures.
     const kitP =
-      options.dressingUrl && structures && isPropCatalog(options.propCatalog)
+      dressingUrl && worldQ.structures && isPropCatalog(options.propCatalog)
         ? PropKitAssets.load(loader, options.propCatalog, q, options.dracoPath)
         : Promise.resolve(null);
     // Settle all of them before deciding: a car that finishes after another file failed is
