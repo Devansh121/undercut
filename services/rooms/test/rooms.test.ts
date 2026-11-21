@@ -111,6 +111,19 @@ describe('rooms service on the local Workers runtime', () => {
     c.ws.send(Buffer.from([1, 2, 3]));
     expect(await c.next()).toMatchObject({ type: 'error', code: 'bad_message' });
 
+    for (const raw of [
+      '{"type":{"toString":null}}',
+      '{"type":{"type":"hello"}}',
+      '{"type":["hello"]}',
+      '{"type":null}',
+      JSON.stringify({ type: 'hello', v: PROTOCOL_VERSION, name: { toString: null } }),
+      JSON.stringify({ type: 'hello', v: PROTOCOL_VERSION, name: ['Cy'] }),
+      JSON.stringify({ type: 'hello', v: [PROTOCOL_VERSION], name: 'Cy' }),
+    ]) {
+      c.send(raw);
+      expect(await c.next()).toMatchObject({ type: 'error', code: 'bad_message' });
+    }
+
     c.send(hello('Cy'));
     expect(await c.next()).toMatchObject({ type: 'presence', peers: [{ name: 'Cy' }] });
   });

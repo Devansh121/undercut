@@ -1,10 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
-import {
-  encodeServerMessage,
-  parseClientMessage,
-  type PeerInfo,
-  type ServerMessage,
-} from '@undercut/protocol';
+import { encodeServerMessage, type PeerInfo, type ServerMessage } from '@undercut/protocol';
+import { handleFrame } from './frame';
 
 /** Per-socket data. Stored as a socket attachment so it survives hibernation. */
 interface Peer {
@@ -28,23 +24,23 @@ export class Room extends DurableObject {
   }
 
   override async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
-    if (typeof data !== 'string') {
-      send(ws, { type: 'error', code: 'bad_message', detail: 'binary frames are not accepted' });
-      return;
-    }
-    const result = parseClientMessage(data);
-    if (!result.ok) {
-      send(ws, { type: 'error', ...result.error });
-      return;
-    }
-    const message = result.message;
-    switch (message.type) {
-      case 'hello': {
-        const peer = ws.deserializeAttachment() as Peer;
-        ws.serializeAttachment({ ...peer, name: message.name } satisfies Peer);
-        this.broadcastPresence();
-        break;
+    // No input may throw out of here: an uncaught exception would leave the client
+    // without an answer. Anything unexpected is reported as a protocol error.
+    try {
+      const outcome = handleFrame(data);
+      if (outcome.kind === 'error') {
+        send(ws, { type: 'error', ...outcome.error });
+        return;
       }
+      const peer = ws.deserializeAttachment() as Peer;
+      ws.serializeAttachment({ ...peer, name: outcome.name } satisfies Peer);
+      this.broadcastPresence();
+    } catch {
+      send(ws, {
+        type: 'error',
+        code: 'internal_error',
+        detail: 'the server could not handle this message',
+      });
     }
   }
 

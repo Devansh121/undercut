@@ -72,6 +72,49 @@ describe('parseClientMessage: envelope', () => {
     expect(parseClientMessage(raw)).toMatchObject({ ok: false, error: { code: 'bad_message' } });
   });
 
+  it.each([
+    ['an object whose toString is null', '{"type":{"toString":null}}'],
+    ['a nested object', '{"type":{"type":"hello"}}'],
+    ['an array', '{"type":["hello"]}'],
+    ['a number', '{"type":1}'],
+    ['null', '{"type":null}'],
+    ['a boolean', '{"type":true}'],
+    ['missing', '{"v":1,"name":"Ana"}'],
+  ])('rejects a type that is %s without coercing it', (_label, raw) => {
+    expect(() => parseClientMessage(raw)).not.toThrow();
+    expect(parseClientMessage(raw)).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+  });
+
+  it.each([
+    ['name', { name: { toString: null } }],
+    ['name', { name: ['Ana'] }],
+    ['name', { name: { first: 'Ana' } }],
+    ['v', { v: { valueOf: null } }],
+    ['v', { v: [PROTOCOL_VERSION] }],
+    ['v', { v: String(PROTOCOL_VERSION) }],
+  ])('rejects a hello whose %s is not a plain value of the right type', (_field, fields) => {
+    const raw = hello(fields);
+    expect(() => parseClientMessage(raw)).not.toThrow();
+    expect(parseClientMessage(raw)).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+  });
+
+  it('never throws on arbitrary JSON values', () => {
+    const samples = [
+      '{}',
+      '{"type":"hello","v":1,"name":"A","__proto__":{"x":1}}',
+      '{"type":"hello","v":1,"name":{"toString":null,"valueOf":null}}',
+      '{"type":"\u0000"}',
+      '[{"type":"hello"}]',
+      '{"type":"hello","v":1e999,"name":"A"}',
+      '""',
+      'true',
+    ];
+    for (const raw of samples) {
+      const result = parseClientMessage(raw);
+      expect(result.ok).toBe(false);
+    }
+  });
+
   it('rejects an unknown type', () => {
     expect(parseClientMessage(JSON.stringify({ type: 'teleport' }))).toMatchObject({
       ok: false,

@@ -33,7 +33,7 @@ export interface PresenceMessage {
 }
 
 export type ErrorCode =
-  'bad_json' | 'bad_message' | 'too_large' | 'unknown_type' | 'version_mismatch';
+  'bad_json' | 'bad_message' | 'too_large' | 'unknown_type' | 'version_mismatch' | 'internal_error';
 
 /** Sent when a client message is rejected. The socket stays open. */
 export interface ErrorMessage {
@@ -67,6 +67,7 @@ const CONTROL_CHARS = /[\p{Cc}\p{Zl}\p{Zp}]/u;
 function parseHello(obj: Record<string, unknown>): ParseResult<HelloMessage> {
   const extra = Object.keys(obj).filter((k) => k !== 'type' && k !== 'v' && k !== 'name');
   if (extra.length > 0) return fail('bad_message', `unknown field: ${extra[0]}`);
+  if (typeof obj.v !== 'number') return fail('bad_message', 'v must be a number');
   if (obj.v !== PROTOCOL_VERSION) {
     return fail('version_mismatch', `server speaks protocol ${PROTOCOL_VERSION}`);
   }
@@ -92,11 +93,14 @@ export function parseClientMessage(raw: string): ParseResult<ClientMessage> {
     return fail('bad_json', 'message is not valid JSON');
   }
   if (!isPlainObject(value)) return fail('bad_message', 'message must be a JSON object');
-  switch (value.type) {
+  // Check the type before using it: never coerce a client value to a string.
+  const type = value.type;
+  if (typeof type !== 'string') return fail('bad_message', 'type must be a string');
+  switch (type) {
     case 'hello':
       return parseHello(value);
     default:
-      return fail('unknown_type', `unknown message type: ${String(value.type).slice(0, 32)}`);
+      return fail('unknown_type', `unknown message type: ${JSON.stringify(type.slice(0, 32))}`);
   }
 }
 
