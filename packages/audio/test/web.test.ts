@@ -237,3 +237,82 @@ describe('unsupported sample rates', () => {
     expect(fallbacks[0]).toMatch(/sample rate/);
   });
 });
+
+describe('lifecycle changes while the worklet is still loading', () => {
+  function deferred() {
+    const context = new FakeContext();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    context.audioWorklet = { addModule: () => gate };
+    return { ...setup({ context }), release };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+  const unpaused = (n: FakeNode | undefined) =>
+    (n?.sent ?? []).some((m) => m.type === 'pause' && !m.paused);
+
+  it('resume, then suspend, then the load completes: stays suspended and paused', async () => {
+    const { engine, context, nodes, release } = deferred();
+    const resumed = engine.resume();
+    await engine.suspend();
+    release();
+    await resumed;
+    await settle();
+    expect(context.state).toBe('suspended');
+    expect(engine.status).toBe('suspended');
+    expect(unpaused(nodes[0])).toBe(false);
+    // And it still starts when asked.
+    await engine.resume();
+    expect(context.state).toBe('running');
+    expect(engine.status).toBe('running');
+    expect(unpaused(nodes[0])).toBe(true);
+  });
+
+  it('resume, then dispose, then the load completes: nothing is left connected or running', async () => {
+    const { engine, context, nodes, release } = deferred();
+    const resumed = engine.resume();
+    const disposed = engine.dispose();
+    release();
+    await resumed;
+    await disposed;
+    await settle();
+    expect(context.state).toBe('closed');
+    expect(engine.status).toBe('silent');
+    expect(nodes.every((n) => !n.connected)).toBe(true);
+    expect(nodes.some(unpaused)).toBe(false);
+  });
+
+  it('the tab is hidden during the load: stays suspended, then starts when shown', async () => {
+    const { engine, context, nodes, doc, release } = deferred();
+    const resumed = engine.resume();
+    doc.set('hidden');
+    release();
+    await resumed;
+    await settle();
+    expect(context.state).toBe('suspended');
+    expect(unpaused(nodes[0])).toBe(false);
+    doc.set('visible');
+    await settle();
+    expect(context.state).toBe('running');
+    expect(engine.status).toBe('running');
+    expect(unpaused(nodes[0])).toBe(true);
+  });
+
+  it('creates the processor paused, so nothing sounds before it is told to start', async () => {
+    const options: AudioWorkletNodeOptions[] = [];
+    const context = new FakeContext();
+    const engine = createAudioEngine({
+      workletUrl: 'x',
+      fadeMs: 1,
+      visibility: null,
+      createContext: () => context,
+      createNode: (_c, _n, o) => {
+        options.push(o);
+        return new FakeNode();
+      },
+    });
+    await engine.resume();
+    expect((options[0]?.processorOptions as { startPaused?: boolean }).startPaused).toBe(true);
+  });
+});

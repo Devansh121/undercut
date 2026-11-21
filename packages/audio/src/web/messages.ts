@@ -12,4 +12,6 @@ export type ToProcessor =
 /** Options passed to the processor at construction. */
 export interface ProcessorOptions {
   seed: number;
+  /** Start silent (paused) until a `{ type: 'pause', paused: false }` message. */
+  startPaused?: boolean;
 }

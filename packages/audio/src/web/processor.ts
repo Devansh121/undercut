@@ -26,6 +26,9 @@ export class CarAudioProcessor extends scope.AudioWorkletProcessor {
       sampleRate: scope.sampleRate,
       seed: options?.processorOptions?.seed ?? 1,
     });
+    // Paused before the first render quantum, so a processor connected while its context
+    // is still meant to be suspended produces exact silence.
+    if (options?.processorOptions?.startPaused) this.core.setPaused(true);
     this.port.onmessage = (event: MessageEvent<ToProcessor>) => this.receive(event.data);
   }
 

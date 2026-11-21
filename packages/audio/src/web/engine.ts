@@ -98,20 +98,28 @@ export class SilentAudioEngine implements AudioEngine {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * The real engine. Every public call records what the game wants (running, suspended or
+ * disposed) and then reconciles: one serialised step at a time, each step waiting for the
+ * worklet if it is still loading and then moving the node and context to the wanted state.
+ * So a suspend, a dispose or a hidden tab during the asynchronous load is honoured when the
+ * load completes, and the processor is created paused so it is silent until told to run.
+ */
 class WorkletAudioEngine implements AudioEngine {
   status: AudioEngineStatus = 'idle';
   private context: AudioContextLike | undefined;
   private node: AudioNodeLike | undefined;
-  private starting: Promise<void> | undefined;
+  private loading: Promise<void> | undefined;
+  /** The game asked for sound (resume) and has not asked to stop (suspend). */
   private wanted = false;
+  private disposed = false;
+  /** The processor is currently unpaused. */
+  private playing = false;
+  private chain: Promise<void> = Promise.resolve();
   private readonly packed = new Float64Array(CAR_STATE_LENGTH);
   private hasState = false;
   private readonly gains = new Map<GainId, number>();
-  private readonly onVisibility = () => {
-    if (!this.options.visibility) return;
-    if (this.options.visibility.visibilityState === 'hidden') void this.pause();
-    else if (this.wanted) void this.start();
-  };
+  private readonly onVisibility = () => void this.reconcile();
 
   constructor(
     private readonly options: AudioEngineOptions & {
@@ -123,14 +131,31 @@ class WorkletAudioEngine implements AudioEngine {
   }
 
   resume(): Promise<void> {
-    if (this.status === 'silent') return Promise.resolve();
+    if (this.status === 'silent' || this.disposed) return Promise.resolve();
     this.wanted = true;
-    return this.start();
+    if (!this.context) {
+      // Create and resume the context inside the user gesture that called resume(); some
+      // browsers only let a context start from there. The module loads meanwhile.
+      try {
+        this.context = this.options.createContext();
+      } catch (error) {
+        this.fallBack(error);
+        return Promise.resolve();
+      }
+      if (this.hidden()) void this.context.suspend().catch(() => undefined);
+      else void this.context.resume().catch(() => undefined);
+      this.status = 'starting';
+      this.loading = this.load(this.context);
+    }
+    // Reconcile now, and again once the worklet has loaded: whatever was asked for while it
+    // loaded (suspend, a hidden tab) is applied then.
+    const now = this.reconcile();
+    return this.loading ? this.loading.then(() => this.reconcile()) : now;
   }
 
-  async suspend(): Promise<void> {
+  suspend(): Promise<void> {
     this.wanted = false;
-    await this.pause();
+    return this.reconcile();
   }
 
   setCarState(state: AudioCarState): void {
@@ -147,81 +172,113 @@ class WorkletAudioEngine implements AudioEngine {
     if (this.node) this.post({ type: 'gain', id, value });
   }
 
-  async dispose(): Promise<void> {
-    if (this.status === 'silent') return;
-    this.options.visibility?.removeEventListener('visibilitychange', this.onVisibility);
+  dispose(): Promise<void> {
+    this.disposed = true;
     this.wanted = false;
-    if (this.node) {
-      this.post({ type: 'pause', paused: true });
-      await wait(this.options.fadeMs);
-      this.node.disconnect();
-    }
-    await this.context?.close().catch(() => undefined);
-    this.node = undefined;
-    this.context = undefined;
-    this.status = 'silent';
+    this.options.visibility?.removeEventListener('visibilitychange', this.onVisibility);
+    return this.reconcile();
   }
 
-  private start(): Promise<void> {
-    if (!this.context) {
-      // Create the context inside the user gesture that called resume(); some browsers only
-      // let a context start from there.
-      try {
-        this.context = this.options.createContext();
-      } catch (error) {
-        this.fallBack(error);
-        return Promise.resolve();
-      }
+  private hidden(): boolean {
+    return this.options.visibility?.visibilityState === 'hidden';
+  }
+
+  /** Queue one reconcile step after any in progress. Never rejects. */
+  private reconcile(): Promise<void> {
+    const step = this.chain
+      .then(() => this.apply())
+      .catch((error: unknown) => this.fallBack(error));
+    this.chain = step;
+    return step;
+  }
+
+  private async apply(): Promise<void> {
+    if (this.disposed) {
+      await this.teardown();
+      return;
     }
     const context = this.context;
-    if (!this.starting) {
-      this.status = 'starting';
-      this.starting = this.load(context);
+    if (this.status === 'silent' || !context) return;
+    const run = this.wanted && !this.hidden();
+    if (!this.node) {
+      // Still loading. Stopping takes effect at once; starting waits for the load, after
+      // which resume() reconciles again.
+      if (!run) {
+        await context.suspend();
+        if (!this.disposed && this.isNot('silent')) this.status = 'suspended';
+      }
+      return;
     }
-    return this.starting.then(async () => {
-      if (!this.node || !this.wanted) return;
-      if (this.options.visibility?.visibilityState === 'hidden') return;
+    if (run) {
       this.post({ type: 'pause', paused: false });
-      await context.resume().catch((error: unknown) => this.fallBack(error));
-      if (this.node) this.status = 'running';
-    });
+      this.playing = true;
+      await context.resume();
+      // A later call may have changed the intent meanwhile; its own step follows this one.
+      if (this.isNot('silent')) this.status = 'running';
+    } else {
+      if (this.playing) {
+        this.post({ type: 'pause', paused: true });
+        this.playing = false;
+        await wait(this.options.fadeMs);
+      }
+      await context.suspend();
+      if (this.isNot('silent')) this.status = 'suspended';
+    }
+  }
+
+  /** Status check that TypeScript does not narrow across awaits. */
+  private isNot(status: AudioEngineStatus): boolean {
+    return this.status !== status;
   }
 
   private async load(context: AudioContextLike): Promise<void> {
     try {
-      // Ask for resume now, while still inside the gesture; the module loads meanwhile.
-      const resumed = context.resume().catch(() => undefined);
       if (!context.audioWorklet) throw new Error('AudioWorklet is not supported');
       if (!(context.sampleRate >= MIN_SAMPLE_RATE)) {
         throw new Error(`sample rate ${context.sampleRate} Hz is below ${MIN_SAMPLE_RATE} Hz`);
       }
       await context.audioWorklet.addModule(this.options.workletUrl);
-      const processorOptions: ProcessorOptions = { seed: this.options.seed };
+      // Disposed (or failed) while loading: never create the node.
+      if (this.disposed || !this.isNot('silent')) return;
+      const processorOptions: ProcessorOptions = { seed: this.options.seed, startPaused: true };
       const node = this.options.createNode(context, PROCESSOR_NAME, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
         outputChannelCount: [2],
         processorOptions,
       });
-      node.connect(context.destination as never);
       this.node = node;
       for (const [id, value] of this.gains) this.post({ type: 'gain', id, value });
       if (this.hasState) this.post({ type: 'state', packed: this.packed });
-      await resumed;
+      // Connected paused: silent until a reconcile step decides it should run.
+      node.connect(context.destination as never);
     } catch (error) {
       this.fallBack(error);
+    } finally {
+      this.loading = undefined;
     }
   }
 
-  private async pause(): Promise<void> {
-    if (!this.node || !this.context || this.status === 'silent') return;
-    this.post({ type: 'pause', paused: true });
-    await wait(this.options.fadeMs);
-    // A resume may have come in while fading.
-    if (this.wanted && this.options.visibility?.visibilityState !== 'hidden') return;
-    await this.context.suspend().catch(() => undefined);
-    // A fallback may have happened while suspending.
-    if ((this.status as AudioEngineStatus) !== 'silent') this.status = 'suspended';
+  private async teardown(): Promise<void> {
+    const node = this.node;
+    const context = this.context;
+    this.node = undefined;
+    this.context = undefined;
+    this.status = 'silent';
+    if (node) {
+      if (this.playing) {
+        node.port.postMessage({ type: 'pause', paused: true });
+        this.playing = false;
+        await wait(this.options.fadeMs);
+      }
+      try {
+        node.disconnect();
+      } catch {
+        // Already gone.
+      }
+    }
+    await context?.close().catch(() => undefined);
+    this.status = 'silent';
   }
 
   private post(message: ToProcessor): void {
