@@ -17,6 +17,7 @@ import type { DriveHandle } from './drive';
 type DriveModule = typeof DriveModuleNs;
 import { RecordStore, durableStorage, memoryStorage } from './game/records';
 import { mountLaunchScreen, type LaunchScreen } from './launch';
+import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
 
 const app = document.getElementById('app');
 const canvas = document.getElementById('view');
@@ -43,10 +44,16 @@ attachKeyboard(input);
 attachFocusGuard(input);
 input.setContext('menu');
 
-function chooseQuality(): QualityName {
+/** A preset in the URL (tests, stations), else the saved choice, else a default to benchmark. */
+function chooseQuality(): { quality: QualityName; auto: boolean } {
   const asked = params.get('quality');
-  if (asked === 'high' || asked === 'mobile' || asked === 'lite') return asked;
-  return touch || Math.min(window.innerWidth, window.innerHeight) < 600 ? 'mobile' : 'high';
+  if (isQuality(asked)) return { quality: asked, auto: false };
+  const saved = loadQuality();
+  if (saved) return { quality: saved, auto: false };
+  return {
+    quality: firstGuess(touch, Math.min(window.innerWidth, window.innerHeight)),
+    auto: true,
+  };
 }
 
 let drive: DriveHandle | null = null;
@@ -67,7 +74,7 @@ function showLaunch(): void {
     onStart: () => {
       // The Start click is the gesture that may start audio.
       audio.gesture();
-      void start();
+      start().catch(() => undefined);
     },
   });
   void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
@@ -97,6 +104,7 @@ async function start(): Promise<DriveHandle> {
     try {
       driveModule ??= await import('./drive');
       const { startDrive } = driveModule;
+      const chosen = chooseQuality();
       const handle = await startDrive({
         canvas: canvas as HTMLCanvasElement,
         host: app as HTMLElement,
@@ -105,7 +113,8 @@ async function start(): Promise<DriveHandle> {
         audio,
         onCarAudioState: audio.sink,
         soundNote: () => (audio.status === 'silent' ? 'No sound in this browser' : ''),
-        quality: chooseQuality(),
+        quality: chosen.quality,
+        autoQuality: chosen.auto,
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
@@ -114,8 +123,12 @@ async function start(): Promise<DriveHandle> {
       drive = handle;
       return handle;
     } catch (error) {
-      document.documentElement.dataset.webgl = 'unavailable';
       launch?.setLoading(false);
+      if (error instanceof Error && error.name === 'LoadCancelled') {
+        showLaunch();
+        throw error;
+      }
+      document.documentElement.dataset.webgl = 'unavailable';
       console.error('Could not start the session', error);
       throw error;
     } finally {

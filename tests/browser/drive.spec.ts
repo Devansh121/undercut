@@ -285,6 +285,7 @@ test.describe('drive', () => {
         await page.evaluate(
           ([camera, at]) => {
             const u = window.__undercut;
+            u?.setTimeScale(1);
             u?.camera(camera as string);
             const p = at as { restart?: boolean; s?: number; kmh?: number };
             if (p.restart) u?.restartLap();
@@ -293,8 +294,22 @@ test.describe('drive', () => {
           },
           [camera, at] as const,
         );
-        // Cameras settle on real time; wait for the framing to converge.
+        // Let the car run briefly, then freeze the sim: the cameras settle on real time, and a
+        // busy runner can stall the page's frames, so wait for 30 drawn frames as well as the
+        // settle time, on a scene that does not move meanwhile.
+        await page.waitForTimeout(500);
+        await page.evaluate(() => {
+          window.__undercut?.setTimeScale(0);
+          window.__undercut?.resetFrameTimes();
+        });
         await page.waitForTimeout(1500);
+        await page.waitForFunction(
+          () => (window.__undercut?.frameTimes().length ?? 0) >= 30,
+          null,
+          {
+            timeout: 30_000,
+          },
+        );
         const r = await page.evaluate(() => {
           const car = window.__undercut?.carScreenRect() as {
             left: number;

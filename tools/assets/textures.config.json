@@ -1,0 +1,121 @@
+{
+  "$comment": "Inputs of npm run assets:build (tools/assets/build_textures.py). Every source is CC0 and downloads without an account (docs/asset-survey.md). sizeM is the real-world tile size in metres from the source's own metadata. sizes are the shipped edge lengths: the first is the 'hi' tier, the second the 'lo' tier (see packages/render/src/quality.ts). sha256 pins the original download; the build refuses a changed upstream file.",
+  "cache": "~/.cache/undercut/assets-src",
+  "out": "apps/web/public/assets",
+  "textures": [
+    {
+      "id": "asphalt",
+      "source": "polyhaven",
+      "asset": "asphalt_track",
+      "author": "Dimitrios Savva (Poly Haven)",
+      "sizeM": 2,
+      "sizes": [2048, 1024],
+      "quality": {
+        "diff": 80,
+        "nor": 86,
+        "arm": 80
+      }
+    },
+    {
+      "id": "asphalt_worn",
+      "source": "polyhaven",
+      "asset": "asphalt_pit_lane",
+      "author": "Dimitrios Savva (Poly Haven)",
+      "sizeM": 2,
+      "sizes": [1024, 512],
+      "quality": {
+        "diff": 80,
+        "nor": 84,
+        "arm": 78
+      }
+    },
+    {
+      "id": "concrete",
+      "source": "polyhaven",
+      "asset": "concrete_floor_worn_001",
+      "author": "Dimitrios Savva and Rico Cilliers (Poly Haven)",
+      "sizeM": 3,
+      "sizes": [1024, 512],
+      "quality": {
+        "diff": 80,
+        "nor": 84,
+        "arm": 78
+      }
+    },
+    {
+      "id": "grass",
+      "source": "ambientcg",
+      "asset": "Grass001",
+      "author": "Lennart Demes (ambientCG)",
+      "sizeM": 1.4,
+      "sizes": [1024, 512],
+      "quality": {
+        "diff": 80,
+        "nor": 80,
+        "arm": 76
+      }
+    },
+    {
+      "id": "gravel",
+      "source": "polyhaven",
+      "asset": "gravel_stones",
+      "author": "Amal Kumar (Poly Haven)",
+      "sizeM": 2,
+      "sizes": [1024, 512],
+      "quality": {
+        "diff": 80,
+        "nor": 84,
+        "arm": 78
+      }
+    },
+    {
+      "id": "metal",
+      "source": "polyhaven",
+      "asset": "metal_plate",
+      "author": "Rob Tuytel (Poly Haven)",
+      "sizeM": 0.5,
+      "sizes": [512, 256],
+      "quality": {
+        "diff": 82,
+        "nor": 86,
+        "arm": 80
+      }
+    },
+    {
+      "id": "rubber",
+      "source": "ambientcg",
+      "asset": "Rubber004",
+      "author": "Lennart Demes (ambientCG)",
+      "sizeM": 1,
+      "sizes": [512, 256],
+      "quality": {
+        "diff": 82,
+        "nor": 86,
+        "arm": 80
+      }
+    }
+  ],
+  "skies": [
+    {
+      "id": "monza_afternoon",
+      "asset": "kloofendal_48d_partly_cloudy_puresky",
+      "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+      "sizes": [4096, 2048],
+      "quality": 95
+    },
+    {
+      "id": "overcast",
+      "asset": "kloofendal_overcast_puresky",
+      "author": "Greg Zaal (Poly Haven)",
+      "sizes": [2048, 1024],
+      "quality": 92
+    },
+    {
+      "id": "night",
+      "asset": "kloppenheim_07_puresky",
+      "author": "Greg Zaal and Jarod Guest (Poly Haven)",
+      "sizes": [2048, 1024],
+      "quality": 92
+    }
+  ]
+}

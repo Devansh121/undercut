@@ -8,8 +8,8 @@ import {
 } from 'three';
 
 /**
- * Procedural textures drawn at load time. No third-party images in M1: every texture is
- * generated here from seeded value noise, so the look is reproducible and licence-free.
+ * Procedural helpers: seeded tileable noise (macro variation) and the chain-link fence alpha.
+ * Surfaces use real texture sets (materials/surface.ts); these fill what a photo cannot.
  */
 
 /** Small deterministic PRNG (mulberry32), so textures are the same on every load. */
@@ -92,114 +92,6 @@ function finish(el: HTMLCanvasElement, colour: boolean, anisotropy: number): Tex
   return tex;
 }
 
-type RGB = readonly [number, number, number];
-
-function hex(c: string): RGB {
-  const v = parseInt(c.slice(1), 16);
-  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
-}
-
-/**
- * A colour texture: noise mixes between `dark` and `light`, with optional speckle (aggregate,
- * gravel stones) of `speckle` density.
- */
-export function noiseColourTexture(
-  size: number,
-  seed: number,
-  dark: string,
-  light: string,
-  options: {
-    cells?: number;
-    octaves?: number;
-    speckle?: number;
-    speckleColour?: string;
-    contrast?: number;
-  } = {},
-  anisotropy = 8,
-): Texture {
-  const { el, ctx } = canvas(size);
-  const n = tileNoise(size, seed, options.cells ?? 8, options.octaves ?? 5);
-  const fine = tileNoise(size, seed + 101, Math.max(32, size / 4), 2);
-  const a = hex(dark);
-  const b = hex(light);
-  const sp = options.speckleColour ? hex(options.speckleColour) : b;
-  const contrast = options.contrast ?? 1.6;
-  const img = ctx.createImageData(size, size);
-  const rand = prng(seed + 7);
-  for (let i = 0; i < size * size; i++) {
-    let t = ((n[i] as number) - 0.5) * contrast + 0.5;
-    t = t * 0.75 + (fine[i] as number) * 0.25;
-    t = Math.min(1, Math.max(0, t));
-    let r = a[0] + (b[0] - a[0]) * t;
-    let g = a[1] + (b[1] - a[1]) * t;
-    let bl = a[2] + (b[2] - a[2]) * t;
-    if (options.speckle && rand() < options.speckle) {
-      const k = 0.4 + rand() * 0.6;
-      r = r + (sp[0] - r) * k;
-      g = g + (sp[1] - g) * k;
-      bl = bl + (sp[2] - bl) * k;
-    }
-    img.data[i * 4] = r;
-    img.data[i * 4 + 1] = g;
-    img.data[i * 4 + 2] = bl;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  return finish(el, true, anisotropy);
-}
-
-/** A tangent-space normal map from tileable noise height, `strength` scaling the slopes. */
-export function noiseNormalTexture(
-  size: number,
-  seed: number,
-  cells: number,
-  strength: number,
-  anisotropy = 8,
-): Texture {
-  const { el, ctx } = canvas(size);
-  const h = tileNoise(size, seed, cells, 4, 0.55);
-  const img = ctx.createImageData(size, size);
-  const at = (x: number, y: number): number =>
-    h[((y + size) % size) * size + ((x + size) % size)] as number;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
-      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
-      const len = Math.hypot(dx, dy, 1);
-      const i = (y * size + x) * 4;
-      img.data[i] = ((-dx / len) * 0.5 + 0.5) * 255;
-      img.data[i + 1] = ((dy / len) * 0.5 + 0.5) * 255;
-      img.data[i + 2] = ((1 / len) * 0.5 + 0.5) * 255;
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return finish(el, false, anisotropy);
-}
-
-/** A greyscale data texture (roughness, masks) from noise in [lo, hi]. */
-export function noiseGreyTexture(
-  size: number,
-  seed: number,
-  cells: number,
-  lo: number,
-  hi: number,
-  anisotropy = 8,
-): Texture {
-  const { el, ctx } = canvas(size);
-  const n = tileNoise(size, seed, cells, 4);
-  const img = ctx.createImageData(size, size);
-  for (let i = 0; i < size * size; i++) {
-    const v = (lo + (hi - lo) * (n[i] as number)) * 255;
-    img.data[i * 4] = v;
-    img.data[i * 4 + 1] = v;
-    img.data[i * 4 + 2] = v;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  return finish(el, false, anisotropy);
-}
-
 /**
  * Chain-link fence: a diamond wire mesh on transparent, for an alpha-tested material. One tile
  * is one diamond pitch along and up.
@@ -223,28 +115,5 @@ export function fenceTexture(anisotropy = 8): Texture {
   ctx.moveTo(size / 2, -size / 2);
   ctx.lineTo(size * 1.5, size / 2);
   ctx.stroke();
-  return finish(el, true, anisotropy);
-}
-
-/**
- * Carbon 2x2 twill as a colour map for the car's bare carbon: 16 tows across one tile. With the
- * tile at `CARBON_TILE` metres a tow is 2.5 mm wide, as on real 3K cloth.
- */
-export const CARBON_TILE = 0.04;
-export function carbonTexture(anisotropy = 8): Texture {
-  const size = 128;
-  const { el, ctx } = canvas(size);
-  const cell = 8;
-  for (let y = 0; y < size; y += cell) {
-    for (let x = 0; x < size; x += cell) {
-      const twill = ((x / cell + y / cell) >> 1) % 2 === 0;
-      const g = ctx.createLinearGradient(x, y, twill ? x + cell : x, twill ? y : y + cell);
-      g.addColorStop(0, '#15171a');
-      g.addColorStop(0.5, twill ? '#2a2d32' : '#202328');
-      g.addColorStop(1, '#15171a');
-      ctx.fillStyle = g;
-      ctx.fillRect(x, y, cell, cell);
-    }
-  }
   return finish(el, true, anisotropy);
 }

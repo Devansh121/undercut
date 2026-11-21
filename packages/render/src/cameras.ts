@@ -2,7 +2,7 @@ import { MathUtils, Vector3, type PerspectiveCamera } from 'three';
 import type { CarPose } from '@undercut/sim';
 import type { CarModel } from './car/car-model';
 
-export type CameraName = 'chase-far' | 'chase-near' | 'tcam' | 'cockpit' | 'look-back';
+export type CameraName = 'chase-far' | 'chase-near' | 'tcam' | 'cockpit' | 'look-back' | 'tv';
 
 /** Cycle order for the camera button. Look-back is also held on its own button. */
 export const CAMERA_ORDER: readonly CameraName[] = ['chase-near', 'chase-far', 'tcam', 'cockpit'];
@@ -13,6 +13,7 @@ export const CAMERA_LABELS: Readonly<Record<CameraName, string>> = Object.freeze
   tcam: 'T-cam',
   cockpit: 'Cockpit',
   'look-back': 'Look back',
+  tv: 'Trackside',
 });
 
 /** What a camera reads each frame. */
@@ -85,6 +86,12 @@ export class ChaseCamera implements CameraMode {
   private readonly look = new Vector3();
   private lastYaw = 0;
   private yawRate = 0;
+  /**
+   * Phone landscape (aspect above 1.9): the HUD cluster takes the bottom centre and the timing
+   * panel the top centre, so the car sits further back and higher. It then needs less image lift
+   * to clear the cluster, and the road ahead stays below the timing panel.
+   */
+  private wide = 1;
 
   constructor(
     readonly name: CameraName,
@@ -106,12 +113,17 @@ export class ChaseCamera implements CameraMode {
   private target(f: CameraFrame, out: Vector3): Vector3 {
     const c = Math.cos(this.yaw);
     const s = Math.sin(this.yaw);
-    const d = this.distance + Math.min(1, f.speed / V_TOP) * 0.6;
-    return out.set(f.pose.x - c * d, this.y + this.height, f.pose.z + s * d);
+    const d = (this.distance + Math.min(1, f.speed / V_TOP) * 0.6) * this.wide;
+    return out.set(
+      f.pose.x - c * d,
+      this.y + this.height * (1 + (this.wide - 1) * 0.6),
+      f.pose.z + s * d,
+    );
   }
 
   update(f: CameraFrame, camera: PerspectiveCamera): void {
     const dt = f.dt;
+    this.wide = camera.aspect > 1.9 ? 1.22 : 1;
     if (dt > 0) {
       let dy = f.pose.yaw - this.lastYaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -199,8 +211,36 @@ export class LookBackCamera implements CameraMode {
   }
 }
 
+/**
+ * Trackside TV camera: fixed in the world, a long lens following the car with a little operator
+ * lag. Position and focal length are set from outside (replay director, screenshot stations).
+ */
+export class TvCamera implements CameraMode {
+  readonly name = 'tv' as const;
+  readonly helmet = true;
+  readonly position = new Vector3(0, 2, 0);
+  /** Vertical field of view, degrees (about 9° is a 150 mm lens on full frame). */
+  fov = 12;
+  /** A fixed point to frame instead of the player's car (a grid shot), or null. */
+  target: Vector3 | null = null;
+  private readonly aim = new Vector3();
+  snap(f: CameraFrame): void {
+    if (this.target) this.aim.copy(this.target);
+    else this.aim.set(f.pose.x, f.pose.y + 0.45, f.pose.z);
+  }
+  update(f: CameraFrame, camera: PerspectiveCamera): void {
+    if (this.target) tmp.copy(this.target);
+    else tmp.set(f.pose.x, f.pose.y + 0.45, f.pose.z);
+    this.aim.lerp(tmp, f.dt > 0 ? 1 - Math.exp(-f.dt / 0.12) : 0);
+    camera.position.copy(this.position);
+    camera.lookAt(this.aim);
+    camera.fov = this.fov;
+  }
+}
+
 /** Switches cameras live and runs the active one; a held look-back overrides any of them. */
 export class CameraRig {
+  readonly tv = new TvCamera();
   private readonly modes: Map<CameraName, CameraMode>;
   private currentName: CameraName = 'chase-near';
   private wasLookBack = false;
@@ -213,6 +253,7 @@ export class CameraRig {
       new BodyCamera('tcam', true, (car) => car.tcamMount, 66, 0.004, -0.085),
       new BodyCamera('cockpit', false, (car) => car.cockpitEye, 74, 0.02, -0.07),
       new LookBackCamera(),
+      this.tv,
     ];
     this.modes = new Map(list.map((m) => [m.name, m]));
   }
