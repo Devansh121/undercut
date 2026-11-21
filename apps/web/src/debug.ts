@@ -140,6 +140,19 @@ export function installDebugApi(
       raceResult: s.result,
       standings: s.race.control.standings(),
       raceEvents: s.raceEvents.slice(-30),
+      // Cars within 120 m of the player along the lap (evidence captures look for a pack).
+      nearby: (() => {
+        const me = s.race.carFacts(0);
+        const L = s.track.length;
+        let n = 0;
+        for (let i = 1; i < s.race.world.cars.length; i++) {
+          const f = s.race.carFacts(i);
+          if (f.inPitLane) continue;
+          const ds = Math.abs(((f.s - me.s + 1.5 * L) % L) - L / 2);
+          if (ds < 120) n++;
+        }
+        return n;
+      })(),
       paused: d.loop.paused,
       tick: s.world.tick,
       time: s.world.time,

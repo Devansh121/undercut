@@ -90,17 +90,28 @@ try {
       globalThis.__undercut.autopilot(true);
       globalThis.__undercut.setTimeScale(4);
     });
-    for (const [stage, distance] of [
-      ['turn-one', 560],
-      ['pack', 1450],
-    ]) {
-      await page.waitForFunction(
-        (s) =>
-          Number(globalThis.__undercut.state().s) > s &&
-          Number(globalThis.__undercut.state().s) < s + 2000,
-        distance,
-        { timeout: 120_000 },
-      );
+    for (const stage of ['turn-one', 'pack']) {
+      if (stage === 'turn-one') {
+        // Braking into the first chicane on lap 1.
+        await page.waitForFunction(
+          () => {
+            const s = Number(globalThis.__undercut.state().s);
+            return s > 500 && s < 600;
+          },
+          null,
+          { timeout: 120_000 },
+        );
+      } else {
+        // Mid-race: lap 2 or later with at least six cars within 120 m of the player.
+        await page.waitForFunction(
+          () => {
+            const st = globalThis.__undercut.state();
+            return Number(st.lap) >= 2 && Number(st.nearby) >= 6;
+          },
+          null,
+          { timeout: 300_000, polling: 100 },
+        );
+      }
       await page.evaluate(() => {
         globalThis.__undercut.setTimeScale(0);
         globalThis.__undercut.camera('chase-far');
@@ -114,8 +125,9 @@ try {
       await page.evaluate(() => {
         const u = globalThis.__undercut,
           s = Number(u.state().s);
-        const eye = u.trackPoint(s + 40, 18, 5),
-          aim = u.trackPoint(s - 10, 0, 0.5);
+        // Ahead of the player, looking back down the track at the cars behind it.
+        const eye = u.trackPoint(s + 60, 16, 5),
+          aim = u.trackPoint(s - 30, 0, 0.5);
         u.tvCamera(eye.x, eye.y, eye.z, 42, aim);
       });
       await page.waitForTimeout(300);
