@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import presets from '../src/presets.json';
-import { QUALITY, QUALITY_NAMES, benchmarkPick } from '../src/quality';
+import { QUALITY, QUALITY_NAMES, benchmarkPick, effectiveQuality } from '../src/quality';
 
 describe('quality presets', () => {
   it('every preset is complete and ordered by cost', () => {
@@ -38,5 +38,25 @@ describe('benchmarkPick', () => {
   });
   it('never picks Ultra or High on a touch device', () => {
     expect(benchmarkPick('mobile', { gpuMs: 2, frameMs: 16.7 }, true)).toBe('medium');
+  });
+});
+
+describe('effectiveQuality (what the GPU can actually do)', () => {
+  it('keeps the preset when half-float targets render', () => {
+    expect(effectiveQuality(QUALITY.high, { floatTargets: true })).toBe(QUALITY.high);
+  });
+
+  it('without renderable float targets drops to the direct path: no HDR target, no post, no PMREM', () => {
+    for (const name of QUALITY_NAMES) {
+      const q = effectiveQuality(QUALITY[name], { floatTargets: false });
+      expect(q.post).toBe(false);
+      expect(q.msaa).toBe(0);
+      expect(q.smaa || q.ao.enabled || q.bloom.enabled || q.speedBlur || q.grainVignette).toBe(false);
+      expect(q.envSize).toBe(0);
+      // Everything else (shadows, textures, car levels) is kept.
+      expect(q.shadow).toEqual(QUALITY[name].shadow);
+      expect(q.textureTier).toBe(QUALITY[name].textureTier);
+      expect(q.name).toBe(name);
+    }
   });
 });

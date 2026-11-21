@@ -123,3 +123,31 @@ export function benchmarkPick(
   for (const q of order) if (base * COST[q] <= budget) return q;
   return 'mobile';
 }
+
+/** What the GPU and browser can do that the presets depend on. */
+export interface RenderCapabilities {
+  /** Half-float colour targets are renderable (EXT_color_buffer_float or _half_float). */
+  floatTargets: boolean;
+}
+
+/**
+ * The preset as this GPU can run it. Without renderable half-float targets there is no HDR target,
+ * no post-processing and no prefiltered environment (PMREM renders into half float): the view
+ * takes the direct path (scene straight to the canvas through the renderer's tone map, hemisphere
+ * fill), keeping shadows, textures and cars. Otherwise the preset is returned unchanged.
+ */
+export function effectiveQuality(q: Quality, caps: RenderCapabilities): Quality {
+  if (caps.floatTargets) return q;
+  return Object.freeze({
+    ...q,
+    post: false,
+    msaa: 0,
+    smaa: false,
+    envSize: 0,
+    ao: { ...q.ao, enabled: false },
+    bloom: { ...q.bloom, enabled: false },
+    grainVignette: false,
+    speedBlur: false,
+    contactShadow: true,
+  });
+}

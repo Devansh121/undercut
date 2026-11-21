@@ -40,15 +40,18 @@ export {
   QUALITY_NAMES,
   benchmarkPick,
   defaultQuality,
+  effectiveQuality,
   isQualityName,
   type CarLod,
   type Quality,
   type QualityName,
+  type RenderCapabilities,
 } from './quality';
 export { estimateRacingLine } from './racing-line';
 export {
   RaceView,
   createRenderer,
+  renderCapabilities,
   type RaceViewOptions,
   type ScreenRect,
   type ViewFrame,

@@ -33,7 +33,13 @@ import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { GpuTimer } from './pipeline/gpu-timer';
 import { RenderPipeline, type ToneMap } from './pipeline/post';
 import { PropRegistry } from './props/registry';
-import { QUALITY, type Quality, type QualityName } from './quality';
+import {
+  QUALITY,
+  effectiveQuality,
+  type Quality,
+  type QualityName,
+  type RenderCapabilities,
+} from './quality';
 import { TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 
 /**
@@ -51,6 +57,12 @@ export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.type = PCFShadowMap;
   return renderer;
+}
+
+/** What the page's renderer can do (see `effectiveQuality`). */
+export function renderCapabilities(renderer: WebGLRenderer): RenderCapabilities {
+  const ext = renderer.extensions;
+  return { floatTargets: ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float') };
 }
 
 export interface RaceViewOptions {
@@ -120,6 +132,8 @@ export interface ViewStats {
   width: number;
   height: number;
   cars: number;
+  /** 'hdr': half-float target and post-processing; 'direct': straight to the canvas. */
+  renderPath: 'hdr' | 'direct';
 }
 
 /** Everything a session fetches before it can draw, for one preset. */
@@ -228,7 +242,8 @@ export class RaceView {
 
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions, assets: SessionAssets) {
     this.canvas = canvas;
-    this.quality = QUALITY[options.quality];
+    // The preset as this GPU can run it (no renderable half float: the direct path).
+    this.quality = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
     this.track = options.track;
     this.assets = assets;
     this.fleetLiveries = options.fleetLiveries ?? [];
@@ -603,6 +618,7 @@ export class RaceView {
       width: this.width,
       height: this.height,
       cars: 1 + this.fleet.size,
+      renderPath: this.quality.post ? 'hdr' : 'direct',
     };
   }
 
