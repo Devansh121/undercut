@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { GAME_NAME } from '@undercut/core';
+import { PROTOCOL_VERSION } from '@undercut/protocol';
 
 /** Collect console errors and uncaught exceptions for the whole test. */
 function watchErrors(page: Page): string[] {
@@ -65,22 +66,30 @@ test.describe('serving', () => {
     page,
   }) => {
     await page.goto('/');
-    const presence = await page.evaluate(async () => {
-      const url = new URL(`/rooms/smoke${Math.floor(performance.now())}`, location.href);
+    const welcome = await page.evaluate(async (v) => {
+      const created = await fetch('/rooms', { method: 'POST' });
+      const { code } = (await created.json()) as { code: string };
+      const url = new URL(`/rooms/${code}/ws`, location.href);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(url);
       return await new Promise<unknown>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('no presence within 5 s')), 5000);
-        ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', v: 1, name: 'Smoke' }));
+        const timer = setTimeout(() => reject(new Error('no welcome within 5 s')), 5000);
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'join', v, name: 'Smoke' }));
         ws.onmessage = (event) => {
+          const message = JSON.parse(String(event.data)) as { type: string };
+          if (message.type !== 'welcome') return;
           clearTimeout(timer);
           ws.close();
-          resolve(JSON.parse(String(event.data)));
+          resolve(message);
         };
         ws.onerror = () => reject(new Error('socket error'));
       });
+    }, PROTOCOL_VERSION);
+    expect(welcome).toMatchObject({
+      type: 'welcome',
+      seat: 0,
+      room: { phase: 'lobby', members: [{ name: 'Smoke' }] },
     });
-    expect(presence).toMatchObject({ type: 'presence', peers: [{ name: 'Smoke' }] });
   });
 
   test('serves the same client over HTTPS', async ({ playwright }, testInfo) => {

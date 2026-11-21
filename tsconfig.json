@@ -4,5 +4,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["*.config.ts", "tests"]
+  "include": ["*.config.ts", "tests", "tools/netsim"]
 }
