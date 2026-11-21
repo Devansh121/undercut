@@ -38,10 +38,13 @@ export class ProfileStore {
   ) {}
 
   async load(): Promise<LoadedProfile> {
-    let text: string | null;
+    let text: unknown;
     try {
       text = await this.storage.load(this.key);
     } catch {
+      return { ...deserializeProfile(null), problem: 'Saved controls could not be read' };
+    }
+    if (text !== null && typeof text !== 'string') {
       return { ...deserializeProfile(null), problem: 'Saved controls could not be read' };
     }
     return deserializeProfile(text);

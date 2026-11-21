@@ -256,6 +256,15 @@ function loadBindings(source: unknown): BindingMap {
 
 /** Parse a saved profile. Anything unusable falls back to defaults; it never throws. */
 export function deserializeProfile(text: string | null | undefined): LoadedProfile {
+  try {
+    return parseProfile(text);
+  } catch {
+    // Defence in depth: no saved data may stop the game.
+    return { profile: defaultProfile(), problem: 'Saved controls could not be read' };
+  }
+}
+
+function parseProfile(text: string | null | undefined): LoadedProfile {
   if (text === null || text === undefined || text === '') {
     return { profile: defaultProfile(), problem: null };
   }
@@ -268,10 +277,12 @@ export function deserializeProfile(text: string | null | undefined): LoadedProfi
   if (!isRecord(data))
     return { profile: defaultProfile(), problem: 'Saved controls are not an object' };
   if (data.version !== PROFILE_VERSION) {
-    return {
-      profile: defaultProfile(),
-      problem: `Saved controls are version ${String(data.version)}; expected ${PROFILE_VERSION}`,
-    };
+    // Never format an arbitrary value: an object with a broken toString would throw here.
+    const problem =
+      typeof data.version === 'number' && Number.isFinite(data.version)
+        ? `Saved controls are version ${data.version}; expected ${PROFILE_VERSION}`
+        : 'Saved controls have an invalid version';
+    return { profile: defaultProfile(), problem };
   }
   const shaping = defaultShaping();
   mergeSettings(shaping, data.shaping);
