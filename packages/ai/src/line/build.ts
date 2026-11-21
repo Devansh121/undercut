@@ -2,7 +2,7 @@ import type { Track } from '@undercut/track';
 import { EnvelopeModel, type Envelope, type EnvelopeScale } from '../envelope/envelope';
 import { buildPlan, drsZoneFlags } from '../profile/plan';
 import { Phase, SpeedProfiler } from '../profile/speed-profile';
-import { buildCorridor, type CorridorOptions } from './corridor';
+import { buildCorridor, corridorHalfTrack, type CorridorOptions } from './corridor';
 import { computeLineGeometry } from './geometry';
 import { minimumCurvatureLine } from './min-curvature';
 import { refineLine } from './refine';
@@ -42,7 +42,7 @@ export function buildRacingLine(
   const corridor = buildCorridor(track, config.corridor);
   const mc = minimumCurvatureLine(track, corridor).d;
   const drs = drsZoneFlags(track);
-  const halfTrack = config.corridor.halfTrack;
+  const halfTrack = corridorHalfTrack(config.corridor);
   const lapTimeOf = (d: Float64Array): number => {
     const line = computeLineGeometry(track, d, { halfTrack });
     return new SpeedProfiler(line, model).compute({ scale: config.scale, drs }).lapTime;

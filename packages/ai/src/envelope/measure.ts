@@ -178,7 +178,13 @@ class ThresholdBrake {
   tick(rig: Rig): void {
     const c = rig.car;
     const target = c.model.params.tyre.peakSlipRatio;
-    const excess = lockExcess(c.slipRatio, c.load, target);
+    const excess = lockExcess(
+      c.slipRatio,
+      c.load,
+      target,
+      c.slipTan,
+      c.model.params.tyre.peakSlipTan,
+    );
     this.applied = Math.min(1, this.applied + STEP / 0.08);
     if (excess > 0) this.pedal -= 400 * excess * STEP;
     else this.pedal += 6 * STEP;

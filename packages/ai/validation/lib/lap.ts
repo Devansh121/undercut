@@ -14,8 +14,9 @@ import {
   type MassState,
   type WorldCar,
 } from '@undercut/sim';
-import { LEFT, RIGHT, TrackSurface, createPathPoint, type Track } from '@undercut/track';
+import { TrackSurface, createPathPoint, type Track } from '@undercut/track';
 import type { Driver } from '../../src/driver/driver';
+import { wheelOff } from '../../src/line/limits';
 import type { DrivingPlan } from '../../src/profile/plan';
 
 /** The game's sim step (ADR 0007). */
@@ -171,8 +172,9 @@ class WheelLimits {
       const x = st.x + bx * c - by * sn;
       const z = st.z - bx * sn - by * c;
       const q = this.track.project(x, z, this.hints[i]!, this.q);
-      const side = q.d >= 0 ? LEFT : RIGHT;
-      if (Math.abs(q.d) > this.track.halfWidthAt(q.s, side)) off++;
+      // The track-limit rule the racing line is planned to (`line/limits.ts`): a wheel is off
+      // when its tyre is wholly past the white line.
+      if (wheelOff(this.track, q.s, q.d)) off++;
     }
     return off;
   }

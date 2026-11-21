@@ -15,7 +15,7 @@ import {
 import { measureEnvelope, type MeasureReport } from '../../src/envelope/measure';
 import { REFERENCE_SKILL } from '../../src/driver/reference';
 import { buildRacingLine, type LineBuildResult, type LineConfig } from '../../src/line/build';
-import { buildCorridor } from '../../src/line/corridor';
+import { buildCorridor, corridorHalfTrack } from '../../src/line/corridor';
 import { computeLineGeometry } from '../../src/line/geometry';
 import { minimumCurvatureLine } from '../../src/line/min-curvature';
 import { refineLine } from '../../src/line/refine';
@@ -117,7 +117,7 @@ export function lineFingerprint(
   const model = new EnvelopeModel(envelope);
   const corridor = buildCorridor(track, config.corridor);
   const mc = minimumCurvatureLine(track, corridor).d;
-  const halfTrack = config.corridor.halfTrack;
+  const halfTrack = corridorHalfTrack(config.corridor);
   const geo = computeLineGeometry(track, mc, { halfTrack });
   const drs = drsZoneFlags(track);
   const lapTimeOf = (d: Float64Array): number =>

@@ -235,7 +235,7 @@ export function formatLapReport(r: LapReport): string {
       `harvested ${r.harvestMJ.toFixed(2)} MJ`,
   );
   lines.push(
-    `Clean: at most ${r.maxWheelsOff} wheel(s) past the white line, sideslip ≤ ${fixed1(r.maxSideslipDeg)}°, ` +
+    `Clean: at most ${r.maxWheelsOff} wheel(s) wholly past the white line, sideslip ≤ ${fixed1(r.maxSideslipDeg)}°, ` +
       `line error max ${r.maxLateralError.toFixed(2)} m, RMS ${r.rmsLateralError.toFixed(2)} m`,
   );
   lines.push('');

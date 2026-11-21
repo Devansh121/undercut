@@ -53,12 +53,12 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 85.539,
+    measured: 84.257,
     reason:
-      'After the tyre and floor calibration the lap is 2.81 s outside the M1 band. The ' +
-      "reference driver's planning margin and driving cost about 1.6 s; the line keeps the " +
-      'whole car 0.3 m inside the white lines, where the rules allow the car centre well past ' +
-      'them, and keeps off the kerbs. docs/physics-validation.md section 7.6.',
+      'On the legal corridor, with the contact patch and the steadier driver, the lap is 1.53 s ' +
+      'outside the M1 band. The full-envelope profile on that line is 82.98 s, so even a driver ' +
+      'at 100 % of the measured envelope would miss it; what is left is the car (lateral grip at ' +
+      '150-200 km/h) and the track as modelled. docs/physics-validation.md section 7.6.',
   },
 });
 

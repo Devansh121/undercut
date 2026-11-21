@@ -122,6 +122,23 @@ export interface KerbCrossingOptions {
   lateral: number;
   trim?: 'low' | 'medium' | 'high';
   record?: boolean;
+  /**
+   * Where to stop: 'over' (default) once the left wheels are 0.3 m past the kerb's outer edge;
+   * 'crest' once the left rear wheel reaches the crest (the last point before the profile falls
+   * away or a raised part starts), i.e. riding the kerb the way a racing line may use it.
+   */
+  until?: 'over' | 'crest';
+}
+
+/** The crest of a profile: the last point before it falls toward the verge or rises to a sausage. */
+export function kerbCrest(p: KerbProfile): number {
+  const pts = p.points;
+  let crest = pts[pts.length - 1]![0];
+  for (let m = pts.length - 1; m > 0; m--) {
+    if (pts[m]![1] < pts[m - 1]![1]) crest = pts[m - 1]![0];
+    else break;
+  }
+  return p.high ? Math.min(crest, p.high[0]) : crest;
 }
 
 /** Per-wheel summary of a crossing. FL, FR, RL, RR. */
@@ -223,7 +240,11 @@ export function kerbCrossing(o: KerbCrossingOptions): KerbCrossingResult {
   const deg = 180 / Math.PI;
   const uFL = (): number =>
     -(car.z - Math.sin(car.yaw) * car.model.params.geometry.wheelbase * 0.5 - half);
-  const endU = surface.width + 0.3;
+  // 'crest': stop as the front-left patch's outer edge reaches the crest.
+  const endU =
+    o.until === 'crest'
+      ? kerbCrest(profile) - car.model.params.tyre.patchWidthFront / 2
+      : surface.width + 0.3;
   while (h.time < 30) {
     hold.tick(h);
     steer.targetYawRate = 0;
