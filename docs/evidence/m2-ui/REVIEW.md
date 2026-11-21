@@ -39,6 +39,12 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 7. **Controls list from master (#20) in the old pause style**
    - Folded into the kit: a kit dialog (title, device with its icon, two columns of setting rows, the reverse note on a raised strip, Back with its prompt glyph), opened from a Controls button in the menu's top bar (every menu screen) and from the pause menu. Unbound inputs read in the label colour. Checked at `1440×900` (keyboard rows) and `844×390` (touch rows): two columns fit, nothing clipped.
 
+8. **Three circuits after Spa and Singapore landed (`circuits-1440x900.png`, `circuits-844x390.png`)**
+   - On desktop Monza's tall plan widened its card's content past the card edge ("Race laps" and the record cut off): the card's grid track is now pinned to the card width, and the three cards fill the row. On a phone the cards wrapped to a second row below the fold: they now sit three across in a compact form (smaller plan, two facts), with the screen title left to the breadcrumb.
+   - Spa and Singapore carry a "Time Trial only" mark (no AI racing line yet); the race-mode notice says why in one sentence.
+9. **Tower footer wrapped "Singapore Marina Bay" onto two lines (`hud-drive-1440x900.png`)**
+   - The map already names the circuit, so the tower's footer now shows only the ghost: "On track" or "After a valid lap".
+
 ## HUD frame-time benchmark
 
 Measured at `1440×900`, `high` quality preset, with vsync and frame-rate cap disabled (`--disable-gpu-vsync --disable-frame-rate-limit`), driving Monza on autopilot with the HUD visible vs hidden via `window.__undercut.setHudVisible` (`docs/evidence/m2-ui/report.json`):

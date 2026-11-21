@@ -158,7 +158,8 @@ export class Hud {
     );
     const sFoot = el('footer', 'hud-tower__foot');
     this.ghostStatusEl = txt('ghostStatus', el('span', 'hud-session__ghost'));
-    sFoot.append(txt('circuit', el('span', 'label')), this.ghostStatusEl);
+    // The map names the circuit; the footer says whether the ghost of the record is out.
+    sFoot.append(el('span', 'label', S.hud.ghost), this.ghostStatusEl);
     session.append(sHead, status, rows, sFoot);
 
     // Control and prompt slot (top centre).
