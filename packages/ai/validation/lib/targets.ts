@@ -62,4 +62,20 @@ export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   },
 });
 
+/**
+ * The reference driver's lap exactly as the current car drives it, to the last bit: lap time,
+ * speed-trap speed and sim ticks of the run. The drivability suite checks an unassisted car
+ * reproduces it exactly (the assist layer leaves the car alone); `LAP_GAPS` holds the same lap
+ * rounded, against the target band. A change to the physics updates both.
+ */
+export interface ExactLap {
+  time: number;
+  trap: number;
+  ticks: number;
+}
+
+export const REFERENCE_LAP_EXACT: Readonly<Record<string, ExactLap>> = Object.freeze({
+  'monza-lap-m1': Object.freeze({ time: 84.87247777781505, trap: 349.0184403531988, ticks: 40775 }),
+});
+
 export { gapSlack, outside };
