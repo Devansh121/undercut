@@ -697,12 +697,15 @@
 
 .circuits__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--grid-gutter);
 }
 
 .ccard {
   display: grid;
+  /* One track as wide as the card: a tall plan must not widen the card's content. */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--sp-4);
   padding: var(--sp-5);
   border: 0;
@@ -1098,22 +1101,37 @@
   }
 
   .circuits__body {
-    padding: var(--sp-3) var(--safe-r) var(--sp-3) var(--safe-l);
+    padding: var(--sp-2) var(--safe-r) var(--sp-2) var(--safe-l);
+  }
+  /* The breadcrumb names the screen; the cards get the height. */
+  .circuits .screen__title {
+    display: none;
   }
   .circuits__grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: var(--sp-2);
   }
   .ccard {
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-3);
-    padding: var(--sp-3);
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
   }
   .ccard__art {
-    grid-row: span 3;
+    aspect-ratio: auto;
+    height: 92px;
+  }
+  .ccard__head {
+    gap: 2px;
+  }
+  .ccard__head .label {
+    font-size: var(--fs-10);
   }
   .ccard__name {
     font-size: var(--fs-20);
+  }
+  .ccard__tag {
+    margin-top: 2px;
+    padding: 2px 6px;
+    font-size: var(--fs-10);
   }
   .ccard__facts {
     grid-template-columns: repeat(2, auto);
@@ -1123,12 +1141,18 @@
   .ccard__fact:nth-child(n + 3) {
     display: none;
   }
+  .ccard__fact dt {
+    font-size: var(--fs-10);
+  }
   .ccard__fact dd {
     font-size: var(--fs-14);
     margin-top: 2px;
   }
   .ccard__record {
     padding-top: var(--sp-2);
+  }
+  .ccard__record .label {
+    font-size: var(--fs-10);
   }
 }
 

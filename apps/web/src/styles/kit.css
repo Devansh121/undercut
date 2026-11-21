@@ -202,6 +202,11 @@ button {
     transform var(--t-instant) var(--ease-out);
 }
 
+.btn[hidden],
+.ibtn[hidden] {
+  display: none;
+}
+
 .btn:hover {
   background: var(--c-ink-3);
 }

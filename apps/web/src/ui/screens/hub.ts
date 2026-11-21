@@ -336,8 +336,13 @@ export class HubScreen implements Screen {
 
   private render(): void {
     const p = this.o.prefs.get();
-    const c = this.circuit();
     const mode = p.mode;
+    // Online rooms race at Monza only (protocol v2): show that circuit, with no circuit choice.
+    const online = mode === 'online';
+    const c = online
+      ? (this.o.circuits.find((x) => x.id === 'monza') ?? this.circuit())
+      : this.circuit();
+    this.changeCircuit.hidden = online;
     const playable = PLAYABLE.has(mode);
     for (const [m, row] of this.modeRows) row.setAttribute('aria-current', String(m === mode));
     this.root.dataset.mode = mode;
@@ -391,7 +396,6 @@ export class HubScreen implements Screen {
     this.summaryCard.hidden = !settings;
     this.noticeCard.hidden = settings;
     if (!settings) {
-      const online = mode === 'online';
       const h = el('header', 'notice__head');
       h.append(
         icon('info'),
