@@ -86,6 +86,12 @@ export class ChaseCamera implements CameraMode {
   private readonly look = new Vector3();
   private lastYaw = 0;
   private yawRate = 0;
+  /**
+   * Phone landscape (aspect above 1.9): the HUD cluster takes the bottom centre and the timing
+   * panel the top centre, so the car sits further back and higher. It then needs less image lift
+   * to clear the cluster, and the road ahead stays below the timing panel.
+   */
+  private wide = 1;
 
   constructor(
     readonly name: CameraName,
@@ -107,12 +113,17 @@ export class ChaseCamera implements CameraMode {
   private target(f: CameraFrame, out: Vector3): Vector3 {
     const c = Math.cos(this.yaw);
     const s = Math.sin(this.yaw);
-    const d = this.distance + Math.min(1, f.speed / V_TOP) * 0.6;
-    return out.set(f.pose.x - c * d, this.y + this.height, f.pose.z + s * d);
+    const d = (this.distance + Math.min(1, f.speed / V_TOP) * 0.6) * this.wide;
+    return out.set(
+      f.pose.x - c * d,
+      this.y + this.height * (1 + (this.wide - 1) * 0.6),
+      f.pose.z + s * d,
+    );
   }
 
   update(f: CameraFrame, camera: PerspectiveCamera): void {
     const dt = f.dt;
+    this.wide = camera.aspect > 1.9 ? 1.22 : 1;
     if (dt > 0) {
       let dy = f.pose.yaw - this.lastYaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));

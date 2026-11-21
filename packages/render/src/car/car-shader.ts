@@ -32,13 +32,16 @@ export const COMPOUND_GLSL = /* glsl */ `
 }`;
 
 const patched = new WeakSet<object>();
+/** Glass and screens reflect or glow on their own; their housings' baked darkness must not apply. */
+const EXEMPT = new Set(['mirror_glass', 'visor', 'display', 'rain_light']);
 
 /** Add the car shader edits to `material` once (after any other onBeforeCompile it has). */
 export function ensureCarShader(material: {
+  name: string;
   onBeforeCompile: (shader: WebGLProgramParametersWithUniforms, renderer: never) => void;
   customProgramCacheKey: () => string;
 }): void {
-  if (patched.has(material)) return;
+  if (patched.has(material) || EXEMPT.has(material.name)) return;
   patched.add(material);
   const prev = material.onBeforeCompile;
   const key = material.customProgramCacheKey;

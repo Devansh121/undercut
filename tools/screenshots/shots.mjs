@@ -402,6 +402,7 @@ async function perfRuns(report, vsync) {
           run,
           viewport: vp.label,
           quality,
+          vsync,
           ...summarise(times),
           gpu,
           render: stats,
