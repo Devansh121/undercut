@@ -839,6 +839,9 @@ export function buildTrackBridges(
  * raceways near the circuit): extruded weathered concrete slab with banked outer lip so the old
  * high-speed banking reads clearly where it crosses or parallels the view.
  */
+/** No old-oval concrete nearer the circuit's centreline than this, m (except where it crosses). */
+const BANKING_CLEARANCE = 32;
+
 export function buildHistoricBanking(
   features: readonly MappedFeature[],
   heightAt: (x: number, z: number) => number,
@@ -867,11 +870,18 @@ export function buildHistoricBanking(
       const dz = bz - az;
       const len = Math.hypot(dx, dz);
       if (len < 1.5) continue;
-      // Skip segments that cross directly on top of the active drivable road at ground level.
+      // Old ovals share stretches with the modern circuit (Monza's main straight is part of the
+      // oval) and run beside it elsewhere: build them only away from the circuit, and raise them
+      // as an overpass only where a segment actually crosses it (or the map says bridge).
       const mx = (ax + bx) * 0.5;
       const mz = (az + bz) * 0.5;
-      const hit = lap.nearest(mx, mz);
-      const elevated = isBridge || hit.dist < 18;
+      const hm = lap.nearest(mx, mz);
+      const ha = lap.nearest(ax, az);
+      const hb = lap.nearest(bx, bz);
+      const near = Math.min(hm.dist, ha.dist, hb.dist) < BANKING_CLEARANCE;
+      const crossing = near && Math.sign(ha.d) !== Math.sign(hb.d) && len < 80;
+      const elevated = isBridge || crossing;
+      if (near && !elevated) continue;
       // Only raise as a banked overpass where it crosses the circuit, otherwise ground-hugging embankment.
       const nx = -dz / len;
       const nz = dx / len;
