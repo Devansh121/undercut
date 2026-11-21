@@ -895,6 +895,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       loop.timeScale = 1;
       session.resetAssists();
       view.setDrivingLine(session.assists.racingLine ?? 'off');
+      view.setSkyProbe(null);
       view.setCamera('chase-near');
       actions.restartLap();
       results.hide();
