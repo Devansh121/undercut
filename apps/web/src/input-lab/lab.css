@@ -493,9 +493,8 @@ body.lab {
   background: var(--c-ink-2);
   color: var(--c-text-1);
   font: inherit;
-  font-size: var(--fs-12);
-  font-weight: 650;
-  letter-spacing: 0.02em;
+  font-size: var(--fs-14);
+  font-weight: 600;
   cursor: pointer;
   transition: background-color var(--t-quick) var(--ease-out);
   white-space: nowrap;
