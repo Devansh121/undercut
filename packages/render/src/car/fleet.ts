@@ -101,6 +101,9 @@ export class CarFleet {
   private readonly teamIndex = new Map<string, number>();
   private readonly lodLevels: CarLod[];
   private readonly thresholds: number[];
+  /** Scratch for `update`, reused every frame. */
+  private readonly counts: Int32Array;
+  private readonly scratchColour = new Color();
 
   constructor(
     private readonly assets: CarAssets,
@@ -148,6 +151,7 @@ export class CarFleet {
     this.textures.push(this.atlas);
 
     for (const lod of this.lodLevels) this.sets.push(this.buildSet(lod));
+    this.counts = new Int32Array(this.sets.length);
   }
 
   private buildSet(lod: CarLod): LodSet {
@@ -408,34 +412,35 @@ export class CarFleet {
     }
     // Nothing moved, switched or faded: keep last frame's instances (no uploads).
     if (!changed) return;
-    const counts = this.sets.map(() => 0);
-    const c = new Color();
+    const counts = this.counts;
+    counts.fill(0);
+    const c = this.scratchColour;
     for (const car of this.cars) {
-      const draws: [number, number][] =
-        car.from >= 0
-          ? [
-              [car.from, ditherCode(car.fade, false)],
-              [car.level, ditherCode(car.fade, true)],
-            ]
-          : [[car.level, 1]];
+      // One or two draws per car: the level fading out (if any) and the current one.
+      const n = car.from >= 0 ? 2 : 1;
       const l = this.liveries[car.livery] as CarLivery;
-      for (const [level, code] of draws) {
+      for (let d = 0; d < n; d++) {
+        const level = n === 2 && d === 0 ? car.from : car.level;
+        const code = n === 1 ? 1 : ditherCode(car.fade, d === 1);
         const set = this.sets[level] as LodSet;
         const posed = this.posed(car, set.lod);
         const slot = counts[level] as number;
         counts[level] = slot + 1;
         set.fade.setX(slot, code);
-        set.primary.setXYZ(slot, ...rgb(c, l.primary));
-        set.secondary.setXYZ(slot, ...rgb(c, l.secondary));
-        set.accent.setXYZ(slot, ...rgb(c, l.accent));
+        c.set(l.primary);
+        set.primary.setXYZ(slot, c.r, c.g, c.b);
+        c.set(l.secondary);
+        set.secondary.setXYZ(slot, c.r, c.g, c.b);
+        c.set(l.accent);
+        set.accent.setXYZ(slot, c.r, c.g, c.b);
         set.mask.setX(slot, this.teamIndex.get(l.team) ?? 0);
         const x = (car.livery % PER_ROW) * CELL_W;
         const y = Math.floor(car.livery / PER_ROW) * CELL_H;
         set.decal.setXYZW(slot, x / ATLAS_W, y / ATLAS_H, 0, 0);
-        set.meshes.forEach((im, mi) => {
+        for (let mi = 0; mi < set.meshes.length; mi++) {
           const src = posed.meshes[mi];
-          if (src) im.setMatrixAt(slot, src.matrixWorld);
-        });
+          if (src) (set.meshes[mi] as InstancedMesh).setMatrixAt(slot, src.matrixWorld);
+        }
       }
       car.dirty = false;
     }
@@ -465,11 +470,6 @@ export class CarFleet {
     for (const s of this.sets) for (const m of s.meshes) m.dispose();
     this.group.removeFromParent();
   }
-}
-
-function rgb(c: Color, hex: string): [number, number, number] {
-  c.set(hex);
-  return [c.r, c.g, c.b];
 }
 
 function copyPose(a: CarPose, b: CarPose): void {

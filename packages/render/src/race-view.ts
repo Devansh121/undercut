@@ -20,7 +20,7 @@ import type { Track } from '@undercut/track';
 import { AssetLoader, type AssetIndex, type Progress } from './assets/loader';
 import { CameraRig, type CameraName } from './cameras';
 import { CarAssets, type CarLivery } from './car/car-assets';
-import { CarModel, type CarGeometry } from './car/car-model';
+import { CarModel, type CarExtras, type CarGeometry } from './car/car-model';
 import { ContactShadows, contactShadowOpacity } from './car/contact-shadows';
 import { CarFleet } from './car/fleet';
 import { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
@@ -31,7 +31,7 @@ import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-o
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { GpuTimer } from './pipeline/gpu-timer';
-import { RenderPipeline, type ToneMap } from './pipeline/post';
+import { RenderPipeline, type GradeFrame, type ToneMap } from './pipeline/post';
 import { PropRegistry } from './props/registry';
 import {
   QUALITY,
@@ -58,6 +58,8 @@ export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   renderer.shadowMap.type = PCFShadowMap;
   return renderer;
 }
+
+const GHOST_EXTRAS: CarExtras = Object.freeze({ drs: 0, glow: [0, 0, 0, 0], rain: 0, headYaw: 0 });
 
 /** Exposure multiplier for the cockpit camera (+0.4 EV). */
 const COCKPIT_EXPOSURE = 2 ** 0.4;
@@ -188,6 +190,14 @@ export class RaceView {
   private lift = 0;
   private readonly points: Vector3[] = [];
   private readonly heat = new Float64Array(4);
+  /** Per-frame inputs reused every frame (no garbage in the render loop). */
+  private readonly extras: CarExtras & { glow: Float64Array } = {
+    drs: 0,
+    glow: new Float64Array(4),
+    rain: 0,
+    headYaw: 0,
+  };
+  private readonly grade: GradeFrame = { exposure: 1, speedBlur: 0, time: 0 };
   private headYaw = 0;
   private lastYaw = 0;
   /** Milliseconds spent building each part of the view (start-up budget checks). */
@@ -540,10 +550,13 @@ export class RaceView {
       this.headYaw += (target - this.headYaw) * (1 - Math.exp(-dt / 0.25));
     }
     this.lastYaw = frame.pose.yaw;
-    const glow = this.heat.map((h) => Math.max(0, (h - 0.2) / 0.8));
-    this.car.apply(frame.pose, { drs: frame.drs, glow, rain: 0, headYaw: this.headYaw });
+    const ex = this.extras;
+    for (let i = 0; i < 4; i++) ex.glow[i] = Math.max(0, ((this.heat[i] as number) - 0.2) / 0.8);
+    ex.drs = frame.drs;
+    ex.headYaw = this.headYaw;
+    this.car.apply(frame.pose, ex);
     if (frame.ghost) {
-      this.ghostCar.apply(frame.ghost, { drs: 0, glow: [0, 0, 0, 0], rain: 0, headYaw: 0 });
+      this.ghostCar.apply(frame.ghost, GHOST_EXTRAS);
       this.ghostCar.root.visible = true;
     } else {
       this.ghostCar.root.visible = false;
@@ -591,18 +604,18 @@ export class RaceView {
     this.renderer.info.autoReset = false;
     this.renderer.info.reset();
     this.gpu.begin();
-    this.pipeline.render(this.scene, this.camera, {
-      // An onboard camera exposes for what fills its frame: +0.4 EV in the cockpit.
-      exposure: this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1),
-      speedBlur:
-        mode.name === 'chase-near' ||
-        mode.name === 'chase-far' ||
-        mode.name === 'tcam' ||
-        mode.name === 'cockpit'
-          ? speedBlur
-          : 0,
-      time: frame.time,
-    });
+    const g = this.grade;
+    // An onboard camera exposes for what fills its frame: +0.4 EV in the cockpit.
+    g.exposure = this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1);
+    g.speedBlur =
+      mode.name === 'chase-near' ||
+      mode.name === 'chase-far' ||
+      mode.name === 'tcam' ||
+      mode.name === 'cockpit'
+        ? speedBlur
+        : 0;
+    g.time = frame.time;
+    this.pipeline.render(this.scene, this.camera, g);
     this.gpu.end();
   }
 

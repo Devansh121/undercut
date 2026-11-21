@@ -1,4 +1,4 @@
-import { Color, PointLight, type Scene, type Vector3 } from 'three';
+import { PointLight, type Scene, type Vector3 } from 'three';
 
 /** One floodlight or lamp: position (world, m), colour, intensity (candela) and reach (m). */
 export interface LocalLight {
@@ -22,8 +22,10 @@ export class LightPool {
   private readonly slots: PointLight[] = [];
   private lights: readonly LocalLight[] = [];
   private readonly order: number[] = [];
+  private scores: Float64Array = new Float64Array(1);
 
   constructor(scene: Scene, count: number) {
+    this.scores = new Float64Array(count + 1);
     for (let i = 0; i < count; i++) {
       const l = new PointLight(0xffffff, 0, 1, 2);
       l.castShadow = false;
@@ -36,52 +38,60 @@ export class LightPool {
     this.lights = lights;
   }
 
-  /** Pick the `count` most relevant lights for `eye` (index order, for tests). */
+  /**
+   * Indices of the `count` most relevant lights for `eye` (nearest by distance over reach), best
+   * first, written into `out`; also returns the score of the best light left out (Infinity when
+   * all fit), which sets the fade horizon. Partial insertion selection into `out`: no sorting and
+   * no allocation, however many lights a circuit has.
+   */
   static pick(
     lights: readonly LocalLight[],
     eye: { x: number; y: number; z: number },
     count: number,
     out: number[],
-  ): number[] {
-    out.length = 0;
-    const score = (l: LocalLight): number =>
-      Math.hypot(l.x - eye.x, l.y - eye.y, l.z - eye.z) / Math.max(1, l.distance);
-    const idx = lights.map((_, i) => i);
-    idx.sort((a, b) => score(lights[a] as LocalLight) - score(lights[b] as LocalLight));
-    for (let i = 0; i < Math.min(count, idx.length); i++) out.push(idx[i] as number);
-    return out;
+    scores: Float64Array = new Float64Array(count + 1),
+  ): number {
+    let n = 0;
+    const keep = Math.min(count + 1, scores.length);
+    const idx = out;
+    idx.length = 0;
+    for (let i = 0; i < lights.length; i++) {
+      const l = lights[i] as LocalLight;
+      const s = Math.hypot(l.x - eye.x, l.y - eye.y, l.z - eye.z) / Math.max(1, l.distance);
+      if (n === keep && s >= (scores[n - 1] as number)) continue;
+      let j = n < keep ? n++ : n - 1;
+      while (j > 0 && (scores[j - 1] as number) > s) {
+        scores[j] = scores[j - 1] as number;
+        idx[j] = idx[j - 1] as number;
+        j--;
+      }
+      scores[j] = s;
+      idx[j] = i;
+    }
+    const edge = n > count ? (scores[count] as number) : Infinity;
+    idx.length = Math.min(n, count);
+    return edge;
   }
 
   update(eye: Vector3): void {
-    const picked = LightPool.pick(this.lights, eye, this.slots.length, this.order);
-    // The last slot's score sets the fade horizon for every assigned light.
-    let edge = Infinity;
-    if (this.lights.length > this.slots.length) {
-      const next = this.lights
-        .slice()
-        .sort(
-          (a, b) =>
-            Math.hypot(a.x - eye.x, a.z - eye.z) / a.distance -
-            Math.hypot(b.x - eye.x, b.z - eye.z) / b.distance,
-        )[this.slots.length];
-      if (next) edge = Math.hypot(next.x - eye.x, next.z - eye.z) / next.distance;
-    }
-    const c = new Color();
-    this.slots.forEach((slot, i) => {
+    const edge = LightPool.pick(this.lights, eye, this.slots.length, this.order, this.scores);
+    const picked = this.order;
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i] as PointLight;
       const k = picked[i];
       const l = k === undefined ? undefined : this.lights[k];
       if (!l) {
         slot.intensity = 0;
-        return;
+        continue;
       }
-      const s = Math.hypot(l.x - eye.x, l.z - eye.z) / l.distance;
+      const s = Math.hypot(l.x - eye.x, l.y - eye.y, l.z - eye.z) / Math.max(1, l.distance);
       const fade =
         edge === Infinity ? 1 : Math.min(1, Math.max(0, (edge - s) / Math.max(0.05, edge * 0.25)));
       slot.position.set(l.x, l.y, l.z);
-      slot.color.copy(c.set(l.colour));
+      slot.color.set(l.colour);
       slot.intensity = l.intensity * fade;
       slot.distance = l.distance;
-    });
+    }
   }
 
   dispose(): void {
