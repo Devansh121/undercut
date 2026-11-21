@@ -40,7 +40,7 @@ or 240 s after the flag.
 | A new excursion counts after | 0.5 s back inside the line | Estimate |
 | Race strikes | 1–3 warnings (the 3rd with the black and white flag), 4th a time penalty; repeats (7th black and white, 8th penalty, ...) | Common race-director practice [8]; the exact count is an estimate |
 | Track-limits penalty | 5 s | Common race-director practice [8]; estimate |
-| Place gained off track | give it back within 15 s, or a 5 s penalty; a place counts as gained off track while off and for 2 s after rejoining; a place still owed at the flag is penalised there, before the classification | Estimate (simple rule; lasting time gained without a place is covered by lap invalidation and strikes) |
+| Place gained off track | give it back within 15 s, or a 5 s penalty; a place counts as gained off track while off and for 2 s after rejoining; a place still owed at the flag is penalised there, before the classification (both cars compared where they were at the moment it crossed the line, interpolated inside the tick) | Estimate (simple rule; lasting time gained without a place is covered by lap invalidation and strikes) |
 | Marshalling sectors for local yellows | lap cut into sectors of about 300 m from the timing line (Monza: 19) | Estimate |
 | Yellow: cause | a car on or near the track (within 25 m of the centreline, not in the pit lane) slower than 8 m/s for 1 s, from 4 s after the green | Estimate |
 | Yellow: shown in | the car's sector and the one before it, until 3 s after the cause has gone | Estimate |
@@ -60,6 +60,7 @@ or 240 s after the flag.
 | Release | waits while a moving car in the lane is between 20 m behind and 5 m ahead of the box | Estimate (unsafe-release avoidance) |
 | Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish. A penalty awarded during a hold is not part of it: it stays outstanding for the next stop or the finish | [2]; the in-hold case is a decision |
 | Classified | 90 % of the winner's laps, whether or not the car took the flag | [2] |
+| Exact ties in the final classification | the order the cars took the flag (by time, then position before the tick), then the live order; never the car number | Decision |
 | Two-compound rule | on by default at full race distance; a finisher on one compound is disqualified | [2]; the sanction is the conservative reading |
 | Points | 25, 18, 15, 12, 10, 8, 6, 4, 2, 1; no fastest-lap point | Published scale since 2010; fastest-lap point dropped for 2025 (not re-checked against [2] here) |
 | Fuel in every session | 10 kg (time trial 20 kg), topped up at each timing line | Decision for this slice: fuel arrives in M4 |
