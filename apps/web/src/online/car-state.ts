@@ -30,7 +30,7 @@ export interface LocalCar {
   throttle: number;
   brake: number;
   /** Wheel spin rates, rad/s, FL, FR, RL, RR. */
-  wheelSpin: readonly [number, number, number, number] | readonly number[];
+  wheelSpin: ArrayLike<number>;
   drs: boolean;
   /** Race laps completed and distance from the timing line, m. */
   lap: number;

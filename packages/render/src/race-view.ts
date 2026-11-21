@@ -180,6 +180,8 @@ export class RaceView {
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
   private readonly fleet: CarFleet;
+  /** Team and number of each remote car in the fleet, in fleet order. */
+  private remoteKeys: string[] = [];
   private readonly contact: ContactShadows | null;
   private readonly pipeline: RenderPipeline;
   private readonly assets: SessionAssets;
@@ -433,6 +435,7 @@ export class RaceView {
    */
   setGridCars(count: number, playerPose: CarPose): void {
     this.fleet.clear();
+    this.remoteKeys = [];
     if (count <= 0 || this.fleetLiveries.length === 0) return;
     const slots = this.track.gridSlots;
     let skip = -1;
@@ -466,6 +469,25 @@ export class RaceView {
       placed++;
     }
     this.environment.register(this.fleet.group);
+  }
+
+  /**
+   * Other players' cars, drawn in the fleet: their poses this frame and opacity (1 opaque, fading
+   * to 0). The fleet is rebuilt only when the set of cars or their liveries changes; otherwise
+   * this just moves them. Replaces any grid or static cars.
+   */
+  setRemoteCars(cars: readonly { livery: CarLivery; pose: CarPose; opacity: number }[]): void {
+    const keys = cars.map((c) => `${c.livery.team}:${c.livery.number}`);
+    if (keys.length !== this.remoteKeys.length || keys.some((k, i) => k !== this.remoteKeys[i])) {
+      this.fleet.clear();
+      for (const c of cars) this.fleet.add(c.livery, c.pose);
+      this.remoteKeys = keys;
+      if (cars.length > 0) this.environment.register(this.fleet.group);
+    }
+    cars.forEach((c, i) => {
+      this.fleet.setPose(i, c.pose);
+      this.fleet.setOpacity(i, c.opacity);
+    });
   }
 
   /** Place one static car anywhere (stations: pit lane close-up). */
@@ -608,7 +630,7 @@ export class RaceView {
       c.add(frame.pose.x, groundUnder(frame.pose), frame.pose.z, frame.pose.yaw);
       for (let i = 0; i < this.fleet.size; i++) {
         const p = this.fleet.poseAt(i);
-        if (p) c.add(p.x, groundUnder(p), p.z, p.yaw);
+        if (p && this.fleet.opacityAt(i) >= 0.5) c.add(p.x, groundUnder(p), p.z, p.yaw);
       }
       c.end();
     }

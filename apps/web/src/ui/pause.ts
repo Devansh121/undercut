@@ -23,9 +23,12 @@ export interface PauseSlider {
 
 export interface PauseActions {
   resume(): void;
-  restartLap(): void;
+  /** Absent: no restart (an online race cannot restart one car's lap). */
+  restartLap?: () => void;
   resetToTrack(): void;
   quit(): void;
+  /** Label of the quit button; default "Quit to launch". */
+  quitLabel?: string;
 }
 
 /**
@@ -87,7 +90,7 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     action('Resume', 'play', actions.resume, 'resume', true);
-    action('Restart lap', 'restart', actions.restartLap, 'restart');
+    if (actions.restartLap) action('Restart lap', 'restart', actions.restartLap, 'restart');
     action('Reset to track', 'reset', actions.resetToTrack, 'reset');
 
     const grid = el('div', 'pause__settings');
@@ -145,7 +148,7 @@ export class PauseMenu {
     const quit = el('button', 'pause__quit');
     quit.type = 'button';
     quit.dataset.action = 'quit';
-    quit.append(icon('exit'), el('span', '', 'Quit to launch'));
+    quit.append(icon('exit'), el('span', '', actions.quitLabel ?? 'Quit to launch'));
     quit.addEventListener('click', actions.quit);
     this.focusables.push(quit);
 
