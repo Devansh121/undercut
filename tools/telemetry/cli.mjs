@@ -3,6 +3,7 @@
 // tolerance, and writes traces (CSV) and a summary (JSON) to artifacts/telemetry/.
 // The manoeuvres live in packages/sim/validation/lib, shared with the physics suite; this file
 // loads that TypeScript through Vite's module runner, then only does I/O and timing.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -156,6 +157,147 @@ async function lap(options) {
   console.log(`wrote ${summary.traces.length + 1} file(s) to ${path.relative(root, outDir)}/`);
 }
 
+async function loadRaceLib() {
+  const { module } = await runnerImport(path.join(root, 'packages/race/validation/lib/index.ts'), {
+    root,
+    configFile: false,
+    logLevel: 'error',
+  });
+  return module;
+}
+
+const fmtTime = (t) => {
+  const m = Math.floor(t / 60);
+  const s = t - m * 60;
+  return `${m}:${s.toFixed(3).padStart(6, '0')}`;
+};
+
+/** The event log for the console: everything but positions, sectors and speed traps (counted). */
+function printEvents(run, codes) {
+  const quiet = new Set(['position', 'sector', 'speedTrap', 'lap', 'lapStart', 'drsEligible']);
+  const counts = {};
+  for (const e of run.events) {
+    counts[e.type] = (counts[e.type] ?? 0) + 1;
+    if (quiet.has(e.type)) continue;
+    const who = e.car !== undefined ? ` ${codes[e.car]}` : '';
+    const rest = Object.entries(e)
+      .filter(([k]) => !['type', 't', 'car'].includes(k))
+      .map(([k, v]) => `${k}=${typeof v === 'number' ? Number(v.toFixed(3)) : JSON.stringify(v)}`)
+      .join(' ');
+    console.log(`  ${fmtTime(e.t)}  ${e.type}${who}${rest ? ` ${rest}` : ''}`);
+  }
+  console.log(
+    `  counts: ${Object.entries(counts)
+      .map(([k, v]) => `${k} ${v}`)
+      .join(', ')}`,
+  );
+}
+
+function printRun(lib, run) {
+  const codes = run.result.entries
+    .slice()
+    .sort((a, b) => a.car - b.car)
+    .map((e) => e.code);
+  console.log(lib.formatResult(run));
+  console.log('\nEvent log:');
+  printEvents(run, codes);
+  console.log(
+    '\nPer car (lap-1 position, slowest point after the start outside the pit lane, track limits):',
+  );
+  for (const c of run.cars) {
+    console.log(
+      `  ${c.code}  after lap 1 P${c.positionAfterLap1 ?? '-'}  min ${c.minSpeedKmh.toFixed(0)} km/h at s=${c.minSpeedAt.toFixed(0)}  ` +
+        `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m`,
+    );
+  }
+  const a = run.result.anomalies;
+  console.log(
+    `\nWatchdog: ${a.length === 0 ? 'no stuck cars, no anomalies' : `${a.length} anomalies`}`,
+  );
+  for (const x of a) {
+    console.log(
+      `  ${codes[x.car]} ${x.kind} from ${fmtTime(x.start)} to ${x.end === null ? 'the end' : fmtTime(x.end)}`,
+    );
+  }
+  if (run.result.kind === 'race') {
+    const o = run.overlaps;
+    console.log(
+      `First lap (cars are ghosts to each other): ${o.pairs} car pairs overlapped (${o.pairsInFirstCorner} in the first corner), ` +
+        `at most ${o.peak} at once near s=${o.peakAtS.toFixed(0)}; last car crossed the line ${run.firstLap ? run.firstLap.spread.toFixed(3) : '-'} s after the leader.`,
+    );
+  }
+}
+
+function digest(run) {
+  return createHash('sha256')
+    .update(JSON.stringify({ result: run.result, events: run.events }))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+// N AI cars race at Monza; classification, event log, anomalies; JSON to artifacts/telemetry/.
+async function race(options, weekend = false) {
+  const lib = await loadRaceLib();
+  const circuit = options.circuit ?? 'monza';
+  if (circuit !== 'monza') throw new Error(`only monza has a racing line so far, not ${circuit}`);
+  const o = {
+    cars: Number(options.cars ?? 20),
+    laps: Number(options.laps ?? 5),
+    seed: Number(options.seed ?? 1),
+    clock: () => performance.now(),
+  };
+  if (options.spread !== undefined) o.spread = Number(options.spread);
+  if (options['no-pit'] !== undefined) o.pitLap = null;
+  fs.mkdirSync(outDir, { recursive: true });
+  const runs = [];
+  if (weekend) {
+    if (options.practice !== undefined) o.practice = Number(options.practice);
+    o.qualifying = Number(options.qualifying ?? 600);
+    const out = lib.runWeekend(o);
+    runs.push(...out.runs);
+    console.log(
+      `Grid from qualifying: ${out.weekend
+        .grid()
+        .map((i) => `D${String(i + 1).padStart(2, '0')}`)
+        .join(' ')}\n`,
+    );
+  } else {
+    runs.push(lib.runRace(o));
+  }
+  const files = [];
+  for (const run of runs) {
+    printRun(lib, run);
+    const hash = digest(run);
+    console.log(
+      `\n${run.simTime.toFixed(1)} s simulated in ${run.wallSeconds.toFixed(1)} s (${(run.simTime / run.wallSeconds).toFixed(1)}× real time); result digest ${hash}\n`,
+    );
+    const file = path.join(
+      outDir,
+      `${run.result.kind}-${circuit}-c${o.cars}-l${o.laps}-s${o.seed}.json`,
+    );
+    const { clock: _c, ...args } = o;
+    fs.writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          args,
+          digest: hash,
+          result: run.result,
+          cars: run.cars,
+          overlaps: run.overlaps,
+          firstLap: run.firstLap,
+          simTime: run.simTime,
+          events: run.events,
+        },
+        null,
+        1,
+      ) + '\n',
+    );
+    files.push(path.relative(root, file));
+  }
+  console.log(`wrote ${files.join(', ')}`);
+}
+
 const { name, options } = parseArgs(process.argv.slice(2));
 if (name === 'calibrate') {
   const { calibrate } = await import('./calibrate.mjs');
@@ -164,6 +306,10 @@ if (name === 'calibrate') {
 }
 if (name === 'lap') {
   await lap(options);
+  process.exit(0);
+}
+if (name === 'race' || name === 'weekend') {
+  await race(options, name === 'weekend');
   process.exit(0);
 }
 const lib = await loadLib();
@@ -177,6 +323,12 @@ if (name === 'list' || options.help) {
   );
   console.log(
     `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
+  );
+  console.log(
+    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --no-pit)`,
+  );
+  console.log(
+    `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,
   );
   console.log(
     `  ${'calibrate'.padEnd(15)} every target, the Monza lap and corner speeds for a candidate car (--set file.json, --line rebuild)`,

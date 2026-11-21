@@ -1,0 +1,20 @@
+{
+  "name": "@undercut/race",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Race rules: sessions, start, timing, flags, track limits, penalties, DRS and ERS rules, pit stops, results. Pure: no DOM, no renderer, no wall clock.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@undercut/ai": "0.0.0",
+    "@undercut/core": "0.0.0",
+    "@undercut/sim": "0.0.0",
+    "@undercut/track": "0.0.0"
+  }
+}

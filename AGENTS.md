@@ -8,7 +8,7 @@ Read this before changing anything. It is short on purpose; keep it that way.
 - **World frame.** three.js native, right-handed: +Y up, +X east, +Z south.
 - **Car body frame.** +X forward, +Y up, +Z right. Yaw is about +Y; positive yaw turns left.
 - **Track coordinates `(s, d)`.** `s` is metres along the centreline from the start/finish line; `d` is lateral offset in metres, positive to the left of the direction of travel.
-- **The sim is pure.** `packages/sim` (and core, track, ai, protocol) has no DOM, no three.js, no `Date.now()`, `performance.now()` or `Math.random()`. Time and a seeded `Rng` are passed in. ESLint enforces this.
+- **The sim is pure.** `packages/sim` (and core, track, ai, race, protocol) has no DOM, no three.js, no `Date.now()`, `performance.now()` or `Math.random()`. Time and a seeded `Rng` are passed in. ESLint enforces this.
 - **Fixed timestep.** The sim steps at a fixed `dt` through `FixedStepAccumulator`; rendering interpolates between the last two sim states with `alpha`. Elapsed time is clamped after a stall (default 0.25 s).
 - **The game name** lives in one constant, `GAME_NAME` in `packages/core/src/name.ts`. Nothing else spells it in code or UI; `npm run lint` checks this.
 - **No hard-coded hosts.** Nothing in the client says `localhost` or `127.0.0.1`. The rooms URL is a setting (`apps/web/src/settings.ts`) that defaults to same-origin `/rooms`.
@@ -20,11 +20,11 @@ Read this before changing anything. It is short on purpose; keep it that way.
 Lower layers may not import higher ones, and siblings in a layer do not import each other (except ai may read track):
 
 ```
-core → sim → track, ai → protocol → input, audio, render → apps/web
+core → sim → track, ai → race → protocol → input, audio, render → apps/web
 services/rooms depends on core and protocol only
 ```
 
-Only `render` and `apps/web` may import three.js. `eslint.config.js` encodes this; change both together, with an ADR.
+Only `render` and `apps/web` may import three.js. `eslint.config.js` encodes this; change both together, with an ADR (race joined in ADR 0008).
 
 ## Testing
 

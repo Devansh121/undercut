@@ -1,10 +1,10 @@
 import { createCarParams, createCarState } from '@undercut/sim';
-import { LEFT, RIGHT, TrackSurface, createVec3 } from '@undercut/track';
+import { LEFT, RIGHT, Track, TrackSurface, createVec3 } from '@undercut/track';
+import monza from '@undercut/track/data/monza.json';
 import { describe, expect, it } from 'vitest';
-import { TrackLimits } from '../src/game/limits';
-import { loadMonza } from './fixtures';
+import { TrackLimits } from '../src/limits-geometry';
 
-const track = loadMonza();
+const track = Track.fromJSON(monza);
 const surface = new TrackSurface(track);
 const params = createCarParams('low');
 
