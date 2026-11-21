@@ -10,6 +10,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M6 Cloudflare deploy: top-level `wrangler.jsonc` composes the built client (staged into `dist/cloudflare` with `tools/deploy/_headers`) and the `/rooms` Durable Objects API on one origin, with `npm run deploy`, `npm run deploy:check` (`wrangler deploy --dry-run` assertions in the `build` CI job), composed-Worker runtime tests (`npm run test:deploy`), SQLite-persisted creation rate limits, a global creation cap, same-origin enforcement and a 4-hour room lifetime cap. Local `./start.sh` and `services/rooms/wrangler.jsonc` are unchanged. See `docs/DEPLOY.md`.
 - M3 race core: a pure `packages/race` runs the race rules for every session type (time trial, practice, qualifying, race, race weekend, championship): five-light start with a seeded hold and jump starts, timing from the circuit's control line with mini-sector gaps, track limits with strikes and penalties, yellow, blue, chequered and black-and-white flags, race DRS, ERS laps, pit stops with the limiter, boxes, service time and penalties served, results and points, JSON snapshots, and a stuck-car watchdog. AI cars launch, race (as ghosts to each other: no contact yet), make their pit stops and finish. Rules and values: `docs/race-rules.md`.
 - Headless races: `npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1` (and `weekend`) prints the classification, the event log and the watchdog's findings and writes JSON to `artifacts/telemetry/`. Twenty cars run about 22× faster than real time.
 - Time trial now runs on the race engine. Laps are timed from Monza's control line (320.5 m before the start line), so the rolling start sits 160 m before it. Records kept before this change were timed from the start line and are dropped once.
@@ -134,11 +135,11 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Online rooms: a host whose own car has finished or retired is still watched while its AI race, and only snapshots count as signs of life (a hidden tab keeps pinging but stops driving).
 - Online rooms: at most 32 sockets per room, 16 not yet joined, 4 not yet joined per address, admitted at 5 per second after a burst of 30; refused upgrades get HTTP 429.
 - Car snapshots: the top two bits of the flags byte carry a teleport counter (the unused `finished` flag was dropped to make room), so the record stays 56 bytes.
+- Cloudflare deploy (M6): top-level `wrangler.jsonc` composes the rooms Worker with Workers Static Assets staged in `dist/cloudflare` rather than modifying `services/rooms/wrangler.jsonc` or `apps/web/dist`, keeping `./start.sh`, `tools/budget/check.mjs` and `npm run test:rooms` untouched. Precompressed `.br`/`.gz`, `.map` and `first-race.json` are excluded from `dist/cloudflare` because Cloudflare compresses at the edge. `not_found_handling` is `"none"` (no path-based SPA routes) and `run_worker_first` covers `/rooms` and `/rooms/*`. Production defaults cap room creation at 10 per 10 min per `CF-Connecting-IP` (persisted in SQLite), 60 per hour globally, same-origin browser requests only, and 4 hours maximum room lifetime.
 
 ## Optional, needs you
 
-- A Cloudflare account to deploy the rooms Worker, and a static host for the client. Neither blocks a milestone; everything runs locally.
-  Deploying the rooms service would take: a Cloudflare account on the Workers plan that includes Durable Objects with SQLite storage; `npx wrangler login`, then `npx wrangler deploy --config services/rooms/wrangler.jsonc` (the migrations `v1` and `v2` create the `Room` and `CreateLimiter` classes); optionally a route so the Worker answers `/rooms/*` on the game's own domain. If the client is served from a different origin, set the rooms URL setting (`settings.roomsUrl`, or `VITE_ROOMS_URL` at build time) to `https://<worker host>/rooms`. Nothing has been deployed.
+- First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
 
 ### Decided for you — modular prop kit
 
