@@ -127,6 +127,26 @@ describe('GameLoop and DriveSession', () => {
     expect(session.world.tick).toBe(Math.floor(0.25 / STEP + 1e-9));
   });
 
+  it('reports the hardest barrier impact of any step in the frame, not only the last', () => {
+    // The sim resets the impact speed every step; a 60 Hz frame runs four 240 Hz steps.
+    const { loop, session } = setup();
+    const perStep = [0, 7, 0, 0];
+    const tick = session.tick.bind(session);
+    let k = 0;
+    session.tick = (control, device) => {
+      const events = tick(control, device);
+      session.car.state.wallImpactSpeed = perStep[k++ % perStep.length] as number;
+      return events;
+    };
+    const r = loop.frame(1 / 60);
+    expect(r.steps).toBe(4);
+    expect(session.car.state.wallImpactSpeed).toBe(0);
+    expect(r.wallImpact).toBe(7);
+    expect(loop.frame(1 / 60).wallImpact).toBe(7);
+    perStep.fill(0);
+    expect(loop.frame(1 / 60).wallImpact).toBe(0);
+  });
+
   it('scales time for tests and tools', () => {
     const { loop, session } = setup();
     loop.timeScale = 4;
@@ -200,6 +220,42 @@ describe('GameLoop and DriveSession', () => {
     const events = loop.resetToTrack();
     expect(session.timer.valid).toBe(false);
     expect(events.some((e) => e.type === 'invalidated')).toBe(true);
+  });
+
+  it('never needs the safety net in normal driving', () => {
+    const { loop, driver, session } = setup();
+    driver.control.throttle = 1;
+    run(loop, 6);
+    driver.control.steer = 0.4;
+    run(loop, 6);
+    expect(session.safetyResets).toBe(0);
+  });
+
+  it('puts a car with a broken pose back on the track, invalidates the lap and counts it', () => {
+    const { loop, driver, session } = setup();
+    driver.control.throttle = 1;
+    // Just before the timing line, so a lap is running and valid with the wheel held straight.
+    session.teleport(TIMING_LINE - 20, 0, 60);
+    run(loop, 1);
+    expect(session.timer.valid).toBe(true);
+    const s = session.s;
+    // Whatever produced it, a pose outside the invariants must never reach the player.
+    session.car.state.pitch = 1.5;
+    session.car.state.heaveRate = 40;
+    const events = run(loop, 1 / 60);
+    expect(session.safetyResets).toBe(1);
+    expect(session.timer.valid).toBe(false);
+    expect(events).toContainEqual({ type: 'invalidated', reason: 'safety' });
+    expect(events).toContainEqual({ type: 'reset', reason: 'safety' });
+    expect(Math.abs(session.car.state.pitch)).toBeLessThan(0.1);
+    expect(Math.abs(session.d)).toBeLessThan(0.05);
+    expect(Math.abs(track.lapDelta(session.s, s))).toBeLessThan(5);
+    // A NaN state is caught too, and the car goes back to the last place it was sane.
+    session.car.state.x = Number.NaN;
+    run(loop, 1 / 60);
+    expect(session.safetyResets).toBe(2);
+    expect(Number.isFinite(session.s)).toBe(true);
+    expect(Math.abs(track.lapDelta(session.s, s))).toBeLessThan(5);
   });
 
   it('restart lap returns to the rolling start with timing cleared', () => {

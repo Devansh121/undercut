@@ -17,6 +17,7 @@ export default defineConfig({
             '**/node_modules/**',
             'packages/sim/validation/**',
             'packages/ai/validation/**',
+            'packages/track/validation/**',
             'packages/race/validation/**',
             '**/*.runtime.test.*',
           ],
@@ -32,6 +33,7 @@ export default defineConfig({
           include: [
             'packages/sim/validation/**/*.test.ts',
             'packages/ai/validation/**/*.test.ts',
+            'packages/track/validation/**/*.test.ts',
             'packages/race/validation/**/*.test.ts',
           ],
           exclude: ['**/node_modules/**', '**/*.soak.test.ts'],

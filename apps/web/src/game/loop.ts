@@ -26,6 +26,11 @@ export interface FrameResult {
   /** One-shot actions the loop did not handle itself (camera, menu navigation). */
   actions: string[];
   lookBack: boolean;
+  /**
+   * Hardest barrier impact of any step this frame, m/s (normal speed). The sim resets it every
+   * step, so reading telemetry once per frame would miss most impacts.
+   */
+  wallImpact: number;
 }
 
 /** Longest real frame time accepted before the sim stops catching up (a stall). */
@@ -123,7 +128,13 @@ export class GameLoop {
   }
 
   frame(elapsed: number): FrameResult {
-    const result: FrameResult = { steps: 0, events: [], actions: [], lookBack: this.lookBackValue };
+    const result: FrameResult = {
+      steps: 0,
+      events: [],
+      actions: [],
+      lookBack: this.lookBackValue,
+      wallImpact: 0,
+    };
     if (this.session.phase !== 'running') return result;
     const real = Number.isFinite(elapsed) && elapsed > 0 ? Math.min(elapsed, STALL_CLAMP) : 0;
     const steps = this.clock.advance(real * this.scale);
@@ -142,6 +153,8 @@ export class GameLoop {
       }
       result.events.push(...session.tick(frame.control, frame.device));
       result.steps++;
+      const impact = session.car.state.wallImpactSpeed;
+      if (impact > result.wallImpact) result.wallImpact = impact;
       if (stop) {
         this.pause();
         break;
