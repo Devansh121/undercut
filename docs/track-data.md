@@ -273,7 +273,7 @@ Every per-circuit position in section 4 and physics-validation 4.6 was checked f
 | All sector lines, speed traps, other DRS points | before or after a numbered turn | the turn | none (two anchored on the corner's start, section 5.4) |
 | Pit-lane limit lines | not in the sources | authored, in the pit frame | none |
 
-The Monza correction changes the DRS zone the reference driver's speed profile uses, so the committed Monza racing-line artefact (`packages/ai/data/monza-low.line.json`) is stale against this track file until it is rebuilt with `npm run ai:build`.
+The Monza correction changes the DRS zone the reference driver's speed profile uses; the racing-line artefact was rebuilt with `npm run ai:build`, and the reference lap went from 85.539 s to 85.452 s (docs/physics-validation.md 7.6).
 
 ## 6. Sources
 

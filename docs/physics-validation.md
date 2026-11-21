@@ -337,7 +337,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.3 and 78.5 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.05 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference driver |
-| Monza reference lap 85.539 s against the M1 band 74.852–82.732 s (section 7.6) | 2.81 s outside M1, 4.38 s outside M4 | Not reachable inside the documented parameter ranges with this line: with μy and the low-trim ClA both at the top of their ranges (2.2 and 4.2) and the line rebuilt, the lap is 83.847 s. Section 7.6 measures what is left: the reference driver's planning margin and driving (1.76 s), and a line that keeps the whole car 0.3 m inside the white lines and off the kerbs. Letting the car's centre go to 0.76 m past the line, which the track-limit rule allows (no wheel needs to stay inside, only one), is worth 0.95 s in the plan, but the driven lap spins (next task) |
+| Monza reference lap 85.452 s against the M1 band 74.852–82.732 s (section 7.6) | 2.72 s outside M1, 4.30 s outside M4 | Not reachable inside the documented parameter ranges with this line: with μy and the low-trim ClA both at the top of their ranges (2.2 and 4.2) and the line rebuilt, the lap is 83.847 s. Section 7.6 measures what is left: the reference driver's planning margin and driving (1.76 s), and a line that keeps the whole car 0.3 m inside the white lines and off the kerbs. Letting the car's centre go to 0.76 m past the line, which the track-limit rule allows (no wheel needs to stay inside, only one), is worth 0.95 s in the plan, but the driven lap spins (next task) |
 | Kerb disturbance not understood (section 7.6) | The line keeps off the kerbs | Open question: the kerb profile rises 35 mm over 0.12 m across the kerb, with a 3–4 m taper along it, and the vertical tyre model applies its 7 kN·s/m damping directly to the point-sampled ground-height rate with no envelopment, so a wheel crossing that rise at 5 m/s laterally sees about 10 kN of damping force. That may exaggerate kerb strikes; it is not yet measured against anything |
 
 ## 6. Sources
@@ -439,7 +439,7 @@ selection check, or withheld validation.
 | Pouhon, medium trim, 281 km/h, Spa air (2.5) | 5.7 ± 0.7 | 4.14, gap | 4.59 | validation | gap |
 | Parabolica exit, low trim, 270 km/h, Monza air | 3.5–4.0 ± 0.6 | 3.62 | 4.08 | validation | pass |
 | Slow corner 85 km/h, low / medium / high trim | 2.0–2.3 ± 0.4 | 1.81 / 1.82 / 1.85 | 2.15 / 2.18 / 2.24 | fit / validation / validation | pass |
-| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.539 s | selection | gap |
+| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.452 s (85.539 s before the DRS zone 2 correction, 7.6) | selection | gap |
 | Monza speed trap on that lap, DRS open, no tow (2.2) | 348 ± 6 | 347.3 | 347.4 | validation | pass |
 
 Of the 32 component targets, 20 are in band and 12 are recorded gaps (section 5), against 17 and
@@ -697,6 +697,23 @@ so the track file's zone 2 activation (s = 12 m) is about 320 m later than allow
 DRS that much later on the main straight than a real car may. And the earlier version of this
 section, which timed from s = 0, had sector 1 faster than the pole lap's; that does not survive:
 timed from the control line every sector is slower.
+
+**DRS zone 2 corrected (M4).** The track file now carries the control line as `timingLine`
+(track format 3, docs/track-data.md 5.4), and DRS zone 2 opens 12 m after it, at s = 5484.5 m,
+instead of at s = 12 m. The racing line and speed profile were rebuilt (`npm run ai:build`) and
+the lap measured again with `npm run telemetry -- lap`; nothing else changed:
+
+| Quantity | Before (activation s = 12 m) | After (activation s = 5484.5 m) |
+|---|---|---|
+| Lap | 85.539 s | **85.452 s** (−0.087 s); M1 band: outside by 2.720 s; M4 band: outside by 4.296 s |
+| Plan (speed profile on the line) | 84.764 s | 84.675 s |
+| S1 / S2 / S3 | 27.981 / 29.123 / 28.435 s | 27.892 / 29.124 / 28.436 s |
+| Refined line (`ai:build`) | — | minimum curvature 85.053 s, refined 84.670 s |
+| Speed trap / control line | 347.4 / 312.3 km/h | 349.0 / 312.3 km/h |
+| Track limits, stability, ERS | at most two wheel centres past a line, sideslip ≤ 5.1°, 3.22 / 1.35 MJ | unchanged |
+
+The gain is all in S1: the car now has DRS from the control line to turn 1. The tables above and
+below keep the values measured before the correction.
 
 | Sector (from the control line) | Before | After | After, speed profile | Pole lap 2025 | Session best | After − pole |
 |---|---|---|---|---|---|---|
