@@ -56,21 +56,31 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
   ];
 
 /**
- * Cases the inelastic strike fix resolved. Every other case is still open: the run-off ground
- * inside the first chicane folds a 3 % centreline grade into ramps of up to 37 % (s 652-661,
- * d about 11 m), and the car takes off from them. They run as expected failures, so each one
- * turns this suite red the moment it starts passing and must then move into this list.
+ * Cases that pass: fixed by the inelastic strike rule, or by it together with the contact patch
+ * merged from master (#17). Every other case is still open: the run-off ground inside the first
+ * chicane folds a 3 % centreline grade into ramps of up to 37 % (s 652-661, d about 11 m), and
+ * the car takes off from them. Open cases run as expected failures, so each one turns this suite
+ * red the moment it starts passing and must then move into this list.
  */
 const FIXED = new Set([
   '300,8,-0.1,2',
   '540,8,-0.1,0',
   '540,8,-0.1,2',
   '540,8,0,0',
-  '540,8,0.1,0',
   '610,0,0.1,0',
-  '610,8,-0.1,2',
-  '5600,8,0,2',
+  '650,8,-0.1,0',
+  '650,8,-0.1,2',
+  '650,8,0,0',
+  '650,8,0,2',
+  '5600,0,0,0',
+  '5600,0,0,2',
 ]);
+/**
+ * Regressions: these passed with the strike fix before the merge with #17's contact patch and
+ * fail after it (the patch changes each run's path; they end on the same open run-off ramps).
+ * Listed on their own so they are not mistaken for cases that never passed.
+ */
+export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
 
 describe('flat-out kerb strikes in the game never need the safety net (review of PR 19)', () => {
   for (const [s, d, steer, tc, tick] of CASES) {

@@ -99,7 +99,7 @@ export function stepCar(
     for (let i = 0; i < 4; i++) {
       patchHeight[i] = patchStart[i]! + (patchEnd[i]! - patchStart[i]!) * f;
     }
-    substep(state, input, surface, h, env);
+    substep(state, input, surface, h, n, env);
   }
 }
 
@@ -218,6 +218,7 @@ function substep(
   input: ControlInput,
   surface: SurfaceSampler,
   h: number,
+  substeps: number,
   env: Environment,
 ): void {
   const model = s.model;
@@ -269,7 +270,7 @@ function substep(
   const gravY = gNormal * (-nx * sn - nz * c);
 
   // ---- Ground steps: lift the car out of ground it cannot have rolled onto. ----
-  liftOutOfGround(s, h, mass.sprungA, mass.sprungB);
+  liftOutOfGround(s, h, substeps, mass.sprungA, mass.sprungB);
 
   // ---- Vertical: tyres, springs, anti-roll bars, dampers. ----
   const kt = tyre.verticalStiffness;
@@ -604,7 +605,13 @@ function wallContact(
  *   or a floor skid past its saturation depth): the car moves up until it is back at that depth
  *   and its downward velocity is removed, as in an inelastic rim or floor strike.
  */
-function liftOutOfGround(s: CarState, h: number, sprungA: number, sprungB: number): void {
+function liftOutOfGround(
+  s: CarState,
+  h: number,
+  substeps: number,
+  sprungA: number,
+  sprungB: number,
+): void {
   const p = s.model.params;
   const R = p.tyre.freeRadius;
   // A step's size is the extra tyre compression it causes: for a wheel already in the air,
@@ -617,7 +624,9 @@ function liftOutOfGround(s: CarState, h: number, sprungA: number, sprungB: numbe
   }
   for (let pass = 0; pass < 4; pass++) {
     let k = -1;
-    let most = GROUND_STEP_RISE;
+    // The contact patch is sampled once per step and its height spread evenly over the
+    // substeps, so a step's rise arrives in `substeps` equal shares: compare each share.
+    let most = GROUND_STEP_RISE / substeps;
     for (let i = 0; i < 4; i++) {
       const left = stepRise[i]! - stepLift[i]!;
       if (left > most) {
