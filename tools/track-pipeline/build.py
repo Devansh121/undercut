@@ -27,9 +27,9 @@ sys.path.insert(0, HERE)
 from lib import authored, centreline, corners, elevation, geo, geom, inputs, osmfeatures  # noqa: E402
 from lib.writer import dumps  # noqa: E402
 
-PIPELINE_VERSION = "1.0.0"
+PIPELINE_VERSION = "1.1.0"
 FORMAT = "undercut-track"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 OSM_ATTRIBUTION = (
     "© OpenStreetMap contributors. Data available under the Open Database License 1.0, "
@@ -386,7 +386,9 @@ def main(argv):
             "halfWidthRight": [w[1] for w in widths],
         },
         "lineWidth": cfg["runoff"]["lineWidth"],
-        "kerbProfiles": [{"name": p["name"], "points": p["points"], "high": p["high"]} for p in cfg["kerbProfiles"]],
+        "kerbProfiles": [
+            {"name": p["name"], "points": p["points"], "high": p["high"], "taper": p["taper"]} for p in cfg["kerbProfiles"]
+        ],
         "sides": sides,
         "corners": [
             {"number": num, "name": c["name"], "direction": c["direction"], "s": c["apex_s"], "start": c["first_s"], "end": c["last_s"]}

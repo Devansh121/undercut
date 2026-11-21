@@ -12,7 +12,7 @@ import { detectCorners } from '../src/corners';
 import { validateTrackData } from '../src/data';
 import { createPathPoint, createVec3 } from '../src/path';
 import { TrackSurface } from '../src/surface';
-import { LEFT, RIGHT, Track, VERGE_FALL } from '../src/track';
+import { LEFT, RIGHT, Track, VERGE_FALL, createGround } from '../src/track';
 import { steepestKerbSlope } from '../test/fixtures';
 
 const data = validateTrackData(raw);
@@ -324,6 +324,76 @@ describe('Monza: barriers and surfaces', () => {
     }
     expect(worst, where).toBeLessThan(bound);
     for (const k of Object.values(SurfaceKind)) expect(kinds.has(k)).toBe(true);
+  });
+});
+
+describe('Monza: ground continuity along the lap', () => {
+  const g = createGround();
+  const heightAt = (s: number, d: number): number => track.ground(s, d, g).height;
+
+  it('has no step where the Vialone kerbs meet', () => {
+    // Regression: two probes 2 micrometres apart differed by 4.27 cm.
+    const s = 3805.656941;
+    expect(Math.abs(heightAt(s + 1e-6, -5.75) - heightAt(s - 1e-6, -5.75))).toBeLessThan(1e-6);
+  });
+
+  it('is continuous along s across every kerb start and end and every run-off kind change', () => {
+    // Steepest legitimate slope along s: grade and banking (under 0.05) plus a kerb taper
+    // (tallest kerb over the shortest taper). Allow that over one 1 mm probe step.
+    let tallest = 0;
+    let shortest = Infinity;
+    for (const kp of track.kerbProfiles) {
+      tallest = Math.max(tallest, ...kp.h);
+      shortest = Math.min(shortest, kp.taper);
+    }
+    expect(shortest).toBeGreaterThan(1);
+    const bound = (0.05 + tallest / shortest) * 0.001 + 1e-6;
+    const step = L / n;
+    const sweeps: { s: number; d: number[]; what: string }[] = [];
+    for (const k of [LEFT, RIGHT] as const) {
+      const sign = k === LEFT ? 1 : -1;
+      for (let i = 0; i < n; i++) {
+        const h = (i + n - 1) % n;
+        const s = (i - 0.5) * step;
+        const hw = track.halfWidth[k][i]!;
+        const kerb = track.kerb[k][i]! >= 0 ? i : track.kerb[k][h]! >= 0 ? h : -1;
+        if (track.kerb[k][i] !== track.kerb[k][h] && kerb >= 0) {
+          const kp = track.kerbProfiles[track.kerb[k][kerb]!]!;
+          sweeps.push({
+            s,
+            d: Array.from(kp.u, (u) => sign * (hw + Math.min(u + 0.01, kp.width - 0.01))),
+            what: 'kerb',
+          });
+        }
+        if (track.inner[k][i] !== track.inner[k][h])
+          sweeps.push({ s, d: [sign * (hw + 3)], what: 'inner kind' });
+        if (track.outer[k][i] !== track.outer[k][h]) {
+          sweeps.push({
+            s,
+            d: [(sign * (track.split[k][i]! + track.barrier[k][i]!)) / 2],
+            what: 'outer kind',
+          });
+        }
+      }
+    }
+    expect(sweeps.filter((w) => w.what === 'kerb').length).toBeGreaterThan(40);
+    let worst = 0;
+    let where = '';
+    for (const w of sweeps) {
+      for (const d of w.d) {
+        let last = heightAt(w.s - 6, d);
+        for (let s = w.s - 6 + 0.001; s <= w.s + 6; s += 0.001) {
+          const h = heightAt(s, d);
+          const jump = Math.abs(h - last);
+          if (jump > worst) {
+            worst = jump;
+            where = `${w.what} at s ${s.toFixed(3)} d ${d.toFixed(2)}`;
+          }
+          last = h;
+        }
+      }
+    }
+    expect(worst, where).toBeLessThan(bound);
   });
 });
 

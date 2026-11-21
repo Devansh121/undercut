@@ -9,7 +9,7 @@
  */
 
 export const TRACK_FORMAT = 'undercut-track';
-export const TRACK_FORMAT_VERSION = 1;
+export const TRACK_FORMAT_VERSION = 2;
 
 export type Side = 'left' | 'right';
 export type RunoffKind = 'asphalt' | 'grass' | 'gravel';
@@ -25,6 +25,8 @@ export interface KerbProfileData {
   points: readonly (readonly [number, number])[];
   /** Range of u that is a raised (sausage) kerb with lower grip, or null. */
   high: readonly [number, number] | null;
+  /** Length along s over which the profile rises from flat at each end of a kerb run. */
+  taper: number;
 }
 
 export interface SideData {
@@ -387,9 +389,10 @@ export function validateTrackData(raw: unknown): TrackData {
   } else {
     top.kerbProfiles.forEach((p: unknown, i) => {
       const path = `track.kerbProfiles[${i}]`;
-      const o = c.obj(p, path, ['name', 'points', 'high']);
+      const o = c.obj(p, path, ['name', 'points', 'high', 'taper']);
       if (!o) return;
       profileNames.push(c.str(o.name, `${path}.name`));
+      c.num(o.taper, `${path}.taper`, 0.5, 20);
       const pts = o.points;
       if (!Array.isArray(pts) || pts.length < 2) {
         c.fail(`${path}.points`, 'expected at least two [u, h] points');

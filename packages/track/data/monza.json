@@ -1,6 +1,6 @@
 {
   "format": "undercut-track",
-  "version": 1,
+  "version": 2,
   "id": "monza",
   "name": "Monza",
   "country": "Italy",
@@ -13,7 +13,7 @@
     "datum": 178
   },
   "source": {
-    "pipelineVersion": "1.0.0",
+    "pipelineVersion": "1.1.0",
     "scale": 0.999823527,
     "osmLength": 5797.92,
     "smoothedLength": 5794.02,
@@ -62,17 +62,20 @@
     {
       "name": "flat",
       "points": [[0,0],[0.12,0.035],[1.35,0.05],[1.5,0]],
-      "high": null
+      "high": null,
+      "taper": 3
     },
     {
       "name": "exit",
       "points": [[0,0],[0.1,0.02],[2.3,0.03],[2.5,0]],
-      "high": null
+      "high": null,
+      "taper": 3
     },
     {
       "name": "chicane",
       "points": [[0,0],[0.12,0.035],[1.4,0.05],[1.6,0.05],[1.75,0.13],[2.05,0.13],[2.2,0]],
-      "high": [1.6,2.2]
+      "high": [1.6,2.2],
+      "taper": 4
     }
   ],
   "sides": {

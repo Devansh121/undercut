@@ -244,29 +244,31 @@
   "kerbProfiles": [
     {
       "name": "flat",
-      "note": "Low painted kerb with a ramped inner edge.",
+      "note": "Low painted kerb with a ramped inner edge. Height ramps up from nothing over the taper at each end of a run (estimate).",
       "points": [
         [0, 0],
         [0.12, 0.035],
         [1.35, 0.05],
         [1.5, 0]
       ],
-      "high": null
+      "high": null,
+      "taper": 3.0
     },
     {
       "name": "exit",
-      "note": "Wide, very low exit kerb.",
+      "note": "Wide, very low exit kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
       "points": [
         [0, 0],
         [0.1, 0.02],
         [2.3, 0.03],
         [2.5, 0]
       ],
-      "high": null
+      "high": null,
+      "taper": 3.0
     },
     {
       "name": "chicane",
-      "note": "Flat kerb followed by a raised sausage kerb.",
+      "note": "Flat kerb followed by a raised sausage kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
       "points": [
         [0, 0],
         [0.12, 0.035],
@@ -276,7 +278,8 @@
         [2.05, 0.13],
         [2.2, 0]
       ],
-      "high": [1.6, 2.2]
+      "high": [1.6, 2.2],
+      "taper": 4.0
     }
   ],
   "kerbs": {

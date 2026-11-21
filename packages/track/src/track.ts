@@ -32,6 +32,8 @@ export interface KerbProfile {
   /** Raised (sausage) part of the profile, as a range of u; empty when from >= to. */
   readonly highFrom: number;
   readonly highTo: number;
+  /** Length along s over which the profile rises from flat at each end of a kerb run. */
+  readonly taper: number;
 }
 
 /** A position and heading on the ground. Yaw is about +Y; 0 faces +X, positive turns left. */
@@ -187,6 +189,13 @@ export class Track {
   /** Per side ([LEFT, RIGHT]) and sample. */
   readonly halfWidth: readonly [Float64Array, Float64Array];
   readonly kerb: readonly [Int16Array, Int16Array];
+  /**
+   * Per side and sample on a kerb, the lap s where its run starts and ends (sample edges, so a
+   * run of samples a..b spans [(a - 0.5) step, (b + 0.5) step)). The end may exceed the lap
+   * length when a run crosses the line; a kerb all the way round has an infinite span.
+   */
+  readonly kerbStart: readonly [Float64Array, Float64Array];
+  readonly kerbEnd: readonly [Float64Array, Float64Array];
   readonly inner: readonly [Uint8Array, Uint8Array];
   readonly outer: readonly [Uint8Array, Uint8Array];
   readonly split: readonly [Float64Array, Float64Array];
@@ -236,6 +245,7 @@ export class Track {
       width: p.points[p.points.length - 1]![0],
       u: Float64Array.from(p.points.map((q) => q[0])),
       h: Float64Array.from(p.points.map((q) => q[1])),
+      taper: p.taper,
       highFrom: p.high ? p.high[0] : 0,
       highTo: p.high ? p.high[1] : 0,
     }));
@@ -254,6 +264,33 @@ export class Track {
       unrun(sd.inner, n, (v) => RUNOFF_SURFACE[v], this.inner[k]);
       unrun(sd.outer, n, (v) => RUNOFF_SURFACE[v], this.outer[k]);
       unrun(sd.barrierType, n, (v) => BARRIER_TYPES.indexOf(v), this.barrierType[k]);
+    }
+    this.kerbStart = [new Float64Array(n), new Float64Array(n)];
+    this.kerbEnd = [new Float64Array(n), new Float64Array(n)];
+    for (const k of [LEFT, RIGHT] as const) {
+      const kb = this.kerb[k];
+      const step = data.length / n;
+      let first = -1;
+      for (let i = 0; i < n && first < 0; i++) if (kb[i] !== kb[(i + n - 1) % n]) first = i;
+      if (first < 0) {
+        this.kerbStart[k].fill(-Infinity);
+        this.kerbEnd[k].fill(Infinity);
+        continue;
+      }
+      // Walk the lap once from a run boundary, filling each run's span.
+      let m = 0;
+      while (m < n) {
+        const a = first + m;
+        let b = a;
+        while (b + 1 < first + n && kb[(b + 1) % n] === kb[a % n]) b++;
+        const s0 = (a - 0.5) * step;
+        const s1 = (b + 0.5) * step;
+        for (let j = a; j <= b; j++) {
+          this.kerbStart[k][j % n] = s0;
+          this.kerbEnd[k][j % n] = s1;
+        }
+        m += b - a + 1;
+      }
     }
     this.corners = data.corners;
     this.sectors = Float64Array.from(data.timing.sectors);
@@ -474,6 +511,7 @@ export class Track {
     const u = a - hw;
     let h = yc + sign * hw * tb - VERGE_FALL * u;
     let slope = -VERGE_FALL;
+    let kerbSlopeS = 0;
     const k = this.kerb[side][i]!;
     let kind: SurfaceKind;
     const kp = k >= 0 ? this.kerbProfiles[k] : undefined;
@@ -486,8 +524,22 @@ export class Track {
       const h0 = kp.h[m - 1]!;
       const h1 = kp.h[m]!;
       const ds = (h1 - h0) / (u1 - u0);
-      h += h0 + ds * (u - u0);
-      slope += ds;
+      // Taper: the profile rises from flat over `taper` metres at each end of the run.
+      const along = this.lap.wrap(s - this.kerbStart[side][i]!);
+      const left = this.kerbEnd[side][i]! - this.kerbStart[side][i]! - along;
+      let f = 1;
+      let df = 0;
+      if (along < kp.taper && along <= left) {
+        f = along / kp.taper;
+        df = 1 / kp.taper;
+      } else if (left < kp.taper) {
+        f = left / kp.taper;
+        df = -1 / kp.taper;
+      }
+      const ph = h0 + ds * (u - u0);
+      h += f * ph;
+      slope += f * ds;
+      kerbSlopeS = df * ph;
       kind = SurfaceKind.Kerb;
       out.highKerb = u >= kp.highFrom && u < kp.highTo;
     } else if (a < this.split[side][i]!) {
@@ -499,7 +551,7 @@ export class Track {
     }
     out.height = h;
     out.slopeD = sign * slope;
-    out.slopeS = grade + sign * hw * dtb;
+    out.slopeS = grade + sign * hw * dtb + kerbSlopeS;
     out.kind = kind;
     return out;
   }

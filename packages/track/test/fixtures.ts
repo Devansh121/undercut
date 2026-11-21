@@ -120,6 +120,7 @@ export function syntheticTrackData(options: SyntheticOptions = {}): TrackData {
           [1.5, 0],
         ],
         high: null,
+        taper: 3,
       },
       {
         name: 'sausage',
@@ -129,6 +130,7 @@ export function syntheticTrackData(options: SyntheticOptions = {}): TrackData {
           [0.4, 0],
         ],
         high: [0, 0.4],
+        taper: 2,
       },
     ],
     sides: {

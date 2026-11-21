@@ -14,7 +14,7 @@ describe('validateTrackData', () => {
   it('lists every problem it finds', () => {
     const bad = JSON.parse(JSON.stringify(syntheticTrackData())) as Record<string, unknown>;
     (bad.centreline as Record<string, number[]>).x!.pop();
-    (bad as { version: number }).version = 2;
+    (bad as { version: number }).version = 99;
     (bad as { extra?: number }).extra = 1;
     ((bad.sides as Record<string, Record<string, unknown>>).left!.inner as unknown[]) = [
       [3, 'grass'],
