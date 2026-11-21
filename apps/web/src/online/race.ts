@@ -173,6 +173,7 @@ export class OnlineRace implements DriveExtension {
       elapsed,
       ctx.loop.alpha * ctx.session.world.step,
       ctx.session.world.time,
+      this.released ? null : (this.client.room?.start?.lightsOutAt ?? null),
     );
   }
 

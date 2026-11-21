@@ -439,5 +439,7 @@ lights-out or releasing the earlier ticks prematurely. The debug report records 
 actual tick's sim time and mapped server/local epoch, rather than substituting the
 announced lights-out time. The two-client scheduling bound is one 240 Hz tick
 (4.167 ms) plus the sum of their clock-sync errors. Rendering can present the resulting
-state later; after a stall beyond the 250 ms clamp the game cannot catch up the discarded
-time. Such a start fails the scheduling assertion rather than expanding the bound.
+state later. When a clamped stall spans lights-out, stationary pre-start time is discarded
+first so the surviving interval retains the release tick at the boundary. Physics still
+runs at most 250 ms of catch-up; excess race time is lost as on any other stall. The
+report keeps the wall-clock observation separately from the released simulation tick.

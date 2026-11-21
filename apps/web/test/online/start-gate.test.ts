@@ -26,3 +26,14 @@ it('holds pre-start ticks and releases the first eligible tick inside a delayed 
   const b = simulate(1188, 0.2, 0.001);
   expect(Math.abs(a - b)).toBeLessThan(step * 1000);
 });
+
+it('preserves the release tick when a stall clamp would discard lights-out', () => {
+  const gate = new StartGate();
+  // A frame arrives 334 ms after lights-out. Only 250 ms can be simulated.
+  gate.beginFrame(1334, 0.25, 0.001, 7.6, 1000);
+  expect(gate.tickAt(7.6)).toBe(1000);
+  expect(gate.tickAt(7.6 + 1 / 240)).toBeCloseTo(1000 + 1000 / 240, 6);
+  // Once released, subsequent frames use the normal catch-up interval.
+  gate.beginFrame(1350, 0.016, 0, 7.85);
+  expect(gate.tickAt(7.85)).toBe(1334);
+});

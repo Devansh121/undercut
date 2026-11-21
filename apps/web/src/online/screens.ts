@@ -81,7 +81,9 @@ export class RoomScreens {
         el(
           'p',
           '',
-          'On another device use the Wi-Fi address printed by start.sh, with ?room=' + s.code,
+          this.origins.length > 0
+            ? 'Share this Wi-Fi invite with a driver on the same network.'
+            : 'Share this invite to bring another driver into the room.',
         ),
       );
       const list = el('ul', 'online-members');

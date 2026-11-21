@@ -215,7 +215,7 @@ export class OnlineSession {
         detail:
           res.error === 'http_429' || /limit|many/i.test(res.error)
             ? 'Too many rooms were made from this network lately. Wait a few minutes.'
-            : 'The rooms service did not answer. Check that the game was started with start.sh.',
+            : 'The room service did not answer. Check your connection and try again.',
       });
     }
     this.connect(res.code, name);
