@@ -53,6 +53,23 @@ export {
   type RaceRules,
 } from './rules';
 export type { PitPhase } from './systems/pit';
+export { createAiField, type AiFieldOptions } from './session/ai-field';
+export {
+  AiController,
+  InputController,
+  type AiControllerOptions,
+  type CarController,
+  type ControlContext,
+} from './session/controllers';
+export { PIT_MARGIN, pitInPath, pitOutPath } from './session/pit-paths';
+export {
+  RACE_STEP,
+  RaceSession,
+  SESSION_FUEL,
+  type RaceCar,
+  type RaceSessionOptions,
+  type RaceSessionSnapshot,
+} from './session/session';
 export type { Anomaly } from './systems/watchdog';
 export {
   LapTimer,

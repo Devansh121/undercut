@@ -82,7 +82,7 @@ export function buildResult(
       laps: c.finishLaps ?? timer.lapsCompleted,
       unserved,
       best: timer.bestLap,
-      total: c.finishTime !== null ? c.finishTime - start + unserved : null,
+      total: c.finishTime !== null && s.kind === 'race' ? c.finishTime - start + unserved : null,
       dist: c.finishDist ?? c.dist,
       status: 'finished' as ResultStatus,
       reason: c.reason,

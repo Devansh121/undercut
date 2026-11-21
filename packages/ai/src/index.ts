@@ -13,6 +13,12 @@ export {
 } from './driver/reference';
 export { lockExcess, spinExcess } from './driver/feel';
 export {
+  FOLLOWER_GAINS,
+  PathFollower,
+  type FollowPoint,
+  type FollowerGains,
+} from './driver/path-follower';
+export {
   EnvelopeModel,
   FULL_ENVELOPE,
   decodeEnvelope,
