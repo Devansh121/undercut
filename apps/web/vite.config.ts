@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 // Relative import on purpose: the config is loaded by Node, which cannot import the
 // workspace package's TypeScript entry directly.
@@ -44,6 +45,13 @@ export default defineConfig({
     sourcemap: true,
     // The real gate is tools/budget; this only silences Vite's generic warning.
     chunkSizeWarningLimit: 1500,
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        // Diagnostic page for the input layer; linked from nowhere in the game.
+        inputLab: fileURLToPath(new URL('./input-lab.html', import.meta.url)),
+      },
+    },
   },
   server: {
     // Same-origin /rooms, as in production; the rooms service runs on the Workers runtime.
