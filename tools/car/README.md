@@ -10,7 +10,7 @@ npm run car:build -- --check   # rebuild into a temporary directory and compare 
 flock ~/.cache/undercut/gpu.lock npm run car:preview   # three.js captures into docs/evidence/m2-car/threejs
 ```
 
-`car:build` takes about 25 s and needs no GPU. On first use it downloads the Blender 5.2.4 LTS tarball from download.blender.org into `~/.cache/undercut/blender/`, checks it against the published sha256 and unpacks it there. Nothing is installed system-wide and nothing from Blender is committed. The output is deterministic: two builds give byte-identical files.
+`car:build` takes about 40 s and needs no GPU. On first use it downloads the Blender 5.2.4 LTS tarball from download.blender.org into `~/.cache/undercut/blender/`, checks it against the published sha256 and unpacks it there. Nothing is installed system-wide and nothing from Blender is committed. The output is deterministic: two builds give byte-identical files.
 
 ## Review renders
 
@@ -20,7 +20,7 @@ GPU work holds the shared lock. One station per run keeps each hold short.
 B=~/.cache/undercut/blender/blender-5.2.4-linux-x64/blender
 # orthographic proportion sheets on a 500 mm grid (Workbench)
 flock ~/.cache/undercut/gpu.lock $B -b --factory-startup -P tools/car/car.py -- --mode ortho --out /tmp/car
-# EEVEE iteration renders: stations front34, rear34, side, top, front, wing, cockpit, low
+# EEVEE iteration renders: stations front34, rear34, side, top, front, rear, chase, wing, cockpit, low
 flock ~/.cache/undercut/gpu.lock $B -b --factory-startup -P tools/car/car.py -- --mode review --out /tmp/car \
   --stations front34 --team kestrel --hdri /path/to/studio.hdr --samples 24
 # Cycles beauty render
@@ -34,18 +34,18 @@ The studio HDRI used for the committed renders is Poly Haven `studio_small_09` (
 
 | File | What it does |
 | --- | --- |
-| `build.mjs` | `npm run car:build`: fetches Blender, runs `car.py` per level of detail and for the masks, writes the livery index, the manifest entries and `docs/evidence/m2-car/stats.json` |
+| `build.mjs` | `npm run car:build`: fetches Blender, runs `car.py` per level of detail and for the masks, writes the livery index and the manifest entries, and measures the shipped GLBs for `docs/evidence/m2-car/stats.json` |
 | `car.py` | Blender entry point: `--mode export, masks, review, beauty, ortho` |
 | `carlib/dims.py` | Hard points, with assertions |
-| `carlib/geom.py` | Mesh builder, lofts, lathes, sweeps, monotone splines, NACA sections |
-| `carlib/body.py` | Survival cell with nose and engine cover, cockpit opening, sidepods, airbox, floor, fences, edge wings, diffuser, plank, crash structure, exhaust |
-| `carlib/wings.py` | Front wing (four elements, endplates), rear wing (main plane, DRS flap, endplates, swan necks, actuator pod), beam wing |
+| `carlib/geom.py` | Mesh builder, lofts, lathes, sweeps, monotone splines, NACA sections, atlas patches, triangulation and the manifold check that fails the build |
+| `carlib/body.py` | Survival cell, nose and engine cover (one loft with a blended shoulder), cockpit opening, airbox intake, sidepods that grow out of the chassis, floor, fences, edge wings, diffuser, plank, crash structure with rain-light bezel, exhaust |
+| `carlib/wings.py` | Front wing (four elements, the top two curling into the endplates), rear wing with rolled tips, DRS flap, endplates, swan necks and actuator pod, beam wing on a centre mount |
 | `carlib/wheels.py` | Tyres, rims, wheel covers, discs, uprights, brake ducts, wheel-wake deflectors |
-| `carlib/cockpit.py` | Halo, headrest, helmet, steering wheel, mirrors, T-camera, suspension links, driveshafts |
-| `carlib/assemble.py` | The node hierarchy with pivots, and the level-of-detail rules |
-| `carlib/livery.py` | Livery atlas packing and the seven mask patterns |
-| `carlib/textures.py`, `png.py` | Procedural carbon twill, tyre sidewall and disc-glow textures; a deterministic PNG writer |
+| `carlib/cockpit.py` | Halo and its mounts, headrest, helmet, steering wheel with gloves, driver's shoulders, arms and harness, mirrors, T-camera, suspension links, driveshafts |
+| `carlib/assemble.py` | The node hierarchy with pivots, the link morph targets, and the level-of-detail and material-merging rules |
+| `carlib/livery.py` | Livery atlas packing, the rasteriser, the ten team designs and the bodywork detail normal map |
+| `carlib/textures.py`, `png.py` | Procedural carbon twill, tyre sidewall (invented marking, compound ticks, rubber grain) and disc-glow textures; a deterministic PNG writer |
 | `carlib/ao.py` | Per-vertex ambient occlusion baked by ray casting |
-| `carlib/decals.py` | Carriers for race numbers and driver codes |
+| `carlib/decals.py` | One mesh carrying the race numbers and driver codes, mapped into a shared canvas |
 | `carlib/materials.py`, `export.py`, `stage.py` | Materials, glTF export, review cameras and lights |
 | `preview/` | Standalone three.js viewer (`server.mjs`, `index.html`, `viewer.js`), the reference rig (`car-rig.js`) and the Playwright capture (`capture.mjs`); not part of the app build |

@@ -25,10 +25,10 @@ The car's proportions are named constants in `carlib/dims.py`, asserted on every
 | Steering wheel | centre (0.53, 0, 0.64), face tilted 18° towards the driver | Estimate |
 | Halo | pylon base (0.98, 0, 0.665), hoop front (0.82, 0, 0.835), rear mounts x = 0.03, half width 0.330, z = 0.705 | Estimate; the regulation fixes the halo as a standard part of about this size |
 | Sidepod inlet | x = 0.70, half width 0.740, z = 0.36 to 0.62 | Estimate, a "downwash" sidepod of the 2023–2025 kind |
-| Sidepod end (coke bottle) | x = −1.45, half width 0.215 | Estimate |
+| Sidepod end (coke bottle) | x = −1.45, half width 0.215; the sidepod relaxes onto the chassis surface over the last 0.30 m | Estimate |
 | Roll hoop and airbox | x = −0.10, top 0.950, airbox half width 0.105 | Estimate |
 | Front wing | span 1.970 (endplate outer faces at ±0.985), main plane leading edge x = 2.985, lowest point z ≈ 0.09, top flap trailing edge at the tip z ≈ 0.31 | Regulation limits the wing to the car's width and to four elements; heights are estimates |
-| Rear wing | endplate outer faces at ±0.530, main plane leading edge x = −2.05, top 0.960 | Estimate; the regulation box puts the rear wing narrower than the rear track |
+| Rear wing | span ±0.530 to the rolled tips, main plane leading edge x = −2.05, top 0.960, tips rolled over a 100 mm radius into the endplates | Estimate; the regulation box puts the rear wing narrower than the rear track, and cars of this era roll the wing tips into the endplates |
 | Beam wing | x = −2.18, z = 0.33, two elements | Estimate |
 | DRS flap | hinge at the flap trailing edge, opens 22° (slot about 85 mm) | Regulation: 85 mm maximum slot gap; the angle follows from the 0.225 m flap chord |
 | Rear crash structure tip | x = −2.53, centre z = 0.33 | Estimate |

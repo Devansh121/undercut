@@ -1,8 +1,189 @@
 {
   "high": {
-    "draw_calls": 82,
-    "glb_bytes": 882332,
-    "images": {
+    "file": "car_high.glb",
+    "bytes": 1303948,
+    "triangles": 119602,
+    "draw_calls": 36,
+    "nodes": {
+      "body": {
+        "triangles": 76118,
+        "primitives": 7,
+        "materials": [
+          "paint",
+          "dark",
+          "carbon",
+          "carbon_matte",
+          "metal_dark",
+          "exhaust",
+          "mirror_glass"
+        ],
+        "morph_targets": 0
+      },
+      "decals": {
+        "triangles": 484,
+        "primitives": 1,
+        "materials": [
+          "decal"
+        ],
+        "morph_targets": 0
+      },
+      "drs_flap": {
+        "triangles": 3240,
+        "primitives": 1,
+        "materials": [
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "helmet": {
+        "triangles": 1184,
+        "primitives": 2,
+        "materials": [
+          "paint",
+          "visor"
+        ],
+        "morph_targets": 0
+      },
+      "rain_light": {
+        "triangles": 2,
+        "primitives": 1,
+        "materials": [
+          "rain_light"
+        ],
+        "morph_targets": 0
+      },
+      "steering_wheel": {
+        "triangles": 590,
+        "primitives": 3,
+        "materials": [
+          "carbon",
+          "display",
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "upright_FL": {
+        "triangles": 1296,
+        "primitives": 2,
+        "materials": [
+          "carbon",
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FL": {
+        "triangles": 7464,
+        "primitives": 3,
+        "materials": [
+          "tyre",
+          "rim",
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "upright_FR": {
+        "triangles": 1296,
+        "primitives": 2,
+        "materials": [
+          "carbon",
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FR": {
+        "triangles": 7464,
+        "primitives": 3,
+        "materials": [
+          "tyre",
+          "rim",
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "suspension_links": {
+        "triangles": 3648,
+        "primitives": 1,
+        "materials": [
+          "carbon"
+        ],
+        "morph_targets": 6
+      },
+      "upright_RL": {
+        "triangles": 944,
+        "primitives": 2,
+        "materials": [
+          "carbon",
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RL": {
+        "triangles": 7464,
+        "primitives": 3,
+        "materials": [
+          "tyre",
+          "rim",
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "upright_RR": {
+        "triangles": 944,
+        "primitives": 2,
+        "materials": [
+          "carbon",
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RR": {
+        "triangles": 7464,
+        "primitives": 3,
+        "materials": [
+          "tyre",
+          "rim",
+          "paint"
+        ],
+        "morph_targets": 0
+      }
+    },
+    "images": [
+      {
+        "name": "body_detail",
+        "mimeType": "image/webp",
+        "bytes": 9486
+      },
+      {
+        "name": "carbon_normal",
+        "mimeType": "image/webp",
+        "bytes": 19804
+      },
+      {
+        "name": "carbon_base",
+        "mimeType": "image/webp",
+        "bytes": 2862
+      },
+      {
+        "name": "disc_glow",
+        "mimeType": "image/webp",
+        "bytes": 178
+      },
+      {
+        "name": "tyre_normal",
+        "mimeType": "image/webp",
+        "bytes": 142554
+      },
+      {
+        "name": "tyre_base",
+        "mimeType": "image/webp",
+        "bytes": 9308
+      }
+    ],
+    "textures": {
+      "body_detail": [
+        1024,
+        1024
+      ],
       "carbon_base": [
         512,
         512
@@ -23,26 +204,180 @@
         2048,
         512
       ]
-    },
-    "lod": "high",
-    "triangles": 110912,
-    "triangles_by_part": {
-      "body_carbon": 24944,
-      "body_dark": 2680,
-      "body_paint": 39282,
-      "brake_discs": 1024,
-      "drs_flap": 3512,
-      "helmet": 1184,
-      "steering_wheel": 302,
-      "suspension": 3648,
-      "uprights": 3456,
-      "wheels": 30880
     }
   },
   "mobile": {
-    "draw_calls": 67,
-    "glb_bytes": 432940,
-    "images": {
+    "file": "car_mobile.glb",
+    "bytes": 607428,
+    "triangles": 39616,
+    "draw_calls": 23,
+    "nodes": {
+      "body": {
+        "triangles": 22058,
+        "primitives": 3,
+        "materials": [
+          "paint",
+          "dark",
+          "carbon"
+        ],
+        "morph_targets": 0
+      },
+      "decals": {
+        "triangles": 76,
+        "primitives": 1,
+        "materials": [
+          "decal"
+        ],
+        "morph_targets": 0
+      },
+      "drs_flap": {
+        "triangles": 920,
+        "primitives": 1,
+        "materials": [
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "helmet": {
+        "triangles": 304,
+        "primitives": 2,
+        "materials": [
+          "paint",
+          "dark"
+        ],
+        "morph_targets": 0
+      },
+      "rain_light": {
+        "triangles": 2,
+        "primitives": 1,
+        "materials": [
+          "rain_light"
+        ],
+        "morph_targets": 0
+      },
+      "steering_wheel": {
+        "triangles": 416,
+        "primitives": 2,
+        "materials": [
+          "carbon",
+          "display"
+        ],
+        "morph_targets": 0
+      },
+      "upright_FL": {
+        "triangles": 708,
+        "primitives": 1,
+        "materials": [
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FL": {
+        "triangles": 2904,
+        "primitives": 2,
+        "materials": [
+          "tyre",
+          "rim"
+        ],
+        "morph_targets": 0
+      },
+      "upright_FR": {
+        "triangles": 708,
+        "primitives": 1,
+        "materials": [
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FR": {
+        "triangles": 2904,
+        "primitives": 2,
+        "materials": [
+          "tyre",
+          "rim"
+        ],
+        "morph_targets": 0
+      },
+      "suspension_links": {
+        "triangles": 1584,
+        "primitives": 1,
+        "materials": [
+          "carbon"
+        ],
+        "morph_targets": 6
+      },
+      "upright_RL": {
+        "triangles": 612,
+        "primitives": 1,
+        "materials": [
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RL": {
+        "triangles": 2904,
+        "primitives": 2,
+        "materials": [
+          "tyre",
+          "rim"
+        ],
+        "morph_targets": 0
+      },
+      "upright_RR": {
+        "triangles": 612,
+        "primitives": 1,
+        "materials": [
+          "brake_disc"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RR": {
+        "triangles": 2904,
+        "primitives": 2,
+        "materials": [
+          "tyre",
+          "rim"
+        ],
+        "morph_targets": 0
+      }
+    },
+    "images": [
+      {
+        "name": "body_detail",
+        "mimeType": "image/webp",
+        "bytes": 3824
+      },
+      {
+        "name": "carbon_normal",
+        "mimeType": "image/webp",
+        "bytes": 8710
+      },
+      {
+        "name": "carbon_base",
+        "mimeType": "image/webp",
+        "bytes": 1018
+      },
+      {
+        "name": "disc_glow",
+        "mimeType": "image/webp",
+        "bytes": 178
+      },
+      {
+        "name": "tyre_normal",
+        "mimeType": "image/webp",
+        "bytes": 39152
+      },
+      {
+        "name": "tyre_base",
+        "mimeType": "image/webp",
+        "bytes": 4866
+      }
+    ],
+    "textures": {
+      "body_detail": [
+        512,
+        512
+      ],
       "carbon_base": [
         256,
         256
@@ -63,26 +398,114 @@
         1024,
         256
       ]
-    },
-    "lod": "mobile",
-    "triangles": 33790,
-    "triangles_by_part": {
-      "body_carbon": 7516,
-      "body_dark": 1242,
-      "body_paint": 10544,
-      "brake_discs": 512,
-      "drs_flap": 984,
-      "helmet": 304,
-      "steering_wheel": 272,
-      "suspension": 1584,
-      "uprights": 2000,
-      "wheels": 8832
     }
   },
   "far": {
-    "draw_calls": 21,
-    "glb_bytes": 236780,
-    "images": {
+    "file": "car_far.glb",
+    "bytes": 191000,
+    "triangles": 10584,
+    "draw_calls": 11,
+    "nodes": {
+      "body": {
+        "triangles": 8082,
+        "primitives": 3,
+        "materials": [
+          "paint",
+          "dark",
+          "carbon"
+        ],
+        "morph_targets": 0
+      },
+      "drs_flap": {
+        "triangles": 312,
+        "primitives": 1,
+        "materials": [
+          "paint"
+        ],
+        "morph_targets": 0
+      },
+      "helmet": {
+        "triangles": 204,
+        "primitives": 2,
+        "materials": [
+          "paint",
+          "dark"
+        ],
+        "morph_targets": 0
+      },
+      "rain_light": {
+        "triangles": 2,
+        "primitives": 1,
+        "materials": [
+          "rain_light"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FL": {
+        "triangles": 496,
+        "primitives": 1,
+        "materials": [
+          "tyre"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_FR": {
+        "triangles": 496,
+        "primitives": 1,
+        "materials": [
+          "tyre"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RL": {
+        "triangles": 496,
+        "primitives": 1,
+        "materials": [
+          "tyre"
+        ],
+        "morph_targets": 0
+      },
+      "wheel_RR": {
+        "triangles": 496,
+        "primitives": 1,
+        "materials": [
+          "tyre"
+        ],
+        "morph_targets": 0
+      }
+    },
+    "images": [
+      {
+        "name": "body_detail",
+        "mimeType": "image/webp",
+        "bytes": 3824
+      },
+      {
+        "name": "carbon_normal",
+        "mimeType": "image/webp",
+        "bytes": 8710
+      },
+      {
+        "name": "carbon_base",
+        "mimeType": "image/webp",
+        "bytes": 1018
+      },
+      {
+        "name": "tyre_normal",
+        "mimeType": "image/webp",
+        "bytes": 39152
+      },
+      {
+        "name": "tyre_base",
+        "mimeType": "image/webp",
+        "bytes": 4866
+      }
+    ],
+    "textures": {
+      "body_detail": [
+        512,
+        512
+      ],
       "carbon_base": [
         256,
         256
@@ -103,45 +526,42 @@
         1024,
         256
       ]
-    },
-    "lod": "far",
-    "triangles": 14268,
-    "triangles_by_part": {
-      "body_carbon": 3596,
-      "body_dark": 936,
-      "body_paint": 4336,
-      "drs_flap": 348,
-      "helmet": 204,
-      "steering_wheel": 0,
-      "suspension": 1440,
-      "wheels": 3408
     }
   },
   "masks": {
-    "block-sidepod.png": {
-      "bytes": 30784
+    "aldermoor.png": {
+      "bytes": 39470
     },
-    "chevron-nose.png": {
-      "bytes": 24021
+    "brevik.png": {
+      "bytes": 27327
     },
-    "fade-rear.png": {
-      "bytes": 28261
+    "calder.png": {
+      "bytes": 50258
     },
     "index.json": {
-      "bytes": 1708
+      "bytes": 2060
     },
-    "pinstripe.png": {
-      "bytes": 63498
+    "kestrel.png": {
+      "bytes": 30138
     },
-    "side-band.png": {
-      "bytes": 49823
+    "meridian.png": {
+      "bytes": 32864
     },
-    "split-diagonal.png": {
-      "bytes": 34216
+    "norrland.png": {
+      "bytes": 50935
     },
-    "two-tone-horizontal.png": {
-      "bytes": 36108
+    "orrin.png": {
+      "bytes": 42703
+    },
+    "quillon.png": {
+      "bytes": 38887
+    },
+    "sable.png": {
+      "bytes": 58164
+    },
+    "terraluce.png": {
+      "bytes": 24244
     }
   },
-  "total_bytes": 1820471
+  "total_bytes": 2499426
 }

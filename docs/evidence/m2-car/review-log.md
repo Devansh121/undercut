@@ -44,17 +44,38 @@ What each look at the renders showed and what was changed. Iterations 1–4 are 
 - Chase camera too far for the Mobile LOD check; moved to 5.6 m.
 - Far LOD drew 29 draw calls and 17k triangles. Uprights dropped, links merged into the body, materials merged: 21 draw calls, 14.3k triangles.
 
+## 6. Second pass, after the PR review
+
+Each claim was checked before fixing it.
+
+- **Tyre topology** (confirmed: 5 duplicate profile points, the tread crossed twice). The profile is now one bead-to-bead pass: the sidewall and shoulder are mirrored, the tread is not. Every part meant to be closed is now checked before export, and so is every edge: an edge with more than two faces, or an open edge on a closed part, fails the build. The check caught three more faults on its first run, all fixed: two centreline caps doubled by mirroring (diffuser exit lip, DRS gurney), and thin triangles being dropped as "degenerate", which opened holes in the Mobile rear endplates.
+- **Intersecting body panels** (confirmed in the cockpit close-up). The airbox is no longer a separate loft: the engine-cover ridge is joined to the tub's sections by a smooth maximum in polar form, so the shoulder is one filleted surface. The intake is a lipped ring on the roll hoop's face. The sidepods are open profiles that leave and rejoin the chassis surface with a fillet, and they relax onto the chassis at the rear instead of ending in an open tube.
+- **Tail caps** (confirmed: fan centres off the symmetry plane at the crash structure and the spine tail). All half-ring caps now put their centre on the plane; the crash-structure tip carries a bezel round the rain light.
+- **Livery UVs on plates and caps** (confirmed on Calder, Aldermoor, Brevik, Norrland and Terraluce). Plates now use planar UVs over the face and the outer half of the edge; caps get their own small planar patch; masks are rasterised from each patch's own triangles, split exactly as the export splits them.
+- **Tyre markings read as the real supplier's**. Replaced with an invented scheme in `design/compounds.json`: the maker's mark once per sidewall, and four groups of short radial ticks lit one, two or three at a time (hard, medium, soft) in steel blue, orange or magenta. The HUD mock now shows the code letter over the same tick count; its screenshots were re-captured.
+- **Published triangle counts** (confirmed: they came from the generator, before cleanup). `stats.json` is now measured on the exported GLBs. The far LOD dropped its suspension links (thinner than a pixel at that size), its uprights and its small fittings: 10,584 triangles, under the 12,000 budget.
+- **Draw calls**: minor materials merged per motion group, the decals made one mesh, and the sixteen suspension links and two driveshafts made one mesh with morph targets. 82 → 36 on High, 67 → 23 on Mobile, 21 → 11 on Far.
+- **LOD switching**: switch sizes defined by projected radius in `docs/car-asset.md`, with a transition strip at each switch (`threejs/lod_strip_*.jpg`). The Mobile tyre went from 32 to 40 segments so its outline matches High more closely.
+- **Draco decoder**: one per batch of loads, disposed in `finally`.
+
+The look, in the reviewer's order:
+
+- **A. Rear assembly.** The main plane rolls down into the endplate at each tip (radius 100 mm). A static fairing carries the flap's section through the roll, so the DRS flap opens inside it. The endplate hangs below the roll with a concave leading edge and a cut-away lower front, edges are 12 mm thick, and the swan necks have foot blocks. The beam wing sits on a centre mount with rolled tips. The diffuser has a shaped throat, an arched roof in each tunnel, side walls down to the reference plane, a curved strake and an exit lip. The crash structure has a flat underside, and the lamp sits in a bezel; the exhaust has a rolled lip. Checked straight from behind and from the chase position (6 m back, 2 m up), now standard stations.
+- **B. Bodywork.** One filleted shoulder (above). Panel gaps, fasteners, sidepod-top louvres and engine-cover gills are a normal map drawn in the livery atlas. The floor edge tapers to 5 mm and the edge wing is slimmer.
+- **C. Liveries.** Ten designs, one mask each, built from a shared vocabulary of nose tips, spine stripes, sidepod slashes and panels, number panels and wing graphics. No two teams share a design. Quillon's code was dark on navy and is now on lime.
+- **D. Front end and wheels.** The two upper front flaps curl up into the endplate. The wheel cover has a rolled rim, a dished face with a step ring and a hub boss, and the tyre texture has a restrained rubber grain.
+- **E. Cockpit and materials.** The driver's shoulders sit in the cockpit under the halo, the forearms reach for the wheel, the gloves are on the grips and turn with them, and harness straps run over the shoulders. The halo mounts have fairings and the visor has a dark seal. Carbon is rougher with a softer clear coat and a stronger weave, so broad highlights break up instead of reading as metal.
+
 ## Remaining giveaways (honest list)
 
-At thumbnail size the captures pass for a current single-seater. At full size:
+At thumbnail size the captures, rear and chase included, pass for a current single-seater. At full size:
 
-1. Overlapping panels meet in visible creases instead of filleted blends: sidepod top into the chassis beside the cockpit, airbox flanks into the sidepods. Visible in the cockpit close-up.
-2. Bodywork is too clean: no panel gaps, fasteners, louvres, cooling gills, sensor stalks or antennae. Surfaces are one smooth gloss.
-3. Rear wing endplates are plain flat plates: no slots or louvres, and the wingtips do not roll into the endplate the way current cars' do.
-4. The front wing elements end square inside the endplate; real elements curl up into it. There is one footplate strake and no other endplate detail.
-5. Mirrors are simple rounded housings on blade stalks; real ones are sharper and mounted lower on the sidepod.
-6. The cockpit interior is a dark tub with pads; there are no hands, harness, seat shape or visible pedal box (hands were optional and were not built).
-7. Wheel covers are flat discs with a painted ring; the rim behind them has no spokes, which only shows at very low angles.
-8. The diffuser roof is plain; strakes are flat plates.
-9. Ambient occlusion is per vertex, so it is soft on long, sparsely tessellated panels.
-10. The livery atlas runs at about 5 mm per texel along the spine, so a diagonal edge can show slight stepping in a close-up.
+1. Mirrors are simple rounded housings on blade stalks; real ones are sharper and mounted lower on the sidepod.
+2. Panel gaps, fasteners and louvres are a normal map only: they catch light but cast no shadow and do not change the silhouette.
+3. The rear-wing endplate is one flat plate below the roll; real ones have slots, strakes and a footplate.
+4. The cockpit is sparse: the shoulders and gloves show, but there is no seat shape, pedal box or visible harness buckle, and the forearms do not follow the wheel when it turns.
+5. The diffuser has one strake per side; real ones have several, with curved fences at the outer edge.
+6. Wheel covers hide a rim with no spokes; that only shows from very low angles.
+7. Ambient occlusion is per vertex, so it is soft on long, sparsely tessellated panels.
+8. The far LOD has no suspension links; at its switch size they are thinner than a pixel, but a magnified capture shows the gap.
+9. The livery atlas runs at about 5 mm per texel along the spine, so a diagonal edge can show slight stepping in a close-up.
