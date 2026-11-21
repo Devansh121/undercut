@@ -34,6 +34,8 @@ export function createPathPoint(): PathPoint {
 
 const CLEARANCE_MAX = 400;
 const GRID_CELL = 20;
+/** Largest miss, in metres, for a segment solve to count as a solution. */
+const SOLVE_TOLERANCE = 1e-3;
 /** Segments are indexed in every grid cell within this distance of them. */
 const GRID_REACH = 80;
 const MAX_WALK = 64;
@@ -79,6 +81,8 @@ export class TrackPath {
   // Scratch results of solve() and locate(); keeps the hot paths allocation-free.
   private st = 0;
   private sd = 0;
+  /** Whether the last `solve` found a true solution (the point lies on a normal of the segment). */
+  private sok = true;
   private li = 0;
   private lt = 0;
 
@@ -333,8 +337,16 @@ export class TrackPath {
     if (!Number.isFinite(t)) t = 0;
     const mx = n0x + t * dnx;
     const mz = n0z + t * dnz;
+    const rx = qx - t * ex;
+    const rz = qz - t * ez;
+    const sd = (rx * mx + rz * mz) / (mx * mx + mz * mz);
     this.st = t;
-    this.sd = ((qx - t * ex) * mx + (qz - t * ez) * mz) / (mx * mx + mz * mz);
+    this.sd = sd;
+    // With no real root (the point is outside every normal of this segment) t is only the
+    // nearest miss, and sd is not a coordinate of the point. Check the solution reproduces it.
+    const ex2 = rx - sd * mx;
+    const ez2 = rz - sd * mz;
+    this.sok = ex2 * ex2 + ez2 * ez2 <= SOLVE_TOLERANCE * SOLVE_TOLERANCE;
   }
 
   /**
@@ -355,6 +367,8 @@ export class TrackPath {
     let ok = false;
     for (let k = 0; k < MAX_WALK; k++) {
       this.solve(i, px, pz);
+      // No true solution on this segment: the point is not in its frame, search globally.
+      if (!this.sok) break;
       if (this.st >= 0 && this.st <= 1) {
         ok = true;
         break;
@@ -416,7 +430,7 @@ export class TrackPath {
       for (let k = this.cellStart[cell]!; k < this.cellStart[cell + 1]!; k++) {
         const i = this.cellItems[k]!;
         this.solve(i, px, pz);
-        if (this.st < -1e-9 || this.st > 1 + 1e-9) continue;
+        if (!this.sok || this.st < -1e-9 || this.st > 1 + 1e-9) continue;
         if (Math.abs(this.sd) < Math.abs(bestD)) {
           best = i;
           bestT = this.st;
