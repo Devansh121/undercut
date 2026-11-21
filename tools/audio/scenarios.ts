@@ -3,7 +3,14 @@
  * update rate with the time step, it advances its own little state and returns the car
  * state the game would send to the audio engine at that moment.
  */
-import { AudioCore, defaultCarState, rpmToRadPerSecond, type AudioCarState } from '@undercut/audio';
+import {
+  AudioCore,
+  defaultCarState,
+  rpmToRadPerSecond,
+  type AudioCarState,
+  type AudioView,
+  LAYERS,
+} from '@undercut/audio';
 import { brakingDecel, CAR, coastDecel, fullThrottleAccel, rpmAt, speedAt } from './car-model';
 
 export interface Scenario {
@@ -359,6 +366,7 @@ export interface Rendered {
 }
 
 export interface RenderOptions {
+  view?: AudioView;
   sampleRate?: number;
   /** State updates per second (the sim rate). */
   updateRate?: number;
@@ -374,7 +382,11 @@ export function renderScenario(scenario: Scenario, options: RenderOptions = {}):
   const sampleRate = options.sampleRate ?? 48_000;
   const updateRate = options.updateRate ?? 120;
   const blockSize = options.blockSize ?? 128;
-  const core = new AudioCore({ sampleRate, seed: options.seed ?? 1 });
+  const core = new AudioCore({
+    sampleRate,
+    seed: options.seed ?? 1,
+    ...(options.view ? { view: options.view } : {}),
+  });
   const step = scenario.create();
   const total = Math.round(scenario.duration * sampleRate);
   const left = new Float32Array(total);
@@ -409,21 +421,7 @@ export function renderScenario(scenario: Scenario, options: RenderOptions = {}):
     frame += n;
   }
   const layers: Record<string, number> = {};
-  for (const name of [
-    'exhaust',
-    'intake',
-    'combustion',
-    'turbo',
-    'ers',
-    'crackle',
-    'shift',
-    'roll',
-    'wind',
-    'scrub',
-    'squeal',
-    'kerb',
-    'scrape',
-  ] as const) {
+  for (const name of LAYERS) {
     const rms = core.meters.rms(name);
     layers[name] = rms > 0 ? Math.round(200 * Math.log10(rms)) / 10 : -Infinity;
   }

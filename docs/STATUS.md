@@ -55,6 +55,12 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- M6 audio Slice 1 uses synthesized car/road layers and estimated camera/gear-mesh balances.
+  The reference render is an actual 240 Hz reference-driver lap; trackside is a balance preset
+  until spatial voices land in Slice 2. Collision audio accepts explicit speed/serial events;
+  current master has no barrier or car-contact telemetry, so the seam stays silent by default.
+  UI and ambience levels persist now; their sound sources and menu presentation follow later.
+
 - MIT copyright holder written as "Devansh121".
 - npm workspaces instead of pnpm, because pnpm is not installed.
 - Era: the 2022–2025 ground-effect regulations (ADR 0001).

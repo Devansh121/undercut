@@ -43,6 +43,9 @@ export class CarAudioProcessor extends scope.AudioWorkletProcessor {
       case 'pause':
         this.core.setPaused(message.paused);
         break;
+      case 'view':
+        this.core.setView(message.view);
+        break;
     }
   }
 
