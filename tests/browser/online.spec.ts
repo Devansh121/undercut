@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './base';
 import { DEFAULT_CIRCUIT } from '@undercut/protocol';
 
 // Keep DOM/network traces; continuous raster captures compete with two software renderers.
@@ -117,6 +118,9 @@ test('two players race, rematch, leave and migrate the host', async ({
     );
     throw error;
   } finally {
+    // Unload both pages first: closing a context that still holds a live software WebGL context
+    // stalls Chromium's GPU process for the next test (see base.ts).
+    for (const page of [host, guest]) await page.goto('about:blank').catch(() => undefined);
     await hostContext.close();
     await guestContext.close();
   }
