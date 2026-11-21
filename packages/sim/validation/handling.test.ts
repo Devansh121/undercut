@@ -21,10 +21,17 @@ describe('handling: stability at and near the limit', () => {
   }
 
   it('lifting off mid-corner tightens the line but does not spin the car', () => {
-    for (const latG of [1.5, 2.4, 3.0]) {
-      const r = liftOffInCorner({ latG });
-      expect(r.spun).toBe(false);
-      expect(r.yawRateRise).toBeLessThan(0.4);
+    for (const [kmh, fraction] of [
+      [150, 0.6],
+      [150, 0.8],
+      [150, 0.95],
+      [250, 0.9],
+    ] as const) {
+      const r = liftOffInCorner({ speed: kmh / 3.6, fraction });
+      // The corner really was held at that share of the limit before the lift.
+      expect(r.achievedLatG / r.latG, `${kmh} km/h at ${fraction}`).toBeGreaterThan(0.97);
+      expect(r.spun, `${kmh} km/h at ${fraction}`).toBe(false);
+      expect(r.yawRateRise, `${kmh} km/h at ${fraction}`).toBeLessThan(0.4);
     }
   });
 

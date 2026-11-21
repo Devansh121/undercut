@@ -396,7 +396,9 @@ export function stepSteer(
 
 export interface LiftOffResult {
   speed: number;
+  /** Lateral acceleration asked for (a share of the measured limit), and held before the lift. */
   latG: number;
+  achievedLatG: number;
   /** Largest yaw-rate rise after the lift, as a fraction of the yaw rate before it. */
   yawRateRise: number;
   maxSideslipDeg: number;
@@ -405,16 +407,18 @@ export interface LiftOffResult {
 }
 
 /**
- * Lift-off in a steady corner: hold a corner at `fraction` of the limit, then snap the throttle
- * shut with the wheel held still. The car may tighten its line, but must not spin.
+ * Lift-off in a steady corner: hold a corner at `fraction` of the car's measured lateral limit
+ * at that speed, then snap the throttle shut with the wheel held still. The car may tighten
+ * its line, but must not spin.
  */
 export function liftOffInCorner(
-  o: RunOptions & { trim?: AeroTrim; speed?: number; latG?: number } = {},
+  o: RunOptions & { trim?: AeroTrim; speed?: number; fraction?: number } = {},
 ): LiftOffResult {
   const speed = o.speed ?? 150 * KMH;
-  const latG = o.latG ?? 2.4;
+  const trim = o.trim ?? 'medium';
+  const latG = (o.fraction ?? 0.8) * limitAt(o, trim, speed);
   const h = new Harness({
-    trim: o.trim ?? 'medium',
+    trim,
     fuel: 50,
     speed,
     ersMode: ErsMode.None,
@@ -423,10 +427,13 @@ export function liftOffInCorner(
   });
   const hold = new SpeedHold(speed);
   const steer = new YawRateSteer((latG * G) / speed);
+  const window = new MovingAverage(Math.round(0.5 / STEP));
+  let achieved = 0;
   while (h.time < 3) {
     hold.tick(h);
     steer.tick(h);
     h.step();
+    achieved = window.push(h.tel.latG);
   }
   const before = h.car.yawRate;
   const held = h.input.steer;
@@ -443,6 +450,7 @@ export function liftOffInCorner(
   const r: LiftOffResult = {
     speed,
     latG,
+    achievedLatG: achieved,
     yawRateRise: peak / before - 1,
     maxSideslipDeg: maxBeta / DEG,
     spun: maxBeta > 20 * DEG,
