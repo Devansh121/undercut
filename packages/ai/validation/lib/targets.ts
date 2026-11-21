@@ -165,30 +165,30 @@ export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
     reason:
       'First reference lap on the Spa line (medium trim): 8.5 % over the 2025 pole. The gap is ' +
       'mostly in sector 2, the downforce sector (+14 % on the session best), as at Monza the ' +
-      "car is slower than the era's cars in fast corners. docs/physics-validation.md section 7.7.",
+      "car is slower than the era's cars in fast corners. docs/physics-validation.md section 7.8.",
   },
   'spa-s1': {
     measured: 31.75,
-    reason: 'Sector 1 on the first Spa reference lap, 6.7 % over the session best (section 7.7).',
+    reason: 'Sector 1 on the first Spa reference lap, 6.7 % over the session best (section 7.8).',
   },
   'spa-s2': {
     measured: 48.486,
-    reason: 'Sector 2 on the first Spa reference lap, 14 % over the session best (section 7.7).',
+    reason: 'Sector 2 on the first Spa reference lap, 14 % over the session best (section 7.8).',
   },
   'spa-s3': {
     measured: 28.836,
-    reason: 'Sector 3 on the first Spa reference lap, 3.5 % over the session best (section 7.7).',
+    reason: 'Sector 3 on the first Spa reference lap, 3.5 % over the session best (section 7.8).',
   },
   'singapore-s1': {
     measured: 27.234,
     reason:
       'Sector 1 on the first Singapore reference lap, 3.1 % over the session best, while the ' +
-      'lap is inside its band (section 7.7).',
+      'lap is inside its band (section 7.8).',
   },
   'singapore-s3': {
     measured: 26.257,
     reason:
-      'Sector 3 on the first Singapore reference lap, 4.1 % over the session best (section 7.7).',
+      'Sector 3 on the first Singapore reference lap, 4.1 % over the session best (section 7.8).',
   },
 });
 
