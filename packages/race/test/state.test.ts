@@ -110,6 +110,9 @@ describe('determinism', () => {
 
 describe('positions', () => {
   it('are always a total order consistent with race distance (property, many seeded fields)', () => {
+    // Checked in plain code every few ticks and asserted once per field (expect() in the loop
+    // would dominate the run time).
+    const failures: string[] = [];
     for (let seed = 1; seed <= 12; seed++) {
       const n = 3 + (seed % 6);
       const r = new RailRace({ kind: 'race', laps: 3 }, field(seed, n), { seed });
@@ -118,15 +121,22 @@ describe('positions', () => {
         if (k % 7 !== 0) continue;
         const c = r.control;
         const order = c.order;
-        // A permutation of the field, positions 1..n.
-        expect([...order].sort((x, y) => x - y)).toEqual(Array.from({ length: n }, (_, i) => i));
-        order.forEach((car, idx) => expect(c.cars[car]!.position).toBe(idx + 1));
+        const sorted = [...order].sort((x, y) => x - y);
+        if (sorted.length !== n || sorted.some((v, i) => v !== i))
+          failures.push(`${seed}@${k}: not a permutation`);
+        order.forEach((car, idx) => {
+          if (c.cars[car]!.position !== idx + 1) failures.push(`${seed}@${k}: car ${car} position`);
+        });
         // Running cars in order of race distance (finished ones by their frozen distance).
         const dist = order.map((car) => c.cars[car]!.finishDist ?? c.cars[car]!.dist);
-        for (let i = 1; i < dist.length; i++)
-          expect(dist[i]!).toBeLessThanOrEqual(dist[i - 1]! + 1e-9);
+        for (let i = 1; i < dist.length; i++) {
+          if (dist[i]! > dist[i - 1]! + 1e-9)
+            failures.push(`${seed}@${k}: ${order[i]} ahead of ${order[i - 1]}`);
+        }
       }
+      expect(r.control.ended).toBe(true);
     }
+    expect(failures).toEqual([]);
   });
 
   it('gives gaps to the leader and intervals at mini-sectors, and laps down', () => {
