@@ -327,7 +327,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
-  const hud = new Hud(plan);
+  const hud = new Hud(plan, ext?.label ?? 'Time trial');
   const results = new ResultsStrip();
   let quitting = false;
   const restartLap = (): void => {

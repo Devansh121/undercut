@@ -78,7 +78,8 @@ export class Hud {
   private lastErs = '';
   private lastMark = '';
 
-  constructor(plan: MinimapPlan) {
+  /** `mode`: the session panel's title ("Time trial", "Online race"). */
+  constructor(plan: MinimapPlan, mode = 'Time trial') {
     this.plan = plan;
     const root = el('div', 'hud');
     root.dataset.testid = 'hud';
@@ -92,10 +93,7 @@ export class Hud {
     const session = el('section', 'hud-session panel');
     session.setAttribute('aria-label', 'Session');
     const sHead = el('header', 'panel-head');
-    sHead.append(
-      el('span', 'label', 'Time trial'),
-      txt('circuit', el('span', 'label label--strong')),
-    );
+    sHead.append(el('span', 'label', mode), txt('circuit', el('span', 'label label--strong')));
     const sBody = el('div', 'hud-session__body');
     const lapRow = el('div', 'hud-row');
     lapRow.append(el('span', 'label', 'Lap'), txt('lap', el('b', 'num')));
