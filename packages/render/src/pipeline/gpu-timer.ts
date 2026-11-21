@@ -56,6 +56,13 @@ export class GpuTimer {
     }
   }
 
+  /** The context was lost: its queries are gone; forget them without touching GL. */
+  abandon(): void {
+    this.pending.length = 0;
+    this.active = null;
+    this.latest = null;
+  }
+
   dispose(): void {
     if (this.active && this.ext) this.gl.endQuery(this.ext.TIME_ELAPSED_EXT);
     for (const q of this.pending) this.gl.deleteQuery(q);

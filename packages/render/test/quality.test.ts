@@ -51,7 +51,9 @@ describe('effectiveQuality (what the GPU can actually do)', () => {
       const q = effectiveQuality(QUALITY[name], { floatTargets: false });
       expect(q.post).toBe(false);
       expect(q.msaa).toBe(0);
-      expect(q.smaa || q.ao.enabled || q.bloom.enabled || q.speedBlur || q.grainVignette).toBe(false);
+      expect(q.smaa || q.ao.enabled || q.bloom.enabled || q.speedBlur || q.grainVignette).toBe(
+        false,
+      );
       expect(q.envSize).toBe(0);
       // Everything else (shadows, textures, car levels) is kept.
       expect(q.shadow).toEqual(QUALITY[name].shadow);

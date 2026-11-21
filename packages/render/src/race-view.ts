@@ -62,7 +62,9 @@ export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
 /** What the page's renderer can do (see `effectiveQuality`). */
 export function renderCapabilities(renderer: WebGLRenderer): RenderCapabilities {
   const ext = renderer.extensions;
-  return { floatTargets: ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float') };
+  return {
+    floatTargets: ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'),
+  };
 }
 
 export interface RaceViewOptions {
@@ -134,6 +136,7 @@ export interface ViewStats {
   cars: number;
   /** 'hdr': half-float target and post-processing; 'direct': straight to the canvas. */
   renderPath: 'hdr' | 'direct';
+  environmentBakes: number;
 }
 
 /** Everything a session fetches before it can draw, for one preset. */
@@ -166,6 +169,7 @@ export class RaceView {
   private readonly assets: SessionAssets;
   private readonly dynamic: DynamicResolution;
   private readonly gpu: GpuTimer;
+  private contextLost = false;
   private readonly fleetLiveries: readonly CarLivery[];
   private readonly track: Track;
   private readonly focus = new Vector3();
@@ -310,6 +314,25 @@ export class RaceView {
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.resize();
+    canvas.addEventListener('webglcontextlost', this.onContextLost);
+  }
+
+  /**
+   * The GPU dropped the context: stop drawing and release everything now. While the context is
+   * lost every GL call is a silent no-op, so releasing here detaches three.js's per-object hooks
+   * for the dead context; released later (after a restore) they would delete handles that belong
+   * to the dead context. The owner builds a new view when the context is restored, from the
+   * page's cached downloads.
+   */
+  private readonly onContextLost = (): void => {
+    this.contextLost = true;
+    this.gpu.abandon();
+    this.dispose();
+  };
+
+  /** True once the WebGL context was lost under this view. */
+  get lost(): boolean {
+    return this.contextLost;
   }
 
   /** Match the drawing buffer to the canvas, capped by the preset, scaled by dynamic resolution. */
@@ -493,6 +516,7 @@ export class RaceView {
   }
 
   render(frame: ViewFrame): void {
+    if (this.contextLost) return;
     const dt = frame.dt;
     if (frame.frameMs !== undefined && this.dynamic.update(this.gpu.latest ?? frame.frameMs))
       this.resize(true);
@@ -619,10 +643,16 @@ export class RaceView {
       height: this.height,
       cars: 1 + this.fleet.size,
       renderPath: this.quality.post ? 'hdr' : 'direct',
+      environmentBakes: this.environment.bakes,
     };
   }
 
+  private disposed = false;
+
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.observer.disconnect();
     this.gpu.dispose();
     this.pipeline.dispose();

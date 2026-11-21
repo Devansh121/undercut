@@ -134,6 +134,7 @@ export function installDebugApi(
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
       camera: d.view.cameraName,
+      viewBuilds: d.viewBuilds,
       device: s.device,
       assists: { ...s.assists },
       lap: timer.lap,

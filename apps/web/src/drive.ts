@@ -168,6 +168,8 @@ export interface DriveHandle {
   readonly view: RaceView;
   /** The render preset in use, and a switch to another (rebuilds the view, keeps the session). */
   readonly quality: QualityName;
+  /** Views built for this session (the first, quality switches, context restores). */
+  readonly viewBuilds: number;
   setQuality(name: QualityName): Promise<void>;
   /** Static cars on the grid slots in every livery (0 clears them). */
   gridCars(count: number): void;
@@ -473,6 +475,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (document.visibilityState === 'hidden') doPause();
   };
   document.addEventListener('visibilitychange', onVisibility);
+  // The GPU can drop the context (driver reset, memory pressure): stop the session until it is
+  // back; the view restores its own GPU state.
+  const onContextLost = (): void => {
+    if (session.phase === 'running') doPause();
+  };
+  // Back: build a fresh view from the cached downloads (the old one released everything when the
+  // context went). The session stays paused for the player.
+  const onContextRestored = (): void => {
+    void rebuildView('Restoring graphics');
+  };
+  o.canvas.addEventListener('webglcontextlost', onContextLost);
+  o.canvas.addEventListener('webglcontextrestored', onContextRestored);
 
   // Frame loop.
   const pose = createCarPose();
@@ -652,6 +666,29 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   handle = requestAnimationFrame(frame);
   document.documentElement.dataset.ready = '';
 
+  /** Views built for this session (1 + quality switches + context restores). */
+  let viewBuilds = 1;
+
+  /** A new view at the current preset after a context restore. */
+  async function rebuildView(detail: string): Promise<void> {
+    if (quitting) return;
+    if (switching) await switching;
+    const screen = mountLoadingScreen(o.host, track.name, detail);
+    try {
+      const nv = await loadView(quality, screen);
+      const camera = view.cameraName;
+      view.dispose();
+      view = nv;
+      viewBuilds++;
+      view.setCamera(camera);
+      measureCluster();
+    } catch (error) {
+      if (!(error instanceof LoadCancelled)) console.warn('Could not restore the 3D view', error);
+    } finally {
+      screen.remove();
+    }
+  }
+
   /** Rebuild the view at another preset; the session waits (paused) while it loads. */
   let switching: Promise<void> | null = null;
   async function setQuality(next: QualityName): Promise<void> {
@@ -666,6 +703,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         const camera = view.cameraName;
         view.dispose();
         view = nv;
+        viewBuilds++;
         quality = next;
         view.setCamera(camera);
         measureCluster();
@@ -707,6 +745,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     o.audio?.setActive(false);
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
+    o.canvas.removeEventListener('webglcontextlost', onContextLost);
+    o.canvas.removeEventListener('webglcontextrestored', onContextRestored);
     clusterObserver.disconnect();
     window.removeEventListener('resize', measureCluster);
     loop.quit();
@@ -735,6 +775,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     },
     get quality() {
       return quality;
+    },
+    get viewBuilds() {
+      return viewBuilds;
     },
     setQuality,
     gridCars: (count) => view.setGridCars(count, pose),

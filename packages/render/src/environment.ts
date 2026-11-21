@@ -308,9 +308,13 @@ export class Environment {
         : null;
   }
 
+  /** How many times the environment map was prefiltered (once, plus once per context restore). */
+  bakes = 0;
+
   /** Prefilter the sky (without the sun disc) into the scene's environment map. */
   bake(renderer: WebGLRenderer): void {
     if (this.quality.envSize <= 0) return;
+    this.bakes++;
     const pmrem = new PMREMGenerator(renderer);
     const skyScene = new Scene();
     const mat = this.dome.material.clone();
