@@ -116,10 +116,10 @@ follower (`PathFollower` in `packages/ai`); a player can have the same as an ass
 
 - Cars do not touch each other (no contact in the sim) and the AI has no racecraft: in a race
   they drive through each other as ghosts. In the 20-car, 5-lap acceptance run all 20 converge
-  on the racing line into the first chicane: 40 car pairs overlap on lap 1, at most 35 at once,
+  on the racing line into the first chicane: 38 car pairs overlap on lap 1, at most 30 at once,
   and the order after lap 1 is the grid order. The racecraft slice must give the AI a sense of
   the cars around it (keep a lane, brake for the car ahead, pick a gap) before contact is on.
-- Pit loss at Monza comes out at about 33.6 s against the published 24.3 s (physics-validation
+- Pit loss at Monza comes out at about 33.2 s against the published 24.3 s (physics-validation
   4.5). Most of it is the track file's speed-limit lines, 511 m apart (110 m from each end of the
   OpenStreetMap pit way), so about 23 s at 80 km/h; the follower's conservative approach and stop
   add a few seconds. The limit lines should come from the circuit map (a track-pipeline task).

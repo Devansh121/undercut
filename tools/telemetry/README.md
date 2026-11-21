@@ -14,6 +14,8 @@ npm run telemetry -- lap               # reference driver, flying lap at Monza
 npm run telemetry -- lap --laps 10     # ten consecutive laps (fuel for all of them)
 npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1
 npm run telemetry -- weekend --cars 20 --laps 5 --qualifying 600 --seed 1
+npm run telemetry -- calibrate         # every target + the Monza lap, one score
+npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only targets|lap]
 ```
 
 | Manoeuvre | What it does |
@@ -30,6 +32,17 @@ npm run telemetry -- weekend --cars 20 --laps 5 --qualifying 600 --seed 1
 | `lap` | The reference driver on the committed racing line (`packages/ai`): an out-lap, then timed lap(s) from the control line at Monza in the doc 2.1 conditions; lap, sector, corner, corner-geometry and trap tables against the published figures, driver cost per tick; `lap-monza.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-monza.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
 | `race` | AI cars race at Monza from a standing start (`packages/race`): `--cars` (20), `--laps` (5), `--seed` (1), `--spread` of skill 0–1 (0.5), `--no-pit` (otherwise one tyre stop each around half distance for races of five laps or more). Prints the classification, the event log (positions, sectors and speed traps counted, everything else listed), per-car first-lap position, slowest point and track-limit figures, the watchdog's findings, the first-lap overlap count (cars are ghosts to each other), the speed and a digest of the result so two runs can be compared; writes `race-monza-c<cars>-l<laps>-s<seed>.json` with the result and every event |
 | `weekend` | Qualifying (`--qualifying` seconds, 600; `--practice` seconds to add practice) and then the race on the grid from qualifying, with the same output per session |
+
+`calibrate` is the calibration harness: the 32 component targets (role, result, band, in or out,
+miss in band half-widths, the recorded gap), then the Monza lap with a freshly measured envelope
+(driven lap, the driver's plan and the full-envelope plan, sectors, corners, the corner-geometry
+table and the doc 2.6 reference corner speeds), and a score: the summed misses of every target
+and the M1 lap band. About 5 s. `--set` takes a JSON file of parameter values laid out like
+`CarParams`, with aero keyed by trim (`{"tyre": {"muY": 2.1}, "aero": {"low": {"clA": 3.9},
+"all": {"floorShare": 0.5}}}`); it is applied by rewriting `createCarParams` as params.ts loads,
+so the physics manoeuvres, the envelope measurement and the lap runner all build that car, and an
+unknown parameter name is an error. The committed racing line is kept unless `--line rebuild`
+(about 15 s more). It writes `calibrate.json` (or `--out`); it never edits the repository.
 
 Each run writes `<name>.csv` per trace (40 Hz rows: speed, rpm, gear, pedals, g, per-wheel
 load, slip ratio and slip angle, ride heights, pitch, roll, aero forces, DRS, ERS, fuel, yaw

@@ -284,6 +284,11 @@ async function race(options, weekend = false) {
 }
 
 const { name, options } = parseArgs(process.argv.slice(2));
+if (name === 'calibrate') {
+  const { calibrate } = await import('./calibrate.mjs');
+  await calibrate(process.argv.slice(3));
+  process.exit(0);
+}
 if (name === 'lap') {
   await lap(options);
   process.exit(0);
@@ -309,6 +314,9 @@ if (name === 'list' || options.help) {
   );
   console.log(
     `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,
+  );
+  console.log(
+    `  ${'calibrate'.padEnd(15)} every target, the Monza lap and corner speeds for a candidate car (--set file.json, --line rebuild)`,
   );
 } else if (name === 'bench') {
   bench(lib, options);

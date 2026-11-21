@@ -12,7 +12,8 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 74.852,
     high: 82.732,
     stated: '1:18.792 ± 5 %',
-    source: 'doc 2.1 [24]',
+    source: 'doc 2.1 [24]; used in selection: the floor share (doc 7.1)',
+    role: 'selection',
   },
   'monza-trap': {
     id: 'monza-trap',
@@ -22,6 +23,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     high: 354,
     stated: '348 ± 6',
     source: 'doc 2.2 [11]',
+    role: 'validation',
   },
 });
 
@@ -51,11 +53,12 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 90.137,
+    measured: 85.539,
     reason:
-      'The car is slow in the medium-speed corners: sustained lateral grip at 150–250 km/h is ' +
-      '2.3–3.2 g in low trim (doc 7.2), where the corner speeds of a pole lap need about 3.5–4 g. ' +
-      'Section 7.6 has the per-corner breakdown.',
+      'After the tyre and floor calibration the lap is 2.81 s outside the M1 band. The ' +
+      "reference driver's planning margin and driving cost about 1.6 s; the line keeps the " +
+      'whole car 0.3 m inside the white lines, where the rules allow the car centre well past ' +
+      'them, and keeps off the kerbs. docs/physics-validation.md section 7.6.',
   },
 });
 

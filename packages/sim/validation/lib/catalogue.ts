@@ -69,7 +69,12 @@ function row(label: string, result: number, unit: string, digits = 2): ReportRow
 function targetRow(id: string, value: number, digits = 2): ReportRow {
   const t = TARGETS[id]!;
   return {
-    label: t.fit ? `${t.label} (the fit)` : t.label,
+    label:
+      t.role === 'fit'
+        ? `${t.label} (fit)`
+        : t.role === 'selection'
+          ? `${t.label} (selection)`
+          : t.label,
     result: num(value, digits),
     unit: t.unit,
     target: t.stated,
@@ -382,7 +387,7 @@ export const MANOEUVRES: Readonly<Record<string, Manoeuvre>> = {
           high: t.high,
           stated: t.stated,
           source: t.source,
-          fit: t.fit ?? false,
+          role: t.role,
           verdict: verdict(id, v),
           knownGap: KNOWN_GAPS[id]?.measured ?? null,
         });

@@ -33,6 +33,12 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 3. DRS on the main straight: after Parabolica press F once the DRS box on the HUD turns white (zone open), watch it go green and the rear flap open, and note the extra top speed; the first brake press closes it.
 4. On a phone in landscape, open the `Wi-Fi:` HTTPS address: steer with the left pad, pedals on the right. Everything should fit around the controls.
 
+## Known gaps
+
+- Physics: the reference driver laps Monza in 1:29.9; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The car is short of cornering grip. Calibration is in progress; the gap is recorded in `docs/physics-validation.md` section 7 and pinned by a test, not hidden.
+- Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
+- Sound: measured, never heard. The listening queue is in `docs/audio.md`.
+
 ## Decided for you
 
 - MIT copyright holder written as "Devansh121".
@@ -47,12 +53,13 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Committed track files will be offered under ODbL 1.0 with the OpenStreetMap and Copernicus notices, separate from the MIT code.
 - The TUMFTM track dataset is used only as a local cross-check, never shipped: it is OSM-derived but published under LGPL-3.0.
 - Race start fuel 105 kg in the physics targets: the commonly quoted 110 kg cap was not found in the 2025 regulation text.
-- Reference driver (M1): the reference lap at Monza is 90.137 s, outside the M1 band (74.852–82.732 s). It is recorded as a known gap (physics-validation section 5 and 7.6), not loosened. The residual is not yet split between the car's grip, the track geometry and widths, and the line; the test asserts the gap stays within 0.197 s of the recorded value.
+- Reference driver (M1): after the physics calibration the reference lap at Monza is 85.539 s (from 90.137 s), still outside the M1 band (74.852–82.732 s). It is recorded as a known gap, not forced: with the tyre's lateral friction and the low-trim downforce both at the tops of their documented ranges and the line rebuilt it is 83.847 s. Physics-validation section 7.6 measures what is left: the driver's margin and driving (1.76 s), and a racing line that keeps the whole car 0.3 m inside the white lines and off the kerbs although the rule only needs one wheel inside (the legal corridor is worth 0.95 s in the plan; the driven lap spins on it, which is the next task).
+- Physics calibration: the tyre's longitudinal and lateral friction are set separately; both load slopes are −8.75e-5 per N from Perantoni and Limebeer's published single-seater tyre table, not fitted. The high-downforce braking peaks above the published ones are recorded as gaps with competing explanations, not absorbed by the tyre. Targets carry one of three roles (direct fit, selection check, withheld validation); the Monza lap and the cross-trim braking peaks are selection checks. The floor stall acts on the floor's share of the downforce only and changes neither drag nor balance. Low-trim ClA stays at the table's 3.6 for want of evidence to raise it. Counting engine braking inside the brake-by-wire rear demand was tried and not adopted (it needs a brake-migration model with a source). The artefact build now plans on the racing-line offsets as stored, so the shipped speeds are what a driver re-plans from the file (the AI file was outside the calibration's scope; the alternative was loosening a test). The kerb disturbance (point-sampled ground rate into the tyre damping, no envelopment) is an open question.
 - The reference driver keeps off the kerbs and 0.3 m inside the white lines: the kerb edges in the track model unsettle the car at the limit. Kerb use is a per-profile setting in the line configuration for when kerbs are smoother.
 - The reference driver plans with 97 % of the lateral and traction limits and 95 % of braking: the fastest setting that stays clean (98–99 % is slower, 100 % leaves the track).
 - The timed lap follows one out-lap on which the MGU-K is saved (a full store at the line, as in qualifying). Shorter run-ups placed the car at full speed with a full store just before a braking zone, a state a flying lap never reaches, and it could spin there. Track limits are judged strictly: a wheel is off once its centre is past the white line.
 - Monza laps and sectors are timed from the control line, measured on the FIA circuit map at s = 5472.5 m (320.5 m before the track file's s = 0, ±13 m). The track file is unchanged; the track pipeline should carry the control line as metadata, and its DRS zone 2 activation (anchored on the map at the finish line) is about 320 m late.
-- The nightly ten-lap soak starts with 34 kg of fuel (qualifying fuel cannot cover ten laps) and requires a lap-time spread of at most 0.5 s; measured 0.228 s.
+- The nightly ten-lap soak starts with 34 kg of fuel (qualifying fuel cannot cover ten laps) and requires a lap-time spread of at most 0.5 s; measured 0.393 s with the calibrated car (0.228 s before).
 - The racing-line and envelope artefacts are checked for staleness by behavioural fingerprints (what the sim, track and line code compute), not by hashing source text, so unrelated edits do not block other work. The check takes about 5 s in the physics job.
 
 - Time trial starts rolling (150 km/h) from the last grid slot, so lap 1 is a near-flying lap.
@@ -69,7 +76,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Penalties are time penalties only: jump start 5 s, track limits (4th strike) 5 s, keeping a place gained off track 5 s, ignoring blue flags for 15 s 5 s, pit-lane speeding 5 s in a race (a warning elsewhere). Served at the next stop or added at the finish.
 - A finisher that runs one compound in a full-distance race is disqualified (two-compound rule).
 - A car stuck for 60 s is retired; the stuck-car definition (5 s stationary, 10 s without 10 m of progress, 10 s off track, 3 s wrong way) is the watchdog's.
-- The AI's pit-lane driving is a small path follower added to `packages/ai`; its pit loss at Monza is about 33.6 s against the published 24.3 s, mostly because the track file's speed-limit lines are 511 m apart. The limit lines should come from the circuit map (track pipeline).
+- The AI's pit-lane driving is a small path follower added to `packages/ai`; its pit loss at Monza is about 33.2 s against the published 24.3 s, mostly because the track file's speed-limit lines are 511 m apart. The limit lines should come from the circuit map (track pipeline).
 - A ghost records at most ten minutes of lap time (12 000 samples); recording also stops when the lap is invalidated. Lap timing carries on either way.
 - One WebGL renderer for the page's lifetime, reused by every session; each session releases all its own GPU resources when it ends.
 - DRS in time trial opens on request anywhere inside a DRS zone (there is no car to be within a second of); a request made before the zone opens the flap on entry.

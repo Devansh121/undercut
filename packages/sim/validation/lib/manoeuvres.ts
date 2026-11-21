@@ -180,7 +180,7 @@ export function braking(
     v2: number;
     bias: number;
     fuel?: number;
-    /** 'event' (default) trails off into the corner; 'threshold' brakes flat out to v2. */
+    /** 'event' (default) applies the assumed pedal ceiling (`trailOffCap`); 'threshold' does not. */
     profile?: 'event' | 'threshold';
   },
 ): BrakingResult {

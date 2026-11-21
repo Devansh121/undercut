@@ -302,16 +302,22 @@ function substep(
     let fy = tf.fy;
     const w = 1 - speed / tyre.lowSpeed;
     if (w > 0 && tyreZ[i]! > 0) {
-      fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
-      fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
-      // The damped force obeys the same combined friction limit as the steady force.
-      const ex = fx / tf.dx;
-      const ey = fy / tf.dy;
-      const e = ex * ex + ey * ey;
-      if (e > 1) {
-        const k = 1 / Math.sqrt(e);
-        fx *= k;
-        fy *= k;
+      if (tf.dx > 0 && tf.dy > 0) {
+        fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
+        fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
+        // The damped force obeys the same combined friction limit as the steady force.
+        const ex = fx / tf.dx;
+        const ey = fy / tf.dy;
+        const e = ex * ex + ey * ey;
+        if (e > 1) {
+          const k = 1 / Math.sqrt(e);
+          fx *= k;
+          fy *= k;
+        }
+      } else {
+        // No friction available (zero grip): nothing bounds the damping, so no force.
+        fx = 0;
+        fy = 0;
       }
     }
     s.forceX[i] = fx;
@@ -606,12 +612,15 @@ export function aeroCoefficients(
 ): { front: number; rear: number; drag: number } {
   const mean = rideFront + (1 - a.frontHeightWeight) * (rideRear - rideFront);
   const dh = a.referenceHeight - mean;
-  let lift = 1 + a.heightSensitivity * dh;
-  lift = clamp(lift, 0.3, 2);
+  // Only the floor's share follows the floor height and stalls; the wings and bodywork do not.
+  // The stall changes neither the drag nor the balance (doc 1.4).
   const leadingEdge = rideFront + a.leadingEdge * (rideRear - rideFront);
   const stall = clamp((a.stallHeight - leadingEdge) / a.stallWidth, 0, 1);
-  lift *= 1 - a.stallLoss * stall * stall * (3 - 2 * stall);
-  const dragFactor = clamp(1 + (a.heightSensitivity / 3) * dh, 0.5, 1.5);
+  const stallFactor = 1 - a.stallLoss * stall * stall * (3 - 2 * stall);
+  const floorLift = clamp(1 + a.heightSensitivity * dh, 0.3, 2) * stallFactor;
+  const lift = 1 - a.floorShare + a.floorShare * floorLift;
+  const dragFactor =
+    1 - a.floorShare + a.floorShare * clamp(1 + (a.heightSensitivity / 3) * dh, 0.5, 1.5);
   const balance = clamp(
     a.balance + a.rakeBalance * (rideRear - rideFront - a.referenceRake),
     0.2,
