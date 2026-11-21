@@ -342,6 +342,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
 | Monza reference lap 84.969 s against the M1 band 74.852–82.732 s (section 7.6) | 2.24 s outside M1 (2.14 s with DRS zone 2 at its mapped activation), 3.81 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
 | Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
+| Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0009) |
 
 ## 6. Sources
 
@@ -917,3 +918,43 @@ manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both assert
 - No downforce gain from the tow, and the controller never uses more than 98 % of the envelope.
 - The racing line is computed on the OpenStreetMap-derived centreline and authored widths
   (track-data.md), and the authored run-off kinds decide where the corridor may use run-off.
+
+### 7.7 Pose invariants and barrier contact
+
+Added after the owner found a car thrown hundreds of metres up beyond the barrier at Monza (ADR
+0009). `checkCarInvariants` in `packages/sim/src/invariants.ts` is the one checker; the game runs
+it on the player's car every tick, and the suites below call it every step.
+
+**Limits, reference car, low trim** (medium and high differ only by their static ride height):
+
+| Invariant | Limit | Derivation |
+|---|---|---|
+| Every state number | finite | |
+| Floor height above the ground under each axle | −0.100 to 0.644 m | Top: static rear ride height 0.065 m, plus the tyre's full bottoming deflection 0.079 m (wheels unloaded), plus 0.5 m of airborne allowance (about four times the tallest kerb face, 0.13 m). Bottom: twice the depth at which the contact lifts the floor out (50 mm) |
+| Pitch relative to the plane through the four contact heights | ±0.207 rad | Relative pitch is exactly (front − rear floor height) / wheelbase, so it follows from the floor-height span over 3.6 m |
+| Roll relative to that plane | ±0.531 rad | The floor-height span across the floor's 1.4 m width |
+| Wheel centre above the ground under it | 0.181 to 1.004 m | Bottom: free radius 0.36 m less the bottoming deflection and the plank allowance. Top: free radius plus the highest floor |
+| Tyre bottoming deflection, force ceiling | 0.079 m, 23.7 kN | 60 % of the 18-inch tyre's 0.131 m sidewall; × 300 kN/m. Reference lap peak 11.5 kN and 32.5 mm. A floor skid has the same ceiling |
+| Bump and droop stops | 40 mm of spring travel either way, 5 MN/m | Reference lap: at most 16 mm of compression, never extended |
+
+A surface that declares steps (`surfaceStep`) widens the height limits by the step and the angle
+limits through them: 2.644 m, ±1.318 rad pitch and ±3.388 rad roll for 2 m steps.
+
+**Coverage.**
+
+| Suite | Runs | Result |
+|---|---|---|
+| Adversarial surface (`packages/sim/validation/adversarial-surface.test.ts`, CI): cells 4–16 m with heights ±1 m (steps to 2 m), normals tilted up to 20°, grip 0.2–1.2, drag ×1–10, random inputs held up to 1 s | 6 seeds × 30 s, plus determinism | All in bounds; bit-identical repeat. A 40-seed sweep: no failures, highest floor 2.25 m against 2.65 |
+| Random driving on Monza (`packages/track/validation/drive-fuzz.test.ts`, CI): random start round the lap and across the track, random steer, throttle and brake held 0.1–3 s | 10 seeds × 180 s (30 min) | All in bounds; deepest body corner 5 µm past a face at the end of a step; hardest barrier impact 62.4 m/s; highest floor 0.281 m; the ground-step rule never acted; floor or rim strikes only with a wheel on a kerb |
+| The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | All in bounds; deepest corner 52 µm past a face; hardest impact 69.3 m/s; highest floor 0.502 m; no ground steps; one floor strike, on a kerb. The first run had failed that seed because a strike on a kerb counted as a failure; strikes on kerbs are now counted, not failed. Raising the skid ceiling to four tyre loads so the floor could lift the car off the kerb was tried and dropped: it threw a rear wheel 1.02 m up (limit 1.01) |
+| The owner's run (`packages/track/test/offtrack.test.ts`) | 40 s with barriers, and 40 s with the barriers taken away | Bounded both ways; with barriers the car stops at the left barrier before the first chicane and never meets a step |
+| Pit lane (`packages/track/validation/pit-lane.test.ts`) | Entry to exit at 20 m/s | No barrier contact |
+| Ground a car can reach (`packages/track/test/ground-continuity.test.ts`) | Every point inside the barriers plus 0.5 m, and the pit lane, on a 1 m × 0.5 m lattice with 0.25 m probes | No step larger than the steepest kerb flank allows (0.34 m per 0.35 m probe). Before the projection fix: 2.73 m at the first chicane |
+
+Random driving spends about 70 % of its time touching a barrier in the three-minute runs and 90 %
+in the ten-minute ones (an undriven car ends up against one), so the coverage of free running is
+thinner than the hours suggest.
+
+**Reference lap.** 84.969 s on master after the contact patch (#17) and on this branch, bit for
+bit; the physics suite and the AI artefact fingerprints are unchanged.
+

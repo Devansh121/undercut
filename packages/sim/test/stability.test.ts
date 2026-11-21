@@ -25,15 +25,6 @@ function driver(over: Partial<ControlInput>): ControlInput {
 
 const STABILITY: AssistSettings = { tractionControl: 0, abs: 0, autoGears: false, stability: 1 };
 
-/** A car at `speed` m/s sliding with body sideslip `beta` (positive: travelling left of the nose). */
-function sliding(speed: number, beta: number, gear = 4): CarState {
-  const car = createCarState(REFERENCE_CAR, { speed, gear });
-  car.vx = speed * Math.cos(beta);
-  car.vy = speed * Math.sin(beta);
-  car.slipTan.set([0, 0, -Math.tan(beta), -Math.tan(beta)]);
-  return car;
-}
-
 function apply(settings: AssistSettings, car: CarState, d: ControlInput): ControlInput {
   return applyAssists(settings, createAssistState(), car, d, DT, driver({}));
 }
@@ -89,54 +80,124 @@ describe('traction control', () => {
 });
 
 describe('stability assist', () => {
-  it('is off unless asked for, and does nothing while the car is not sliding', () => {
-    const car = sliding(50, 10 * DEG);
-    const d = driver({ steer: 0.1, throttle: 1, brake: 0 });
-    expect(apply(NO_ASSISTS, car, d)).toEqual(d);
-    expect(apply({ ...NO_ASSISTS, stability: 0 }, car, d)).toEqual(d);
-    const gripping = sliding(50, 1 * DEG);
-    expect(apply(STABILITY, gripping, d)).toEqual(d);
+  /**
+   * A car at `speed` m/s turning at `yawRate` rad/s (positive: left), with its rear (`at:
+   * 'rear'`) or front tyres at their peak slip angle, or neither.
+   */
+  function turning(
+    speed: number,
+    yawRate: number,
+    gear = 4,
+    at: 'rear' | 'front' | 'none' = 'rear',
+  ): CarState {
+    const car = createCarState(REFERENCE_CAR, { speed, gear });
+    car.yawRate = yawRate;
+    const peak = car.model.curve.peakSlipTan * 1.05;
+    if (at === 'rear') car.slipTan.set([0, 0, peak, peak]);
+    if (at === 'front') car.slipTan.set([peak, peak, 0, 0]);
+    return car;
+  }
+  /** Run the assists `ticks` times on a frozen car and return the last output. */
+  function hold(
+    settings: AssistSettings,
+    car: CarState,
+    d: ControlInput,
+    ticks = 60,
+    ref = car.yawRate,
+  ): ControlInput {
+    const memory = createAssistState();
+    memory.refYaw = ref;
+    const out = driver({});
+    for (let k = 0; k < ticks; k++) applyAssists(settings, memory, car, d, DT, out);
+    return out;
+  }
+
+  it('is off unless asked for, and leaves a car turning as asked alone', () => {
+    const car = turning(50, 0.8);
+    const d = driver({ steer: 0.02, throttle: 1 });
+    const off = hold(NO_ASSISTS, car, d);
+    expect(off.wheelBrake).toBeUndefined();
+    expect(off.throttle).toBe(1);
+    // Steer asking for exactly the yaw rate the car has: nothing to correct.
+    const p = car.model.params;
+    const asked = (0.4 * p.geometry.wheelbase) / (40 * p.geometry.maxSteerAngle);
+    const on = hold(STABILITY, turning(40, 0.4), driver({ steer: asked, throttle: 1 }));
+    expect(on.wheelBrake).toBeUndefined();
+    expect(on.throttle).toBe(1);
   });
 
-  it('steers toward a slide', () => {
-    for (const beta of [6 * DEG, -6 * DEG]) {
-      const out = apply(STABILITY, sliding(50, beta), driver({ steer: 0 }));
-      expect(Math.sign(out.steer)).toBe(Math.sign(beta));
+  it('never touches the steering and never eases the brake', () => {
+    for (const [r, steer, brake] of [
+      [1.2, 0, 1],
+      [-1.2, 0.2, 0.6],
+      [0, 0.3, 0.8],
+    ] as const) {
+      const out = hold(STABILITY, turning(45, r), driver({ steer, brake }));
+      expect(out.steer).toBe(steer);
+      expect(out.brake).toBe(brake);
     }
-    // More slide, more help, never past full lock.
-    const small = apply(STABILITY, sliding(50, 5 * DEG), driver({})).steer;
-    const big = apply(STABILITY, sliding(50, 15 * DEG), driver({})).steer;
-    expect(big).toBeGreaterThan(small);
-    expect(apply(STABILITY, sliding(50, 60 * DEG), driver({ steer: 1 })).steer).toBe(1);
   });
 
-  it('takes drive away from a sliding rear, down to neutral and no further', () => {
-    const car = sliding(40, 12 * DEG, 4);
-    const out = apply(STABILITY, car, driver({ throttle: 1 }));
-    expect(out.throttle).toBeLessThan(0.5);
+  it('brakes the outer front wheel when the car rotates more than the steering asks', () => {
+    const left = hold(STABILITY, turning(50, 0.9), driver({ steer: 0 }));
+    expect(left.wheelBrake?.[1]).toBeGreaterThan(0.2);
+    expect(left.wheelBrake?.[0]).toBe(0);
+    expect(left.wheelBrake?.[2]).toBe(0);
+    expect(left.wheelBrake?.[3]).toBe(0);
+    const right = hold(STABILITY, turning(50, -0.9), driver({ steer: 0 }));
+    expect(right.wheelBrake?.[0]).toBeGreaterThan(0.2);
+    expect(right.wheelBrake?.[1]).toBe(0);
+  });
+
+  it('brakes the inner rear wheel when the car turns less than the steering asks', () => {
+    const left = hold(STABILITY, turning(30, 0.05, 4, 'front'), driver({ steer: 0.3 }), 120);
+    expect(left.wheelBrake?.[2]).toBeGreaterThan(0.05);
+    expect(left.wheelBrake?.[0]).toBe(0);
+    expect(left.wheelBrake?.[1]).toBe(0);
+    const right = hold(STABILITY, turning(30, -0.05, 4, 'front'), driver({ steer: -0.3 }), 120);
+    expect(right.wheelBrake?.[3]).toBeGreaterThan(0.05);
+  });
+
+  it('takes drive away in oversteer, down to neutral and no further', () => {
+    const car = turning(40, 1.2, 4);
+    const out = hold(STABILITY, car, driver({ throttle: 1 }));
     expect(out.throttle).toBeCloseTo(neutralThrottle(car), 6);
   });
 
-  it('cancels engine braking on a sliding rear when the driver lifts', () => {
-    const car = sliding(40, 12 * DEG, 3);
-    const out = apply(STABILITY, car, driver({ throttle: 0 }));
+  it('cancels engine braking on the rear in oversteer when the driver lifts', () => {
+    const car = turning(40, 1.2, 3);
+    const out = hold(STABILITY, car, driver({ throttle: 0 }));
     expect(out.throttle).toBeCloseTo(neutralThrottle(car), 6);
     expect(Math.abs(crankTorque(car, out.throttle))).toBeLessThan(1e-6);
   });
 
-  it('eases the brake while the car slides', () => {
-    const out = apply(STABILITY, sliding(40, 8 * DEG), driver({ brake: 1 }));
-    expect(out.brake).toBeLessThan(1);
-    expect(out.brake).toBeGreaterThan(0);
-    // Off the brake pedal, nothing to ease.
-    expect(apply(STABILITY, sliding(40, 8 * DEG), driver({})).brake).toBe(0);
+  it('holds the automatic gearbox down-shifts while it corrects oversteer', () => {
+    const settings = { ...STABILITY, autoGears: true };
+    expect(hold(settings, turning(20, 1.5, 6), driver({ brake: 1 }), 1, 0).gearShift).toBe(0);
+    expect(hold(settings, turning(20, 0, 6), driver({ brake: 1 }), 1, 0).gearShift).toBe(-1);
   });
 
-  it('holds the automatic gearbox down-shifts while the car slides', () => {
-    const settings = { ...STABILITY, autoGears: true };
-    const car = sliding(20, 10 * DEG, 6);
-    expect(apply(settings, car, driver({ brake: 1 })).gearShift).toBe(0);
-    expect(apply(settings, sliding(20, 0, 6), driver({ brake: 1 })).gearShift).toBe(-1);
+  it('leaves an axle that still has grip alone', () => {
+    // Rotating faster than the (released) steering asks, rear tyres well inside their grip:
+    // the car is turning, not sliding.
+    const out = hold(STABILITY, turning(50, 0.5, 6, 'none'), driver({ throttle: 1 }));
+    expect(out.wheelBrake).toBeUndefined();
+    expect(out.throttle).toBe(1);
+  });
+
+  it('drops its wheel brake on a wheel that would lock', () => {
+    const car = turning(50, 0.9);
+    car.slipRatio[1] = -0.5;
+    expect(hold(STABILITY, car, driver({})).wheelBrake).toBeUndefined();
+  });
+
+  it('a braked front wheel turns the car toward its side', () => {
+    const env = createEnvironment();
+    const car = createCarState(REFERENCE_CAR, { speed: 50, gear: 6, fuel: 20 });
+    const wheelBrake = new Float64Array([0, 0.4, 0, 0]);
+    const d = driver({ throttle: 0.3, wheelBrake });
+    for (let k = 0; k < 120; k++) stepCar(car, d, FLAT_SURFACE, DT, env);
+    expect(car.yawRate).toBeLessThan(-0.02);
   });
 
   it('catches repeated steering reversals at speed that spin the car without it', () => {

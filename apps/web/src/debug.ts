@@ -4,12 +4,14 @@
  * drive the game through it instead of timing key presses.
  *
  *   await __undercut.start()                 // launch screen -> Time Trial at Monza
- *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera
+ *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera,
+ *                                            // safety-net resets, barrier hits
  *   __undercut.telemetry()                   // CarTelemetry (SI units)
  *   __undercut.teleport(s, d?, kmh?)         // place the car on the lap; timing restarts
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
  *   __undercut.drive({ throttle: 1 })        // hold a scripted ControlInput; drive(null) ends it
  *   __undercut.autopilot(true)               // keyboard-only autopilot through the input layer
+ *   __undercut.clumsyPilot(7)                // the same, as a clumsy player (seeded mistakes)
  *   __undercut.camera('cockpit')             // set the camera; camera() reads it
  *   __undercut.pause() / resume() / restartLap() / resetToTrack()
  *   __undercut.capture()                     // state + telemetry + HUD text + recent events
@@ -22,8 +24,14 @@ import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/re
 import { isQuality } from './game/quality-setting';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
+import type { OnlineState } from './online/session';
+import type { OnlineRaceReport } from './online/race';
 
 export interface DebugApi {
+  online(): {
+    state: OnlineState | null;
+    race: OnlineRaceReport | null;
+  };
   start(): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
@@ -31,6 +39,7 @@ export interface DebugApi {
   setTimeScale(scale: number): void;
   drive(control: Partial<ControlInput> | null): void;
   autopilot(on: boolean): void;
+  clumsyPilot(seed: number): void;
   camera(name?: CameraName): string;
   drivingLine(mode?: DrivingLineMode): DrivingLineState;
   pause(): void;
@@ -136,6 +145,9 @@ export function installDebugApi(
       surface: s.surfaceUnderCar(),
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
+      safetyResets: s.safetyResets,
+      wallHits: s.wallHits,
+      spins: s.spins,
       camera: d.view.cameraName,
       viewBuilds: d.viewBuilds,
       device: s.device,
@@ -153,6 +165,7 @@ export function installDebugApi(
     };
   };
   window.__undercut = {
+    online: () => ({ state: null, race: null }),
     start: async () => {
       if (!getDrive()) await start();
     },
@@ -164,6 +177,7 @@ export function installDebugApi(
     },
     drive: (control) => need().drive(control),
     autopilot: (on) => need().autopilot(on),
+    clumsyPilot: (seed) => need().clumsyPilot(seed),
     camera: (name) => {
       const d = need();
       if (name) d.setCamera(name);

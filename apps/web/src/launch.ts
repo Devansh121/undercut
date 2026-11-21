@@ -1,5 +1,6 @@
 import { GAME_NAME } from '@undercut/core';
 import { formatLapTime } from './game/format';
+import { ControlsPanel, type ControlsSource } from './ui/controls-help';
 import { el, icon } from './ui/dom';
 
 export interface LaunchScreenOptions {
@@ -7,6 +8,9 @@ export interface LaunchScreenOptions {
   /** Best lap at the circuit from storage, if any. */
   record: number | null;
   onStart(): void;
+  onOnline?(): void;
+  /** Where the controls list reads bindings and the device in use. */
+  controls?: ControlsSource;
 }
 
 export interface LaunchScreen {
@@ -16,6 +20,10 @@ export interface LaunchScreen {
   setRecord(record: number | null): void;
   /** Start as if the button was pressed (keyboard or gamepad accept). */
   start(): void;
+  /** Menu accept from a gamepad: press the focused control in the controls list, else Start. */
+  accept(): void;
+  /** Close the controls list if it is open (gamepad back). Returns true when it closed it. */
+  back(): boolean;
 }
 
 /** The launch screen: the name, one mode for M1 (Time Trial at Monza) and the build. */
@@ -52,8 +60,26 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const build = el('footer', 'launch__build');
   build.append('Build ', el('code', '', options.buildHash));
 
-  bar.append(mode, start, build);
+  const online = el('button', 'button', 'Online rooms');
+  online.type = 'button';
+  online.onclick = () => options.onOnline?.();
+  const panel = options.controls ? new ControlsPanel(options.controls) : null;
+  const help = el('button', 'button');
+  help.type = 'button';
+  help.dataset.action = 'controls';
+  help.append(el('span', 'button__label', 'Controls'));
+  help.addEventListener('click', () => panel?.show());
+  screen.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel?.open) {
+      e.preventDefault();
+      panel.hide();
+    }
+  });
+
+  bar.append(mode, start, online, build);
+  if (panel) bar.insertBefore(help, start);
   screen.append(stage, bar);
+  if (panel) screen.append(panel.root);
   root.replaceChildren(screen);
 
   const setRecord = (r: number | null): void => {
@@ -72,7 +98,16 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
     },
     setRecord,
     start() {
+      if (!start.disabled && !panel?.open) start.click();
+    },
+    accept() {
+      if (panel?.accept()) return;
       if (!start.disabled) start.click();
+    },
+    back() {
+      if (!panel?.open) return false;
+      panel.hide();
+      return true;
     },
   };
 }

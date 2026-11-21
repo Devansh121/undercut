@@ -13,6 +13,15 @@ export const LAYERS = [
   'squeal',
   'kerb',
   'scrape',
+  'crack',
+  'burble',
+  'gearWhine',
+  'lockup',
+  'wheelspin',
+  'grass',
+  'gravel',
+  'drs',
+  'impact',
 ] as const;
 
 export type LayerName = (typeof LAYERS)[number];
@@ -32,6 +41,15 @@ export const L = {
   squeal: 10,
   kerb: 11,
   scrape: 12,
+  crack: 13,
+  burble: 14,
+  gearWhine: 15,
+  lockup: 16,
+  wheelspin: 17,
+  grass: 18,
+  gravel: 19,
+  drs: 20,
+  impact: 21,
 } as const satisfies { readonly [K in LayerName]: number };
 
 /** Running sum of squares per layer, before bus gains. Allocation-free. */

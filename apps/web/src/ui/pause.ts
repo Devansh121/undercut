@@ -1,3 +1,4 @@
+import { ControlsPanel, type ControlsSource } from './controls-help';
 import { el, icon, type IconKey } from './dom';
 
 export interface Choice<T extends string | number> {
@@ -24,9 +25,12 @@ export interface PauseSlider {
 
 export interface PauseActions {
   resume(): void;
-  restartLap(): void;
+  /** Absent: no restart (an online race cannot restart one car's lap). */
+  restartLap?: () => void;
   resetToTrack(): void;
   quit(): void;
+  /** Label of the quit button; default "Quit to launch". */
+  quitLabel?: string;
 }
 
 /**
@@ -46,12 +50,15 @@ export class PauseMenu {
     { slider: PauseSlider; input: HTMLInputElement; output: HTMLOutputElement }
   >();
   private focusIndex = 0;
+  /** The controls list, when the menu was given a bindings source. */
+  readonly controls: ControlsPanel | null;
 
   constructor(
     actions: PauseActions,
     settings: PauseSetting[],
     note: () => string,
     sliders: PauseSlider[] = [],
+    controls?: ControlsSource,
   ) {
     const root = el('div', 'pause');
     root.dataset.testid = 'pause-menu';
@@ -88,8 +95,11 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     action('Resume', 'play', actions.resume, 'resume', true);
-    action('Restart lap', 'restart', actions.restartLap, 'restart');
+    if (actions.restartLap) action('Restart lap', 'restart', actions.restartLap, 'restart');
     action('Reset to track', 'reset', actions.resetToTrack, 'reset');
+    this.controls = controls ? new ControlsPanel(controls) : null;
+    const panel = this.controls;
+    if (panel) action('Controls', 'keys', () => panel.show(), 'controls');
 
     const grid = el('div', 'pause__settings');
     for (const setting of settings) {
@@ -152,7 +162,7 @@ export class PauseMenu {
     const quit = el('button', 'pause__quit');
     quit.type = 'button';
     quit.dataset.action = 'quit';
-    quit.append(icon('exit'), el('span', '', 'Quit to launch'));
+    quit.append(icon('exit'), el('span', '', actions.quitLabel ?? 'Quit to launch'));
     quit.addEventListener('click', actions.quit);
     this.focusables.push(quit);
 
@@ -160,6 +170,7 @@ export class PauseMenu {
     body.append(list, grid);
     card.append(head, body, quit);
     root.append(card);
+    if (panel) root.append(panel.root);
   }
 
   private refreshNote: () => void;
@@ -177,6 +188,7 @@ export class PauseMenu {
   }
 
   hide(): void {
+    this.controls?.hide();
     this.root.hidden = true;
   }
 
@@ -207,6 +219,12 @@ export class PauseMenu {
   navigate(action: string): boolean {
     if (!this.open) return false;
     const active = document.activeElement;
+    // The controls list sits on top: back or pause closes it, accept presses its focused button.
+    if (this.controls?.open) {
+      if (action === 'menuBack' || action === 'pause') this.controls.hide();
+      else if (action === 'menuAccept') this.controls.accept();
+      return true;
+    }
     const rowOf = (
       node: Element | null,
     ): { setting: PauseSetting; buttons: HTMLButtonElement[] } | undefined => {

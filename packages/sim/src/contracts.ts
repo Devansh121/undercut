@@ -3,8 +3,9 @@
  *
  * - `ControlInput` is what a driver asks of the car on one sim tick. The input layer (human
  *   devices plus assists) and the AI drivers both produce it; the vehicle model consumes it.
- * - `SurfaceSampler` is how the vehicle model reads the ground. The track package implements it;
- *   the sim ships a flat implementation for tests and validation manoeuvres.
+ * - `SurfaceSampler` is how the vehicle model reads the ground and, optionally, the barriers.
+ *   The track package implements it; the sim ships a flat implementation (no barriers) for tests
+ *   and validation manoeuvres.
  */
 
 /** One tick of driver demand. All fields are already filtered, assisted and clamped. */
@@ -26,6 +27,13 @@ export interface ControlInput {
   overtake: boolean;
   /** Pit-lane speed limiter engaged. */
   pitLimiter: boolean;
+  /**
+   * Optional friction brake per wheel (FL, FR, RL, RR) on top of the pedal, each in [0, 1] as a
+   * share of that wheel's own full braking torque. Only the stability assist sets it (one wheel
+   * at a time, the way road-car stability control brakes a single corner); drivers never do.
+   * Absent, the car is exactly the unassisted car.
+   */
+  wheelBrake?: ArrayLike<number> | undefined;
 }
 
 /** A car with no driver demand: wheel straight, pedals released, nothing pressed. */
@@ -41,6 +49,7 @@ export const NEUTRAL_INPUT: Readonly<ControlInput> = Object.freeze({
 
 /** Writes neutral demand into `out` and returns it. Lets hot loops reuse one object. */
 export function resetControlInput(out: ControlInput): ControlInput {
+  out.wheelBrake = undefined;
   out.steer = 0;
   out.throttle = 0;
   out.brake = 0;
@@ -115,6 +124,25 @@ export function createSurfaceSample(): SurfaceSample {
   };
 }
 
+/**
+ * Where a point stands relative to the barriers: filled in place by `SurfaceSampler.wall`. The
+ * drivable area is everything on the near side of every barrier (track, run-off, pit lane).
+ */
+export interface WallSample {
+  /**
+   * Distance of the point past the nearest barrier face, m: positive behind the barrier (where
+   * no part of a car may be), zero or negative on the drivable side.
+   */
+  depth: number;
+  /** Unit horizontal normal of that face, world frame, pointing back into the drivable area. */
+  normalX: number;
+  normalZ: number;
+}
+
+export function createWallSample(): WallSample {
+  return { depth: Number.NEGATIVE_INFINITY, normalX: 0, normalZ: 0 };
+}
+
 /** A tyre contact patch's view of the ground: means over the patch (`contact.ts`). */
 export interface PatchSample {
   height: number;
@@ -129,6 +157,12 @@ export interface PatchSample {
 export interface SurfaceSampler {
   /** Fills `out` for the world point (x, z). `hint` belongs to this query point. */
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void;
+  /**
+   * Barrier query for the world point (x, z), called per body corner per substep; must not
+   * allocate. Samplers without barriers (open flat ground, test surfaces) leave it out and the
+   * car is never stopped. `hint` belongs to this query point, as for `sample`.
+   */
+  wall?(x: number, z: number, hint: SurfaceHint, out: WallSample): void;
   /**
    * Optional fast path for a tyre's contact patch: the mean of `sample` over the grid
    * `PATCH_ACROSS` × `PATCH_ALONG` (`contact.ts`) of a patch centred at (x, z), forward along the

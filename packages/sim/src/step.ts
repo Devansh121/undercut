@@ -1,6 +1,20 @@
-import type { ControlInput, SurfaceSampler } from './contracts';
+import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
+import { createWallSample } from './contracts';
 import { PATCH_HINTS, createPatchSample, samplePatch, tyreVerticalForce } from './contact';
 import type { Environment } from './environment';
+import {
+  BODY_HALF_WIDTH,
+  BODY_NOSE,
+  BODY_TAIL,
+  BUMP_STOP_GAP,
+  CONTACT_LIFT_MARGIN,
+  DROOP_STOP_GAP,
+  GROUND_STEP_RISE,
+  STOP_RATE,
+  WALL_FRICTION,
+  WALL_RESTITUTION,
+  tyreBottomDeflection,
+} from './model';
 import type { AeroParams, EngineParams } from './params';
 import { ErsMode, computeMass, gearRatio, type CarState, type MassState } from './state';
 import { createTyreForce, tyreForce } from './tyre';
@@ -33,6 +47,7 @@ const ERS_MODES = [
 
 // Per-step scratch. Module-level so the hot loop never allocates; the sim is single-threaded.
 const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
+const wallSample = createWallSample();
 const patch = createPatchSample();
 // Per-step patch samples (`samplePatchesAhead`) and the ground of the current substep.
 const patchStart = new Float64Array(4);
@@ -55,6 +70,9 @@ const bodyX = new Float64Array(4);
 const unsprungZ = new Float64Array(4);
 const wheelX = new Float64Array(4);
 const aero = { front: 0, rear: 0, drag: 0 };
+const stepRise = new Float64Array(4);
+const stepLift = new Float64Array(4);
+const cornerRise = new Float64Array(4);
 
 /**
  * Advance one car by `dt` seconds. `input` is what reaches the car this step (after assists).
@@ -71,6 +89,8 @@ export function stepCar(
   const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-9));
   const h = dt / n;
   applyDriverRequests(state, input);
+  state.wallImpactSpeed = 0;
+  state.wallContact = 0;
   samplePatchesAhead(state, surface, dt);
   for (let k = 0; k < n; k++) {
     // The ground under each patch moves from where it was (groundY) to the patch sample at the
@@ -79,7 +99,7 @@ export function stepCar(
     for (let i = 0; i < 4; i++) {
       patchHeight[i] = patchStart[i]! + (patchEnd[i]! - patchStart[i]!) * f;
     }
-    substep(state, input, h, env);
+    substep(state, input, surface, h, n, env);
   }
 }
 
@@ -129,6 +149,33 @@ function samplePatchesAhead(s: CarState, surface: SurfaceSampler, dt: number): v
   }
 }
 
+const cornerMass: MassState = {
+  total: 0,
+  sprung: 0,
+  a: 0,
+  b: 0,
+  sprungA: 0,
+  sprungB: 0,
+  yawInertia: 0,
+};
+
+/**
+ * World (x, z) of the body's four footprint corners (front left, front right, rear left, rear
+ * right) into `out` as x0, z0, x1, z1, ... Allocation-free.
+ */
+export function bodyCorners(state: CarState, out: Float64Array): Float64Array {
+  const m = computeMass(state.model, state.fuelMass, cornerMass);
+  const c = Math.cos(state.yaw);
+  const sn = Math.sin(state.yaw);
+  for (let k = 0; k < 4; k++) {
+    const bx = k < 2 ? m.a + BODY_NOSE : -m.b - BODY_TAIL;
+    const by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    out[2 * k] = state.x + bx * c - by * sn;
+    out[2 * k + 1] = state.z - bx * sn - by * c;
+  }
+  return out;
+}
+
 /** Begin a new ERS lap: the timing line (or pit entry) resets the per-lap counters. */
 export function beginErsLap(state: CarState): void {
   state.ersDeployLap = 0;
@@ -166,7 +213,14 @@ function applyDriverRequests(s: CarState, input: ControlInput): void {
   s.shiftTimer = target > s.gear ? p.gearbox.upshiftTime : p.gearbox.downshiftTime;
 }
 
-function substep(s: CarState, input: ControlInput, h: number, env: Environment): void {
+function substep(
+  s: CarState,
+  input: ControlInput,
+  surface: SurfaceSampler,
+  h: number,
+  substeps: number,
+  env: Environment,
+): void {
   const model = s.model;
   const p = model.params;
   const tyre = p.tyre;
@@ -215,12 +269,22 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
   const gravX = gNormal * (nx * c - nz * sn);
   const gravY = gNormal * (-nx * sn - nz * c);
 
+  // ---- Ground steps: lift the car out of ground it cannot have rolled onto. ----
+  liftOutOfGround(s, h, substeps, mass.sprungA, mass.sprungB);
+
   // ---- Vertical: tyres, springs, anti-roll bars, dampers. ----
   const kt = tyre.verticalStiffness;
   const ct = tyre.verticalDamping;
+  const tyreMax = model.tyreForceMax;
   for (let i = 0; i < 4; i++) {
     const comp = gh[i]! + tyre.freeRadius - s.wheelY[i]!;
-    const f = tyreVerticalForce(comp, ghRate[i]! - s.wheelVy[i]!, kt, ct, tyre.dampingOnset, damp);
+    // A tyre only pushes, and never past its bottoming load: a step in the ground (a wheel
+    // suddenly deep below it, or a huge ground rate) then gives a bounded force.
+    let f = tyreVerticalForce(comp, ghRate[i]! - s.wheelVy[i]!, kt, ct, tyre.dampingOnset, damp);
+    if (f > tyreMax) {
+      damp.damping -= f - tyreMax;
+      f = tyreMax;
+    }
     tyreZ[i] = f;
     s.load[i] = f;
     s.tyreDamping[i] = damp.damping;
@@ -233,9 +297,13 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
     const lenRate = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - s.wheelVy[i]!;
     const comp = model.springFree[i]! - len;
     s.travel[i] = comp - model.staticCompression[i]!;
-    bodyZ[i] =
+    let f =
       (front ? susp.springFront : susp.springRear) * comp -
       (front ? susp.damperFront : susp.damperRear) * lenRate;
+    // Bump and droop stops bound the wheel's travel relative to the body.
+    if (comp > BUMP_STOP_GAP) f += STOP_RATE * (comp - BUMP_STOP_GAP);
+    else if (comp < -DROOP_STOP_GAP) f += STOP_RATE * (comp + DROOP_STOP_GAP);
+    bodyZ[i] = f;
   }
   for (let axle = 0; axle < 2; axle++) {
     const l = axle * 2;
@@ -297,8 +365,12 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
     if (height >= 0) continue;
     const groundRate = (ghRate[l]! + ghRate[l + 1]!) / 2 + across * (ghRate[l]! - ghRate[l + 1]!);
     const rate = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - groundRate;
-    const n = -0.5 * susp.plankStiffness * height - 0.5 * susp.plankDamping * rate;
+    let n = -0.5 * susp.plankStiffness * height - 0.5 * susp.plankDamping * rate;
     if (n <= 0) continue;
+    // A skid passes at most a tyre's bottoming load. A raised kerb that puts the floor's edge
+    // in deeper than the plank can lift is a floor strike, resolved inelastically below
+    // (`liftOutOfGround`): a stronger floor spring would throw the car off the kerb instead.
+    if (n > model.tyreForceMax) n = model.tyreForceMax;
     skidHeave += n;
     skidPitch += n * xb;
     skidRoll += n * yl;
@@ -381,7 +453,7 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
   }
 
   // ---- Power unit, ERS, brakes, wheel spin. ----
-  stepPowertrain(s, throttle, brake, input.overtake, h);
+  stepPowertrain(s, throttle, brake, input.overtake, h, input.wheelBrake);
 
   // ---- Planar chassis (semi-implicit Euler). ----
   const extX = s.externalForceX * c - s.externalForceZ * sn;
@@ -404,6 +476,9 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
   s.distance += h * Math.sqrt(s.vx * s.vx + s.vy * s.vy);
   s.accelX = specificX;
   s.accelY = specificY;
+
+  // ---- Barriers. ----
+  if (surface.wall) wallContact(s, surface, m, mass.yawInertia, mass.a, mass.b);
 
   // ---- Sprung and unsprung vertical motion. ----
   // The ground forces' overturning moment, h·ΣF about the whole car's CoG height, splits in
@@ -455,6 +530,179 @@ function substep(s: CarState, input: ControlInput, h: number, env: Environment):
   }
 }
 
+/**
+ * Barrier contact at the body's four footprint corners, resolved every substep. A corner behind
+ * a barrier face is pushed back onto it (the whole car moves; position only). If that corner is
+ * moving into the face, a planar impulse at the corner removes its normal speed (keeping
+ * WALL_RESTITUTION of it) and a friction impulse, at most WALL_FRICTION times the normal one,
+ * scrubs its speed along the face. Applied at the corner, both impulses also change the yaw
+ * rate, so a car that hits at an angle swings round and slides along the barrier. The largest
+ * normal speed met on the step is kept as the impact speed. No damage here.
+ */
+function wallContact(
+  s: CarState,
+  surface: SurfaceSampler,
+  m: number,
+  inertia: number,
+  a: number,
+  b: number,
+): void {
+  for (let k = 0; k < 4; k++) {
+    const c = Math.cos(s.yaw);
+    const sn = Math.sin(s.yaw);
+    const bx = k < 2 ? a + BODY_NOSE : -b - BODY_TAIL;
+    const by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    // Corner offset from the CoG in the world frame.
+    const rx = bx * c - by * sn;
+    const rz = -bx * sn - by * c;
+    surface.wall!(s.x + rx, s.z + rz, s.wallHints[k] as SurfaceHint, wallSample);
+    const depth = wallSample.depth;
+    if (!(depth > 0)) continue;
+    const nx = wallSample.normalX;
+    const nz = wallSample.normalZ;
+    s.x += depth * nx;
+    s.z += depth * nz;
+    s.wallContact = 1;
+    // Corner velocity, world frame: v + ω × r with ω about +Y.
+    const vwx = s.vx * c - s.vy * sn;
+    const vwz = -s.vx * sn - s.vy * c;
+    const w = s.yawRate;
+    const px = vwx + w * rz;
+    const pz = vwz - w * rx;
+    const vn = px * nx + pz * nz;
+    if (vn >= 0) continue;
+    if (-vn > s.wallImpactSpeed) s.wallImpactSpeed = -vn;
+    // Tangent along the face and the corner's sliding speed on it.
+    const tx = -nz;
+    const tz = nx;
+    const vt = px * tx + pz * tz;
+    const rn = rz * nx - rx * nz;
+    const rt = rz * tx - rx * tz;
+    const jn = (-(1 + WALL_RESTITUTION) * vn) / (1 / m + (rn * rn) / inertia);
+    let jt = -vt / (1 / m + (rt * rt) / inertia);
+    const jmax = WALL_FRICTION * jn;
+    if (jt > jmax) jt = jmax;
+    else if (jt < -jmax) jt = -jmax;
+    const jx = jn * nx + jt * tx;
+    const jz = jn * nz + jt * tz;
+    // Back to the car's frame: forward and left components of the impulse.
+    s.vx += (jx * c - jz * sn) / m;
+    s.vy += (-jx * sn - jz * c) / m;
+    s.yawRate += (rz * jx - rx * jz) / inertia;
+  }
+}
+
+/**
+ * The contact's last line of defence against ground no wheel could roll onto. Two rules, both
+ * at position level and both counted in the state's diagnostics:
+ *
+ * - A step (the ground under a wheel rose more than GROUND_STEP_RISE into its tyre since the
+ *   last substep): that corner of the car, wheel and body together, is lifted by the rise,
+ *   pivoting about the diagonally opposite corner (the two adjacent corners rise by half). The
+ *   wheels move with their body corners, so no spring or tyre compression changes and no
+ *   velocity changes: the step adds potential energy only.
+ * - Penetration no deflection explains (a wheel past its bottoming depth by CONTACT_LIFT_MARGIN,
+ *   or a floor skid past its saturation depth): the car moves up until it is back at that depth
+ *   and its downward velocity is removed, as in an inelastic rim or floor strike.
+ */
+function liftOutOfGround(
+  s: CarState,
+  h: number,
+  substeps: number,
+  sprungA: number,
+  sprungB: number,
+): void {
+  const p = s.model.params;
+  const R = p.tyre.freeRadius;
+  // A step's size is the extra tyre compression it causes: for a wheel already in the air,
+  // only the part of the rise that reaches above the tyre's free radius counts.
+  for (let i = 0; i < 4; i++) {
+    const comp = gh[i]! + R - s.wheelY[i]!;
+    const before = comp - ghRate[i]! * h;
+    stepRise[i] = comp - (before > 0 ? before : 0);
+    stepLift[i] = 0;
+  }
+  for (let pass = 0; pass < 4; pass++) {
+    let k = -1;
+    // The contact patch is sampled once per step and its height spread evenly over the
+    // substeps, so a step's rise arrives in `substeps` equal shares: compare each share.
+    let most = GROUND_STEP_RISE / substeps;
+    for (let i = 0; i < 4; i++) {
+      const left = stepRise[i]! - stepLift[i]!;
+      if (left > most) {
+        most = left;
+        k = i;
+      }
+    }
+    if (k < 0) break;
+    pivotCorner(s, k, most, sprungA, sprungB);
+    s.groundSteps += 1;
+  }
+  // Relative to the moved car, each wheel's ground rose by its own rise less its lift.
+  for (let i = 0; i < 4; i++) ghRate[i] = ghRate[i]! - stepLift[i]! / h;
+
+  const depthMax = tyreBottomDeflection(p.tyre) + CONTACT_LIFT_MARGIN;
+  const floorMax = s.model.tyreForceMax / (0.5 * p.suspension.plankStiffness);
+  let lift = 0;
+  for (let i = 0; i < 4; i++) {
+    const over = gh[i]! + R - s.wheelY[i]! - depthMax;
+    if (over > lift) lift = over;
+  }
+  const halfWidth = p.suspension.floorHalfWidth;
+  for (let k = 0; k < 4; k++) {
+    const front = k < 2;
+    const yl = k % 2 === 0 ? halfWidth : -halfWidth;
+    const xb = front ? sprungA : -sprungB;
+    const l = front ? 0 : 2;
+    const across = yl / (2 * s.model.wheelLeft[l]!);
+    const ground = (gh[l]! + gh[l + 1]!) / 2 + across * (gh[l]! - gh[l + 1]!);
+    const over = ground - (s.y + xb * s.pitch + yl * s.roll) - floorMax;
+    if (over > lift) lift = over;
+  }
+  if (lift <= 0) return;
+  s.y += lift;
+  for (let i = 0; i < 4; i++) s.wheelY[i] = s.wheelY[i]! + lift;
+  if (s.heaveRate < 0) s.heaveRate = 0;
+  for (let i = 0; i < 4; i++) if (s.wheelVy[i]! < 0) s.wheelVy[i] = 0;
+  s.contactLifts += 1;
+}
+
+/**
+ * Raise corner k of the car (body corner and wheel) by `dz`, pivoting about the diagonally
+ * opposite corner: a rigid rotation and heave of the body, with each wheel following its corner.
+ * Adds each corner's rise to `stepLift`.
+ */
+function pivotCorner(s: CarState, k: number, dz: number, sprungA: number, sprungB: number): void {
+  const wl = s.model.wheelLeft;
+  // Corner rises: k by dz, the opposite corner by 0, the two adjacent ones by dz / 2.
+  const opp = 3 - k;
+  for (let i = 0; i < 4; i++) cornerRise[i] = i === k ? dz : i === opp ? 0 : dz / 2;
+  // Body pose change from the front-left, front-right and rear-left corner rises.
+  const L = sprungA + sprungB;
+  const dRoll =
+    ((cornerRise[0]! - cornerRise[1]!) / (wl[0]! - wl[1]!) +
+      (cornerRise[2]! - cornerRise[3]!) / (wl[2]! - wl[3]!)) /
+    2;
+  const front = (cornerRise[0]! + cornerRise[1]!) / 2;
+  const rear = (cornerRise[2]! + cornerRise[3]!) / 2;
+  const dPitch = (front - rear) / L;
+  const dHeave = front - sprungA * dPitch;
+  s.y += dHeave;
+  s.pitch += dPitch;
+  s.roll += dRoll;
+  for (let i = 0; i < 4; i++) {
+    const xb = i < 2 ? sprungA : -sprungB;
+    const lift = dHeave + xb * dPitch + wl[i]! * dRoll;
+    s.wheelY[i] = s.wheelY[i]! + lift;
+    stepLift[i] = stepLift[i]! + lift;
+  }
+}
+
+/** One wheel's share of an assist's per-wheel brake demand, clamped to [0, 1]. */
+function wheelShare(demand: ArrayLike<number>, i: number): number {
+  return clamp(finite(demand[i] ?? 0), 0, 1);
+}
+
 /** Engine, clutch, gearbox, differential, ERS and brakes for one substep. */
 function stepPowertrain(
   s: CarState,
@@ -462,6 +710,7 @@ function stepPowertrain(
   brake: number,
   overtake: boolean,
   h: number,
+  wheelBrake: ArrayLike<number> | undefined,
 ): void {
   const p = s.model.params;
   const eng = p.engine;
@@ -559,10 +808,15 @@ function stepPowertrain(
   // Brakes (friction torque per wheel) plus rolling resistance as a torque on the wheel.
   const rearBrake = Math.max(0, rearRequest - harvestAtWheels) / 2;
   const crr = tyre.rollingResistance * R;
+  // Per-wheel friction brake an assist asks for on top of the pedal, as a share of that wheel's
+  // own full braking torque (`ControlInput.wheelBrake`). Absent, nothing below changes.
+  const frontFull = (s.model.brakeCapacity * s.brakeBias) / 2;
+  const rearFull = (s.model.brakeCapacity * (1 - s.brakeBias)) / 2;
 
   // Front wheels: free spin with Coulomb friction from brake and rolling resistance.
   for (let i = 0; i < 2; i++) {
-    const bound = ((frontBrake + crr * s.load[i]! * rollDrag[i]!) * h) / If;
+    const fb = wheelBrake ? frontBrake + wheelShare(wheelBrake, i) * frontFull : frontBrake;
+    const bound = ((fb + crr * s.load[i]! * rollDrag[i]!) * h) / If;
     let w = s.wheelSpeed[i]! - (h * s.forceX[i]! * R) / If;
     if (Math.abs(w) <= bound) w = 0;
     else w -= w > 0 ? bound : -bound;
@@ -586,8 +840,10 @@ function stepPowertrain(
   const inputTorque = Math.abs(s.driveTorque * G);
   const ramp = s.driveTorque >= 0 ? p.diff.rampDrive : p.diff.rampCoast;
   const lsdCap = (p.diff.preload + ramp * inputTorque) * h;
-  const brakeL = (rearBrake + crr * s.load[2]! * rollDrag[2]!) * h;
-  const brakeR = (rearBrake + crr * s.load[3]! * rollDrag[3]!) * h;
+  const rbL = wheelBrake ? rearBrake + wheelShare(wheelBrake, 2) * rearFull : rearBrake;
+  const rbR = wheelBrake ? rearBrake + wheelShare(wheelBrake, 3) * rearFull : rearBrake;
+  const brakeL = (rbL + crr * s.load[2]! * rollDrag[2]!) * h;
+  const brakeR = (rbR + crr * s.load[3]! * rollDrag[3]!) * h;
   const clutchMass = clutchCap > 0 ? 1 / (1 / Je + (G * G) / (2 * Ir)) : 0;
   const halfG = G / 2;
   let lc = 0;

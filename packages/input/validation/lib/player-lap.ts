@@ -13,7 +13,9 @@ import {
   createCarParams,
   createCarState,
   createWorld,
+  restoreAssists,
   restoreCar,
+  snapshotAssists,
   snapshotCar,
   stepWorld,
   type CarState,
@@ -29,9 +31,16 @@ import {
   type AxisShaper,
   type Axes,
 } from '../../src/axis-shaper';
-import { applyDriverAids, type AssistConfig } from '../../src/driver-aids';
+import {
+  applyDriverAids,
+  type AssistConfig,
+  type GuidePosition,
+  type SpeedGuide,
+} from '../../src/driver-aids';
 import { DEFAULT_KEYBOARD_SHAPING, type KeyboardShaping } from '../../src/shaping';
 import { Human, type CueSource, type HumanTraits } from './human';
+
+const ZERO_AXES: Readonly<Axes> = Object.freeze({ steer: 0, throttle: 0, brake: 0 });
 
 /** The game's sim step (ADR 0007). */
 export const STEP = 1 / 240;
@@ -45,6 +54,9 @@ export const ROLLING_START_RUN_UP = 160;
  * envelope than the reference driver uses). What a player who knows the circuit a little aims for.
  */
 export const NEWCOMER_SCALE: Readonly<EnvelopeScale> = DRIVING_LINE_SCALE;
+
+/** Default cost of a spin, s (see `PlayerRunOptions.spinCost`). */
+export const SPIN_COST = 5;
 
 /** A spin: body sideslip past `SPIN_SIDESLIP`, or the car pointing more than 90° off the road. */
 export const SPIN_SIDESLIP = (30 * Math.PI) / 180;
@@ -65,6 +77,14 @@ export interface PlayerRunOptions {
   /** The plan the human drives to; default the newcomer plan on the shipped line. */
   plan?: DrivingPlan;
   cues?: CueSource;
+  /** The driving line's advised speeds for the braking help, as the game passes them. */
+  guide?: SpeedGuide;
+  /**
+   * What a spin costs, s: added to the lap and counted as time off the track (a spun car
+   * stops, turns round and rejoins, usually from the run-off). The car is then put back on the
+   * line where it spun. Default `SPIN_COST`.
+   */
+  spinCost?: number;
   /** Keyboard shaping; default the game's. */
   shaping?: KeyboardShaping;
   /** Collect one row per tick here (diagnostics; see `TRACE_COLUMNS`). */
@@ -140,8 +160,15 @@ export interface PlayerRunResult {
   /** Laps with no spin. */
   cleanLaps: number[];
   spins: SpinEvent[];
-  /** Ticks with every wheel on grass or gravel. */
+  /** Spins that ended against a barrier (struck in the 1.5 s before). */
+  wallSpins: number;
+  /**
+   * Ticks with the car's centre on grass or gravel, plus `spinCost` seconds of ticks for each
+   * spin.
+   */
   offTicks: number;
+  /** Ticks on which the steer reaching the car differed from the driver's by more than 0.15. */
+  overrideTicks: number;
   maxSideslipDeg: number;
   reaction: number;
 }
@@ -219,13 +246,20 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
     lapTimes: [],
     cleanLaps: [],
     spins: [],
+    wallSpins: 0,
     offTicks: 0,
+    overrideTicks: 0,
     maxSideslipDeg: 0,
     reaction: human.reaction,
   };
   let lapIndex = -1;
   let lapStart = 0;
   let lapSpins = 0;
+  let penalty = 0;
+  let lastWall = -Infinity;
+  const spinCost = o.spinCost ?? SPIN_COST;
+  const ground = createGround();
+  const where: GuidePosition | undefined = o.guide ? { guide: o.guide, s: 0 } : undefined;
   let prevS = track.project(car.state.x, car.state.z, hint, q).s;
   let prevT = 0;
   let prevGear = car.state.gear;
@@ -238,8 +272,11 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
     control.steer = shaped.steer;
     control.throttle = shaped.throttle;
     control.brake = shaped.brake;
-    applyDriverAids(o.device, o.assists, memory, st, control, STEP, car.input);
+    if (where) where.s = prevS;
+    applyDriverAids(o.device, o.assists, memory, st, control, STEP, car.input, where);
+    if (lapIndex >= 0 && Math.abs(car.input.steer - control.steer) > 0.15) result.overrideTicks++;
     stepWorld(world);
+    if (st.wallImpactSpeed > 0) lastWall = world.time;
 
     const t = world.time;
     const s = track.project(st.x, st.z, hint, q).s;
@@ -282,16 +319,18 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
       const ds = track.forwardDistance(prevS, s);
       const tc = prevT + (t - prevT) * (ds > 0 ? track.forwardDistance(prevS, timing) / ds : 1);
       if (lapIndex >= 0) {
-        result.lapTimes.push(tc - lapStart);
+        result.lapTimes.push(tc - lapStart + penalty);
         if (lapSpins === 0) result.cleanLaps.push(tc - lapStart);
         result.laps++;
       }
       lapIndex++;
       lapStart = tc;
       lapSpins = 0;
+      penalty = 0;
     }
     if (lapIndex >= 0 && lapIndex < o.laps) {
-      if (kinds.grass === 4) result.offTicks++;
+      const centre = track.ground(q.s, q.d, ground).kind;
+      if (centre === SurfaceKind.Grass || centre === SurfaceKind.Gravel) result.offTicks++;
       result.maxSideslipDeg = Math.max(result.maxSideslipDeg, (Math.abs(beta) * 180) / Math.PI);
       const spun = (Math.abs(beta) > SPIN_SIDESLIP && st.vx > 8) || off > Math.PI / 2;
       if (spun) {
@@ -306,8 +345,11 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
           before: history.summary(),
         });
         lapSpins++;
-        // Back on the line a little further on, at half the plan's speed.
-        const sr = track.wrap(s + 30);
+        if (t - lastWall < 1.5) result.wallSpins++;
+        penalty += spinCost;
+        result.offTicks += Math.round(spinCost / STEP);
+        // Back on the line where it spun, at half the plan's speed.
+        const sr = s;
         const ir = Math.round(sr / track.lap.step) % n;
         const speed = Math.max(15, 0.5 * plan.profile.v[ir]!);
         const fresh = createCarState(params, {
@@ -320,7 +362,9 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
           surface,
         });
         restoreCar(st, snapshotCar(fresh));
-        Object.assign(memory, createAssistState());
+        restoreAssists(memory, snapshotAssists(createAssistState()));
+        human.reset();
+        shaper.seed(ZERO_AXES);
         history.clear();
         prevS = track.project(st.x, st.z, hint, q).s;
         prevT = t;

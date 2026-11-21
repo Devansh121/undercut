@@ -74,11 +74,11 @@ export interface InputShaping {
 }
 
 export const DEFAULT_KEYBOARD_SHAPING: Readonly<KeyboardShaping> = Object.freeze({
-  steerRate: 1.8,
-  steerRateAtHighSpeed: 0.3,
-  returnRate: 1.8,
+  steerRate: 4.5,
+  steerRateAtHighSpeed: 0.8,
+  returnRate: 8,
   highSpeed: 70,
-  lockAtHighSpeed: 0.12,
+  lockAtHighSpeed: 0.15,
   throttleRise: 5,
   throttleFall: 10,
   brakeRise: 8,

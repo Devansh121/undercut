@@ -2,7 +2,16 @@ export { AudioCore, MAX_SAMPLE_RATE, MIN_SAMPLE_RATE, type AudioCoreOptions } fr
 export { CHUNK } from './controls';
 export { DEFAULT_LIMITER, softClip, type LimiterOptions } from './limiter';
 export { LAYERS, LayerMeters, type LayerName } from './meters';
-export { DEFAULT_POWER_UNIT, type Formant, type PowerUnitSoundSpec } from './spec';
+export { DUCKING, Ducker } from './ducking';
+export { IMPACT_FULL_SPEED, IMPACT_MIN_SPEED } from './impact';
+export { DRS_WIND, SLIP_VOICES } from './road-voice';
+export {
+  DEFAULT_POWER_UNIT,
+  type Formant,
+  type GearboxSoundSpec,
+  type PowerUnitSoundSpec,
+} from './spec';
+export { AUDIO_VIEWS, VIEW_BALANCE, type AudioView, type ViewBalance } from './view';
 export {
   CAR_STATE_FIELDS,
   CAR_STATE_RANGE,
@@ -11,6 +20,7 @@ export {
   packCarState,
   radPerSecondToRpm,
   rpmToRadPerSecond,
+  SLIP_LIMIT,
   unpackCarState,
   type AudioCarState,
 } from './state';
