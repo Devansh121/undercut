@@ -612,12 +612,13 @@ export function aeroCoefficients(
 ): { front: number; rear: number; drag: number } {
   const mean = rideFront + (1 - a.frontHeightWeight) * (rideRear - rideFront);
   const dh = a.referenceHeight - mean;
-  // Only the floor's share follows the floor height; the wings and bodywork do not.
-  const floorLift = clamp(1 + a.heightSensitivity * dh, 0.3, 2);
-  let lift = 1 - a.floorShare + a.floorShare * floorLift;
+  // Only the floor's share follows the floor height and stalls; the wings and bodywork do not.
+  // The stall changes neither the drag nor the balance (doc 1.4).
   const leadingEdge = rideFront + a.leadingEdge * (rideRear - rideFront);
   const stall = clamp((a.stallHeight - leadingEdge) / a.stallWidth, 0, 1);
-  lift *= 1 - a.stallLoss * stall * stall * (3 - 2 * stall);
+  const stallFactor = 1 - a.stallLoss * stall * stall * (3 - 2 * stall);
+  const floorLift = clamp(1 + a.heightSensitivity * dh, 0.3, 2) * stallFactor;
+  const lift = 1 - a.floorShare + a.floorShare * floorLift;
   const dragFactor =
     1 - a.floorShare + a.floorShare * clamp(1 + (a.heightSensitivity / 3) * dh, 0.5, 1.5);
   const balance = clamp(

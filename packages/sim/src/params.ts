@@ -153,10 +153,11 @@ export interface AeroParams {
   drsOpenTime: number;
   drsCloseTime: number;
   /**
-   * Ride-height map (doc 1.4, shape estimate). ClA·(1 − f + f·(1 + k·(h0 − h))), f the floor
-   * share and h a front-weighted mean of the floor heights at the axles; a smooth stall of
-   * `stallLoss` over `stallWidth` once the floor's leading edge drops below `stallHeight`; drag
-   * sensitivity one third of the downforce sensitivity. `referenceHeight` (h0) is the mean
+   * Ride-height map (doc 1.4, shape estimate). ClA·(1 − f + f·(1 + k·(h0 − h))·S), f the floor
+   * share, h a front-weighted mean of the floor heights at the axles, and S a smooth stall of
+   * the floor alone: it loses `stallLoss` of its own downforce over `stallWidth` once its
+   * leading edge drops below `stallHeight`, with drag and balance unchanged. Drag sensitivity
+   * is one third of the downforce sensitivity, on the floor's share. `referenceHeight` (h0) is the mean
    * floor height at which the table ClA and CdA hold: the doc fitted them to speed-trap and
    * braking data, so h0 is the height the car runs at 300 km/h on a flat straight in that trim
    * (measured, see the Results section).

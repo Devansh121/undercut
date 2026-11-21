@@ -339,13 +339,36 @@ describe('aero', () => {
     }
     // Continuous: no step anywhere near the size of the stall loss itself.
     expect(biggestStep).toBeLessThan(0.05 * a.stallLoss * a.clA);
-    // Below the stall the floor loses `stallLoss` of what the height trend would give.
+    // Below the stall the floor, and only the floor, loses `stallLoss` of what the height trend
+    // would give it; the wings and bodywork keep theirs.
     const deep = a.stallHeight - a.leadingEdge * 0.03 - a.stallWidth - 0.001;
     const noStall = { ...a, stallLoss: 0 };
     aeroCoefficients(noStall, deep, deep + 0.03, 0, out);
     const trend = out.front + out.rear;
-    expect(total(deep) / trend).toBeCloseTo(1 - a.stallLoss, 9);
+    const wings = (1 - a.floorShare) * a.clA;
+    expect((total(deep) - wings) / (trend - wings)).toBeCloseTo(1 - a.stallLoss, 9);
     expect(edge(a.stallHeight - a.leadingEdge * 0.03)).toBeCloseTo(a.stallHeight, 9);
+  });
+
+  it('stalls no downforce when the floor makes none, and keeps drag and balance when stalled', () => {
+    const a = createCarParams('medium').aero;
+    const deep = a.stallHeight - a.leadingEdge * 0.03 - a.stallWidth - 0.001;
+    const noFloor = { ...a, floorShare: 0 };
+    const w = aeroCoefficients(noFloor, deep, deep + 0.03, 0, out);
+    expect(w.front + w.rear).toBeCloseTo(a.clA, 9);
+    // A stalled floor changes neither the drag nor where the downforce acts (doc 1.4).
+    const stalled = { ...aeroCoefficients(a, deep, deep + 0.03, 0, out) };
+    const clean = aeroCoefficients({ ...a, stallLoss: 0 }, deep, deep + 0.03, 0, {
+      front: 0,
+      rear: 0,
+      drag: 0,
+    });
+    expect(stalled.front + stalled.rear).toBeLessThan(clean.front + clean.rear);
+    expect(stalled.drag).toBe(clean.drag);
+    expect(stalled.front / (stalled.front + stalled.rear)).toBeCloseTo(
+      clean.front / (clean.front + clean.rear),
+      12,
+    );
   });
 
   it('moves only the floor share of the downforce and its drag with the floor height', () => {
