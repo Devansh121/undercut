@@ -375,17 +375,21 @@ test.describe('drive', () => {
           },
           [camera, at] as const,
         );
-        // Let the car run briefly, then freeze the sim: the cameras settle on real time, and a
-        // busy runner can stall the page's frames, so wait for 30 drawn frames as well as the
-        // settle time, on a scene that does not move meanwhile.
+        // Let the car run briefly, then freeze the sim: the cameras and lift ease on clamped real
+        // time (dt <= 0.25 s, slowest tau = 0.25 s), so 1.5 s of clamped frame time (>= 8 frames)
+        // converges them to >99.7 % without waiting for 30 slow software-WebGL frames.
         await page.waitForTimeout(500);
         await page.evaluate(() => {
           window.__undercut?.setTimeScale(0);
           window.__undercut?.resetFrameTimes();
         });
-        await page.waitForTimeout(1500);
         await page.waitForFunction(
-          () => (window.__undercut?.frameTimes().length ?? 0) >= 30,
+          () => {
+            const times = window.__undercut?.frameTimes() ?? [];
+            let clamped = 0;
+            for (const ms of times) clamped += Math.min(250, ms);
+            return times.length >= 8 && clamped >= 1500;
+          },
           null,
           {
             timeout: 30_000,

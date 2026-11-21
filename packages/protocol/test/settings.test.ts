@@ -66,3 +66,19 @@ describe('parseTimings', () => {
     }
   });
 });
+
+describe('parseTimings: room lifetime cap', () => {
+  it('accepts a cap from one minute to a week and nothing else', () => {
+    expect(parseTimings('{"maxRoomAgeMs":21600000}')).toEqual({
+      ok: true,
+      value: { ...DEFAULT_TIMINGS, maxRoomAgeMs: 21_600_000 },
+    });
+    for (const raw of [
+      '{"maxRoomAgeMs":59999}',
+      '{"maxRoomAgeMs":604800001}',
+      '{"maxRoomAgeMs":null}',
+    ]) {
+      expect(parseTimings(raw).ok).toBe(false);
+    }
+  });
+});

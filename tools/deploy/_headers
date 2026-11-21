@@ -1,0 +1,45 @@
+# Static asset headers for Cloudflare Workers Static Assets.
+# Copied into dist/cloudflare/_headers by tools/deploy/stage.mjs.
+# Rules are evaluated in order; `! Cache-Control` clears an earlier rule before overriding it.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+# style-src allows 'unsafe-inline' because packages/input/src/dom/touch-overlay.ts injects
+# a <style> tag on touch devices; script-src stays strict (no 'unsafe-inline'/'unsafe-eval').
+/
+  Cache-Control: no-cache
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob: ws: wss:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/*.html
+  Cache-Control: no-cache
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob: ws: wss:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# Vite hashed chunks, AudioWorklet bundle, CSS and fonts under /assets/*
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+# Unhashed asset manifest and static public assets (overwritten in place between builds)
+/assets/index.json
+  ! Cache-Control
+  Cache-Control: no-cache
+
+/assets/car/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/assets/tex/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/assets/env/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+
+/assets/draco/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
