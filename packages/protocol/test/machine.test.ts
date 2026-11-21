@@ -165,7 +165,7 @@ describe('lobby', () => {
 
   it.each([
     [{ name: '​' }, 'name_invalid', CLOSE.nameInvalid],
-    [{ v: 1 }, 'version_mismatch', null],
+    [{ v: 1 }, 'version_mismatch', CLOSE.versionMismatch],
     [{ resume: 'f'.repeat(32) }, 'resume_invalid', CLOSE.resumeInvalid],
   ])('refuses a join with %j', (fields, code, close) => {
     const h = new Harness();

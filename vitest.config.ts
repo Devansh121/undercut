@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Three projects map onto three CI jobs: `unit`, `physics` and `rooms`.
+// Projects map onto CI jobs: `unit`, `physics` and `rooms`, and the nightly `soak`.
 // Run one with `vitest run --project <name>` (see the npm scripts).
 export default defineConfig({
   test: {
@@ -22,16 +22,30 @@ export default defineConfig({
         },
       },
       {
+        // The real Workers runtime: the rooms service, the local server's lifecycle and
+        // a short network-simulator soak. Protocol logic is unit-tested in `unit`.
         test: {
           name: 'rooms',
           environment: 'node',
           include: [
             'services/rooms/test/**/*.test.ts',
-            'packages/protocol/test/**/*.test.ts',
             'tools/serve/**/*.runtime.test.mjs',
+            'tools/netsim/**/*.runtime.test.ts',
           ],
           globalSetup: ['services/rooms/test/global-setup.ts'],
           testTimeout: 90_000,
+          hookTimeout: 60_000,
+        },
+      },
+      {
+        // Nightly: the same soak at full length (`npm run test:soak`).
+        test: {
+          name: 'soak',
+          environment: 'node',
+          include: ['tools/netsim/**/*.runtime.test.ts'],
+          globalSetup: ['services/rooms/test/global-setup.ts'],
+          env: { SOAK: 'long' },
+          testTimeout: 50 * 60_000,
           hookTimeout: 60_000,
         },
       },

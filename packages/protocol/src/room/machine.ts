@@ -717,6 +717,12 @@ export class RoomMachine {
     const c = this.conn(id) ?? this.register(id);
     const parsed = parseClientMessage(data);
     if (!parsed.ok) {
+      if (parsed.error.code === 'version_mismatch') {
+        // A client on another protocol version cannot do anything useful here.
+        this.error(id, parsed.error.code, parsed.error.detail);
+        this.closeConn(id, CLOSE.versionMismatch, 'version_mismatch');
+        return;
+      }
       if (this.strike(c)) this.error(id, parsed.error.code, parsed.error.detail);
       return;
     }
