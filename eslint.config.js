@@ -144,6 +144,34 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
+    files: ['tests/browser/**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              message:
+                "Import test and expect from './base' or './fixtures' so the software-WebGL preset guard runs (type-only imports are allowed).",
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'ImportExpression[source.value="@playwright/test"], CallExpression[callee.name="require"][arguments.0.value="@playwright/test"]',
+          message:
+            "Import test and expect from './base' or './fixtures' so the software-WebGL preset guard runs.",
+        },
+      ],
+    },
+  },
+  {
     files: ['services/rooms/src/**/*.ts'],
     languageOptions: { globals: { ...globals.serviceworker } },
     rules: restrictImports(['core', 'protocol']),
