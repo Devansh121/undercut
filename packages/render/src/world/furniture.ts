@@ -1450,6 +1450,8 @@ export function placeTracksideFurniture(options: {
     });
   }
   const fenceSlotStep = 4;
+  /** Shortest catch-fence run worth building, m. */
+  const MIN_FENCE_RUN = 24;
   const slotCount = Math.ceil(L / fenceSlotStep);
   const fenceMask: [Uint8Array, Uint8Array] = [
     new Uint8Array(slotCount),
@@ -1464,16 +1466,25 @@ export function placeTracksideFurniture(options: {
   }
   const mobileSkip = mobile ? 2 : 1;
   for (const side of [0, 1] as const) {
-    for (let slot = 0; slot < slotCount; slot += mobileSkip) {
-      if (!fenceMask[side][slot]) continue;
+    // Accept slots first, then place only continuous runs: a few panels left standing alone
+    // between rejected slots (inner islands, barrier steps) read as debris, not as a fence.
+    let run: ReturnType<typeof atBarrier>[] = [];
+    const flush = (): void => {
+      if (run.length * fenceSlotStep * mobileSkip >= MIN_FENCE_RUN)
+        for (const b of run) placeFence(b.x, b.y, b.z, b.yawInward, b.s);
+      run = [];
+    };
+    for (let slot = 0; slot < slotCount; slot++) {
       const s = slot * fenceSlotStep;
-      if (nearPitGap(s, side)) continue;
-      const b = atBarrier(s, side, 0.3);
+      const b = fenceMask[side][slot] && !nearPitGap(s, side) ? atBarrier(s, side, 0.3) : null;
       // Skip tight inner chicane islands and folded barriers.
-      if (b.barD < b.halfW + 1.8) continue;
-      if (foldsAcrossTrack(b, 2.0, 0.24)) continue;
-      placeFence(b.x, b.y, b.z, b.yawInward, b.s);
+      if (!b || b.barD < b.halfW + 1.8 || foldsAcrossTrack(b, 2.0, 0.24)) {
+        flush();
+        continue;
+      }
+      if (slot % mobileSkip === 0) run.push(b);
     }
+    flush();
   }
   counts.catchFences = fences;
 
