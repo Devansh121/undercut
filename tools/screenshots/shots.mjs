@@ -141,7 +141,7 @@ async function openGame(browser, vp, extraQuery = '', launchShot = null) {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(
-    `http://127.0.0.1:${PORT}/?debug=1&storage=memory&quality=${vp.quality}${extraQuery}`,
+    `http://127.0.0.1:${PORT}/?debug=1&quality=${vp.quality}${extraQuery}`,
   );
   await page.waitForFunction(() => Boolean(globalThis.__undercut));
   if (launchShot) {

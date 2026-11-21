@@ -13,7 +13,7 @@ import {
   type CarTelemetry,
   type ControlInput,
 } from '@undercut/sim';
-import type { InputSystem, StoragePort } from '@undercut/input';
+import type { InputSystem } from '@undercut/input';
 import { mountTouchOverlay, type TouchOverlay } from '@undercut/input/dom';
 import {
   CAMERA_LABELS,
@@ -33,7 +33,7 @@ import {
 } from './game/autopilot';
 import { GameLoop } from './game/loop';
 import { buildMinimap } from './game/minimap';
-import { RecordStore } from './game/records';
+import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
 import { Hud, type HudMessage, type HudState } from './ui/hud';
 import { PauseMenu } from './ui/pause';
@@ -55,7 +55,7 @@ export interface DriveOptions {
   canvas: HTMLCanvasElement;
   host: HTMLElement;
   input: InputSystem;
-  storage: StoragePort;
+  records: RecordStore;
   quality: QualityName;
   touch: boolean;
   seed: number;
@@ -89,7 +89,7 @@ export interface DriveHandle {
 
 export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = Track.fromJSON(monza);
-  const records = new RecordStore(o.storage);
+  const records = o.records;
   const record = await records.load(track.id);
   const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
   const params = session.params;
@@ -232,7 +232,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           lastLap = { time: e.result.time, cls: e.result.class };
           break;
         case 'record':
-          void records.save(e.circuit, e.record).then(() => {
+          void records.save(e.circuit, e.update).then(() => {
             if (!records.persistent)
               say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
           });

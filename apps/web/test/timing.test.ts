@@ -181,3 +181,51 @@ describe('LapTimer', () => {
     expect(sector.class).toBe('overall');
   });
 });
+
+describe('LapTimer sector records', () => {
+  // A 30 m loop with sector lines at 0, 10 and 20 m: sector times are 10 m / speed.
+  const LINES3 = { length: 30, sectors: [0, 10, 20] };
+
+  /** Drive at a speed per sector so each sector takes exactly the given time. */
+  function lapWith(timer: LapTimer, from: { s: number; t: number }, times: number[]) {
+    let s = from.s;
+    let t = from.t;
+    const events: TimingEvent[] = [];
+    const dt = 1 / 240;
+    for (const time of times) {
+      const v = 10 / time;
+      const steps = Math.round(time / dt) + 1;
+      for (let i = 0; i < steps; i++) {
+        const ns = (s + v * dt) % 30;
+        events.push(...timer.update(s, ns, t, t + dt));
+        s = ns;
+        t += dt;
+      }
+    }
+    return { s, t, events };
+  }
+
+  it('flags each sector that beats its record, separately from the lap record', () => {
+    const timer = new LapTimer(LINES3, { lap: 30, sectors: [10, 10, 10] });
+    // Cross the line first, then a faster lap with a slower middle sector.
+    // Start the lap on a tiny step across the line, then drive the sectors.
+    timer.update(29.9999, 0.0001, 0, 1e-6);
+    const r = lapWith(timer, { s: 0.0001, t: 1e-6 }, [9, 11, 9]);
+    const lap = r.events.find((e) => e.type === 'lap');
+    if (lap?.type !== 'lap') throw new Error('no lap');
+    expect(lap.result.record).toBe(true);
+    expect(lap.result.sectorRecords).toEqual([true, false, true]);
+    // Within the 4 ms tick quantisation of this helper's sector speeds.
+    expect(timer.record.sectors.map((x) => x?.toFixed(1))).toEqual(['9.0', '10.0', '9.0']);
+  });
+
+  it('reports a sector record on a lap that is not a lap record', () => {
+    const timer = new LapTimer(LINES3, { lap: 25, sectors: [10, 10, 10] });
+    timer.update(29.9999, 0.0001, 0, 1e-6);
+    const r = lapWith(timer, { s: 0.0001, t: 1e-6 }, [11, 9.5, 11]);
+    const lap = r.events.find((e) => e.type === 'lap');
+    if (lap?.type !== 'lap') throw new Error('no lap');
+    expect(lap.result.record).toBe(false);
+    expect(lap.result.sectorRecords).toEqual([false, true, false]);
+  });
+});

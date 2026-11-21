@@ -1,6 +1,6 @@
 import '../../../design/mock/tokens.css';
 import './styles.css';
-import { InputSystem, MemoryStorage, type StoragePort } from '@undercut/input';
+import { InputSystem } from '@undercut/input';
 import {
   WebStorageAdapter,
   attachFocusGuard,
@@ -11,7 +11,7 @@ import {
 import type { QualityName } from '@undercut/render';
 import { debugEnabled, installDebugApi } from './debug';
 import type { DriveHandle } from './drive';
-import { RecordStore } from './game/records';
+import { RecordStore, durableStorage, memoryStorage } from './game/records';
 import { mountLaunchScreen, type LaunchScreen } from './launch';
 
 const app = document.getElementById('app');
@@ -22,14 +22,11 @@ if (!(app instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
 
 const params = new URLSearchParams(window.location.search);
 const touch = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
-let storage: StoragePort;
-try {
-  storage = new WebStorageAdapter();
-} catch {
-  storage = new MemoryStorage();
-}
-// Storage-blocked runs (and tests that ask for it) keep records in memory only.
-if (params.get('storage') === 'memory') storage = new MemoryStorage();
+// One record store for the page, so records kept in memory (storage blocked, or ?storage=memory)
+// survive quitting to the launch screen and starting again.
+const records = new RecordStore(
+  params.get('storage') === 'memory' ? memoryStorage() : durableStorage(new WebStorageAdapter()),
+);
 const input = new InputSystem({
   readGamepads: navigatorGamepads(),
   rumble: navigatorRumble(),
@@ -61,7 +58,7 @@ function showLaunch(): void {
     record: null,
     onStart: () => void start(),
   });
-  void new RecordStore(storage).load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
+  void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
   // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
   let last: number | null = null;
   const poll = (now: number): void => {
@@ -91,7 +88,7 @@ async function start(): Promise<DriveHandle> {
         canvas: canvas as HTMLCanvasElement,
         host: app as HTMLElement,
         input,
-        storage,
+        records,
         quality: chooseQuality(),
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,

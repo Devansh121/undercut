@@ -63,7 +63,7 @@ const telemetry = (page: Page): Promise<Telemetry> =>
   page.evaluate(() => window.__undercut?.telemetry() as unknown as Telemetry);
 
 async function startSession(page: Page): Promise<void> {
-  await page.goto('/?debug=1&storage=memory&quality=mobile');
+  await page.goto('/?debug=1&quality=mobile');
   await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
   await page.getByRole('button', { name: /Start/ }).click();
   // Building the circuit and compiling shaders on software WebGL takes several seconds on CI.
@@ -272,6 +272,33 @@ test.describe('drive', () => {
       return problems;
     });
     expect(report).toEqual([]);
+  });
+
+  test('says records last only until the page closes when storage is blocked', async ({ page }) => {
+    const errors = watchErrors(page);
+    // Private-mode style blocking: touching localStorage throws.
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        get() {
+          throw new DOMException('The operation is insecure.', 'SecurityError');
+        },
+      });
+    });
+    await startSession(page);
+    await expect(page.locator('[data-testid=hud-message]')).toContainText(
+      'Records last until the page closes',
+    );
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid=pause-menu]')).toContainText(
+      'Records last until the page closes',
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps quiet about storage when it works', async ({ page }) => {
+    await startSession(page);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid=pause-menu]')).not.toContainText('Records last');
   });
 
   test('drives the car with the touch overlay on a phone', async ({ page, context }, info) => {

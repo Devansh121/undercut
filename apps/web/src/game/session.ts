@@ -31,7 +31,7 @@ import { assistSteer, assistsFor, type AssistConfig, type AssistOverrides } from
 import type { Ghost } from './ghost';
 import { GhostRecorder, decodeGhost, encodeGhost } from './ghost';
 import { TrackLimits } from './limits';
-import type { CircuitRecord } from './records';
+import type { CircuitRecord, RecordUpdate } from './records';
 import { LapTimer, type TimingEvent } from './timing';
 
 /** Sim step: 240 Hz (ADR 0007). */
@@ -46,7 +46,8 @@ export type SessionPhase = 'ready' | 'running' | 'paused' | 'ended';
 export type SessionEvent =
   | TimingEvent
   | { type: 'invalidated'; reason: 'limits' | 'reset' }
-  | { type: 'record'; circuit: string; record: CircuitRecord }
+  /** Something to persist: a new best lap, better sector minima, or both. */
+  | { type: 'record'; circuit: string; update: RecordUpdate }
   | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' };
 
 /** Counts wheels wholly past the track-limit lines. `TrackLimits` in play; scripts in tests. */
@@ -115,7 +116,7 @@ export class DriveSession {
     const record = options.record ?? null;
     this.timer = new LapTimer(
       { length: this.track.length, sectors: this.track.sectors },
-      record ? { lap: record.lap, sectors: record.sectors } : undefined,
+      record ? { lap: record.lap, sectors: record.bestSectors } : undefined,
     );
     this.ghostValue = record?.ghost ? decodeGhost(record.ghost) : null;
     this.limits = options.limits ?? new TrackLimits(this.track);
@@ -310,17 +311,27 @@ export class DriveSession {
 
   private onLapComplete(e: Extract<TimingEvent, { type: 'lap' }>, events: SessionEvent[]): void {
     const r = e.result;
+    let ghostText: string | null = null;
     if (this.recorder.recording) {
       this.recorder.sample(r.time, this.track.length, this.car.pose, true);
       const ghost = this.recorder.finish(r.time);
       if (r.record) {
         this.ghostValue = ghost;
-        events.push({
-          type: 'record',
-          circuit: this.track.id,
-          record: { lap: r.time, sectors: r.sectors, ghost: encodeGhost(ghost), date: this.today },
-        });
+        ghostText = encodeGhost(ghost);
       }
+    }
+    // The best lap keeps its own splits and ghost; sector minima are persisted on their own,
+    // including from laps that are not lap records.
+    if (r.valid && (r.record || r.sectorRecords.some(Boolean))) {
+      events.push({
+        type: 'record',
+        circuit: this.track.id,
+        update: {
+          lap: r.record ? { time: r.time, sectors: r.sectors.slice(), ghost: ghostText } : null,
+          bestSectors: this.timer.record.sectors.slice(),
+          date: this.today,
+        },
+      });
     }
     this.onLine(e.at);
   }

@@ -39,6 +39,8 @@ export interface LapResult {
   personalBest: boolean;
   /** New all-time best for the circuit. */
   record: boolean;
+  /** Per sector, a new all-time best for that sector (from any valid lap, lap record or not). */
+  sectorRecords: boolean[];
 }
 
 export type TimingEvent =
@@ -257,6 +259,10 @@ export class LapTimer {
       deltaToBest: previousBest === null ? null : time - previousBest,
       personalBest: valid && (previousBest === null || time < previousBest),
       record: valid && (this.record.lap === null || time < this.record.lap),
+      sectorRecords: sectors.map((t, i) => {
+        const best = this.record.sectors[i] ?? null;
+        return valid && (best === null || t < best);
+      }),
     };
     this.lastLapValue = time;
     if (valid) {
