@@ -11,6 +11,7 @@ import type { CarPose } from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import { CameraRig, type CameraName } from './cameras';
 import { CarModel, type CarGeometry, type Livery } from './car/car-model';
+import { nextLift } from './framing';
 import { Environment, MONZA_AFTERNOON, type LightingPreset } from './environment';
 import { QUALITY, type Quality, type QualityName } from './quality';
 import { TrackView } from './track-view';
@@ -106,6 +107,8 @@ export class RaceView {
   /** Current upward shift of the image, CSS px, smoothed. */
   private lift = 0;
   private readonly points: Vector3[] = [];
+  /** Milliseconds spent building each part of the view (start-up budget checks). */
+  readonly loadTimes: Record<string, number>;
 
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions) {
     this.canvas = canvas;
@@ -117,15 +120,19 @@ export class RaceView {
     this.width = 0;
     this.height = 0;
 
+    const t0 = performance.now();
     this.environment = new Environment(this.scene, lighting, q);
     this.environment.bakeEnvironment(this.renderer, this.scene);
+    const t1 = performance.now();
     this.trackView = new TrackView(options.track, q);
+    const t2 = performance.now();
     this.scene.add(this.trackView.group);
     this.car = new CarModel(options.car, options.livery, q);
     this.ghostCar = new CarModel(options.car, options.livery, q, true);
     this.ghostCar.root.visible = false;
     this.ghostCar.root.renderOrder = 2;
     this.scene.add(this.car.root, this.ghostCar.root);
+    this.loadTimes = { environment: t1 - t0, track: t2 - t1, cars: performance.now() - t2 };
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
@@ -191,8 +198,8 @@ export class RaceView {
 
   /**
    * Shift the image up (a projection offset, so perspective and scale are unchanged) far enough
-   * that the car clears the avoid rectangle. Only chase cameras are reframed; the shift eases in
-   * and out over about 0.25 s so a camera switch does not jump.
+   * that the car clears the avoid rectangle. Only chase cameras are reframed. The shift rises at
+   * once to whatever this frame needs and eases back down (see `nextLift`).
    */
   private frame(chase: boolean, dt: number): void {
     const cam = this.camera;
@@ -208,7 +215,7 @@ export class RaceView {
         target = Math.max(0, Math.min(car.bottom + margin - a.top, car.top - 8));
       }
     }
-    this.lift = dt > 0 ? target + (this.lift - target) * Math.exp(-dt / 0.25) : this.lift;
+    this.lift = nextLift(this.lift, target, dt);
     if (this.lift < 0.5) return;
     const dy = this.lift;
     const fullH = h + 2 * dy;

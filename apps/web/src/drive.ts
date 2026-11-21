@@ -113,9 +113,12 @@ export interface DriveHandle {
   events(): SessionEvent[];
   hudText(): Record<string, string>;
   quit(): void;
+  /** Start-up phase times, ms. */
+  loadTimes(): Record<string, number>;
 }
 
 export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
+  const loadStart = performance.now();
   const track = Track.fromJSON(monza);
   const records = o.records;
   const record = await records.load(track.id);
@@ -503,6 +506,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   input.setContext('driving');
   loop.start();
   o.audio?.setActive(true);
+  const loadTimes: Record<string, number> = {
+    ...view.loadTimes,
+    beforeFirstFrame: performance.now() - loadStart,
+  };
+  // The first frame compiles every shader; time it too.
+  requestAnimationFrame(() => {
+    const t = performance.now();
+    requestAnimationFrame(() => {
+      loadTimes.firstFrames = performance.now() - t;
+      loadTimes.total = performance.now() - loadStart;
+    });
+  });
   handle = requestAnimationFrame(frame);
   document.documentElement.dataset.ready = '';
 
@@ -585,5 +600,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       };
     },
     quit,
+    loadTimes: () => ({ ...loadTimes }),
   };
 }

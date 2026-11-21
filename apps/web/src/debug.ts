@@ -38,6 +38,8 @@ export interface DebugApi {
   renderStats(): Record<string, unknown>;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
+  /** Start-up phase times of the current session, ms. */
+  loadTimes(): Record<string, number>;
   /** Audio engine status ('none' before the first gesture creates it). */
   audioStatus(): string;
   /** What the steering-wheel display last drew (cockpit camera), or null. */
@@ -142,6 +144,7 @@ export function installDebugApi(
     carScreenRect: () => need().view.carScreenRect(),
     dashboard: () => need().view.dashboard,
     rendererInfo,
+    loadTimes: () => need().loadTimes(),
     audioStatus,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),
