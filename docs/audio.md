@@ -93,7 +93,7 @@ Unit tests (`npm test`): `packages/audio/test/` and `tools/audio/*.test.ts`, abo
 | Loudness, every scenario | −28 to −14 LUFS (BS.1770-4 integrated, K-weighted, gated) | A sane in-game level with headroom |
 | Loudness spread, scenarios with the car moving | ≤ 8 LU | The player should not ride the volume between manoeuvres; idle and the stationary sweep are excluded |
 | Determinism | identical bits for the same seed and inputs, and for block sizes 1, 37, 128, 400 and 1000 | Offline renders must predict the browser |
-| Allocation | heap change < 64 kB over 40 s of audio after a forced GC | The audio thread must not trigger garbage collection |
+| Allocation | young generation grows < 16 kB and no scavenge runs over 40 s of audio, state passed packed as the worklet receives it | The audio thread must not trigger garbage collection; one boxed number per block would be 240 kB. Measured after warm-up, a forced collection and a re-settle, since a collection can discard optimised code and the interpreter boxes numbers until it is rebuilt |
 | Speed | > 10× real time (CI margin); measured 52–54× on this laptop (Ryzen 7 7435HS) | One car at about 2 % of one core |
 
 ## Results

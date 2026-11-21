@@ -1,10 +1,11 @@
+import { constants, PerformanceObserver } from 'node:perf_hooks';
 import v8 from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { dcOffset, maxStep, samplePeak, truePeak } from '../src/analysis/index';
 import { DEFAULT_LIMITER, softClip } from '../src/dsp/limiter';
 import { SoftLimiter } from '../src/dsp/limiter';
-import { AudioCore, type AudioCarState } from '../src/index';
+import { AudioCore, CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../src/index';
 import { engineState, FS, render, type Clip } from './helpers';
 
 /** Everything at once, every gain at its maximum. */
@@ -253,32 +254,68 @@ describe('DC', () => {
 });
 
 describe('cost', () => {
-  it('does not allocate in steady state', () => {
-    // Expose the collector so the heap can be measured from a clean start.
+  it('does not allocate in steady state', async () => {
+    // Expose the collector to clear earlier tests' garbage first, and compile optimised code
+    // on this thread so a busy machine cannot leave the core in the
+    // interpreter (which boxes numbers) into the measured window.
     v8.setFlagsFromString('--expose-gc');
+    v8.setFlagsFromString('--no-concurrent-recompilation');
     const gc = runInNewContext('gc') as () => void;
+    const newSpaceUsed = () =>
+      v8.getHeapSpaceStatistics().find((s) => s.space_name === 'new_space')?.space_used_size ?? NaN;
     const core = new AudioCore({ sampleRate: FS });
-    const state = everything(0);
+    // State arrives packed, as the worklet receives it from the main thread.
+    const packed = packCarState(everything(0), new Float64Array(CAR_STATE_LENGTH));
     const out = [new Float32Array(128), new Float32Array(128)];
-    // Warm up so every function is optimised and every lazily created buffer exists.
-    for (let i = 0; i < 4000; i++) {
-      if (i % 3 === 0) core.setCarState(state);
-      core.process(out, 128);
-    }
-    const blocks = 15_000; // 40 s of audio
-    gc();
-    const before = process.memoryUsage().heapUsed;
-    for (let i = 0; i < blocks; i++) {
-      if (i % 3 === 0) {
-        state.shifting = i % 300 < 12;
-        core.setCarState(state);
+    // The same input pattern as the measured loop: state every third block, a gear change
+    // every 300 blocks, the limiter cutting, every layer on.
+    const run = (blocks: number) => {
+      for (let i = 0; i < blocks; i++) {
+        if (i % 3 === 0) {
+          packed[5] = i % 300 < 12 ? 1 : 0; // shifting
+          packed[6] = i % 600 < 300 ? 1 : -1; // shift direction
+          core.setCarState(packed);
+        }
+        core.process(out, 128);
       }
-      core.process(out, 128);
-    }
-    const grown = process.memoryUsage().heapUsed - before;
-    // Allocating even 16 bytes per block would grow the heap by 240 kB, or set off a
-    // collection that would show up as a large negative change.
-    expect(Math.abs(grown)).toBeLessThan(64 * 1024);
+    };
+    // Warm up so every path is optimised and every lazily created buffer exists.
+    run(12_000);
+    // Collect the garbage of earlier tests, then settle again: a full collection can throw
+    // away optimised code that referred to objects it freed, and until a function is
+    // re-optimised the interpreter boxes numbers. Nothing in steady play forces collections
+    // on the audio thread, since it makes no garbage.
+    gc();
+    run(4000);
+    // Short-lived objects (what a per-sample allocation would make) land in the young
+    // generation. Render 40 s and see how much it grew; if anything was allocated it is
+    // either still there or set off a scavenge, which the observer records.
+    const scavenges: number[] = [];
+    const observer = new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        if (
+          (e as PerformanceEntry & { detail?: { kind?: number } }).detail?.kind ===
+          constants.NODE_PERFORMANCE_GC_MINOR
+        ) {
+          scavenges.push(e.startTime);
+        }
+      }
+    });
+    observer.observe({ entryTypes: ['gc'] });
+    const t0 = performance.now();
+    const before = newSpaceUsed();
+    run(15_000);
+    const grown = newSpaceUsed() - before;
+    const t1 = performance.now();
+    v8.setFlagsFromString('--concurrent-recompilation');
+    await new Promise((r) => setTimeout(r, 50));
+    observer.disconnect();
+    // 16 bytes per block (one boxed number) would be 240 kB.
+    expect(grown, 'young-generation bytes allocated in 15 000 blocks').toBeLessThan(16 * 1024);
+    expect(
+      scavenges.filter((t) => t >= t0 && t <= t1),
+      'scavenges while rendering',
+    ).toHaveLength(0);
   });
 
   it('renders one car much faster than real time', () => {
