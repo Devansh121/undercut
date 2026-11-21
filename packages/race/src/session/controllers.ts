@@ -290,6 +290,7 @@ export class AiController implements CarController {
       this.pit.mode === 'none' &&
       c.pitPhase(ctx.car) === 'none' &&
       (out0 === null || ctx.time >= out0 + this.reaction);
+    view.launching = this.launching && out0 !== null;
     driver.sense(view);
   }
 

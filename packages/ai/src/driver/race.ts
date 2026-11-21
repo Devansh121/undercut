@@ -171,6 +171,7 @@ export class RaceDriver implements Driver {
   private rejoinTime = 0;
   private stillTime = 0;
   private backTime = 0;
+  private wasActive = false;
   private biasX = 0;
   private biasZ = 0;
   private haveSense = false;
@@ -231,6 +232,7 @@ export class RaceDriver implements Driver {
     this.rejoinTime = 0;
     this.stillTime = 0;
     this.backTime = 0;
+    this.wasActive = false;
     this.biasX = 0;
     this.biasZ = 0;
     this.haveSense = false;
@@ -252,6 +254,7 @@ export class RaceDriver implements Driver {
     out.rejoinTime = this.rejoinTime;
     out.stillTime = this.stillTime;
     out.backTime = this.backTime;
+    out.wasActive = this.wasActive;
     out.biasX = this.biasX;
     out.biasZ = this.biasZ;
     out.haveSense = this.haveSense;
@@ -291,6 +294,7 @@ export class RaceDriver implements Driver {
     this.rejoinTime = num('rejoinTime');
     this.stillTime = num('stillTime');
     this.backTime = num('backTime');
+    this.wasActive = m.wasActive === true;
     this.biasX = num('biasX');
     this.biasZ = num('biasZ');
     this.haveSense = m.haveSense === true;
@@ -441,7 +445,9 @@ export class RaceDriver implements Driver {
     let ns = 0;
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
-      const ds = this.ahead(s0, c.s) - c.speed * SEE_DELAY;
+      // Relative position as it was SEE_DELAY ago (both cars move; the gap changes by the
+      // speed difference).
+      const ds = this.ahead(s0, c.s) - (c.speed - v) * SEE_DELAY;
       if (c.id === this.passId) {
         passCar = c;
         passDs = ds;
@@ -506,6 +512,15 @@ export class RaceDriver implements Driver {
       lo = oMin;
       hi = oMax;
     }
+    // Cars dropped from the bands because they are further back give way, but this car does
+    // not steer at them while they do: it holds its line on their side.
+    for (let k = 0; k < ns; k++) {
+      const e = side[k]!;
+      if (e.ds > skipBelow || e.car === yieldTo) continue;
+      if (e.left) lo = Math.max(lo, Math.min(myO, this.o));
+      else hi = Math.min(hi, Math.max(myO, this.o));
+    }
+    if (lo > hi) lo = hi = Math.max(oMin, Math.min(oMax, this.o));
     if (yieldTo && yieldDs < leaderDs) {
       leader = yieldTo;
       leaderDs = yieldDs;
@@ -573,6 +588,13 @@ export class RaceDriver implements Driver {
     if (this.passId < 0 && view.blueFlag) {
       base = oMax >= -oMin ? Math.min(SIDE_BY_SIDE, oMax) : Math.max(-SIDE_BY_SIDE, oMin);
     }
+    // Back in the racing driver's hands after the pit lane (or any spell without it): rejoin
+    // from where the car is, as after a spin.
+    if (view.active && !this.wasActive && !view.launching) {
+      this.o = myO;
+      this.rejoinTime = 4;
+    }
+    this.wasActive = view.active;
     if (this.rejoinTime > 0) {
       // Just rejoined after a spin: come back to the line only as the traffic allows.
       this.rejoinTime = Math.max(0, this.rejoinTime - dt);
@@ -582,9 +604,8 @@ export class RaceDriver implements Driver {
     // The target offset: as close to the base as the cars alongside and the edges allow.
     const target = Math.max(lo, Math.min(hi, base));
     const yielding = yieldTo !== null;
-    // Off the line at walking pace (the launch, a crawl in traffic) the car holds its lane
-    // unless it is going round a car.
-    this.o = v < 10 && this.passId < 0 ? myO : this.approach(this.o, target, dt);
+    // Launching, the car holds its grid lane while traction is limited.
+    this.o = view.launching && this.passId < 0 ? myO : this.approach(this.o, target, dt);
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
     let limit = Number.POSITIVE_INFINITY;

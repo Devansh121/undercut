@@ -26,6 +26,8 @@ export interface TrafficView {
    * lane's hands. Only then can it be stuck.
    */
   active: boolean;
+  /** Launching from the grid (the controller holds the throttle under the driven wheels' grip). */
+  launching: boolean;
 }
 
 export function createTrafficCar(): TrafficCar {
@@ -39,5 +41,6 @@ export function createTrafficView(capacity: number): TrafficView {
     count: 0,
     blueFlag: false,
     active: false,
+    launching: false,
   };
 }
