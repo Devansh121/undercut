@@ -15,6 +15,8 @@ interface UndercutDebugApi {
   capture(): Record<string, unknown>;
   frameTimes(): number[];
   quit(): void;
+  /** The player's car's projected bounding box in CSS pixels. */
+  carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** The page's renderer: live geometries, textures and compiled programs. */
   rendererInfo(): Record<string, number>;
 }

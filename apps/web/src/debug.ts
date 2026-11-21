@@ -38,6 +38,8 @@ export interface DebugApi {
   renderStats(): Record<string, unknown>;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
+  /** The player's car's projected bounding box, CSS px. */
+  carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** The RaceView itself, for render experiments from tools. */
   view(): unknown;
   quit(): void;
@@ -132,6 +134,7 @@ export function installDebugApi(
     frameTimes: () => need().frameTimes(),
     resetFrameTimes: () => need().resetFrameTimes(),
     view: () => need().view,
+    carScreenRect: () => need().view.carScreenRect(),
     rendererInfo,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),

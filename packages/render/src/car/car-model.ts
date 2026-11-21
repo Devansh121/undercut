@@ -1,4 +1,6 @@
+import type { Matrix4 } from 'three';
 import {
+  Box3,
   BufferAttribute,
   CatmullRomCurve3,
   Color,
@@ -96,6 +98,7 @@ export class CarModel {
   private readonly materials: Material[] = [];
   private readonly textures: Texture[] = [];
   private readonly geo: CarGeometry;
+  private readonly bodyBox = new Box3();
   private ghostMaterial: MeshStandardMaterial | null = null;
 
   constructor(geo: CarGeometry, livery: Livery, quality: Quality, ghost = false) {
@@ -109,6 +112,14 @@ export class CarModel {
     this.buildCockpit(m);
     this.buildWheels(geo, m);
     this.buildSuspension(geo, m);
+    // Bodywork extent in the body frame, measured with the body at rest (suspension arms are
+    // left out: they are placed per frame and stay inside the wheels' boxes anyway).
+    this.body.updateMatrixWorld(true);
+    for (const child of this.body.children) {
+      child.traverse((o) => {
+        if (o instanceof Mesh && o.name !== 'suspension') this.bodyBox.expandByObject(o);
+      });
+    }
     this.root.traverse((o) => {
       if (o instanceof Mesh) {
         o.castShadow = !ghost;
@@ -656,6 +667,37 @@ export class CarModel {
     const f = Math.min(1, Math.max(0, (distanceToCamera - 4) / 8));
     this.ghostMaterial.opacity = 0.32 * f;
     this.root.visible = f > 0.01;
+  }
+
+  /**
+   * World-space points that bound the car as drawn: the bodywork box corners in the body frame
+   * and each wheel's box corners. Call after `apply`; fills and returns `out` (40 points).
+   */
+  boundingPoints(out: Vector3[]): Vector3[] {
+    this.root.updateMatrixWorld(true);
+    let k = 0;
+    const put = (x: number, y: number, z: number, m: Matrix4): void => {
+      const v = out[k] ?? (out[k] = new Vector3());
+      v.set(x, y, z).applyMatrix4(m);
+      k++;
+    };
+    const b = this.bodyBox;
+    for (let i = 0; i < 8; i++) {
+      put(
+        i & 1 ? b.max.x : b.min.x,
+        i & 2 ? b.max.y : b.min.y,
+        i & 4 ? b.max.z : b.min.z,
+        this.body.matrixWorld,
+      );
+    }
+    const R = this.geo.tyreRadius;
+    for (const c of this.corners) {
+      const hw = (c.front ? FRONT_TYRE_WIDTH : REAR_TYRE_WIDTH) / 2;
+      for (let i = 0; i < 8; i++)
+        put(i & 1 ? R : -R, i & 2 ? R : -R, i & 4 ? hw : -hw, c.corner.matrixWorld);
+    }
+    out.length = k;
+    return out;
   }
 
   /** Show or hide the driver's helmet (hidden for the cockpit camera). */

@@ -61,6 +61,13 @@ export interface ViewFrame {
   lookBack: boolean;
 }
 
+export interface ScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export interface ViewStats {
   calls: number;
   triangles: number;
@@ -91,6 +98,11 @@ export class RaceView {
   private readonly observer: ResizeObserver;
   private width = 0;
   private height = 0;
+  /** Screen rectangle (CSS px) the chase cameras keep the car clear of, e.g. the HUD cluster. */
+  private avoid: ScreenRect | null = null;
+  /** Current upward shift of the image, CSS px, smoothed. */
+  private lift = 0;
+  private readonly points: Vector3[] = [];
 
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions) {
     this.canvas = canvas;
@@ -148,7 +160,60 @@ export class RaceView {
     this.rig.snap();
   }
 
+  /** Keep the car clear of `rect` (CSS px, viewport space) in the chase cameras; null for none. */
+  setAvoidRect(rect: ScreenRect | null): void {
+    this.avoid = rect;
+  }
+
+  /** The player's car's projected bounding box in CSS pixels, with the current framing. */
+  carScreenRect(): ScreenRect {
+    this.camera.updateMatrixWorld();
+    const out = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+    for (const p of this.car.boundingPoints(this.points)) {
+      p.project(this.camera);
+      const x = ((p.x + 1) / 2) * this.width;
+      const y = ((1 - p.y) / 2) * this.height;
+      out.left = Math.min(out.left, x);
+      out.right = Math.max(out.right, x);
+      out.top = Math.min(out.top, y);
+      out.bottom = Math.max(out.bottom, y);
+    }
+    return out;
+  }
+
+  /**
+   * Shift the image up (a projection offset, so perspective and scale are unchanged) far enough
+   * that the car clears the avoid rectangle. Only chase cameras are reframed; the shift eases in
+   * and out over about 0.25 s so a camera switch does not jump.
+   */
+  private frame(chase: boolean, dt: number): void {
+    const cam = this.camera;
+    const w = this.width;
+    const h = this.height;
+    let target = 0;
+    if (chase && this.avoid) {
+      const car = this.carScreenRect();
+      const a = this.avoid;
+      const margin = 10;
+      if (car.left < a.right && a.left < car.right && car.bottom + margin > a.top) {
+        // Never lift the car's top out of the frame.
+        target = Math.max(0, Math.min(car.bottom + margin - a.top, car.top - 8));
+      }
+    }
+    this.lift = dt > 0 ? target + (this.lift - target) * Math.exp(-dt / 0.25) : this.lift;
+    if (this.lift < 0.5) return;
+    const dy = this.lift;
+    const fullH = h + 2 * dy;
+    // Same vertical scale: widen the field of view over the taller virtual frame.
+    cam.fov = (2 * Math.atan((Math.tan((cam.fov * Math.PI) / 360) * fullH) / h) * 180) / Math.PI;
+    cam.aspect = w / fullH;
+    cam.setViewOffset(w, fullH, 0, 2 * dy, w, h);
+  }
+
   render(frame: ViewFrame): void {
+    // The rig sets field of view and aspect from scratch each frame; start unshifted.
+    this.camera.clearViewOffset();
+    this.camera.aspect = this.width / Math.max(1, this.height);
     this.car.apply(frame.pose, frame.drs);
     if (frame.ghost) {
       this.ghostCar.apply(frame.ghost, 0);
@@ -170,6 +235,7 @@ export class RaceView {
       frame.lookBack,
     );
     this.car.setHelmetVisible(mode.helmet);
+    this.frame(mode.name === 'chase-near' || mode.name === 'chase-far', frame.dt);
     if (frame.ghost) {
       const dx = frame.ghost.x - this.camera.position.x;
       const dz = frame.ghost.z - this.camera.position.z;

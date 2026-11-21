@@ -218,6 +218,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}`,
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
+  // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
+  // phone). Measured when the layout changes, not every frame.
+  const cluster = hud.root.querySelector<HTMLElement>('.hud-drive');
+  const measureCluster = (): void => {
+    if (!cluster) return;
+    const r = cluster.getBoundingClientRect();
+    view.setAvoidRect(
+      r.width > 0 ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null,
+    );
+  };
+  const clusterObserver = new ResizeObserver(measureCluster);
+  if (cluster) clusterObserver.observe(cluster);
+  window.addEventListener('resize', measureCluster);
+  measureCluster();
   document.documentElement.dataset.screen = 'drive';
 
   let overlay: TouchOverlay | null = null;
@@ -480,6 +494,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     quitting = true;
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
+    clusterObserver.disconnect();
+    window.removeEventListener('resize', measureCluster);
     loop.quit();
     overlay?.destroy();
     view.dispose();

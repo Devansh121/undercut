@@ -19,6 +19,7 @@ export {
   RaceView,
   createRenderer,
   type RaceViewOptions,
+  type ScreenRect,
   type ViewFrame,
   type ViewStats,
 } from './race-view';

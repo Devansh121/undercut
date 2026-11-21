@@ -274,6 +274,54 @@ test.describe('drive', () => {
     expect(report).toEqual([]);
   });
 
+  test('keeps the whole car visible above the driver cluster in both chase cameras', async ({
+    page,
+  }) => {
+    await startSession(page);
+    for (const camera of ['chase-near', 'chase-far']) {
+      for (const at of [{ restart: true }, { s: 300, kmh: 280 }]) {
+        await page.evaluate(
+          ([camera, at]) => {
+            const u = window.__undercut;
+            u?.camera(camera as string);
+            const p = at as { restart?: boolean; s?: number; kmh?: number };
+            if (p.restart) u?.restartLap();
+            else u?.teleport(p.s ?? 0, 0, p.kmh ?? 0);
+            u?.drive({ throttle: 0.6, steer: 0 });
+          },
+          [camera, at] as const,
+        );
+        // Cameras settle on real time; wait for the framing to converge.
+        await page.waitForTimeout(1500);
+        const r = await page.evaluate(() => {
+          const car = window.__undercut?.carScreenRect() as {
+            left: number;
+            top: number;
+            right: number;
+            bottom: number;
+          };
+          const c = document.querySelector('.hud-drive')?.getBoundingClientRect();
+          return {
+            car,
+            cluster: c && { left: c.left, top: c.top, right: c.right, bottom: c.bottom },
+          };
+        });
+        if (!r.cluster) throw new Error('no cluster');
+        const overlap =
+          r.car.left < r.cluster.right &&
+          r.cluster.left < r.car.right &&
+          r.car.top < r.cluster.bottom &&
+          r.cluster.top < r.car.bottom;
+        expect(
+          overlap,
+          `${camera} ${JSON.stringify(at)}: car ${JSON.stringify(r.car)} cluster ${JSON.stringify(r.cluster)}`,
+        ).toBe(false);
+        // And the car is on screen, not lifted out of the top.
+        expect(r.car.top).toBeGreaterThan(0);
+      }
+    }
+  });
+
   test('says records last only until the page closes when storage is blocked', async ({ page }) => {
     const errors = watchErrors(page);
     // Private-mode style blocking: touching localStorage throws.

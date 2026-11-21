@@ -140,9 +140,7 @@ async function openGame(browser, vp, extraQuery = '', launchShot = null) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-  await page.goto(
-    `http://127.0.0.1:${PORT}/?debug=1&quality=${vp.quality}${extraQuery}`,
-  );
+  await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=${vp.quality}${extraQuery}`);
   await page.waitForFunction(() => Boolean(globalThis.__undercut));
   if (launchShot) {
     await page.evaluate(() => globalThis.document.fonts.ready);
@@ -192,7 +190,26 @@ async function shots(browser, report) {
       const file = path.join(outDir, `${station.name}-${vp.label}.png`);
       await page.screenshot({ path: file });
       const capture = await page.evaluate(() => globalThis.__undercut.capture());
+      // Framing check: in the chase cameras the whole car stays clear of the driver cluster.
+      const framing = await page.evaluate(() => {
+        const car = globalThis.__undercut.carScreenRect();
+        const c = globalThis.document.querySelector('.hud-drive')?.getBoundingClientRect();
+        const cluster = c ? { left: c.left, top: c.top, right: c.right, bottom: c.bottom } : null;
+        const overlap =
+          cluster !== null &&
+          car.left < cluster.right &&
+          cluster.left < car.right &&
+          car.top < cluster.bottom &&
+          cluster.top < car.bottom;
+        return { car, cluster, overlap };
+      });
+      if (station.camera.startsWith('chase') && framing.overlap) {
+        report.errors.push(
+          `${station.name} ${vp.label}: the car (${JSON.stringify(framing.car)}) overlaps the driver cluster (${JSON.stringify(framing.cluster)})`,
+        );
+      }
       report.shots.push({
+        framing,
         station: station.name,
         viewport: vp.label,
         file: path.relative(root, file),
