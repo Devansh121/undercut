@@ -1,4 +1,9 @@
-import { BufferAttribute, BufferGeometry } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  MeshStandardMaterial,
+  type WebGLProgramParametersWithUniforms,
+} from 'three';
 import { hash01, type MappedFeature } from './dressing';
 import type { LapIndex } from './lap-index';
 
@@ -25,20 +30,20 @@ export interface StandFrame {
 
 /** Seating geometry constants, m. */
 export const STAND = {
-  frontWall: 1.6,
+  frontWall: 1.5,
   rowDepth: 0.85,
   rowRise: 0.42,
-  backWall: 2.6,
-  maxRows: 34,
+  backWall: 2.2,
+  maxRows: 30,
 };
 
-/** Seat colours of the stands (invented; no circuit's real scheme). */
+/** Seat colours of the stands (invented; muted commercial tones, linear RGB). */
 const SEATS: [number, number, number][] = [
-  [0.05, 0.12, 0.3],
-  [0.32, 0.33, 0.35],
-  [0.05, 0.14, 0.09],
-  [0.36, 0.04, 0.03],
-  [0.2, 0.21, 0.24],
+  [0.04, 0.09, 0.22],
+  [0.18, 0.19, 0.21],
+  [0.04, 0.11, 0.07],
+  [0.24, 0.035, 0.03],
+  [0.13, 0.14, 0.16],
 ];
 
 /**
@@ -144,11 +149,12 @@ export function fitStand(
   };
 }
 
-/** Geometry builder with vertex colours. */
+/** Geometry builder with vertex colours and world-space/local-UV weathering attributes. */
 class Builder {
   pos: number[] = [];
   nor: number[] = [];
   col: number[] = [];
+  uv: number[] = [];
   idx: number[] = [];
   quad(
     a: readonly number[],
@@ -156,6 +162,12 @@ class Builder {
     c: readonly number[],
     d: readonly number[],
     colour: readonly number[],
+    uvs: readonly (readonly number[])[] = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
   ): void {
     // a b c d counter-clockwise seen from the front.
     const e1 = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!];
@@ -168,11 +180,13 @@ class Builder {
     ny /= l;
     nz /= l;
     const base = this.pos.length / 3;
-    for (const v of [a, b, c, d]) {
+    [a, b, c, d].forEach((v, i) => {
       this.pos.push(v[0]!, v[1]!, v[2]!);
       this.nor.push(nx, ny, nz);
       this.col.push(colour[0]!, colour[1]!, colour[2]!);
-    }
+      const t = uvs[i] as readonly number[];
+      this.uv.push(t[0]!, t[1]!);
+    });
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
   /** Axis box from a local frame: origin, unit axes a (length), b (depth), y up. */
@@ -192,26 +206,109 @@ class Builder {
       f.oz + f.az * u + f.bz * v,
     ];
     // Front (v0), back (v1), left (u0), right (u1), top, all faces outward.
-    this.quad(P(u1, v0, y0), P(u0, v0, y0), P(u0, v0, y1), P(u1, v0, y1), colour);
-    this.quad(P(u0, v1, y0), P(u1, v1, y0), P(u1, v1, y1), P(u0, v1, y1), colour);
-    this.quad(P(u0, v0, y0), P(u0, v1, y0), P(u0, v1, y1), P(u0, v0, y1), colour);
-    this.quad(P(u1, v1, y0), P(u1, v0, y0), P(u1, v0, y1), P(u1, v1, y1), colour);
-    this.quad(P(u0, v0, y1), P(u0, v1, y1), P(u1, v1, y1), P(u1, v0, y1), colour);
+    this.quad(P(u1, v0, y0), P(u0, v0, y0), P(u0, v0, y1), P(u1, v0, y1), colour, [
+      [u1, y0],
+      [u0, y0],
+      [u0, y1],
+      [u1, y1],
+    ]);
+    this.quad(P(u0, v1, y0), P(u1, v1, y0), P(u1, v1, y1), P(u0, v1, y1), colour, [
+      [u0, y0],
+      [u1, y0],
+      [u1, y1],
+      [u0, y1],
+    ]);
+    this.quad(P(u0, v0, y0), P(u0, v1, y0), P(u0, v1, y1), P(u0, v0, y1), colour, [
+      [v0, y0],
+      [v1, y0],
+      [v1, y1],
+      [v0, y1],
+    ]);
+    this.quad(P(u1, v1, y0), P(u1, v0, y0), P(u1, v0, y1), P(u1, v1, y1), colour, [
+      [v1, y0],
+      [v0, y0],
+      [v0, y1],
+      [v1, y1],
+    ]);
+    this.quad(P(u0, v0, y1), P(u0, v1, y1), P(u1, v1, y1), P(u1, v0, y1), colour, [
+      [u0, v0],
+      [u0, v1],
+      [u1, v1],
+      [u1, v0],
+    ]);
+  }
+  /** Sloped trapezoidal side wall following the seating rake from yFront at v0 to yBack at v1. */
+  slopedWall(
+    f: StandFrame,
+    u0: number,
+    u1: number,
+    v0: number,
+    v1: number,
+    yFront: number,
+    yBack: number,
+    colour: readonly number[],
+  ): void {
+    const P = (u: number, v: number, y: number): number[] => [
+      f.ox + f.ax * u + f.bx * v,
+      f.base + y,
+      f.oz + f.az * u + f.bz * v,
+    ];
+    // Left face (u0, outward -a).
+    this.quad(P(u0, v0, 0), P(u0, v1, 0), P(u0, v1, yBack), P(u0, v0, yFront), colour, [
+      [v0, 0],
+      [v1, 0],
+      [v1, yBack],
+      [v0, yFront],
+    ]);
+    // Right face (u1, outward +a).
+    this.quad(P(u1, v1, 0), P(u1, v0, 0), P(u1, v0, yFront), P(u1, v1, yBack), colour, [
+      [v1, 0],
+      [v0, 0],
+      [v0, yFront],
+      [v1, yBack],
+    ]);
+    // Front edge (v0).
+    this.quad(P(u1, v0, 0), P(u0, v0, 0), P(u0, v0, yFront), P(u1, v0, yFront), colour, [
+      [u1, 0],
+      [u0, 0],
+      [u0, yFront],
+      [u1, yFront],
+    ]);
+    // Back edge (v1).
+    this.quad(P(u0, v1, 0), P(u1, v1, 0), P(u1, v1, yBack), P(u0, v1, yBack), colour, [
+      [u0, 0],
+      [u1, 0],
+      [u1, yBack],
+      [u0, yBack],
+    ]);
+    // Sloped top coping cap.
+    this.quad(P(u0, v0, yFront), P(u0, v1, yBack), P(u1, v1, yBack), P(u1, v0, yFront), colour, [
+      [u0, v0],
+      [u0, v1],
+      [u1, v1],
+      [u1, v0],
+    ]);
   }
   build(): BufferGeometry {
     const g = new BufferGeometry();
     g.setAttribute('position', new BufferAttribute(new Float32Array(this.pos), 3));
     g.setAttribute('normal', new BufferAttribute(new Float32Array(this.nor), 3));
     g.setAttribute('color', new BufferAttribute(new Float32Array(this.col), 3));
+    g.setAttribute('uv', new BufferAttribute(new Float32Array(this.uv), 2));
     g.setIndex(new BufferAttribute(new Uint32Array(this.idx), 1));
     g.computeBoundingSphere();
     return g;
   }
 }
 
-const CONCRETE = [0.42, 0.41, 0.39];
-const STEEL = [0.3, 0.31, 0.33];
-const ROOF = [0.55, 0.56, 0.57];
+// Weathered trackside albedos (linear RGB; ~0.42-0.50 sRGB, never blown-out bright white).
+const CONCRETE = [0.18, 0.175, 0.168];
+const CONCRETE_DARK = [0.13, 0.128, 0.124];
+const STAIR = [0.23, 0.225, 0.215];
+const STEEL = [0.1, 0.105, 0.115];
+const RAIL = [0.16, 0.165, 0.175];
+const ROOF = [0.22, 0.23, 0.24];
+const FASCIA = [0.06, 0.065, 0.075];
 
 /** Height of row r's tread above the stand's base, m. */
 export function rowHeight(r: number): number {
@@ -219,64 +316,93 @@ export function rowHeight(r: number): number {
 }
 
 /**
- * Grandstand structures: a concrete front wall, one stepped tread and riser per row with the
- * seat colour along its front, side walls, a back wall, a cantilever roof on steel columns over
- * bigger stands, and access stairs (a lighter step band) every 25 m.
+ * Grandstand structures: weathered concrete front wall with dark front safety handrail, stepped
+ * treads and seat risers, sloped trapezoidal side walls matching the seating rake (never giant
+ * rectangular blocks), back wall, access stairs every 22 m, and cantilevered roof on structural
+ * steel columns and ribs over larger stands.
  */
 export function buildStands(frames: readonly StandFrame[]): BufferGeometry {
   const b = new Builder();
   for (const f of frames) {
     const L = f.length;
     const top = rowHeight(f.rows);
-    // Front wall.
+    const back = 0.3 + f.rows * STAND.rowDepth;
+
+    // Front concrete retaining wall + darker plinth + top metal guardrail.
     b.box(f, 0, L, 0, 0.3, 0, STAND.frontWall, CONCRETE);
-    // Rows: tread (concrete) and the seat band at its front edge.
+    b.box(f, 0, L, 0.08, 0.22, STAND.frontWall + 0.72, STAND.frontWall + 0.82, RAIL);
+    for (let u = 0.2; u <= L - 0.1; u += 4) {
+      b.box(f, u - 0.04, u + 0.04, 0.1, 0.2, STAND.frontWall, STAND.frontWall + 0.82, RAIL);
+    }
+
+    // Rows: tread (weathered concrete) and the seat band at its front edge.
     for (let r = 0; r < f.rows; r++) {
       const v0 = 0.3 + r * STAND.rowDepth;
       const v1 = v0 + STAND.rowDepth;
       const y = rowHeight(r);
-      b.box(f, 0, L, v0, v1, 0, y, CONCRETE);
-      b.box(f, 0, L, v0 + 0.05, v0 + 0.5, y, y + 0.42, f.seat);
+      const stepTone = r % 2 === 0 ? CONCRETE : CONCRETE_DARK;
+      b.box(f, 0, L, v0, v1, Math.max(0, y - STAND.rowRise - 0.1), y, stepTone);
+      b.box(f, 0, L, v0 + 0.06, v0 + 0.48, y, y + 0.4, f.seat);
     }
-    const back = 0.3 + f.rows * STAND.rowDepth;
-    b.box(f, 0, L, back, back + 0.3, 0, top + STAND.backWall, CONCRETE);
-    // Side walls rising with the rake.
-    b.box(f, -0.3, 0, 0, back + 0.3, 0, top + 1.0, CONCRETE);
-    b.box(f, L, L + 0.3, 0, back + 0.3, 0, top + 1.0, CONCRETE);
-    // Stairs: a lighter band of steps every 25 m (drawn over the seats).
-    for (let u = 12; u < L - 6; u += 25) {
+
+    // Back wall + darker structural base.
+    b.box(f, 0, L, back, back + 0.35, 0, top + STAND.backWall, CONCRETE_DARK);
+
+    // Sloped side walls following the rake (removes the giant rectangular side-cube silhouette).
+    const yFrontSide = STAND.frontWall + 0.95;
+    const yBackSide = top + Math.min(STAND.backWall, 1.4);
+    b.slopedWall(f, -0.35, 0, 0, back + 0.35, yFrontSide, yBackSide, CONCRETE_DARK);
+    b.slopedWall(f, L, L + 0.35, 0, back + 0.35, yFrontSide, yBackSide, CONCRETE_DARK);
+
+    // Stairs: lighter concrete step band every 22 m.
+    for (let u = 11; u < L - 6; u += 22) {
       for (let r = 0; r < f.rows; r++) {
         const v0 = 0.3 + r * STAND.rowDepth;
         b.box(
           f,
-          u - 0.6,
-          u + 0.6,
+          u - 0.65,
+          u + 0.65,
           v0,
           v0 + STAND.rowDepth,
-          0,
-          rowHeight(r) + 0.02 + 0.21,
-          [0.5, 0.5, 0.48],
+          rowHeight(r) - 0.1,
+          rowHeight(r) + 0.24,
+          STAIR,
         );
       }
     }
+
     if (f.roof) {
-      const ry = top + STAND.backWall + 2.2;
-      const over = back * 0.25;
-      // Columns at the back, every 12 m.
-      for (
-        let u = 0.5;
-        u <= L - 0.5;
-        u += Math.max(6, (L - 1) / Math.max(1, Math.round((L - 1) / 12)))
-      ) {
-        b.box(f, u - 0.2, u + 0.2, back - 0.1, back + 0.3, 0, ry, STEEL);
-      }
-      // Roof plate sloping down to the front, a fascia under its front edge.
+      const ry = top + STAND.backWall + 2.4;
+      const over = back * 0.18;
+      const yf = ry - 0.7;
       const P = (u: number, v: number, y: number): number[] => [
         f.ox + f.ax * u + f.bx * v,
         f.base + y,
         f.oz + f.az * u + f.bz * v,
       ];
-      const yf = ry - 0.6;
+      // Back steel columns + cantilevered roof ribs every ~10 m.
+      const bayCount = Math.max(1, Math.round((L - 1) / 10));
+      const bayStep = (L - 1) / bayCount;
+      for (let k = 0; k <= bayCount; k++) {
+        const u = 0.5 + k * bayStep;
+        b.box(f, u - 0.22, u + 0.22, back - 0.05, back + 0.4, 0, ry, STEEL);
+        // Cantilever truss beam from back column toward front roof edge.
+        b.quad(
+          P(u - 0.14, over, yf - 0.45),
+          P(u - 0.14, back + 0.3, ry - 0.85),
+          P(u - 0.14, back + 0.3, ry - 0.06),
+          P(u - 0.14, over, yf - 0.06),
+          STEEL,
+        );
+        b.quad(
+          P(u + 0.14, back + 0.3, ry - 0.85),
+          P(u + 0.14, over, yf - 0.45),
+          P(u + 0.14, over, yf - 0.06),
+          P(u + 0.14, back + 0.3, ry - 0.06),
+          STEEL,
+        );
+      }
+      // Roof plate top, underside soffit, and crisp dark fascia band.
       b.quad(
         P(-0.5, over, yf),
         P(-0.5, back + 0.6, ry),
@@ -285,22 +411,67 @@ export function buildStands(frames: readonly StandFrame[]): BufferGeometry {
         ROOF,
       );
       b.quad(
-        P(L + 0.5, over, yf - 0.05),
-        P(L + 0.5, back + 0.6, ry - 0.05),
-        P(-0.5, back + 0.6, ry - 0.05),
-        P(-0.5, over, yf - 0.05),
+        P(L + 0.5, over, yf - 0.06),
+        P(L + 0.5, back + 0.6, ry - 0.06),
+        P(-0.5, back + 0.6, ry - 0.06),
+        P(-0.5, over, yf - 0.06),
         STEEL,
       );
       b.quad(
-        P(-0.5, over, yf - 1.0),
-        P(L + 0.5, over, yf - 1.0),
+        P(-0.5, over, yf - 0.85),
+        P(L + 0.5, over, yf - 0.85),
         P(L + 0.5, over, yf),
         P(-0.5, over, yf),
-        [0.12, 0.13, 0.14],
+        FASCIA,
+      );
+      // Back fascia edge.
+      b.quad(
+        P(L + 0.5, back + 0.6, ry - 0.6),
+        P(-0.5, back + 0.6, ry - 0.6),
+        P(-0.5, back + 0.6, ry),
+        P(L + 0.5, back + 0.6, ry),
+        FASCIA,
       );
     }
   }
   return b.build();
+}
+
+/**
+ * Weathered concrete & painted steel grandstand material: subtle architectural expansion joints,
+ * surface grain variation, and ground-level dirt darkening so large stand walls never look like
+ * flat untextured polygons.
+ */
+export function grandstandMaterial(): MeshStandardMaterial {
+  const m = new MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.88,
+    metalness: 0.04,
+  });
+  m.name = 'grandstand';
+  m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vStandUv;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvStandUv = uv;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vStandUv;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        {
+          // Subtle concrete form-tie panels (3.5 m × 1.8 m) and weathering noise.
+          vec2 cell = vec2(vStandUv.x / 3.5, vStandUv.y / 1.8);
+          vec2 f = fract(cell);
+          float joint = (1.0 - smoothstep(0.0, 0.025, f.x)) + (1.0 - smoothstep(0.0, 0.025, f.y));
+          float grain = fract(sin(dot(floor(vStandUv * 2.5), vec2(12.9898, 78.233))) * 43758.5453);
+          float panel = fract(sin(dot(floor(cell), vec2(37.1, 17.3))) * 43758.5453);
+          float grime = mix(0.76, 1.0, smoothstep(0.0, 1.2, vStandUv.y));
+          diffuseColor.rgb *= grime * (0.93 + 0.1 * panel) * (0.95 + 0.08 * grain) * (1.0 - clamp(joint, 0.0, 1.0) * 0.14);
+        }`,
+      );
+  };
+  m.customProgramCacheKey = () => 'grandstand-v2';
+  return m;
 }
 
 /** Seat positions for the crowd: per stand, per row, every 0.55 m, kept with probability `fill`. */
@@ -316,10 +487,13 @@ export function crowdSeats(
     for (let r = 0; r < f.rows; r++) {
       const p = fill(f, r);
       const v = 0.3 + r * STAND.rowDepth + 0.38;
-      const y = f.base + rowHeight(r) + 0.42;
+      const y = f.base + rowHeight(r) + 0.4;
       for (let u = 0.5; u < f.length - 0.4; u += 0.55) {
         k++;
         if (hash01(k, 77) > p) continue;
+        // Leave stair aisles clear every 22 m!
+        const modStair = (((u - 11) % 22) + 22) % 22;
+        if (u > 9 && (modStair < 0.85 || modStair > 21.15)) continue;
         const uj = u + (hash01(k, 78) - 0.5) * 0.12;
         out.push({
           x: f.ox + f.ax * uj + f.bx * v,

@@ -43,6 +43,8 @@ import {
 } from './quality';
 import { GRASS_COLOUR, TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 import { isDressingFile, type DressingFile } from './world/dressing';
+import type { BrandSpec } from './world/brands';
+import type { GarageTeam } from './world/pit-building';
 import { CircuitWorld } from './world/world';
 
 /**
@@ -112,6 +114,10 @@ export interface RaceViewOptions {
    * own ground grid.
    */
   dressingUrl?: string | null;
+  /** Team names/codes/colours for garage boards, pit-wall canopies and pit crew. */
+  garageTeams?: readonly GarageTeam[];
+  /** Invented brands for trackside hoardings and bridge banners. */
+  brands?: readonly BrandSpec[];
 }
 
 /** Everything the view needs for one frame, already interpolated by the game loop. */
@@ -331,6 +337,8 @@ export class RaceView {
           grass: assets.sets.grass,
           grassColour: GRASS_COLOUR,
           props: this.props,
+          garageTeams: options.garageTeams,
+          brands: options.brands,
         })
       : null;
     if (this.world) this.scene.add(this.world.group);

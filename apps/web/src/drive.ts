@@ -34,6 +34,7 @@ import {
   type ToneMap,
 } from '@undercut/render';
 import teams from '../../../design/teams.json';
+import brandsData from '../../../design/brands.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
 import monzaDressing from '@undercut/render/data/monza.dressing.json?url';
@@ -242,6 +243,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           car: carGeometry,
           racingLine: line,
           dressingUrl: monzaDressing,
+          garageTeams: teams.teams.map((t) => ({
+            name: t.name,
+            code: t.code,
+            primary: t.colours.primary,
+            secondary: t.colours.secondary,
+          })),
+          brands: brandsData.brands,
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),

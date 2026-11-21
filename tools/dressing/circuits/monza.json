@@ -3,11 +3,24 @@
   "track": "packages/track/data/monza.json",
   "radius": 600,
   "simplify": 0.5,
-  "notes": "Mapped features within `radius` metres of the centreline. Authored additions (grandstand capacity and facing, marshal posts, boards, gantry, podium, screens, towers) go under `authored` in a later step.",
+  "notes": "Mapped features within `radius` metres of the centreline plus authored Monza trackside landmarks (bridges, big screens) resolved into the track's world frame by tools/dressing/build.py.",
   "terrain": {
     "cell": 50,
     "halfSize": 6000,
     "openWindow": 400,
     "average": 150
+  },
+  "authored": {
+    "objects": [
+      { "kind": "bridge", "s": 310, "d": 0, "data": { "label": "start-straight-bridge" } },
+      { "kind": "bridge", "s": 1480, "d": 0, "data": { "label": "roggia-approach-bridge" } },
+      { "kind": "bridge", "s": 2860, "d": 0, "data": { "label": "serraglio-bridge" } },
+      { "kind": "bridge", "s": 4560, "d": 0, "data": { "label": "parabolica-approach-bridge" } },
+      { "kind": "big-screen", "s": 5640, "d": -16, "data": { "side": "right", "offset": 9 } },
+      { "kind": "big-screen", "s": 595, "d": 18, "data": { "side": "left", "offset": 10 } },
+      { "kind": "big-screen", "s": 1830, "d": 18, "data": { "side": "left", "offset": 10 } },
+      { "kind": "big-screen", "s": 3740, "d": 18, "data": { "side": "left", "offset": 10 } },
+      { "kind": "big-screen", "s": 4950, "d": 18, "data": { "side": "left", "offset": 10 } }
+    ]
   }
 }

@@ -273,7 +273,7 @@ def build(cfg, offline):
             out[name].sort(key=lambda it: it["id"])
     terrain = terrain_grid(cfg, frame, o["datum"], offline)
     counts = {k: (len(v) // 2 if k == "tree" else len(v)) for k, v in out.items()}
-    return {
+    doc = {
         "format": "undercut-dressing",
         "version": FORMAT_VERSION,
         "id": cfg["id"],
@@ -285,6 +285,41 @@ def build(cfg, offline):
         "mapped": out,
         "terrain": terrain,
     }
+    authored_cfg = cfg.get("authored")
+    if authored_cfg:
+        ys = track["centreline"]["y"]
+        n_cl = len(xs)
+        lap_len = track["length"]
+        step = lap_len / n_cl
+        resolved_objs = []
+        for obj in authored_cfg.get("objects", []):
+            s = float(obj["s"]) % lap_len
+            d = float(obj.get("d", 0.0))
+            i0 = int(s / step) % n_cl
+            i1 = (i0 + 1) % n_cl
+            tx = xs[i1] - xs[i0]
+            tz = zs[i1] - zs[i0]
+            tl = math.hypot(tx, tz) or 1.0
+            tx, tz = tx / tl, tz / tl
+            nx, nz = -tz, tx
+            x = xs[i0] + nx * d
+            z = zs[i0] + nz * d
+            y = ys[i0]
+            entry = {
+                "kind": obj["kind"],
+                "s": round(s, 1),
+                "x": round(x, 1),
+                "y": round(y, 1),
+                "z": round(z, 1),
+                "yaw": round(math.atan2(-tz, tx), 4),
+            }
+            if "scale" in obj:
+                entry["scale"] = obj["scale"]
+            if "data" in obj:
+                entry["data"] = obj["data"]
+            resolved_objs.append(entry)
+        doc["authored"] = {"objects": resolved_objs}
+    return doc
 
 
 def main():

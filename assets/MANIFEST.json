@@ -56,6 +56,14 @@
     "sha256": "5f4eed49e1aec79e78d6cca406260f1932df6d3983caae1ad0252f1fd35df75b"
   },
   {
+    "file": "packages/render/data/monza.dressing.json",
+    "source_url": "https://www.openstreetmap.org/relation/284565 (via https://overpass-api.de/api/interpreter); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E009_00_DEM/Copernicus_DSM_COG_10_N45_00_E009_00_DEM.tif",
+    "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+    "licence": "ODbL-1.0",
+    "changes": "Derived database built by tools/dressing/build.py monza: OSM woods, tree rows, individual trees, meadows, service roads, grandstands, paddock buildings, bridges and historic banking projected into the circuit frame; canopy-filtered Copernicus GLO-30 terrain heights on a 12 m grid; authored bridge and big-screen placements from tools/dressing/circuits/monza.json. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "caf8b20f323d96e2a828c04f6b9b5190a46893b94b6053289a862a85c8cf1028"
+  },
+  {
     "file": "apps/web/public/assets/car/car_far.glb",
     "source_url": "tools/car/build.mjs (this repository)",
     "author": "Project contributors",

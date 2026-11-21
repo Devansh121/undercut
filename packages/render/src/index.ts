@@ -58,5 +58,8 @@ export {
   type ViewStats,
 } from './race-view';
 
+export type { BrandSpec } from './world/brands';
+export type { GarageTeam } from './world/pit-building';
+
 /** Interpolation factor between the previous and current sim state, in [0, 1). */
 export type RenderAlpha = number;
