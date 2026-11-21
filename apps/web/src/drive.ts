@@ -855,6 +855,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (session.phase === 'paused') resume();
       setSource('human');
       loop.timeScale = 1;
+      view.setSkyProbe(null);
       view.setCamera('chase-near');
       actions.restartLap();
       results.hide();

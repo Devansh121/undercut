@@ -51,6 +51,8 @@ export interface DebugApi {
     aim?: { x: number; y: number; z: number },
   ): void;
   quality(): string;
+  /** Draw only the sky dome through one render path until cleared with null (RaceView.setSkyProbe). */
+  skyProbe(path: 'hdr' | 'direct' | null): void;
   setQuality(name: string): Promise<void>;
   /** World point at lap (s, d), height h above the ground, and the track edges there. */
   trackPoint(
@@ -190,6 +192,7 @@ export function installDebugApi(
     gridCars: (count) => need().gridCars(count),
     tvCamera: (x, y, z, fov, aim) => need().view.setTvCamera(x, y, z, fov, aim),
     quality: () => need().quality,
+    skyProbe: (path) => need().view.setSkyProbe(path),
     trackPoint: (s, d = 0, h = 0) => {
       const t = need().session.track;
       const p = { x: 0, y: 0, z: 0 };

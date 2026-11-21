@@ -993,3 +993,61 @@ describe('persistence policy', () => {
     expect(inPhase(phase).h.machine.durableWrites).toBe(durable);
   });
 });
+
+describe('room lifetime cap', () => {
+  const HOUR = 3600_000;
+
+  it('has no cap by default', () => {
+    const h = new Harness();
+    h.join('c1', 'Ana');
+    expect(h.machine.timings.maxRoomAgeMs).toBe(Number.POSITIVE_INFINITY);
+    expect(h.machine.nextWakeAt()).toBeNull();
+  });
+
+  it('closes a lobby at the cap even with members connected', () => {
+    const h = new Harness({ maxRoomAgeMs: 6 * HOUR });
+    h.join('c1', 'Ana');
+    h.join('c2', 'Ben');
+    expect(h.machine.nextWakeAt()).toBe(T0 + 6 * HOUR);
+    h.runUntil(T0 + 6 * HOUR - 1);
+    expect(h.state.phase).toBe('lobby');
+    h.runUntil(T0 + 6 * HOUR);
+    expect(h.machine.closed).toBe(true);
+    expect(h.last('c1', 'error')).toMatchObject({ code: 'room_closed' });
+    expect(h.box('c1').closed).toMatchObject({ code: CLOSE.roomClosed });
+    expect(h.box('c2').closed).toMatchObject({ code: CLOSE.roomClosed });
+    expect(h.machine.nextWakeAt()).toBeNull();
+  });
+
+  it('lets a race that runs past the cap finish, then closes after the results', () => {
+    const h = new Harness({ maxRoomAgeMs: 60_000 });
+    h.runUntil(T0 + 50_000);
+    const conns = h.toRacing();
+    for (let i = 0; i < 100; i++) {
+      h.now += 400;
+      h.heartbeat(conns);
+      h.advance(0);
+    }
+    expect(h.now).toBeGreaterThan(T0 + 60_000);
+    expect(h.state.phase).toBe('racing');
+    driveLaps(h, conns, 3);
+    expect(h.state.phase).toBe('results');
+    h.runUntil(h.now + h.machine.timings.resultsLingerMs - 1);
+    expect(h.state.phase).toBe('results');
+    h.runUntil(h.now + 1);
+    expect(h.machine.closed).toBe(true);
+    expect(h.box('c1').closed).toMatchObject({ code: CLOSE.roomClosed });
+  });
+
+  it('closes on a rematch after the cap instead of opening a new lobby', () => {
+    const h = new Harness({ maxRoomAgeMs: 60_000 });
+    h.runUntil(T0 + 50_000);
+    const conns = h.toRacing();
+    driveLaps(h, conns, 3);
+    expect(h.state.phase).toBe('results');
+    h.runUntil(Math.max(h.now, T0 + 60_000));
+    expect(h.state.phase).toBe('results');
+    h.send('c1', { type: 'rematch' });
+    expect(h.machine.closed).toBe(true);
+  });
+});

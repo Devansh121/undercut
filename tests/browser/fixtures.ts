@@ -1,4 +1,5 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test as base, expect } from './base';
 
 /**
  * One drive session per worker, shared by the tests that do not need a fresh load. Software
@@ -29,6 +30,8 @@ export const test = base.extend<{ drive: DriveFixture }, { sharedPage: Page }>({
       await page.getByRole('button', { name: /Start/ }).click();
       await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
       await use(page);
+      await page.evaluate(() => window.__undercut?.quit()).catch(() => undefined);
+      await page.goto('about:blank').catch(() => undefined);
       await context.close();
     },
     { scope: 'worker', timeout: 90_000 },
