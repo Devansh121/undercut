@@ -514,6 +514,9 @@ export class RaceView {
       this.contact.end();
     }
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
+    // Count every pass of the frame (shadow cascades, AO, post), not only the last draw.
+    this.renderer.info.autoReset = false;
+    this.renderer.info.reset();
     this.gpu.begin();
     this.pipeline.render(this.scene, this.camera, {
       exposure: this.environment.exposure,

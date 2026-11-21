@@ -70,7 +70,7 @@ export const NIGHT_FLOODLIT: TimeOfDay = Object.freeze({
   sunScale: 0,
   sunFallback: 0,
   shadowSoftness: 1,
-  exposure: 1.1,
+  exposure: 1.6,
   fogDensity: 0.0006,
   fogColour: '#2a2620',
   localLightSlots: 8,

@@ -332,9 +332,10 @@ function summarise(times) {
 }
 
 /**
- * Frame-time runs on the GPU with vsync off (so the numbers are what the GPU can do): the
- * scripted drive (autopilot from Ascari to the line) and the full grid in view (twenty cars,
- * cameras and sim running, cars static). At 1080p on High and 844x390 on Mobile.
+ * Frame-time runs on the GPU: the scripted drive (autopilot from Ascari to the line) and the full
+ * grid in view (twenty cars, cameras and sim running, cars static), at 1080p on High and 844x390
+ * on Mobile; once with vsync (does it hold 60 fps) and once without (the headroom; its 1 % lows
+ * are dominated by the browser's uncapped frame pacing and are not a target).
  */
 const PERF_VIEWPORTS = [
   {
@@ -356,8 +357,12 @@ const PERF_VIEWPORTS = [
 ];
 
 async function perf(report) {
+  for (const vsync of [true, false]) await perfRuns(report, vsync);
+}
+
+async function perfRuns(report, vsync) {
   const browser = await chromium.launch({
-    args: [...GPU_ARGS, '--disable-gpu-vsync', '--disable-frame-rate-limit'],
+    args: [...GPU_ARGS, ...(vsync ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit'])],
   });
   try {
     for (const vp of PERF_VIEWPORTS) {
@@ -403,7 +408,9 @@ async function perf(report) {
           file: path.relative(root, file),
         };
         report.perf.push(summary);
-        console.log(`  perf ${run} ${vp.label} ${quality}: ${JSON.stringify(summary)}`);
+        console.log(
+          `  perf ${run} ${vp.label} ${quality} vsync=${vsync}: ${JSON.stringify(summary)}`,
+        );
       }
       await context.close();
     }

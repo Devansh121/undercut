@@ -25,6 +25,7 @@ export class GpuTimer {
   }
 
   begin(): void {
+    this.poll();
     if (!this.ext || this.active || this.pending.length > 4) return;
     const q = this.gl.createQuery();
     if (!q) return;

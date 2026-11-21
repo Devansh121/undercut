@@ -116,7 +116,7 @@ export function floodlightsAlong(
       y: track.heightAt(s, d) + (options.height ?? 14),
       z: p.z,
       colour: options.colour ?? '#ffe6c8',
-      intensity: options.intensity ?? 60,
+      intensity: options.intensity ?? 420,
       distance: 75,
     });
   }

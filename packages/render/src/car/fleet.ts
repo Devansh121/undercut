@@ -89,6 +89,7 @@ export class CarFleet {
   private readonly patternIndex = new Map<string, number>();
   private readonly lodLevels: CarLod[];
   private readonly distances: number[];
+  private lastKey = '';
 
   constructor(
     private readonly assets: CarAssets,
@@ -310,6 +311,7 @@ export class CarFleet {
     for (const car of this.cars) for (const { model } of car.posed.values()) model.dispose();
     this.cars.length = 0;
     this.liveries.length = 0;
+    this.lastKey = '';
     for (const s of this.sets) {
       for (const m of s.meshes) {
         m.count = 0;
@@ -353,6 +355,18 @@ export class CarFleet {
 
   /** Assign levels by distance from `eye` and write every instance. Call once per frame. */
   update(eye: Vector3): void {
+    // Nothing moved and no car changed level or fade: keep last frame's instances (a static
+    // grid then costs no uploads at all).
+    let key = '';
+    let dirty = false;
+    for (const car of this.cars) {
+      dirty ||= car.dirty;
+      const dist = Math.hypot(car.pose.x - eye.x, car.pose.y - eye.y, car.pose.z - eye.z);
+      for (const w of lodBlend(dist, this.distances, CROSSFADE_M))
+        key += `${w.level}:${w.fade.toFixed(3)},`;
+    }
+    if (!dirty && key === this.lastKey) return;
+    this.lastKey = key;
     const counts = this.sets.map(() => 0);
     const c = new Color();
     for (let ci = 0; ci < this.cars.length; ci++) {
