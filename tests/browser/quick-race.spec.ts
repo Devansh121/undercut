@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './base';
 
 test('Quick Race: grid, lights, moving field and player result', async ({ page }) => {
   test.setTimeout(180_000);
