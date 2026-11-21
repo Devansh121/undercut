@@ -42,7 +42,7 @@ const PROFILES: Record<string, Profile> = {
 };
 const profile =
   process.env.SOAK_PLAYERS === '2'
-    ? { name: 'two-player', lengthM: 450, laps: 5, seed: 1 }
+    ? { name: 'two-player', lengthM: 450, laps: 6, seed: 1 }
     : (PROFILES[process.env.SOAK === 'long' ? 'long' : 'short'] as Profile);
 
 const CONDITIONS: NetConditions = {
@@ -124,7 +124,10 @@ describe(`soak: ${profile.name}`, () => {
       let lastTick = 0;
       let maxTickGap = 0;
       const lastFrame = new Map<Recorder, number>();
-      const smoothers = rs.map(() => new RemoteCarSmoother());
+      // The game's renderer smoothing, measured only in the opt-in two-player run
+      // (SOAK_PLAYERS=2): the CI soak keeps its sampler to the interpolation check alone, as
+      // this process also hosts every sender.
+      const smoothers = HUMANS === 2 ? rs.map(() => new RemoteCarSmoother()) : null;
       const lastSample = new Map<Recorder, number>();
       let maxFrameGap = 0;
       const heldBySeat = new Map<number, number>();
@@ -153,9 +156,11 @@ describe(`soak: ${profile.name}`, () => {
           )
             continue;
           const views = c.remoteCars.sample(now);
-          const elapsed = (tick - (lastSample.get(r) ?? tick)) / 1000;
-          lastSample.set(r, tick);
-          smoothers[rs.indexOf(r)]!.update(views, elapsed);
+          if (smoothers) {
+            const elapsed = (tick - (lastSample.get(r) ?? tick)) / 1000;
+            lastSample.set(r, tick);
+            smoothers[rs.indexOf(r)]!.update(views, elapsed);
+          }
           const renderTime = now - c.remoteCars.delayMs;
           delays.push(c.remoteCars.delayMs);
           maxRemoteSize = Math.max(maxRemoteSize, c.remoteCars.size);
@@ -221,7 +226,11 @@ describe(`soak: ${profile.name}`, () => {
         `| wall time (join to results) | ${((Date.now() - started) / 1000).toFixed(1)} s, race ${raceSeconds.toFixed(1)} s |`,
         `| phase sequence agreement | ${new Set(phases).size === 1 ? `${phases.length}/${phases.length} clients identical` : JSON.stringify(phases)} |`,
         `| classification agreement | ${new Set(results).size === 1 ? `${results.length}/${results.length} identical` : 'DIFFERENT'}, ${rows.length} cars, rejected laps ${rejected.length}, flagged ${flagged.length ? flagged.join(', ') : 'none'} |`,
-        `| renderer smoothing snaps / corrections | ${smoothers.map((s) => s.stats.snaps + '/' + s.stats.corrections).join(', ')} |`,
+        ...(smoothers
+          ? [
+              `| renderer smoothing snaps / corrections | ${smoothers.map((s) => s.stats.snaps + '/' + s.stats.corrections).join(', ')} |`,
+            ]
+          : []),
         `| interpolation error p50 / p99 / max | ${(p50 * 100).toFixed(2)} cm / ${(p99 * 100).toFixed(2)} cm / ${(max * 100).toFixed(1)} cm (bounds ${P99_BOUND_M * 100} cm / ${MAX_BOUND_M * 100} cm) |`,
         `| samples interpolated / extrapolated / held | ${pct(modes.interpolated)} / ${pct(modes.extrapolated)} / ${pct(modes.held)} of ${total} |`,
         `| interpolation delay p50 / max | ${percentile(delays, 0.5).toFixed(0)} ms / ${delays[delays.length - 1]?.toFixed(0)} ms |`,
