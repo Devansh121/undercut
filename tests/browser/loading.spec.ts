@@ -34,3 +34,42 @@ test('a failed download shows Try again, and trying again starts the session', a
   expect(failures).toBe(1);
   expect(problems).toEqual([]);
 });
+
+test('a failed load leaves no decoder workers running, even when other files arrive later', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    const counts = { created: 0, terminated: 0 };
+    (window as unknown as { __workers: typeof counts }).__workers = counts;
+    const Native = window.Worker;
+    class Counted extends Native {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        counts.created++;
+      }
+      override terminate(): void {
+        counts.terminated++;
+        super.terminate();
+      }
+    }
+    window.Worker = Counted;
+  });
+  // One livery mask fails at once; the car files arrive two seconds later.
+  await page.route('**/assets/car/livery/aldermoor.png', (route) => route.abort('connectionreset'));
+  await page.route('**/assets/car/*.glb', async (route) => {
+    await new Promise((r) => setTimeout(r, 2000));
+    await route.continue();
+  });
+  await page.goto('/?debug=1&quality=lite');
+  await page.getByRole('button', { name: /Start/ }).click();
+  const loading = page.locator('[data-testid=loading]');
+  await expect(loading).toHaveAttribute('data-state', 'error', { timeout: 30_000 });
+  // Long after the delayed files have arrived: every worker that was started has been stopped.
+  await page.waitForTimeout(5000);
+  const workers = await page.evaluate(
+    () => (window as unknown as { __workers: { created: number; terminated: number } }).__workers,
+  );
+  expect(workers.terminated).toBe(workers.created);
+});

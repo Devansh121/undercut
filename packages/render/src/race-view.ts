@@ -210,7 +210,17 @@ export class RaceView {
       }),
     );
     const carP = CarAssets.load(loader, q, teams, options.dracoPath);
-    const [skyImage, setImages, car] = await Promise.all([skyP, setP, carP]);
+    // Settle all three before deciding: a car that finishes after another file failed is
+    // released here, never left behind.
+    const [skyR, setR, carR] = await Promise.allSettled([skyP, setP, carP]);
+    const failure = [skyR, setR, carR].find((r) => r.status === 'rejected');
+    if (failure) {
+      if (carR.status === 'fulfilled') carR.value.dispose();
+      throw (failure as PromiseRejectedResult).reason;
+    }
+    const skyImage = (skyR as PromiseFulfilledResult<ImageBitmap>).value;
+    const setImages = (setR as PromiseFulfilledResult<Awaited<typeof setP>>).value;
+    const car = (carR as PromiseFulfilledResult<CarAssets>).value;
     const sets = {} as Record<TrackTextureId, PbrSet>;
     for (const [id, img] of setImages) sets[id] = pbrSet(img, img.sizeM, q.anisotropy);
     return { index, sky: { meta: skyMeta, image: skyImage }, sets, car };

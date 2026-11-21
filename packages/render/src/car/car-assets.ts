@@ -55,8 +55,12 @@ export class CarAssets {
     draco.setDecoderPath(dracoPath);
     draco.setWorkerLimit(2);
     const gltf = new GLTFLoader().setDRACOLoader(draco);
+    // Once anything fails, files that arrive later are not decoded: no worker starts after the
+    // load has given up.
+    let failed = false;
     const parse = async (lod: CarLod): Promise<void> => {
       const buf = await loader.bytes(CAR_FILES[lod]);
+      if (failed) return;
       const result = await gltf.parseAsync(buf, loader.url('car/'));
       const root = result.scene.getObjectByName('car');
       if (!root) throw new Error(`${CAR_FILES[lod]} has no 'car' node`);
@@ -74,13 +78,20 @@ export class CarAssets {
       out.masks.set(team, t);
     };
     for (const lod of lods) loader.expect(CAR_FILES[lod], undefined);
-    try {
-      await Promise.all([...[...lods].map(parse), ...[...new Set(teams)].map(mask)]);
-    } catch (e) {
+    const jobs = [...[...lods].map(parse), ...[...new Set(teams)].map(mask)].map((p) =>
+      p.catch((e: unknown) => {
+        failed = true;
+        throw e;
+      }),
+    );
+    // Wait for every sibling to settle before releasing anything, so nothing finishes (or starts
+    // decoding) after the decoder and the half-built assets are gone.
+    const settled = await Promise.allSettled(jobs);
+    draco.dispose();
+    const rejected = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    if (rejected) {
       out.dispose();
-      throw e;
-    } finally {
-      draco.dispose();
+      throw rejected.reason;
     }
     return out;
   }
