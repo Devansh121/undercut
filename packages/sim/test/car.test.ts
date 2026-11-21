@@ -71,8 +71,8 @@ describe('car parameters', () => {
   });
 
   it('builds each trim from the doc 1.4 table', () => {
-    expect(createCarParams('low').aero.clA).toBe(4.2); // the top of 3.0–4.2
-    expect(createCarParams('low').aero.cdA).toBe(1.15);
+    expect(createCarParams('low').aero.clA).toBe(3.6);
+    expect(createCarParams('low').aero.cdA).toBe(1.16); // inside 1.05–1.25, fitted to the trap
     expect(createCarParams('medium').aero.clA).toBe(4.6);
     expect(createCarParams('high').aero.balance).toBe(0.45);
     expect(createCarParams('high', { tyre: { muY: 1.9 } }).tyre.muY).toBe(1.9);

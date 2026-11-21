@@ -70,14 +70,14 @@ export interface TyreParams {
   dampingOnset: number;
   /**
    * Peak lateral friction at the reference load. Fitted to the low-trim slow-corner lateral
-   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.112. Range 1.7–2.2
+   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.145. Range 1.7–2.2
    * (doc 1.2): [56] gives 1.71 at 3 kN, [44] 1.85 front and 2.15 rear.
    */
   muY: number;
   /**
    * Peak longitudinal friction at the reference load. Fitted to the low-load launch
    * (0–100 km/h, doc 2.3) and the low-trim braking peak (Monza T1 2025, doc 2.4), which agree
-   * on it: 1.73. Range 1.6–2.0 (doc 1.2). μx/μy at 3 kN is 0.82, below [44]'s 0.89–0.91 and
+   * on it: 1.765. Range 1.6–2.0 (doc 1.2). μx/μy at 3 kN is 0.82, below [44]'s 0.89–0.91 and
    * [56]'s 0.97 (doc 7.4).
    */
   muX: number;
@@ -318,12 +318,10 @@ export interface CarParams {
 
 export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   name: 'low',
-  cdA: 1.15, // doc 1.4: 1.15 (1.05–1.25); the top speed stays in its band with the ClA below
-  // Doc 1.4: 3.6 (3.0–4.2). At the top of the range: chosen by looking at the Monza lap and the
-  // braking peaks (a selection, docs/physics-validation.md section 7.1); a team's published
-  // figure (downforce equal to the car's weight at about 150 km/h, [57]) points to the upper part
-  // of the doc's ranges.
-  clA: 4.2,
+  // Doc 1.4: 1.15 (1.05–1.25), derived from the Monza trap; re-fitted to it with the
+  // calibrated tyres and floor (Results section): 1.16.
+  cdA: 1.16,
+  clA: 3.6, // doc 1.4: 3.6 (3.0–4.2)
   balance: 0.44,
   drsDrag: -0.12,
   drsDownforce: -0.08, // estimate: a small rear wing has less to lose
@@ -413,8 +411,8 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     patchWidthRear: 0.4,
     patchLength: 0.15,
     dampingOnset: 0.003,
-    muY: 2.112,
-    muX: 1.73,
+    muY: 2.145,
+    muX: 1.765,
     loadSensitivityY: -8.75e-5,
     loadSensitivityX: -8.75e-5,
     referenceLoad: 3000,
