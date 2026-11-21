@@ -149,7 +149,7 @@ function verdict(windows: readonly Window[]): { ok: boolean; reason: string } {
   for (const x of windows) {
     if (x.noisy !== 0)
       return { ok: false, reason: `${x.noisy} ticks with events in a quiet window` };
-    if (x.quiet < 500) return { ok: false, reason: `only ${x.quiet} quiet ticks in a window` };
+    if (x.quiet <= 500) return { ok: false, reason: `only ${x.quiet} quiet ticks in a window` };
   }
   const clean = windows.filter((x) => x.scavenges === 0);
   if (clean.length === 0) {
