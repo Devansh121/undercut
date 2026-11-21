@@ -10,6 +10,8 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M5 online client: Online rooms on the launch screen, create or join by invite, ready countdown, server-clock start lights, remote cars and minimap, official results and rematch. A desktop host and landscape phone guest complete the two-browser acceptance test against the local service.
+- Controls list: a Controls panel in the pause menu and on the launch screen lists every driving input for the device in use (keyboard, gamepad or touch), read from the live bindings, with the reverse-gear rule. The first start of a page session shows a six-second HUD hint with the brake and throttle inputs and how to open the list.
 - M6 Cloudflare deploy: top-level `wrangler.jsonc` composes the built client (staged into `dist/cloudflare` with `tools/deploy/_headers`) and the `/rooms` Durable Objects API on one origin, with `npm run deploy`, `npm run deploy:check` (`wrangler deploy --dry-run` assertions in the `build` CI job), composed-Worker runtime tests (`npm run test:deploy`), SQLite-persisted creation rate limits, a global creation cap, same-origin enforcement and a 4-hour room lifetime cap. Local `./start.sh` and `services/rooms/wrangler.jsonc` are unchanged. See `docs/DEPLOY.md`.
 - M3 race core: a pure `packages/race` runs the race rules for every session type (time trial, practice, qualifying, race, race weekend, championship): five-light start with a seeded hold and jump starts, timing from the circuit's control line with mini-sector gaps, track limits with strikes and penalties, yellow, blue, chequered and black-and-white flags, race DRS, ERS laps, pit stops with the limiter, boxes, service time and penalties served, results and points, JSON snapshots, and a stuck-car watchdog. AI cars launch, race (as ghosts to each other: no contact yet), make their pit stops and finish. Rules and values: `docs/race-rules.md`.
 - Headless races: `npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1` (and `weekend`) prints the classification, the event log and the watchdog's findings and writes JSON to `artifacts/telemetry/`. Twenty cars run about 22× faster than real time.
@@ -26,7 +28,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - Off-track fix: barriers stop cars. A car that leaves the track now hits the barrier, scrubs speed and slides along it, and the impact speed is reported for damage and audio later. The pit lane stays drivable with the pit wall between it and the track. The ground inside the barriers no longer steps (a lap-projection bug left a 2.7 m step at the first chicane), and the vehicle model survives bad ground anyway: tyre and floor forces saturate, the suspension has stops, and a step in the ground lifts the car instead of launching it. A reusable pose checker (`checkCarInvariants`) backs fuzz suites on an adversarial surface and on Monza, and the game resets the car if it ever fails (ADR 0009, physics-validation section 7.7).
 - M0 foundation: npm workspaces, TypeScript strict, Vite client, rooms service on the local Workers runtime, CI with eight required checks, the one-command run.
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
-- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. Headless and soak-tested; the lobby and in-race UI come next. See `docs/netcode.md`.
+- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. The lobby and race UI now use the same client library as the headless soak. See `docs/netcode.md`.
 
 ## Try this
 
@@ -45,6 +47,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
+
 - Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
 - Physics: the reference controller laps Monza in 1:24.969; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The quasi-steady full-envelope profile on its line predicts 1:23.4, so the gap is mostly car, line and track model, not driving. It is recorded in `docs/physics-validation.md` section 7.6 and pinned by a test, not hidden.
 - Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
@@ -55,6 +59,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
+- Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
+- Start release happens at the first fixed simulation tick on or after server lights-out. Each frame maps its catch-up ticks to the elapsed server-clock interval, so ticks before lights-out remain held even when rendering stalls. The acceptance test compares the actual released ticks within one 240 Hz tick plus clock error, using the normal referee floors.
 - M6 audio Slice 1 uses synthesized car/road layers and estimated camera/gear-mesh balances.
   The reference render is an actual 240 Hz reference-driver lap; trackside is a balance preset
   until spatial voices land in Slice 2. Collision audio accepts explicit speed/serial events;
@@ -158,3 +165,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 ## Optional, needs you
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
+
+### Decided for you — modular prop kit
+
+- Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
+- Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
+- Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
+- Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.

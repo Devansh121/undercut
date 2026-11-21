@@ -73,6 +73,8 @@ interface FleetCar {
   pose: CarPose;
   livery: number;
   drs: number;
+  /** 1 opaque, 0 not drawn; between, the car is dithered out (remote cars fading). */
+  opacity: number;
   /** Level of detail drawn, the one it is fading from (−1: none) and the fade's progress. */
   level: number;
   from: number;
@@ -315,6 +317,7 @@ export class CarFleet {
       pose: p,
       livery: index,
       drs,
+      opacity: 1,
       level: -1,
       from: -1,
       fade: 1,
@@ -333,6 +336,16 @@ export class CarFleet {
     car.dirty = true;
   }
 
+  /** Fade car `index`: 1 opaque, 0 hidden (dithered between, like the level-of-detail fades). */
+  setOpacity(index: number, opacity: number): void {
+    const car = this.cars[index];
+    if (!car) return;
+    const o = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    if (o === car.opacity) return;
+    car.opacity = o;
+    car.dirty = true;
+  }
+
   clear(): void {
     for (const car of this.cars) for (const { model } of car.posed.values()) model.dispose();
     this.cars.length = 0;
@@ -347,6 +360,11 @@ export class CarFleet {
 
   get size(): number {
     return this.cars.length;
+  }
+
+  /** Opacity of car `i` (1 unless it is fading), or 0 when there is no such car. */
+  opacityAt(i: number): number {
+    return this.cars[i]?.opacity ?? 0;
   }
 
   /** Pose of car `i` (for contact shadows), or undefined. */
@@ -418,12 +436,17 @@ export class CarFleet {
     counts.fill(0);
     const c = this.scratchColour;
     for (const car of this.cars) {
-      // One or two draws per car: the level fading out (if any) and the current one.
-      const n = car.from >= 0 ? 2 : 1;
+      if (car.opacity <= 0) {
+        car.dirty = false;
+        continue;
+      }
+      // One or two draws per car: the level fading out (if any) and the current one. A car
+      // fading as a whole draws only its current level, dithered by its opacity.
+      const n = car.from >= 0 && car.opacity >= 1 ? 2 : 1;
       const l = this.liveries[car.livery] as CarLivery;
       for (let d = 0; d < n; d++) {
         const level = n === 2 && d === 0 ? car.from : car.level;
-        const code = n === 1 ? 1 : ditherCode(car.fade, d === 1);
+        const code = n === 1 ? car.opacity : ditherCode(car.fade, d === 1);
         const set = this.sets[level] as LodSet;
         const posed = this.posed(car, set.lod);
         const slot = counts[level] as number;

@@ -33,6 +33,7 @@ export const ICON_PATHS = {
   exit: 'M14 4h6v16h-6 M10 8l-4 4 4 4 M6 12h10',
   stopwatch: 'M12 21a8 8 0 1 0 0-16a8 8 0 1 0 0 16z M12 9v4l2.5 2.5 M9.5 2.5h5',
   chevron: 'M9 6l6 6-6 6',
+  keys: 'M3 7h18v10H3z M7 10h1 M11 10h2 M16 10h1 M8 14h8',
 } as const;
 
 export type IconKey = keyof typeof ICON_PATHS;
