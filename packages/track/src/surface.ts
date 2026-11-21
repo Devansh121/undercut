@@ -56,6 +56,7 @@ export class TrackSurface implements SurfaceSampler {
   private readonly pq = createPathPoint();
   private readonly g = createGround();
   private readonly t = createVec3();
+  private readonly pt = createVec3();
 
   constructor(track: Track) {
     this.track = track;
@@ -76,18 +77,40 @@ export class TrackSurface implements SurfaceSampler {
     const d = q.d;
     const g = track.ground(s, d, this.g);
     let kind = g.kind;
-    if (kind !== SurfaceKind.Asphalt && kind !== SurfaceKind.Paint && kind !== SurfaceKind.Kerb) {
-      this.pitHint.index = pitIndex;
-      if (track.onPitLane(x, z, s, d, this.pitHint, this.pq)) kind = SurfaceKind.PitLane;
-      pitIndex = this.pitHint.index;
+    // The pit lane has its own ground (Track.pitBlend): full weight on its surface, blending
+    // back to the lap's ground just beyond its edges.
+    this.pitHint.index = pitIndex;
+    const w = track.pitBlend(x, z, s, d, this.pitHint, this.pq);
+    pitIndex = this.pitHint.index;
+    if (w > 0 && kind !== SurfaceKind.Kerb && track.pitLaneSurface(this.pq)) {
+      kind = SurfaceKind.PitLane;
     }
     hint.index = this.lapHint.index + segs * (pitIndex + 1);
 
     const nrm = track.groundNormal(g, this.t);
+    let height = g.height;
+    if (w > 0) {
+      const sp = this.pq.s;
+      height += w * (track.pitGroundHeight(sp) - height);
+      // The pit ground's normal: flat across the pit lane, rising along it at its grade.
+      const grade = track.pitGroundGrade(sp);
+      track.pit.path.tangent(sp, this.pt);
+      let nx = -grade * this.pt.x;
+      let ny = 1;
+      let nz = -grade * this.pt.z;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx = nrm.x + w * (nx / len - nrm.x);
+      ny = nrm.y + w * (ny / len - nrm.y);
+      nz = nrm.z + w * (nz / len - nrm.z);
+      const l2 = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nrm.x = nx / l2;
+      nrm.y = ny / l2;
+      nrm.z = nz / l2;
+    }
     out.normalX = nrm.x;
     out.normalY = nrm.y;
     out.normalZ = nrm.z;
-    out.height = g.height;
+    out.height = height;
     const props = kind === SurfaceKind.Kerb && g.highKerb ? HIGH_KERB : SURFACE_PROPERTIES[kind];
     out.grip = props.grip;
     out.drag = props.drag;

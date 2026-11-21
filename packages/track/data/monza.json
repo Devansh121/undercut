@@ -1,6 +1,6 @@
 {
   "format": "undercut-track",
-  "version": 2,
+  "version": 3,
   "id": "monza",
   "name": "Monza",
   "country": "Italy",
@@ -12,8 +12,26 @@
     "lon": 9.2888,
     "datum": 178
   },
+  "environment": {
+    "latitude": 45.6216,
+    "longitude": 9.2888,
+    "northYaw": 1.570796,
+    "altitude": 186.15,
+    "airTemperature": 299.15,
+    "airPressure": 99109,
+    "timeZone": "Europe/Rome",
+    "utcOffset": 7200,
+    "raceDate": "2025-09-07",
+    "sessions": {
+      "qualifying": 57600,
+      "race": 54000
+    },
+    "lighting": "daylight",
+    "floodlights": null,
+    "notes": "Air temperature is an estimate of a typical race afternoon (early September, Lombardy). Pressure is the ISA value at the lap's mean altitude. Session times are the 2025 event's local start times."
+  },
   "source": {
-    "pipelineVersion": "1.1.0",
+    "pipelineVersion": "1.2.0",
     "scale": 0.999823527,
     "osmLength": 5797.92,
     "smoothedLength": 5794.02,
@@ -44,6 +62,13 @@
         "sha256": "fb357e36d4f0ebea0c96cec7793c686506bb6aaeb34b92d464b46f05889f824d"
       },
       "filter": "opening 300 m, moving average 90 m, Gaussian sigma 20 m"
+    },
+    "cornerRule": {
+      "smoothSigma": 8,
+      "enter": 0.0025,
+      "exit": 0.00125,
+      "mergeGap": 150,
+      "minTurn": 20
     },
     "licence": "ODbL-1.0",
     "attribution": ["© OpenStreetMap contributors. Data available under the Open Database License 1.0, https://www.openstreetmap.org/copyright","produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved","The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30"],
@@ -197,10 +222,15 @@
       },
       {
         "detection": 4848.834,
-        "activation": 12,
+        "activation": 5484.5,
         "end": 598.103
       }
     ]
+  },
+  "timingLine": {
+    "s": 5472.5,
+    "uncertainty": 13,
+    "source": "FIA 2025 Monza circuit map: the map's drawn track fitted to this centreline (median miss 3.4 m) and the control-line tick projected onto it; 320.5 m before the start line. The map's S1, S2 and speed-trap ticks land 8.0, 6.6 and 12.6 m from their stored positions under the same fit, hence +/- 13 m (docs/physics-validation.md section 7.6)."
   },
   "grid": [
     {

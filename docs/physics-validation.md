@@ -340,7 +340,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.3 and 78.5 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.05 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
-| Monza reference lap 84.969 s against the M1 band 74.852–82.732 s (section 7.6) | 2.24 s outside M1 (2.14 s with DRS zone 2 at its mapped activation), 3.81 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
+| Monza reference lap 84.872 s against the M1 band 74.852–82.732 s (section 7.6) | 2.14 s outside M1 (2.24 s before DRS zone 2 moved to its mapped activation), 3.72 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
 | Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
 | Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0009) |
 
@@ -444,7 +444,7 @@ selection check, or withheld validation.
 | Pouhon, medium trim, 281 km/h, Spa air (2.5) | 5.7 ± 0.7 | 4.14, gap | 4.59 | validation | gap |
 | Parabolica exit, low trim, 270 km/h, Monza air | 3.5–4.0 ± 0.6 | 3.62 | 4.08 | validation | pass |
 | Slow corner 85 km/h, low / medium / high trim | 2.0–2.3 ± 0.4 | 1.81 / 1.82 / 1.85 | 2.15 / 2.18 / 2.24 | fit / validation / validation | pass |
-| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.539 s (84.969 s after the lap-band changes, 7.6) | selection | gap |
+| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.539 s (84.969 s after the lap-band changes, 84.872 s with DRS zone 2 at its mapped activation, 7.6) | selection | gap |
 | Monza speed trap on that lap, DRS open, no tow (2.2) | 348 ± 6 | 347.3 | 347.4 | validation | pass |
 
 Of the 32 component targets, 20 are in band and 12 are recorded gaps (section 5), against 17 and
@@ -749,7 +749,7 @@ soak (ten consecutive laps). "Before" is the car and line after the calibration 
 
 | Quantity | Before | After | Target or reference |
 |---|---|---|---|
-| Lap | 85.539 s | **84.969 s** (84.872 s with DRS zone 2 at its mapped activation, below) | 1:18.792 (+6.177 s, +7.8 %); M1 band 74.852–82.732 s: outside by 2.237 s; M4 band 76.428–81.156 s: outside by 3.813 s |
+| Lap | 85.539 s | 84.969 s; **84.872 s** with DRS zone 2 at its mapped activation (below), now the committed value | 1:18.792 (+6.080 s, +7.7 %); M1 band 74.852–82.732 s: outside by 2.140 s (2.237 s before the DRS fix); M4 band 76.428–81.156 s: outside by 3.716 s (3.813 s) |
 | Controller's speed profile / full-envelope profile on the same line | 84.764 / 83.781 s | 84.141 / 83.447 s | |
 | Speed trap (412 m, 212 m before T1) | 347.4 km/h | 347.4 km/h | 348 ± 6 (median 348.3), pass |
 | Control line | 312.3 km/h | 311.4 km/h | fastest 320.7 published |
@@ -781,8 +781,11 @@ slower, so they stay usable.
 (control) line [4], and the control line is at s = 5472.5 m (below), so the activation belongs
 at **s = 5484.5 m**. The track file stores s = 12 m, 320.5 m late (a track-data fix in progress
 elsewhere). Measured with the calibration harness's labelled override (`npm run telemetry --
-calibrate --drs2 5484.5`), it is worth 0.097 s: 84.969 → 84.872 s. The committed lap and the
-tests use the track file as it is.
+calibrate --drs2 5484.5`), it is worth 0.097 s: 84.969 → 84.872 s. The track file now stores the
+activation at s = 5484.5 m (track format 3, docs/track-data.md 5.5); with the racing line
+rebuilt (`npm run ai:build`: minimum curvature 84.711 s, refined 84.048 s) the driven lap is
+84.872 s (S1 27.784, S2 28.665, S3 28.423 s; plan 84.052 s), and that is the committed value.
+The other figures in this section were measured before that change.
 
 **Changes in this work** (the car's own change is the contact patch, 7.2; the low-trim ClA at
 the top of its range was investigated and not adopted, 7.3):
@@ -947,6 +950,8 @@ limits through them: 2.644 m, ±1.318 rad pitch and ±3.388 rad roll for 2 m ste
 | Adversarial surface (`packages/sim/validation/adversarial-surface.test.ts`, CI): cells 4–16 m with heights ±1 m (steps to 2 m), normals tilted up to 20°, grip 0.2–1.2, drag ×1–10, random inputs held up to 1 s | 6 seeds × 30 s, plus determinism | All in bounds; bit-identical repeat. A 40-seed sweep: no failures, highest floor 2.25 m against 2.65 |
 | Random driving on Monza (`packages/track/validation/drive-fuzz.test.ts`, CI): random start round the lap and across the track, random steer, throttle and brake held 0.1–3 s | 10 seeds × 180 s (30 min) | All in bounds; deepest body corner 5 µm past a face at the end of a step; hardest barrier impact 62.4 m/s; highest floor 0.281 m; the ground-step rule never acted; floor or rim strikes only with a wheel on a kerb |
 | The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | All in bounds; deepest corner 52 µm past a face; hardest impact 69.3 m/s; highest floor 0.502 m; no ground steps; one floor strike, on a kerb. The first run had failed that seed because a strike on a kerb counted as a failure; strikes on kerbs are now counted, not failed. Raising the skid ceiling to four tyre loads so the floor could lift the car off the kerb was tried and dropped: it threw a rear wheel 1.02 m up (limit 1.01) |
+
+The drive fuzz now runs on Monza, Spa and Singapore, and starts each car with the vertical velocity of the ground along its heading (body heave and wheels): a level start on Kemmel's 6 % grade at up to 80 m/s met the rising ground as a floor strike in the first steps (track-data 5.2).
 | The owner's run (`packages/track/test/offtrack.test.ts`) | 40 s with barriers, and 40 s with the barriers taken away | Bounded both ways; with barriers the car stops at the left barrier before the first chicane and never meets a step |
 | Pit lane (`packages/track/validation/pit-lane.test.ts`) | Entry to exit at 20 m/s | No barrier contact |
 | Ground a car can reach (`packages/track/test/ground-continuity.test.ts`) | Every point inside the barriers plus 0.5 m, and the pit lane, on a 1 m × 0.5 m lattice with 0.25 m probes | No step larger than the steepest kerb flank allows (0.34 m per 0.35 m probe). Before the projection fix: 2.73 m at the first chicane |

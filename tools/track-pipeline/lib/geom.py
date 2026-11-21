@@ -31,6 +31,106 @@ def densify(pts, closed, step):
     return out
 
 
+def point_at(pts, s_cum, closed, s):
+    """Point at arc length s on a polyline with cumulative lengths s_cum (wraps when closed)."""
+    n = len(pts)
+    total = s_cum[-1]
+    if closed:
+        s %= total
+    else:
+        s = max(0.0, min(total, s))
+    lo, hi = 0, len(s_cum) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if s_cum[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    a, b = pts[lo % n], pts[(lo + 1) % n]
+    L = s_cum[lo + 1] - s_cum[lo]
+    t = 0.0 if L == 0 else (s - s_cum[lo]) / L
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
+def fillet(pts, closed, radius, step, min_turn_deg=10.0):
+    """Rounds sharp vertices of a closed polyline with circular arcs of `radius`.
+
+    Road centrelines meet at junction vertices that no smoothing of reasonable width turns into a
+    drivable radius. Each vertex turning more than `min_turn_deg` is replaced by an arc tangent to
+    the two legs through the points a tangent length radius * tan(turn / 2) before and after it
+    along the polyline, so short segments next to the vertex do not limit the arc. The tangent
+    length is capped at half the distance to the neighbouring sharp vertex, so arcs never overlap;
+    where the cap bites the arc is tighter. Arcs are sampled every `step` metres or closer."""
+    assert closed
+    n = len(pts)
+    s = cumulative(pts, True)
+    total = s[-1]
+    turns = []
+    for i in range(n):
+        a, b, c = pts[(i - 1) % n], pts[i], pts[(i + 1) % n]
+        h0 = math.atan2(b[1] - a[1], b[0] - a[0])
+        h1 = math.atan2(c[1] - b[1], c[0] - b[0])
+        turns.append(_wrapdiff(h1, h0))
+    sharp = [i for i in range(n) if abs(turns[i]) > math.radians(min_turn_deg)]
+    if not sharp:
+        return list(pts)
+    arcs = []
+    for k, i in enumerate(sharp):
+        prev_s = s[sharp[k - 1]] if k > 0 else s[sharp[-1]] - total
+        next_s = s[sharp[k + 1]] if k + 1 < len(sharp) else s[sharp[0]] + total
+        if len(sharp) == 1:
+            prev_s, next_s = s[i] - total / 2, s[i] + total / 2
+        th = abs(turns[i])
+        t = min(radius * math.tan(th / 2), 0.5 * (s[i] - prev_s), 0.5 * (next_s - s[i]))
+        b = pts[i]
+        p0 = point_at(pts, s, True, s[i] - t)
+        p2 = point_at(pts, s, True, s[i] + t)
+        l0, l1 = math.dist(p0, b), math.dist(b, p2)
+        if l0 < 1e-6 or l1 < 1e-6:
+            continue
+        u0 = ((b[0] - p0[0]) / l0, (b[1] - p0[1]) / l0)
+        u1 = ((p2[0] - b[0]) / l1, (p2[1] - b[1]) / l1)
+        turn = math.atan2(u0[0] * u1[1] - u0[1] * u1[0], u0[0] * u1[0] + u0[1] * u1[1])
+        tl = min(l0, l1)
+        if abs(turn) < 1e-9:
+            continue
+        r = tl / math.tan(abs(turn) / 2)
+        q0 = (b[0] - u0[0] * tl, b[1] - u0[1] * tl)
+        sgn = 1 if turn > 0 else -1
+        cx, cz = q0[0] - u0[1] * sgn * r, q0[1] + u0[0] * sgn * r
+        m = max(1, int(math.ceil(r * abs(turn) / step)))
+        a0 = math.atan2(q0[1] - cz, q0[0] - cx)
+        arc = [(cx + r * math.cos(a0 + turn * j / m), cz + r * math.sin(a0 + turn * j / m)) for j in range(m + 1)]
+        arcs.append((s[i] - t, s[i] + t, [p0] + arc + [p2]))
+    # Rebuild: polyline vertices outside every arc's span, arcs in their place.
+    out = []
+    spans = sorted(arcs, key=lambda x: x[0])
+
+    def inside(v):
+        for a0, a1, _ in spans:
+            for off in (-total, 0.0, total):
+                if a0 + off <= v <= a1 + off:
+                    return True
+        return False
+
+    events = [(s[i], "v", pts[i]) for i in range(n) if not inside(s[i])]
+    events += [((a0 % total), "a", arc) for a0, a1, arc in spans]
+    events.sort(key=lambda e: e[0])
+    for _, kind, item in events:
+        if kind == "v":
+            out.append(item)
+        else:
+            out.extend(item)
+    # Drop consecutive duplicates.
+    clean = [out[0]]
+    for p in out[1:]:
+        if math.dist(p, clean[-1]) > 1e-6:
+            clean.append(p)
+    if math.dist(clean[0], clean[-1]) < 1e-6:
+        clean.pop()
+    return clean
+
+
 def resample(pts, closed, count, offset=0.0):
     """`count` points evenly spaced by arc length. Closed loops start at arc `offset`."""
     s = cumulative(pts, closed)

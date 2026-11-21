@@ -1,5 +1,6 @@
-import { SurfaceKind } from '@undercut/sim';
+import { SurfaceKind, createSurfaceHint, createSurfaceSample } from '@undercut/sim';
 import { createVec3 } from './path';
+import { TrackSurface } from './surface';
 import { LEFT, RIGHT, createGround, type Barrier, type SideIndex, type Track } from './track';
 import type { BarrierType } from './data';
 
@@ -474,10 +475,10 @@ function buildPit(track: Track, stride: number): { pit: MeshData; marks: MeshBui
   const pit = track.pit;
   const path = pit.path;
   const p = createVec3();
-  const g = createGround();
-  const nrm = createVec3();
-  const hint = { index: -1 };
-  const q = { s: 0, d: 0, index: -1 };
+  // The pit lane lies on the ground the sampler reports (the pit lane's own ground, Track.pitBlend).
+  const sampler = new TrackSurface(track);
+  const hint = createSurfaceHint();
+  const out = createSurfaceSample();
   const vertexAt = (
     mb: MeshBuilder,
     sp: number,
@@ -488,10 +489,18 @@ function buildPit(track: Track, stride: number): { pit: MeshData; marks: MeshBui
     v: number,
   ): number => {
     path.pointAt(sp, dp, p);
-    track.project(p.x, p.z, hint, q);
-    track.ground(q.s, q.d, g);
-    track.groundNormal(g, nrm);
-    return mb.vertex(p.x, g.height + lift, p.z, nrm.x, nrm.y, nrm.z, u, v, surface);
+    sampler.sample(p.x, p.z, hint, out);
+    return mb.vertex(
+      p.x,
+      out.height + lift,
+      p.z,
+      out.normalX,
+      out.normalY,
+      out.normalZ,
+      u,
+      v,
+      surface,
+    );
   };
   const pitRows: number[] = [];
   for (let j = 0; j < path.count - 1; j += stride) pitRows.push(j);
