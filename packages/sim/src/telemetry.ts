@@ -56,6 +56,10 @@ export interface CarTelemetry {
   z: number;
   yaw: number;
   distance: number;
+  /** Largest speed into a barrier at a contact on the last step, m/s; 0 when nothing hit. */
+  wallImpact: number;
+  /** A body corner is touching a barrier. */
+  wallContact: boolean;
 }
 
 export function createCarTelemetry(): CarTelemetry {
@@ -95,6 +99,8 @@ export function createCarTelemetry(): CarTelemetry {
     z: 0,
     yaw: 0,
     distance: 0,
+    wallImpact: 0,
+    wallContact: false,
   };
 }
 
@@ -141,6 +147,8 @@ export function readCarTelemetry(
   out.z = state.z;
   out.yaw = state.yaw;
   out.distance = state.distance;
+  out.wallImpact = state.wallImpactSpeed;
+  out.wallContact = state.wallContact !== 0;
   return out;
 }
 
