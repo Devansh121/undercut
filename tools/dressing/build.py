@@ -10,6 +10,7 @@ track's world frame (+X east, +Z south, metres from the track origin) and writes
 lives here.
 """
 import argparse
+import base64
 import json
 import math
 import os
@@ -143,6 +144,72 @@ class Proximity:
         return False
 
 
+def _filter2d(h, cols, rows, n, op):
+    """Separable running `op` (min or max) over a square window of n cells, clamped at the edges."""
+    half = n // 2
+    tmp = [0.0] * len(h)
+    for r in range(rows):
+        row = h[r * cols:(r + 1) * cols]
+        for c in range(cols):
+            tmp[r * cols + c] = op(row[max(0, c - half):c + half + 1])
+    out = [0.0] * len(h)
+    for c in range(cols):
+        col = tmp[c::cols]
+        for r in range(rows):
+            out[r * cols + c] = op(col[max(0, r - half):r + half + 1])
+    return out
+
+
+def _blur2d(h, cols, rows, n):
+    half = n // 2
+    tmp = [0.0] * len(h)
+    for r in range(rows):
+        row = h[r * cols:(r + 1) * cols]
+        for c in range(cols):
+            w = row[max(0, c - half):c + half + 1]
+            tmp[r * cols + c] = sum(w) / len(w)
+    out = [0.0] * len(h)
+    for c in range(cols):
+        col = tmp[c::cols]
+        for r in range(rows):
+            w = col[max(0, r - half):r + half + 1]
+            out[r * cols + c] = sum(w) / len(w)
+    return out
+
+
+def terrain_grid(cfg, frame, datum, offline):
+    """Bare-ground heights on a square grid around the origin, relative to the track datum.
+
+    The Copernicus model is a surface model (canopy and roofs included), so the grid gets the same
+    treatment as the lap profile in 2-D: an opening (running minimum, then maximum) wider than any
+    wood or building, then a box average. Stored as int16 decimetres, little endian, base64.
+    """
+    t = cfg["terrain"]
+    cell, half = t["cell"], t["halfSize"]
+    n = int(round(2 * half / cell)) + 1
+    lat0, lon0 = frame.lat0, frame.lon0
+    dem, rec = inputs.dem_tile(lat0, lon0, offline)
+    h = []
+    for r in range(n):
+        z = -half + r * cell
+        for c in range(n):
+            x = -half + c * cell
+            lat, lon = frame.to_latlon(x, z)
+            h.append(dem.sample(lat, lon) - datum)
+    w = int(round(t["openWindow"] / cell)) | 1
+    h = _filter2d(_filter2d(h, n, n, w, min), n, n, w, max)
+    h = _blur2d(h, n, n, int(round(t["average"] / cell)) | 1)
+    raw = b"".join(int(round(v * 10)).to_bytes(2, "little", signed=True) for v in h)
+    return {
+        "x0": -half, "z0": -half, "cell": cell, "cols": n, "rows": n,
+        "unit": "dm above the track datum, int16 little endian, rows run +z (south)",
+        "filter": {"openWindow": t["openWindow"], "average": t["average"]},
+        "source": rec,
+        "heights": base64.b64encode(raw).decode(),
+        "range": [round(min(h), 1), round(max(h), 1)],
+    }
+
+
 def flat(pts):
     out = []
     for x, z in pts:
@@ -204,6 +271,7 @@ def build(cfg, offline):
     for name in out:
         if name != "tree":
             out[name].sort(key=lambda it: it["id"])
+    terrain = terrain_grid(cfg, frame, o["datum"], offline)
     counts = {k: (len(v) // 2 if k == "tree" else len(v)) for k, v in out.items()}
     return {
         "format": "undercut-dressing",
@@ -215,6 +283,7 @@ def build(cfg, offline):
         "counts": counts,
         "stats": stats,
         "mapped": out,
+        "terrain": terrain,
     }
 
 
@@ -234,6 +303,7 @@ def main():
     print("wrote %s (%d bytes)" % (os.path.relpath(path, ROOT), os.path.getsize(path)))
     print(json.dumps(doc["counts"]))
     print(json.dumps(doc["stats"]))
+    print("terrain %dx%d, range %s m" % (doc["terrain"]["cols"], doc["terrain"]["rows"], doc["terrain"]["range"]))
 
 
 if __name__ == "__main__":
