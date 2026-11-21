@@ -10,7 +10,6 @@ import {
 import { HIGH_KERB, type Track } from '@undercut/track';
 import {
   SurfaceKind,
-  applyAssists,
   computeMass,
   createAssistState,
   createCarParams,
@@ -30,7 +29,7 @@ import {
   type WorldCar,
 } from '@undercut/sim';
 import type { DeviceKind } from '@undercut/input';
-import { assistSteer, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
+import { applyDriverAids, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
 import type { Ghost } from './ghost';
 import { GhostRecorder, decodeGhost, encodeGhost } from './ghost';
 import type { CircuitRecord, RecordUpdate } from './records';
@@ -149,17 +148,15 @@ export class DriveSession {
 
   /** The player's input for this tick, with the device's assists, written into the car. */
   private drive(out: ControlInput): void {
-    const control = this.pending;
-    const car = this.car;
-    const a = this.assistValue;
-    out.steer = assistSteer(this.deviceValue, a.steering, control.steer, car.state.vx);
-    out.throttle = control.throttle;
-    out.brake = control.brake;
-    out.gearShift = control.gearShift;
-    out.overtake = control.overtake;
-    out.pitLimiter = control.pitLimiter;
-    out.drs = control.drs;
-    applyAssists(a, this.assistMemory, car.state, out, this.world.step, out);
+    applyDriverAids(
+      this.deviceValue,
+      this.assistValue,
+      this.assistMemory,
+      this.car.state,
+      this.pending,
+      this.world.step,
+      out,
+    );
   }
 
   get phase(): SessionPhase {
