@@ -119,32 +119,42 @@ export class Hud {
       return node;
     };
 
-    // Session panel (top left).
-    const session = el('section', 'hud-session panel');
+    // Timing tower (top left), broadcast style: lap counter, the flag state, then one row per
+    // car on the clock. In time trial that is the player and the record (the ghost's lap).
+    const session = el('section', 'hud-session hud-tower panel');
     session.setAttribute('aria-label', S.hud.session);
-    const sHead = el('header', 'panel-head');
-    sHead.append(
-      el('span', 'label', S.hud.timeTrial),
-      txt('circuit', el('span', 'label label--strong')),
+    session.dataset.testid = 'tower';
+    const sHead = el('header', 'hud-tower__head');
+    const lapCount = el('span', 'hud-tower__lap');
+    lapCount.append(el('span', 'hud-tower__lapword', S.hud.lap), txt('lap', el('b', 'num')));
+    sHead.append(lapCount, el('span', 'label', S.hud.timeTrial));
+    const status = el('div', 'hud-tower__status');
+    status.append(el('i', 'hud-tower__flag'), el('span', '', S.hud.greenFlag));
+    const rows = el('ol', 'hud-tower__rows');
+    const row = (
+      pos: string,
+      code: string,
+      cls: string,
+      key: string,
+      timeClass: string,
+    ): HTMLElement => {
+      const li = el('li', `hud-tower__row ${cls}`);
+      li.append(
+        el('span', 'hud-tower__pos num', pos),
+        el('i', 'hud-tower__bar'),
+        el('strong', 'hud-tower__code', code),
+        txt(key, el('b', `hud-tower__time num ${timeClass}`)),
+      );
+      return li;
+    };
+    rows.append(
+      row('1', identity?.driverCode ?? S.hud.you, 'is-player', 'towerBest', ''),
+      row('', S.hud.recordCode, 'is-record', 'record', 'hud-pb'),
     );
-    const sBody = el('div', 'hud-session__body');
-    if (identity) {
-      const driverRow = el('div', 'hud-session__driver');
-      const bar = el('i', 'hud-session__bar');
-      const code = el('strong', '', identity.driverCode);
-      const no = el('span', 'hud-session__no num', `#${identity.driverNumber}`);
-      driverRow.append(bar, code, no);
-      sBody.append(driverRow);
-    }
-    const lapRow = el('div', 'hud-row');
-    lapRow.append(el('span', 'label', S.hud.lap), txt('lap', el('b', 'num')));
-    const pbRow = el('div', 'hud-row');
-    pbRow.append(el('span', 'label', S.hud.record), txt('record', el('b', 'num hud-pb')));
-    const ghostRow = el('div', 'hud-row hud-row--ghost');
-    this.ghostStatusEl = txt('ghostStatus', el('b', 'hud-session__ghost'));
-    ghostRow.append(el('span', 'label', S.hud.ghost), this.ghostStatusEl);
-    sBody.append(lapRow, pbRow, ghostRow);
-    session.append(sHead, sBody);
+    const sFoot = el('footer', 'hud-tower__foot');
+    this.ghostStatusEl = txt('ghostStatus', el('span', 'hud-session__ghost'));
+    sFoot.append(txt('circuit', el('span', 'label')), this.ghostStatusEl);
+    session.append(sHead, status, rows, sFoot);
 
     // Control and prompt slot (top centre).
     const control = el('div', 'hud-control');
@@ -227,7 +237,7 @@ export class Hud {
     ref.append(last, best);
     timing.append(top, now, sectors, ref);
 
-    // Minimap (bottom left).
+    // Minimap (right, under the lap timing).
     const map = el('section', 'hud-map panel');
     map.setAttribute('aria-label', S.hud.trackMap);
     const mHead = el('header', 'hud-map__head');
@@ -345,7 +355,9 @@ export class Hud {
     drive.append(revs, sg, ers);
     cluster.append(tyres, drive);
 
-    root.append(session, control, timing, map, cluster);
+    const right = el('div', 'hud-right');
+    right.append(timing, map);
+    root.append(session, control, right, cluster);
     refreshGlyphs(root);
   }
 
@@ -364,11 +376,13 @@ export class Hud {
     t.circuit?.set(h.circuit);
     t.mapName?.set(h.circuit);
     t.mapLen?.set(`${h.lengthKm} ${S.circuit.km}`);
-    t.lap?.set(h.lap > 0 ? String(h.lap) : S.hud.outLap);
+    t.lap?.set(h.lap > 0 ? String(h.lap) : S.hud.outLapShort);
+    t.towerBest?.set(h.best === null ? S.hud.noTime : formatLapTime(h.best));
     t.lapNo?.set(h.lap > 0 ? S.hud.lapN(h.lap) : S.hud.outLap);
-    t.record?.set(formatLapTime(h.record));
-    t.ghostStatus?.set(h.ghost ? S.hud.ghostActive : S.hud.ghostOff);
+    t.record?.set(h.record === null ? S.hud.noTime : formatLapTime(h.record));
+    t.ghostStatus?.set(h.ghost ? S.hud.ghostOnTrack : S.hud.ghostOff);
     setClass(this.t.record?.node as HTMLElement, 'is-empty', h.record === null);
+    setClass(this.t.towerBest?.node as HTMLElement, 'is-empty', h.best === null);
     setClass(this.ghostStatusEl, 'is-empty', !h.ghost);
     setClass(this.t.best?.node as HTMLElement, 'is-empty', h.best === null);
     setClass(this.lastEl, 'is-empty', h.last === null);

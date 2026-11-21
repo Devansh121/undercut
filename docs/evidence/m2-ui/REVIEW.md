@@ -32,14 +32,20 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 5. **Phone landscape pause menu clipped `Effects` and pushed `QUIT TO MENU` below the fold (`pause-844x390.png`)**
    - Switched `.pause__card` on short landscape viewports (`max-height: 500px`) to a fixed-height grid (`auto minmax(0, 1fr) auto`) with a scrollable right settings pane and tightened row height (`30px`) in `apps/web/src/styles.css`. Verified all 9 settings rows and `QUIT TO MENU` fit cleanly at `844×390` with zero clipping and touch glyphs hidden.
 
+6. **Time-trial HUD did not read like a broadcast tower (`hud-drive-1440x900.png`, `hud-drive-844x390.png`)**
+   - The top-left panel was a label list (lap, record, ghost) and the map sat bottom left. Rebuilt it as a timing tower: lap counter in the head with the team hairline, a flag banner (green in time trial, which has no other flags), and one row per car on the clock (position, team colour bar, driver code, best lap; the record below it with a dashed purple bar). The map moved to the right column under the lap timing, larger. On a phone the tower stays top left in a compact form (no footer) clear of the steering pad and the top-centre timing.
+
 ## HUD frame-time benchmark
 
 Measured at `1440×900`, `high` quality preset, with vsync and frame-rate cap disabled (`--disable-gpu-vsync --disable-frame-rate-limit`), driving Monza on autopilot with the HUD visible vs hidden via `window.__undercut.setHudVisible` (`docs/evidence/m2-ui/report.json`):
 
 | State | Frames | Mean (ms) | Median (ms) | p95 (ms) | p99 (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| HUD on | 2802 | 2.145 | 1.6 | 4.3 | 17.6 |
-| HUD off | 2738 | 2.193 | 1.5 | 4.9 | 18.2 |
-| **Delta (on − off)** | — | **−0.048** | **+0.1** | **−0.6** | **−0.6** |
+| HUD on | 2848 | 2.108 | 1.6 | 3.5 | 16.1 |
+| HUD off | 2859 | 2.100 | 1.2 | 3.8 | 18.6 |
+| **Delta (on − off)** | — | **+0.008** | **+0.4** | **−0.3** | **−2.5** |
+
+Re-measured after the tower layout below; the HUD costs well under a millisecond a frame (noise
+dominates at the tails).
 
 Car framing check (`window.__undercut.carScreenRect()` vs `.hud-drive` bounding box): zero overlap on both `1440×900` and `844×390`.

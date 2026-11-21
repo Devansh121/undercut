@@ -152,43 +152,95 @@ body {
   color: var(--c-text-1);
 }
 
-/* Session (top left) */
-.hud-session {
+/* Timing tower (top left): lap counter, flag state, one row per car on the clock */
+.hud-tower {
   position: absolute;
   left: var(--safe-l);
   top: var(--safe-t);
   width: 232px;
+  overflow: hidden;
   transform-origin: top left;
   transform: scale(var(--hud-scale, 1));
 }
 
-.hud-session .panel-head {
-  border-bottom: 2px solid var(--hud-team, var(--c-brand));
+.hud-tower__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 var(--sp-3);
+  background: var(--hud-panel-solid);
+  box-shadow: inset 0 -2px 0 var(--hud-team, var(--c-brand));
 }
 
-.hud-session__body {
-  display: grid;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
+.hud-tower__lap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-16);
+  font-weight: 800;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.hud-session__driver {
+.hud-tower__lap b {
+  font-size: var(--fs-20);
+  font-weight: 700;
+}
+
+.hud-tower__status {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding-bottom: var(--sp-2);
+  height: 24px;
+  padding: 0 var(--sp-3);
+  background: rgba(47, 191, 98, 0.14);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-1);
+}
+
+.hud-tower__flag {
+  width: 4px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--c-flag-green);
+}
+
+.hud-tower__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hud-tower__row {
+  display: grid;
+  grid-template-columns: 20px 3px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3) 0 var(--sp-2);
   box-shadow: inset 0 -1px 0 var(--c-line);
 }
 
-.hud-session__bar {
-  width: 3px;
-  height: 16px;
-  border-radius: 1px;
-  background: var(--hud-team, var(--c-brand));
-  flex: none;
+.hud-tower__pos {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-align: right;
+  color: var(--c-text-2);
 }
 
-.hud-session__driver strong {
+.hud-tower__bar {
+  height: 14px;
+  border-radius: 1px;
+  background: var(--hud-team, var(--c-brand));
+}
+
+.hud-tower__code {
   font-size: var(--fs-14);
   font-weight: 750;
   font-stretch: var(--wdth-semi);
@@ -196,11 +248,56 @@ body {
   text-transform: uppercase;
 }
 
-.hud-session__no {
-  margin-left: auto;
-  font-size: var(--fs-12);
+.hud-tower__time {
+  font-size: var(--fs-14);
+  font-weight: 600;
+}
+
+.hud-tower__time.is-empty {
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+}
+
+.hud-tower__row.is-player {
+  background: var(--c-text-1);
+  color: var(--c-text-inverse);
+}
+
+.hud-tower__row.is-player .hud-tower__pos,
+.hud-tower__row.is-player .hud-tower__time.is-empty {
+  color: var(--c-text-inverse);
+}
+
+.hud-tower__row.is-record .hud-tower__bar {
+  background: repeating-linear-gradient(180deg, var(--c-time-overall) 0 3px, transparent 3px 5px);
+}
+
+.hud-tower__row.is-record .hud-tower__code {
+  color: var(--c-text-2);
+}
+
+.hud-tower__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3);
+}
+
+.hud-session__ghost {
+  font-size: var(--fs-11);
   font-weight: 600;
   color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.hud-session__ghost.is-empty {
+  color: var(--c-text-3);
 }
 
 .hud-row {
@@ -212,21 +309,6 @@ body {
 .hud-row b {
   font-weight: 600;
   font-size: var(--fs-16);
-}
-
-.hud-row--ghost {
-  padding-top: var(--sp-2);
-  box-shadow: inset 0 1px 0 var(--c-line);
-}
-
-.hud-session__ghost {
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-text-2);
-}
-
-.hud-session__ghost.is-empty {
-  color: var(--c-text-3);
 }
 
 .hud-pb {
@@ -551,15 +633,35 @@ body {
   color: var(--c-time-personal);
 }
 
-/* Minimap (bottom left) */
+/* Minimap (right, under the lap timing) */
 .hud-map {
   position: absolute;
-  left: var(--safe-l);
-  bottom: var(--safe-b);
-  width: 232px;
+  right: var(--safe-r);
+  top: var(--safe-t);
+  width: 300px;
   padding: var(--sp-3);
-  transform-origin: bottom left;
+  transform-origin: top right;
   transform: scale(var(--hud-scale, 1));
+}
+
+/* Right column on desktop: lap timing, then the map, 8 px apart. Zero-specificity selectors so
+   the phone layout below (timing top centre, map top right) still places each on its own. */
+.hud-right {
+  position: absolute;
+  right: var(--safe-r);
+  top: var(--safe-t);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  transform-origin: top right;
+  transform: scale(var(--hud-scale, 1));
+}
+
+:where(.hud-right) > .hud-timing,
+:where(.hud-right) > .hud-map {
+  position: static;
+  transform: none;
 }
 
 .hud-map__head {
@@ -572,6 +674,7 @@ body {
   display: block;
   width: 100%;
   height: auto;
+  max-height: 176px;
 }
 
 /* Driver cluster (bottom right) */
@@ -1064,9 +1167,56 @@ body {
 /* ================= Phone landscape ================= */
 
 @media (max-height: 500px) and (orientation: landscape) {
-  .hud-session,
   .hud-tyres {
     display: none;
+  }
+
+  /* The tower stays top left on a phone, compact: lap, flag, the rows; no footer. */
+  .hud-tower {
+    width: 156px;
+  }
+  .hud-tower__head {
+    height: 26px;
+    padding: 0 var(--sp-2);
+  }
+  .hud-tower__head .label,
+  .hud-tower__foot {
+    display: none;
+  }
+  .hud-tower__lap {
+    font-size: var(--fs-12);
+  }
+  .hud-tower__lap b {
+    font-size: var(--fs-14);
+  }
+  .hud-tower__status {
+    height: 18px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-10);
+  }
+  .hud-tower__row {
+    grid-template-columns: 14px 3px minmax(0, 1fr) auto;
+    gap: 6px;
+    height: 22px;
+    padding: 0 var(--sp-2) 0 4px;
+  }
+  .hud-tower__pos,
+  .hud-tower__code,
+  .hud-tower__time {
+    font-size: var(--fs-12);
+  }
+  .hud-tower__time.is-empty {
+    font-size: var(--fs-10);
+  }
+
+  .hud-right {
+    display: contents;
+  }
+  :where(.hud-right) > .hud-timing,
+  :where(.hud-right) > .hud-map {
+    position: absolute;
+    top: var(--safe-t);
+    transform: scale(var(--hud-scale, 1));
   }
 
   .hud-control {

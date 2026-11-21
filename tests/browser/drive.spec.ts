@@ -328,7 +328,10 @@ test.describe('drive', () => {
         const r = el.getBoundingClientRect();
         return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0;
       };
-      for (const el of document.querySelectorAll('.hud > *, .ut-touch > *')) {
+      // HUD modules, including those inside the right column (a layout wrapper).
+      for (const el of document.querySelectorAll(
+        '.hud > *:not(.hud-right), .hud-right > *, .ut-touch > *',
+      )) {
         if (!visible(el)) continue;
         const r = el.getBoundingClientRect();
         const name = el.className.toString().split(' ')[0] ?? el.tagName;
