@@ -31,6 +31,7 @@ function record(over: Partial<CarRecord> = {}): CarRecord {
     raceMs: 8000,
     lastCrossAt: OUT + 8000,
     bestLapMs: 8000,
+    crossings: [],
     penaltyMs: 0,
     warnings: 0,
     jumpStart: false,
@@ -43,17 +44,19 @@ function record(over: Partial<CarRecord> = {}): CarRecord {
 /** Lap 2 completed at race time 15 s (a 7 s lap), received at that moment. */
 const NOW = OUT + 15_000;
 function claim(over: Partial<LapMessage> = {}): LapMessage {
+  const raceMs = over.raceMs ?? 15_000;
   return {
     type: 'lap',
     seat: 0,
     lap: 2,
     lapMs: 7000,
-    raceMs: 15_000,
+    raceMs,
     sectorsMs: [2000, 2500, 2500],
     tick: 1800,
     s: 1,
     speed: 80,
-    at: NOW,
+    // Race time runs on the server clock, so the crossing instant follows from it.
+    at: OUT + raceMs,
     ...over,
   };
 }
@@ -158,9 +161,25 @@ describe('judgeLap', () => {
       'race_time_mismatch',
     ],
     [
+      'a race time ahead of the server clock',
+      {},
+      { lap: 4, lapMs: 7000, raceMs: 16_001, sectorsMs: [2000, 2500, 2500] },
+      {},
+      'rejected',
+      'ahead_of_race_clock',
+    ],
+    [
+      'a crossing instant that disagrees with the race time',
+      {},
+      { at: OUT + 13_900 },
+      {},
+      'rejected',
+      'timestamp_implausible',
+    ],
+    [
       'two laps in too little time',
       {},
-      { lap: 3, lapMs: 5000, raceMs: 17_000, sectorsMs: [1600, 1700, 1700] },
+      { lap: 3, lapMs: 5000, raceMs: 16_000, sectorsMs: [1600, 1700, 1700] },
       {},
       'rejected',
       'gap_too_fast',

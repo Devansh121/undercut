@@ -8,5 +8,5 @@ export {
   type RoomInfo,
 } from './machine';
 export { DEFAULT_TIMINGS, LIMITS, parseTimings, type RoomTimings } from './rules';
-export type { CarRecord, ConnState, Member, RoomState } from './state';
+export type { CarRecord, ConnState, Crossing, Member, RoomState } from './state';
 export { judgeLap, type LapEvidence, type LapVerdict } from './timing';

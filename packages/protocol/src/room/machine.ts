@@ -49,7 +49,8 @@ export interface RoomDeps {
 }
 
 export type RoomEvent =
-  | { type: 'open'; conn: string }
+  /** `address` is the client's address as the service sees it (for per-address limits). */
+  | { type: 'open'; conn: string; address: string }
   | { type: 'text'; conn: string; data: string }
   | { type: 'binary'; conn: string; data: Uint8Array }
   | { type: 'close'; conn: string }
@@ -110,6 +111,8 @@ function take(b: Bucket, rule: { capacity: number; perSecond: number }, now: num
 
 export class RoomMachine {
   private readonly seats = new Map<number, SeatTrack>();
+  /** Room-wide admission bucket. Memory only. */
+  private readonly admission: Bucket = { tokens: LIMITS.admission.capacity, at: 0 };
   private out: Outbound[] = [];
   private now = 0;
   private dirty = true;
@@ -197,7 +200,7 @@ export class RoomMachine {
     this.advance();
     switch (event.type) {
       case 'open':
-        this.onOpen(event.conn);
+        this.onOpen(event.conn, event.address);
         break;
       case 'text':
         this.onText(event.conn, event.data);
@@ -354,12 +357,25 @@ export class RoomMachine {
     }
   }
 
+  /**
+   * A member is watched while anything they drive is racing: their own car, and for the
+   * host every AI car too, even after the host's own car has finished or retired. Only
+   * snapshots count as signs of life: a hidden tab keeps its socket and its (throttled)
+   * timers, so it keeps pinging, but it stops rendering frames and so stops driving.
+   */
+  private drivesRacingCar(m: Member): boolean {
+    const cars = this.state.cars ?? [];
+    return cars.some(
+      (c) =>
+        c.state === 'racing' && (c.kind === 'human' ? c.member === m.id : this.state.host === m.id),
+    );
+  }
+
   private updateStaleness(): boolean {
     let changed = false;
     for (const m of this.state.members) {
       if (m.conn === null || m.lastSnapshotAt === null) continue;
-      const car = this.state.cars?.find((c) => c.member === m.id);
-      if (!car || car.state !== 'racing') continue;
+      if (!this.drivesRacingCar(m)) continue;
       const silent = this.now - m.lastSnapshotAt;
       if (silent >= this.timings.awayMs && m.status !== 'away') {
         m.status = 'away';
@@ -483,21 +499,52 @@ export class RoomMachine {
     this.broadcastRoom();
   }
 
-  /** Leader took the flag: the others finish on their next crossing. */
-  private chequer(leaderRaceMs: number): void {
+  /**
+   * The chequered flag, derived from every counted crossing so the order claims arrive
+   * in cannot change it. The flag falls at the earliest race time any car completed the
+   * distance; each car finishes on its first counted crossing at or after that race
+   * time, and crossings it reported after that are not counted. A late claim of an
+   * earlier finish moves the flag earlier, and every car is judged again. Returns
+   * whether any car's state changed.
+   */
+  private resolveFlag(): boolean {
     const s = this.state;
-    s.phase = 'finished';
-    s.chequeredAt = this.now;
-    s.chequerRaceMs = leaderRaceMs;
-    // A car whose crossing after the flag arrived before the leader's: that was its finish.
-    for (const c of s.cars ?? []) {
-      if (c.state === 'racing' && c.lap > 0 && c.raceMs >= leaderRaceMs) c.state = 'finished';
+    const cars = s.cars;
+    if (!cars || (s.phase !== 'racing' && s.phase !== 'finished')) return false;
+    let flag: number | null = null;
+    for (const c of cars) {
+      for (const x of c.crossings) {
+        if (x.lap >= s.settings.laps && (flag === null || x.raceMs < flag)) flag = x.raceMs;
+      }
     }
-    const window = Math.min(
-      Math.max(this.timings.finishWindowMinMs, 2 * s.settings.circuit.minLapMs),
-      s.settings.circuit.maxLapMs,
-    );
-    s.phaseEndsAt = this.now + window;
+    if (flag === null) return false;
+    let changed = false;
+    if (s.phase === 'racing') {
+      s.phase = 'finished';
+      s.chequeredAt = this.now;
+      const window = Math.min(
+        Math.max(this.timings.finishWindowMinMs, 2 * s.settings.circuit.minLapMs),
+        s.settings.circuit.maxLapMs,
+      );
+      s.phaseEndsAt = this.now + window;
+      changed = true;
+    }
+    s.chequerRaceMs = flag;
+    for (const c of cars) {
+      const at = c.crossings.findIndex((x) => x.raceMs >= (flag as number));
+      if (at < 0) continue;
+      if (c.crossings.length > at + 1) {
+        c.crossings.length = at + 1;
+        deriveProgress(c);
+      }
+      // Took the flag; a car that retired after crossing it still finished.
+      if (c.state !== 'finished') {
+        c.state = 'finished';
+        changed = true;
+      }
+    }
+    if (changed) this.dirty = true;
+    return changed;
   }
 
   private checkRaceEnd(): void {
@@ -657,17 +704,57 @@ export class RoomMachine {
 
   // ---- Socket events -------------------------------------------------------------
 
-  private onOpen(id: string): void {
-    if (this.state.phase === 'closed') {
+  /** Why a new socket from `address` cannot be taken now, or null if it can. */
+  private refusal(address: string): 'room_closed' | 'busy' | null {
+    const s = this.state;
+    if (s.phase === 'closed') return 'room_closed';
+    if (s.conns.length >= LIMITS.maxSockets) return 'busy';
+    const pending = s.conns.filter((c) => c.member === null);
+    if (pending.length >= LIMITS.pendingPerRoom) return 'busy';
+    if (pending.filter((c) => c.address === address).length >= LIMITS.pendingPerAddress) {
+      return 'busy';
+    }
+    return null;
+  }
+
+  /**
+   * May a socket from `address` open now? The service asks before it accepts the
+   * WebSocket upgrade. Limits sockets in the room, sockets that have not joined (room-wide
+   * and per address), and the rate the room admits them. A yes uses one admission token.
+   */
+  admit(
+    address: string,
+    now: number,
+  ): { ok: true } | { ok: false; reason: 'room_closed' | 'busy' } {
+    this.now = Math.max(this.now, now);
+    this.advance();
+    const reason = this.refusal(address);
+    if (reason) return { ok: false, reason };
+    if (!take(this.admission, LIMITS.admission, this.now)) return { ok: false, reason: 'busy' };
+    return { ok: true };
+  }
+
+  private onOpen(id: string, address: string): void {
+    const reason = this.refusal(address);
+    if (reason === 'room_closed') {
       this.out.push({ kind: 'close', to: id, code: CLOSE.roomClosed, reason: 'room closed' });
       return;
     }
-    this.register(id);
+    if (reason === 'busy') {
+      this.out.push({ kind: 'close', to: id, code: CLOSE.busy, reason: 'busy' });
+      return;
+    }
+    this.register(id, address);
   }
 
-  private register(id: string): ConnState {
+  /**
+   * Track a socket. Not persisted until it joins: an unjoined socket is cheap to lose,
+   * and a flood of them must not turn into storage writes.
+   */
+  private register(id: string, address: string): ConnState {
     const c: ConnState = {
       id,
+      address,
       member: null,
       openedAt: this.now,
       strikes: 0,
@@ -678,7 +765,6 @@ export class RoomMachine {
       rateErrorAt: -1e15,
     };
     this.state.conns.push(c);
-    this.dirty = true;
     return c;
   }
 
@@ -721,7 +807,7 @@ export class RoomMachine {
 
   private onText(id: string, data: string): void {
     if (this.state.phase === 'closed') return;
-    const c = this.conn(id) ?? this.register(id);
+    const c = this.conn(id) ?? this.register(id, 'unknown');
     const parsed = parseClientMessage(data);
     if (!parsed.ok) {
       if (parsed.error.code === 'version_mismatch') {
@@ -817,6 +903,7 @@ export class RoomMachine {
         const car = this.car(msg.seat) as CarRecord;
         car.warnings += 1;
         if (!car.invalidLaps.includes(msg.lap)) car.invalidLaps.push(msg.lap);
+        deriveProgress(car);
         this.dirty = true;
         this.broadcast({ type: 'limits', seat: car.seat, lap: msg.lap, warnings: car.warnings });
         if (car.warnings > LIMITS.limitsFreeWarnings) {
@@ -966,6 +1053,10 @@ export class RoomMachine {
     if (this.state.host === m.id && this.state.cars && ON_TRACK.has(this.state.phase)) {
       this.sendTo(c.id, { type: 'host', member: m.id, ai: this.aiHandover() });
     }
+    // Coming back during the results: the classification is part of what they missed.
+    if (this.state.phase === 'results' && this.state.results) {
+      this.sendTo(c.id, { type: 'results', results: this.state.results });
+    }
   }
 
   // ---- Timing ------------------------------------------------------------------
@@ -998,32 +1089,18 @@ export class RoomMachine {
       this.sendTo(c.id, timingMessage(msg, 'rejected', verdict.reason));
       return;
     }
-    const gap = msg.lap - car.lap;
-    car.lap = msg.lap;
-    car.raceMs = msg.raceMs;
-    car.lastCrossAt = this.now;
-    if (gap === 1 && !car.invalidLaps.includes(msg.lap)) {
-      car.bestLapMs = car.bestLapMs === null ? msg.lapMs : Math.min(car.bestLapMs, msg.lapMs);
-    }
-    if (verdict.status === 'flagged' && !car.flags.includes(verdict.reason)) {
-      car.flags.push(verdict.reason);
-    }
+    car.crossings.push({
+      lap: msg.lap,
+      raceMs: msg.raceMs,
+      lapMs: msg.lapMs,
+      gap: msg.lap - car.lap,
+      receivedAt: this.now,
+      flag: verdict.status === 'flagged' ? verdict.reason : null,
+    });
+    deriveProgress(car);
     this.dirty = true;
     this.broadcast(timingMessage(msg, verdict.status, verdict.reason));
-    if (s.phase === 'racing' && car.lap >= s.settings.laps) {
-      car.state = 'finished';
-      this.chequer(car.raceMs);
-      this.broadcastRoom();
-    } else if (s.phase === 'finished') {
-      // An earlier full-distance finish that arrived late moves the flag earlier.
-      if (car.lap >= s.settings.laps) {
-        s.chequerRaceMs = Math.min(s.chequerRaceMs ?? car.raceMs, car.raceMs);
-      }
-      if (car.lap >= s.settings.laps || car.raceMs >= (s.chequerRaceMs ?? 0)) {
-        car.state = 'finished';
-        this.broadcastRoom();
-      }
-    }
+    if (this.resolveFlag()) this.broadcastRoom();
     this.checkRaceEnd();
   }
 
@@ -1031,7 +1108,7 @@ export class RoomMachine {
 
   private onBinary(id: string, data: Uint8Array): void {
     if (this.state.phase === 'closed') return;
-    const c = this.conn(id) ?? this.register(id);
+    const c = this.conn(id) ?? this.register(id, 'unknown');
     const m = this.member(c.member);
     if (!m) {
       if (this.strike(c)) this.error(id, 'not_joined', 'send join first');
@@ -1107,12 +1184,29 @@ function newCar(
     raceMs: 0,
     lastCrossAt: null,
     bestLapMs: null,
+    crossings: [],
     penaltyMs: 0,
     warnings: 0,
     jumpStart: false,
     invalidLaps: [],
     flags: [],
   };
+}
+
+/** Laps, race time, best lap and flags from a car's counted crossings. */
+function deriveProgress(car: CarRecord): void {
+  const last = car.crossings[car.crossings.length - 1];
+  car.lap = last?.lap ?? 0;
+  car.raceMs = last?.raceMs ?? 0;
+  car.lastCrossAt = last?.receivedAt ?? null;
+  car.bestLapMs = null;
+  car.flags = [];
+  for (const x of car.crossings) {
+    if (x.gap === 1 && !car.invalidLaps.includes(x.lap)) {
+      car.bestLapMs = car.bestLapMs === null ? x.lapMs : Math.min(car.bestLapMs, x.lapMs);
+    }
+    if (x.flag !== null && !car.flags.includes(x.flag)) car.flags.push(x.flag);
+  }
 }
 
 const gridSlot = (c: CarRecord): GridSlot => ({

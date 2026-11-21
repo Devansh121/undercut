@@ -100,6 +100,13 @@ export function parseTimings(raw: unknown): Checked<RoomTimings> {
 
 /** Message-rate and plausibility limits. Fixed; documented in docs/netcode.md. */
 export const LIMITS = {
+  /** Sockets in one room, joined or not (8 members, resumes and spectating slack). */
+  maxSockets: 32,
+  /** Sockets that have not joined yet, in one room and from one client address. */
+  pendingPerRoom: 16,
+  pendingPerAddress: 4,
+  /** New sockets a room admits: burst, then per second. */
+  admission: { capacity: 30, perSecond: 5 },
   /** Invalid or over-rate messages before the socket is closed. */
   maxStrikes: 10,
   /** One strike is forgiven per this long. */
@@ -114,6 +121,13 @@ export const LIMITS = {
   maxPlausibleSpeed: 120,
   /** Slack in metres on top of the speed bound. */
   evidenceSlackM: 50,
+  /**
+   * Race time is measured on the server clock (the client's synced estimate). A claim
+   * may run this far ahead of the server's own elapsed race time, and its crossing
+   * instant may differ from lights out plus its race time by this much: clock-sync
+   * error, which is half a round trip.
+   */
+  raceClockAllowanceMs: 1000,
   /** A crossing's claimed server time may differ from its receipt by this much. */
   timestampToleranceMs: 10_000,
   /** Claimed and server-observed lap times may differ by max(this, 10 %) before a flag. */

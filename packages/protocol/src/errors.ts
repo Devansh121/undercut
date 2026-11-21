@@ -46,6 +46,8 @@ export const CLOSE = {
   replaced: 4009,
   resumeInvalid: 4010,
   nameInvalid: 4011,
+  /** Too many sockets opening at once; try again (not terminal). */
+  busy: 4012,
 } as const;
 
 /** Close codes after which reconnecting cannot succeed. */
@@ -67,8 +69,9 @@ export const TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set([
  * Why a timing claim was flagged or rejected. Stable like ERROR_CODES.
  *
  * Rejected (the claim does not count): duplicate, not_racing, not_owner,
- * lap_not_monotonic, lap_too_fast, sector_too_fast, bad_sectors, race_time_mismatch,
- * gap_too_fast, timestamp_implausible, crossed_while_disconnected, s_inconsistent.
+ * lap_not_monotonic, ahead_of_race_clock, lap_too_fast, sector_too_fast, bad_sectors,
+ * race_time_mismatch, gap_too_fast, timestamp_implausible, crossed_while_disconnected,
+ * s_inconsistent.
  *
  * Flagged (counted, but marked in the results): no_snapshot_evidence, time_mismatch.
  */
@@ -77,6 +80,7 @@ export const TIMING_REASONS = [
   'not_racing',
   'not_owner',
   'lap_not_monotonic',
+  'ahead_of_race_clock',
   'lap_too_fast',
   'sector_too_fast',
   'bad_sectors',

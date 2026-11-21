@@ -10,6 +10,8 @@ export interface Bucket {
 
 export interface ConnState {
   id: string;
+  /** Client address the socket came from (per-address limits on unjoined sockets). */
+  address: string;
   /** Member this socket speaks for, once joined. */
   member: string | null;
   openedAt: number;
@@ -41,6 +43,19 @@ export interface Member {
   outages: [number, number | null][];
 }
 
+/** One counted line crossing. */
+export interface Crossing {
+  lap: number;
+  /** Race time at the crossing, ms (server clock, from lights out). */
+  raceMs: number;
+  lapMs: number;
+  /** Laps since the previous counted crossing (more than 1 after a rejected claim). */
+  gap: number;
+  /** Server time the claim arrived. */
+  receivedAt: number;
+  flag: TimingReason | null;
+}
+
 export interface CarRecord {
   seat: number;
   kind: 'human' | 'ai';
@@ -60,6 +75,11 @@ export interface CarRecord {
   penaltyMs: number;
   warnings: number;
   jumpStart: boolean;
+  /**
+   * Counted crossings in order. lap, raceMs, lastCrossAt, bestLapMs and flags are
+   * derived from these (see deriveProgress), so a later, earlier flag can cut them.
+   */
+  crossings: Crossing[];
   /** Laps with a track-limit report (their times do not count for best lap). */
   invalidLaps: number[];
   flags: TimingReason[];

@@ -283,7 +283,7 @@ describe('grid and start', () => {
         randomInt: (n) => (i = (i * 7 + 3) % 9973) % n,
         token: () => 'a'.repeat(32),
       });
-      m.handle({ type: 'open', conn: 'c' }, T0);
+      m.handle({ type: 'open', conn: 'c', address: 'a' }, T0);
       m.handle(
         {
           type: 'text',
@@ -845,5 +845,121 @@ describe('phase x message table', () => {
       { kind: 'close', to: 'c5', code: CLOSE.roomClosed, reason: 'room closed' },
     ]);
     expect(h.raw('c5', '{"type":"ping","id":1,"t":0}')).toEqual([]);
+  });
+});
+
+describe('review findings', () => {
+  it('migrates a silent host whose own car has retired while its AI still race (finding 3)', () => {
+    const { h } = inPhase('racing');
+    h.send('c1', { type: 'retire', seat: 0 });
+    const t = h.machine.timings;
+    const from = h.now;
+    // The guest keeps sending; the host's tab is hidden and sends nothing, AI included.
+    for (let ms = 100; ms <= t.awayMs + 200; ms += 100) {
+      h.now = from + ms;
+      h.heartbeat(['c2']);
+      h.advance(0);
+    }
+    expect(h.state.host).toBe('m2');
+    const handover = h.last('c2', 'host')!;
+    expect(handover.member).toBe('m2');
+    expect(handover.ai.map((a) => a.seat)).toEqual([2, 3]);
+  });
+
+  it('keeps a retired host that still sends its AI cars', () => {
+    const { h } = inPhase('racing');
+    h.send('c1', { type: 'retire', seat: 0 });
+    const from = h.now;
+    for (let ms = 100; ms <= h.machine.timings.awayMs + 2000; ms += 100) {
+      h.now = from + ms;
+      h.heartbeat(['c1', 'c2']);
+      h.advance(0);
+    }
+    expect(h.state.host).toBe('m1');
+    expect(h.memberOf('c1')!.status).toBe('active');
+  });
+
+  it('sends the stored results to a member who comes back during the results (finding 4)', () => {
+    const { h } = inPhase('results');
+    const results = h.last('c2', 'results')!;
+    const token = h.memberOf('c2')!.token;
+    h.close('c2');
+    h.join('c2b', 'Ben', token);
+    expect(h.last('c2b', 'results')).toEqual(results);
+  });
+
+  it('sends the stored results after the room is restored from storage (finding 4)', () => {
+    const { h } = inPhase('results');
+    const results = h.last('c2', 'results')!;
+    const token = h.memberOf('c2')!.token;
+    const restored = RoomMachine.restore(JSON.parse(JSON.stringify(h.state)), {
+      randomInt: () => 0,
+      token: () => 'c'.repeat(32),
+    });
+    const now = h.now + 10;
+    restored.handle({ type: 'close', conn: 'c2' }, now);
+    restored.handle({ type: 'open', conn: 'c2b', address: 'a' }, now);
+    const out = restored.handle(
+      {
+        type: 'text',
+        conn: 'c2b',
+        data: JSON.stringify({ type: 'join', v: PROTOCOL_VERSION, name: 'Ben', resume: token }),
+      },
+      now,
+    );
+    const sent = out
+      .filter((o) => o.kind === 'text' && o.to === 'c2b')
+      .map((o) => JSON.parse((o as { text: string }).text));
+    expect(sent.map((m) => m.type)).toEqual(['welcome', 'results', 'room']);
+    expect(sent[1]).toEqual(results);
+  });
+
+  it('bounds unjoined sockets per address and per room, and does not persist them (finding 5)', () => {
+    const h = new Harness();
+    h.machine.takeDirty();
+    const admitted = (address: string, n: number) => {
+      let ok = 0;
+      for (let i = 0; i < n; i++) {
+        const conn = `${address}-${i}`;
+        if (h.machine.admit(address, h.now).ok) {
+          h.open(conn, address);
+          if (h.box(conn).closed === null) ok++;
+        }
+      }
+      return ok;
+    };
+    expect(admitted('a', 20)).toBe(LIMITS.pendingPerAddress);
+    expect(h.machine.takeDirty()).toBe(false);
+    let total = LIMITS.pendingPerAddress;
+    for (let i = 0; i < 10; i++) total += admitted(`b${i}`, LIMITS.pendingPerAddress);
+    expect(total).toBe(LIMITS.pendingPerRoom);
+    expect(h.state.conns.length).toBe(LIMITS.pendingPerRoom);
+    expect(h.machine.admit('fresh', h.now)).toMatchObject({ ok: false });
+    // Pending sockets time out and free their slots.
+    h.runUntil(h.now + h.machine.timings.joinTimeoutMs);
+    expect(h.state.conns.length).toBe(0);
+    expect(h.machine.admit('fresh', h.now)).toEqual({ ok: true });
+  });
+
+  it('closes a socket opened past the limits even if the shell did not ask first', () => {
+    const h = new Harness();
+    for (let i = 0; i < 1000; i++) h.open(`x${i}`, `addr${i}`);
+    expect(h.state.conns.length).toBeLessThanOrEqual(LIMITS.pendingPerRoom);
+    expect(h.box('x999').closed).toMatchObject({ code: CLOSE.busy });
+  });
+
+  it('throttles how fast a room admits sockets', () => {
+    const h = new Harness();
+    let refused = 0;
+    for (let i = 0; i < 200; i++) {
+      const r = h.machine.admit(`addr${i}`, h.now);
+      if (!r.ok) refused++;
+      else {
+        h.open(`x${i}`, `addr${i}`);
+        h.close(`x${i}`);
+      }
+    }
+    expect(refused).toBeGreaterThan(0);
+    expect(200 - refused).toBeLessThanOrEqual(LIMITS.admission.capacity);
   });
 });

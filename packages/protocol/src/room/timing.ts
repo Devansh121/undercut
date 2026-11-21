@@ -52,6 +52,14 @@ export function judgeLap(
   ) {
     return reject('timestamp_implausible');
   }
+  // The race clock is the server's: race time runs from the server's lights out, so no
+  // car can have raced longer than the server has seen elapse (allowing for clock-sync
+  // error), and the claimed crossing instant must be lights out plus that race time.
+  const allowance = LIMITS.raceClockAllowanceMs;
+  if (claim.raceMs > now - evidence.lightsOutAt + allowance) return reject('ahead_of_race_clock');
+  if (Math.abs(claim.at - (evidence.lightsOutAt + claim.raceMs)) > allowance) {
+    return reject('timestamp_implausible');
+  }
   for (const [from, to] of evidence.outages) {
     if (claim.at >= from && claim.at <= (to ?? now)) return reject('crossed_while_disconnected');
   }
