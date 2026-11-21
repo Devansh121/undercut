@@ -46,17 +46,17 @@
   "corners": [
     {
       "number": 1,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "left"
     },
     {
       "number": 2,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "right"
     },
     {
       "number": 3,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "left"
     },
     {
@@ -126,17 +126,17 @@
     },
     {
       "number": 17,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left"
     },
     {
       "number": 18,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left"
     },
     {
       "number": 19,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left"
     }
   ],

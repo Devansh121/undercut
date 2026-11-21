@@ -25,8 +25,8 @@
     "minTurn": 15
   },
   "elevation": {
-    "note": "A short 60 m opening before the 90 m average removes a narrow bump in the surface model on early Kemmel (s 1400 to 1450 m, about 6 m, probably a structure or canopy over the track) that otherwise puts the steepest grade 250 m past the top of Raidillon. A 150 m opening would flatten Raidillon itself (docs/track-data.md section 2.2).",
-    "openWindow": 60,
+    "note": "A short 90 m opening before the 90 m average removes most of a narrow bump in the surface model on early Kemmel (s 1400 to 1450 m, about 6 m, probably a structure or canopy over the track) that otherwise puts the steepest grade 250 m past the top of Raidillon and a -1.5 g crest (at 300 km/h) on Kemmel; about -0.9 g remains there. A 150 m opening would flatten Raidillon itself (docs/track-data.md section 2.2).",
+    "openWindow": 90,
     "average": 90,
     "gradeSigma": 20,
     "publishedRange": 102.2,

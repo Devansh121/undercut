@@ -147,7 +147,7 @@
   "corners": [
     {
       "number": 1,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "left",
       "s": 295.94,
       "start": 269.945,
@@ -155,7 +155,7 @@
     },
     {
       "number": 2,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "right",
       "s": 383.922,
       "start": 323.934,
@@ -163,7 +163,7 @@
     },
     {
       "number": 3,
-      "name": "Republic Avenue",
+      "name": "Republic Boulevard",
       "direction": "left",
       "s": 445.909,
       "start": 401.918,
@@ -275,7 +275,7 @@
     },
     {
       "number": 17,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left",
       "s": 4283.131,
       "start": 4245.138,
@@ -283,7 +283,7 @@
     },
     {
       "number": 18,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left",
       "s": 4573.072,
       "start": 4549.077,
@@ -291,7 +291,7 @@
     },
     {
       "number": 19,
-      "name": "Bayfront",
+      "name": "Marina Promenade",
       "direction": "left",
       "s": 4673.052,
       "start": 4649.056,
