@@ -1,12 +1,10 @@
 /**
  * Projection and ground inside the barriers, densely, on Spa and Singapore.
  *
- * The lap projection can accept a non-solution: a point well inside the barriers maps to a
- * distant part of the lap, and the ground steps there (review of PR #18). The fix is in PR #19
- * (packages/track/src/path.ts). Until it is merged into this branch the failing checks are
- * declared with `it.fails`, named "FAILS UNTIL PR #19": vitest reports them as passing while
- * the defect is there and as FAILING as soon as the fix arrives, so the marker cannot outlive
- * the fix. When that happens, turn each `it.fails` back into `it`.
+ * The lap projection used to accept a non-solution: a point well inside the barriers mapped to
+ * a distant part of the lap, and the ground stepped there (review of PR #18; fixed by the lap
+ * projection change from PR #19). These are the regressions: the two reported points, dense
+ * round trips, and the ground probed from fresh hints as after a teleport or a respawn.
  */
 import { createSurfaceHint, createSurfaceSample } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
@@ -16,8 +14,6 @@ import { createPathPoint, createVec3 } from '../src/path';
 import { TrackSurface } from '../src/surface';
 import { LEFT, RIGHT, Track, VERGE_FALL } from '../src/track';
 import { steepestKerbSlope } from '../test/fixtures';
-
-const UNTIL_19 = 'FAILS UNTIL PR #19 (lap projection fix) is merged:';
 
 /** World point at (s, d), its projection without a hint and with one 60 m ahead. */
 function roundTrip(track: Track, s: number, d: number): { miss: number; err: number; got: string } {
@@ -133,22 +129,19 @@ const stepBound = (track: Track): number => (steepestKerbSlope(track) + VERGE_FA
 describe('Spa: projection and ground inside the barriers', { timeout: 120_000 }, () => {
   const track = Track.fromJSON(spa);
 
-  it(`${UNTIL_19} round-trips (6579, 13.664322) near the Bus Stop (review of PR #18)`, () => {
+  it('round-trips (6579, 13.664322) near the Bus Stop (review of PR #18)', () => {
     const r = roundTrip(track, 6579, 13.664322);
     expect(r.miss, r.got).toBeLessThan(1e-6);
     expect(r.err, r.got).toBeLessThan(1e-6);
   });
 
-  it(
-    `${UNTIL_19} round-trips every point inside the barriers, with and without a hint`,
-    () => {
-      const { worst, where, cases } = denseRoundTrips(track);
-      expect(cases).toBeGreaterThan(100_000);
-      expect(worst, where).toBeLessThan(1e-6);
-    },
-  );
+  it('round-trips every point inside the barriers, with and without a hint', () => {
+    const { worst, where, cases } = denseRoundTrips(track);
+    expect(cases).toBeGreaterThan(100_000);
+    expect(worst, where).toBeLessThan(1e-6);
+  });
 
-  it(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
+  it('reports a ground without steps anywhere inside the barriers', () => {
     const { worst, where } = groundSteps(track);
     expect(worst, where).toBeLessThan(stepBound(track));
   });
@@ -157,25 +150,19 @@ describe('Spa: projection and ground inside the barriers', { timeout: 120_000 },
 describe('Singapore: projection and ground inside the barriers', { timeout: 120_000 }, () => {
   const track = Track.fromJSON(singapore);
 
-  it(
-    `${UNTIL_19} round-trips (257, -25.974) in the turn 1 escape road (review of PR #18)`,
-    () => {
-      const r = roundTrip(track, 257, -25.974);
-      expect(r.miss, r.got).toBeLessThan(1e-6);
-      expect(r.err, r.got).toBeLessThan(1e-6);
-    },
-  );
+  it('round-trips (257, -25.974) in the turn 1 escape road (review of PR #18)', () => {
+    const r = roundTrip(track, 257, -25.974);
+    expect(r.miss, r.got).toBeLessThan(1e-6);
+    expect(r.err, r.got).toBeLessThan(1e-6);
+  });
 
-  it(
-    `${UNTIL_19} round-trips every point inside the barriers, with and without a hint`,
-    () => {
-      const { worst, where, cases } = denseRoundTrips(track);
-      expect(cases).toBeGreaterThan(50_000);
-      expect(worst, where).toBeLessThan(1e-6);
-    },
-  );
+  it('round-trips every point inside the barriers, with and without a hint', () => {
+    const { worst, where, cases } = denseRoundTrips(track);
+    expect(cases).toBeGreaterThan(50_000);
+    expect(worst, where).toBeLessThan(1e-6);
+  });
 
-  it(`${UNTIL_19} reports a ground without steps anywhere inside the barriers`, () => {
+  it('reports a ground without steps anywhere inside the barriers', () => {
     const { worst, where } = groundSteps(track);
     expect(worst, where).toBeLessThan(stepBound(track));
   });

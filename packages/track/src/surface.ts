@@ -82,7 +82,9 @@ export class TrackSurface implements SurfaceSampler {
     this.pitHint.index = pitIndex;
     const w = track.pitBlend(x, z, s, d, this.pitHint, this.pq);
     pitIndex = this.pitHint.index;
-    if (w >= 1 && kind !== SurfaceKind.Kerb) kind = SurfaceKind.PitLane;
+    if (w > 0 && kind !== SurfaceKind.Kerb && track.pitLaneSurface(this.pq)) {
+      kind = SurfaceKind.PitLane;
+    }
     hint.index = this.lapHint.index + segs * (pitIndex + 1);
 
     const nrm = track.groundNormal(g, this.t);

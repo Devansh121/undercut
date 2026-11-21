@@ -520,6 +520,13 @@ export class Track {
     return w > 0 ? h + w * (this.pitGroundHeight(this.pitPoint.s) - h) : h;
   }
 
+  /** Is a pit-frame position (from `pitBlend`) on the pit-lane surface? */
+  pitLaneSurface(p: PathPoint): boolean {
+    const hl = this.pitPath.interpolate(this.pitHalfLeft, p.s);
+    const hr = this.pitPath.interpolate(this.pitHalfRight, p.s);
+    return p.d <= hl && p.d >= -hr;
+  }
+
   /** The pit lane's own ground height at s_pit. */
   pitGroundHeight(sPit: number): number {
     return this.pitPath.interpolate(this.pitHeight, sPit);
@@ -536,7 +543,8 @@ export class Track {
   /**
    * How much of the pit lane's own ground applies at (x, z), already projected to the lap at
    * (s, d): 1 on the pit-lane surface, falling smoothly to 0 over PIT_GROUND_BAND beyond its
-   * edges, 0 elsewhere (and on the lap's own track surface). Fills `out` with the pit-frame
+   * edges, and fading in over the same band from the lap's track edge (where the pit lane
+   * merges, so the ground stays continuous there); 0 elsewhere. Fills `out` with the pit-frame
    * position when the result is above 0.
    */
   pitBlend(
@@ -551,17 +559,19 @@ export class Track {
     const near = this.pitNear[i]!;
     if (near < 0) return 0;
     const side: SideIndex = d >= 0 ? LEFT : RIGHT;
-    if (side !== this.pitSide || Math.abs(d) <= this.halfWidth[side][i]!) return 0;
+    const beyondEdge = Math.abs(d) - this.lap.interpolate(this.halfWidth[side], s);
+    if (side !== this.pitSide || beyondEdge <= 0) return 0;
     if (pitHint.index < 0) pitHint.index = Math.min(near, this.pitPath.segments - 1);
     this.pitPath.project(x, z, pitHint, out);
     if (out.s < 0 || out.s > this.pitPath.length) return 0;
     const hl = this.pitPath.interpolate(this.pitHalfLeft, out.s);
     const hr = this.pitPath.interpolate(this.pitHalfRight, out.s);
     const outside = Math.max(out.d - hl, -hr - out.d);
-    if (outside <= 0) return 1;
     if (outside >= PIT_GROUND_BAND) return 0;
-    const t = 1 - outside / PIT_GROUND_BAND;
-    return t * t * (3 - 2 * t);
+    const smooth = (t: number): number => (t >= 1 ? 1 : t * t * (3 - 2 * t));
+    return (
+      smooth(1 - Math.max(0, outside) / PIT_GROUND_BAND) * smooth(beyondEdge / PIT_GROUND_BAND)
+    );
   }
 
   private readonly worldPoint = createPathPoint();
@@ -695,7 +705,7 @@ export class Track {
     pitHint: { index: number },
     out: PathPoint,
   ): boolean {
-    return this.pitBlend(x, z, s, d, pitHint, out) >= 1;
+    return this.pitBlend(x, z, s, d, pitHint, out) > 0 && this.pitLaneSurface(out);
   }
 
   private buildBarriers(): Barrier[] {
