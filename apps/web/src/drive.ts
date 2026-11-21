@@ -927,6 +927,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       hud.setVisible(true);
       setSource('human');
       loop.timeScale = 1;
+      view.setSkyProbe(null);
       view.setCamera('chase-near');
       actions.restartLap();
       results.hide();

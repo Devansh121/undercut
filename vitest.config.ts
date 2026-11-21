@@ -85,6 +85,16 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      {
+        // Composed Cloudflare Worker (built client + /rooms) on the local Workers runtime.
+        test: {
+          name: 'deploy',
+          environment: 'node',
+          include: ['tools/deploy/**/*.runtime.test.mjs'],
+          testTimeout: 90_000,
+          hookTimeout: 60_000,
+        },
+      },
     ],
   },
 });

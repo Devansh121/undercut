@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 
 /**
  * Re-entering sessions must not leak GPU resources or leave the WebGL context in a state that

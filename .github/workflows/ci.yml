@@ -90,6 +90,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       # Builds the client, then checks it against tools/budget/budget.config.json.
       - run: npm run build
+      # Verifies the Cloudflare bundle (dry-run, limits, DO migrations) and local Workers runtime.
+      - run: node tools/deploy/check.mjs && npm run test:deploy
       - name: Keep the built client
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7

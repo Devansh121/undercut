@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './base';
 import { openMenu, watchProblems } from './helpers';
 
 /**
@@ -58,7 +59,7 @@ const frames = (page: Page, n = 3): Promise<void> =>
     n,
   );
 
-/** Press one pad button for two frames, then release it, in a single round-trip. */
+/** Press one pad button for one frame, then release it, in a single round-trip. */
 async function padPress(page: Page, button: number): Promise<void> {
   await page.evaluate(
     (b) =>
@@ -66,12 +67,10 @@ async function padPress(page: Page, button: number): Promise<void> {
         const pad = (window as unknown as { fakePad: { button(i: number, v: number): void } })
           .fakePad;
         pad.button(b, 1);
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            pad.button(b, 0);
-            requestAnimationFrame(() => resolve());
-          }),
-        );
+        requestAnimationFrame(() => {
+          pad.button(b, 0);
+          requestAnimationFrame(() => resolve());
+        });
       }),
     button,
   );
@@ -147,14 +146,14 @@ async function explore(
 const KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } as const;
 
 test.describe('menus, keyboard only', () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.skip(test.info().project.name !== 'desktop', 'keyboard runs on desktop');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
   test('every control on the main menu and circuit select is reachable with the arrows', async ({
     page,
   }) => {
-    test.setTimeout(60_000);
     const problems = watchProblems(page);
     await page.goto('/');
     await page.keyboard.press('Enter');
@@ -197,7 +196,6 @@ test.describe('menus, keyboard only', () => {
   });
 
   test('settings change with the keyboard and persist across a reload', async ({ page }) => {
-    test.setTimeout(60_000);
     await page.goto('/');
     await openMenu(page);
     const tc = page.locator('.settings [data-setting=tractionControl]');
@@ -218,14 +216,14 @@ test.describe('menus, keyboard only', () => {
 });
 
 test.describe('menus, gamepad only', () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.skip(test.info().project.name !== 'desktop', 'the injected pad runs on desktop');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
   test('a pad opens the menu, moves with the D-pad, switches modes on the shoulders and backs out', async ({
     page,
   }) => {
-    test.setTimeout(60_000);
     const problems = watchProblems(page);
     await installFakePad(page);
     await page.goto('/');
@@ -359,11 +357,11 @@ for (const size of [
   test(`every menu screen fits ${size.width} x ${size.height} with nothing clipped`, async ({
     page,
   }) => {
-    test.setTimeout(90_000);
     test.skip(
       test.info().project.name !== (size.height < 500 ? 'phone' : 'desktop'),
       'one project per size',
     );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize(size);
     await page.goto('/');
     expect(await layoutProblems(page), 'launch').toEqual([]);
