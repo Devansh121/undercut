@@ -50,3 +50,7 @@ Every third-party asset is listed in [`assets/MANIFEST.json`](assets/MANIFEST.js
 Archivo: Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is copied in the file named above, and is also available with a FAQ at: http://scripts.sil.org/OFL. The variable TTF was repackaged as WOFF2 without changes to glyphs, metrics or names.
 
 Barlow: Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow). This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is copied in the file named above, and is also available with a FAQ at: http://scripts.sil.org/OFL. The WOFF2 files are unchanged from upstream.
+
+### Car
+
+The car (`apps/web/public/assets/car/`: three GLB levels of detail, seven livery masks and the livery index) is generated from nothing by the repository's own scripts in `tools/car/` (`npm run car:build`) and is under the same MIT licence as the code. Its textures (carbon twill, tyre sidewall with an invented maker's mark, brake-disc glow) are drawn procedurally; no third-party image or model is used. The build runs [Blender](https://www.blender.org/) 5.2 LTS (GPL-2.0-or-later) as a tool; Blender is not shipped. The studio lighting in the committed Blender reference renders is Poly Haven's `studio_small_09` HDRI (CC0), used for lighting only and not committed.
