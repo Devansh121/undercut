@@ -1,6 +1,6 @@
 {
   "reference-cockpit": {
-    "sampleSha256": "d43427a996777661898c67eae3ce3c42df9ca5cfb7f5341fb300f3807a085d78",
+    "sampleSha256": "7c71791fc6d95d4d6ab504add042ba39eb734e06955650bb796068f548cbbeca",
     "checks": "pass",
     "title": "Reference driver, complete flying lap",
     "listen": "Compare onboard intake and transmission against the external exhaust balance. Trackside is a stationary balance preset; spatial pass-bys follow in slice 2.",
@@ -30,7 +30,7 @@
       "wind": -36.2,
       "scrub": -36.2,
       "squeal": -41.9,
-      "kerb": -52.6,
+      "kerb": -52.7,
       "scrape": null,
       "crack": -59.7,
       "burble": -53.2,
@@ -42,10 +42,10 @@
       "drs": -84.4,
       "impact": null
     },
-    "realtimeRatio": 19.8
+    "realtimeRatio": 15.5
   },
   "reference-trackside": {
-    "sampleSha256": "8b59eb833085e53a7c57831392b5120900f800fb3d601cf49e0c4bfc0b7979f5",
+    "sampleSha256": "0f326114fbfab388dd5a1f326819192f98a475a9a09097206bfef801a75e58f3",
     "checks": "pass",
     "title": "Reference driver, complete flying lap",
     "listen": "Compare onboard intake and transmission against the external exhaust balance. Trackside is a stationary balance preset; spatial pass-bys follow in slice 2.",
@@ -75,7 +75,7 @@
       "wind": -36.2,
       "scrub": -36.2,
       "squeal": -41.9,
-      "kerb": -52.6,
+      "kerb": -52.7,
       "scrape": null,
       "crack": -59.7,
       "burble": -53.2,
@@ -87,6 +87,6 @@
       "drs": -84.4,
       "impact": null
     },
-    "realtimeRatio": 18.1
+    "realtimeRatio": 27
   }
 }

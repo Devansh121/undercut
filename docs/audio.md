@@ -210,10 +210,10 @@ Reference evidence from this pass (48 kHz stereo, 84.97 s, 1343 steady windows p
 
 | View | LUFS | dBTP | Pitch error median / max | DC | Core speed |
 | --- | --- | --- | --- | --- | --- |
-| Cockpit | −17.1 | −6.48 | 0.024 / 0.348 % | 3.43e-7 | 19.8× real time |
-| Trackside | −19.0 | −9.43 | 0.015 / 0.323 % | 1.76e-7 | 18.1× real time |
+| Cockpit | −17.1 | −6.48 | 0.024 / 0.348 % | 3.43e-7 | 15.5–19.8× real time |
+| Trackside | −19.0 | −9.43 | 0.015 / 0.323 % | 1.76e-7 | 18.1–27× real time |
 
-The core cost is about 5–6% of one CPU core for this one-car render on the loaded laptop,
+Speed ranges are two renders of the same lap on the loaded laptop; the sample hashes in `summary.json` were identical across them. Re-rendered after widening the kerb rumble range: only the kerb layer moved (−52.6 to −52.7 dBFS). The core cost is about 4–7% of one CPU core for this one-car render on the loaded laptop,
 excluding analysis and file writing; this is not a mobile AudioWorklet CPU measurement. Both
 views pass the gates and block-size hash comparison. Silent layers are `null` in the JSON
 (the JSON representation of −infinity dBFS).
