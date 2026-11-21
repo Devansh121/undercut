@@ -235,6 +235,12 @@ claim may skip laps if its race time covers them.
 **Penalties.** Jump start 5 s. Track limits: three free warnings, then 5 s for each
 further one; a lap with a report does not count for best lap.
 
+**The flag.** The first car to complete the race distance takes the chequered flag.
+Every other car finishes on its first crossing at or after the leader's race time, so a
+lapped car finishes a lap down. This is decided on race times, which each client measures
+on its own sim clock from lights out, not on the order the messages reach the server:
+a crossing just before the leader's, delivered just after it, is still a normal lap.
+
 **Classification.** Running and finished cars by laps (more first), then race time plus
 penalties, then grid position; retired cars after them, ordered the same way. The same
 `results` object goes to everyone (the soak checks all eight copies are identical).

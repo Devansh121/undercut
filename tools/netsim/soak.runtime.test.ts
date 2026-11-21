@@ -163,7 +163,7 @@ describe(`soak: ${profile.name}`, () => {
 
       const rows = (rs[0] as Recorder).last('results')!.results.rows;
       expect(rows).toHaveLength(HUMANS + AI);
-      expect(rows.every((r) => r.status === 'finished' && r.laps === profile.laps)).toBe(true);
+      expect(rows.filter((r) => r.status !== 'finished' || r.laps !== profile.laps)).toEqual([]);
       // Each car runs at its own speed, so the order is known: fastest (highest seat) first.
       expect(rows.map((r) => r.seat)).toEqual([...rows.map((r) => r.seat)].sort((a, b) => b - a));
       for (const row of rows) expect(row.timeMs).toBe(profile.laps * track.lapMs(row.seat));

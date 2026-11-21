@@ -89,6 +89,12 @@ export interface RoomState {
   cars: CarRecord[] | null;
   start: StartSchedule | null;
   chequeredAt: number | null;
+  /**
+   * Race time of the leader's finishing crossing. A car takes the flag on its first
+   * crossing at or after this race time: decided on the clients' own race clocks, so
+   * the order messages arrive in does not matter.
+   */
+  chequerRaceMs: number | null;
   results: Results | null;
   closeAt: number | null;
   retiredTokens: RetiredToken[];

@@ -147,6 +147,7 @@ export class RoomMachine {
         cars: null,
         start: null,
         chequeredAt: null,
+        chequerRaceMs: null,
         results: null,
         closeAt: now + timings.emptyRoomTtlMs,
         retiredTokens: [],
@@ -483,10 +484,15 @@ export class RoomMachine {
   }
 
   /** Leader took the flag: the others finish on their next crossing. */
-  private chequer(): void {
+  private chequer(leaderRaceMs: number): void {
     const s = this.state;
     s.phase = 'finished';
     s.chequeredAt = this.now;
+    s.chequerRaceMs = leaderRaceMs;
+    // A car whose crossing after the flag arrived before the leader's: that was its finish.
+    for (const c of s.cars ?? []) {
+      if (c.state === 'racing' && c.lap > 0 && c.raceMs >= leaderRaceMs) c.state = 'finished';
+    }
     const window = Math.min(
       Math.max(this.timings.finishWindowMinMs, 2 * s.settings.circuit.minLapMs),
       s.settings.circuit.maxLapMs,
@@ -516,6 +522,7 @@ export class RoomMachine {
     s.cars = null;
     s.start = null;
     s.chequeredAt = null;
+    s.chequerRaceMs = null;
     for (const m of s.members) {
       m.ready = false;
       m.loaded = false;
@@ -1005,11 +1012,17 @@ export class RoomMachine {
     this.broadcast(timingMessage(msg, verdict.status, verdict.reason));
     if (s.phase === 'racing' && car.lap >= s.settings.laps) {
       car.state = 'finished';
-      this.chequer();
+      this.chequer(car.raceMs);
       this.broadcastRoom();
     } else if (s.phase === 'finished') {
-      car.state = 'finished';
-      this.broadcastRoom();
+      // An earlier full-distance finish that arrived late moves the flag earlier.
+      if (car.lap >= s.settings.laps) {
+        s.chequerRaceMs = Math.min(s.chequerRaceMs ?? car.raceMs, car.raceMs);
+      }
+      if (car.lap >= s.settings.laps || car.raceMs >= (s.chequerRaceMs ?? 0)) {
+        car.state = 'finished';
+        this.broadcastRoom();
+      }
     }
     this.checkRaceEnd();
   }

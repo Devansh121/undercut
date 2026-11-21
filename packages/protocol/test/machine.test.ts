@@ -454,6 +454,49 @@ describe('a full race', () => {
     expect(h.state.cars!.filter((c) => c.state === 'racing')).toHaveLength(3);
   });
 
+  it('decides who took the flag by race time, not by the order messages arrive', () => {
+    const { h } = inPhase('racing');
+    const out = h.state.start!.lightsOutAt;
+    const lap = (conn: string, seat: number, n: number, raceMs: number, lapMs: number) => {
+      h.now = Math.max(h.now, out + raceMs + 100);
+      h.send(conn, {
+        type: 'lap',
+        seat,
+        lap: n,
+        lapMs,
+        raceMs,
+        tick: n,
+        s: 1,
+        speed: 80,
+        at: out + raceMs,
+      });
+    };
+    lap('c1', 0, 1, 7000, 7000);
+    lap('c2', 1, 1, 7500, 7500);
+    lap('c1', 2, 1, 10_000, 10_000);
+    lap('c1', 3, 1, 10_500, 10_500);
+    lap('c1', 0, 2, 14_000, 7000);
+    lap('c2', 1, 2, 15_000, 7500);
+    // Seat 3 crosses after the leader's finish, but its message arrives first.
+    lap('c1', 3, 2, 21_500, 11_000);
+    expect(h.state.phase).toBe('racing');
+    lap('c1', 0, 3, 21_000, 7000);
+    expect(h.state.phase).toBe('finished');
+    expect(h.state.cars!.find((c) => c.seat === 3)).toMatchObject({ state: 'finished', lap: 2 });
+    // Seat 2 crossed before the leader's finish, but its message arrives after: it races on.
+    lap('c1', 2, 2, 20_000, 10_000);
+    expect(h.state.cars!.find((c) => c.seat === 2)).toMatchObject({ state: 'racing', lap: 2 });
+    lap('c2', 1, 3, 22_500, 7500);
+    lap('c1', 2, 3, 30_000, 10_000);
+    const rows = h.last('c2', 'results')!.results.rows;
+    expect(rows.map((r) => [r.seat, r.laps, r.timeMs, r.status])).toEqual([
+      [0, 3, 21_000, 'finished'],
+      [1, 3, 22_500, 'finished'],
+      [2, 3, 30_000, 'finished'],
+      [3, 2, 21_500, 'finished'],
+    ]);
+  });
+
   it('ends at the finish window with unfinished cars still running', () => {
     const { h } = inPhase('finished');
     h.runUntil(h.state.phaseEndsAt!);
