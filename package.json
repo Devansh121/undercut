@@ -38,6 +38,7 @@
     "track:bench": "vitest bench --run --project unit packages/track/bench",
     "car:build": "node tools/car/build.mjs",
     "car:preview": "node tools/car/preview/capture.mjs",
+    "ui:cars": "node tools/ui/team-cars.mjs",
     "shots": "node tools/screenshots/shots.mjs"
   },
   "devDependencies": {

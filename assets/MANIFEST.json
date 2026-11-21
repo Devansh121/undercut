@@ -558,5 +558,165 @@
     "licence": "CC0-1.0",
     "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
     "sha256": "a1d8eac4f77ef467a7e2abcb3e516a43c985dcd31184bc7fbf6923a04c74d1d4"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/calder-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "8a962e6e73eb5fb412fbd997ed235623b552f0c0a7dd9d25123563957f1155c4"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/calder-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "c2927b48c04343b7ae350ce9309d1156a9f8a7c46e9e44f9c0519d3cff6b3741"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/aldermoor-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "706f01f37172546bb08fbda80306a262a744d698288be9e7a03f962e58bde3d2"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/aldermoor-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "8781ce96d1f5c7fb8502f95fb82d11f3bb7445a34fb6d398c225830b4b477018"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/kestrel-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "bedc4247e9e3401fdcf46d44769aeccfa715331382ee99005707b590c3702c79"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/kestrel-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "8c339344aab793d6257c438fe1c6aabcd8ed83c38b9ab1007ee5b1cf0083afda"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/norrland-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "402045f83ffb92402fd3fa1b63a6289902e59aea22a537ab99b8578c9bcd7271"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/norrland-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "213e0f7f34655b8945a0db927bbb0fd53791144a85e653367285b0bb55fd5b4f"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/sable-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "0e1d6101feba601d45815eb8b7b70730f2fc8e2ecb6665925bb0e90adc54f793"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/sable-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "94cc31178f8f5d9f1e57c85b7c035ebe72474ca73710ae4799410b9935a47561"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/orrin-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "6a53f8c44c35dd3ba7d967299ea0901e7e407bdf8d95662d6888974669a23e63"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/orrin-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "e360b1f7ccdbf201888453e9dde5e94a664eb1f344c04ecd1490c394a8ef9b85"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/terraluce-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "f9440e84fcf4d9605d2ba45018a10fb347fc661c4003994c3a6a2cd29a7c70e0"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/terraluce-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "568b018b692bd4c70414a1946e83581ad6e60ae8e259ff016859cb62daeb7676"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/meridian-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "521f071533db3b41f89f07ed26c6f292ab4bfae39b35c6ebb90b1ae09f716f3e"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/meridian-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "31a35666d48ee3be559ed7d202f17adf897a4cbb83b33563a3b43f1d4358cea6"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/brevik-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "2403d3c8e77976f20dd5ab1be18298eef6da96fb14a888968866f7fe3102a36d"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/brevik-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "d8686b1eb1fb0dd33919d154d22bc180ed46ced23b6cdb5f84cfe2dd3bf55601"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/quillon-1.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "d6764fe4791b3904a44013ee8ebeab15c42f1584fe9cad09ffc041861802f1cc"
+  },
+  {
+    "file": "apps/web/public/assets/ui/cars/quillon-2.webp",
+    "source_url": "tools/ui/team-cars.mjs (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Rendered from apps/web/public/assets/car/car_high.glb in the team livery by the car viewer (tools/car/preview), 960 x 420, WebP quality 82",
+    "sha256": "896107b3bd63d8d7a0729a83f2c00e029255dfe8b9a670e519de9839fa1ffe5f"
   }
 ]
