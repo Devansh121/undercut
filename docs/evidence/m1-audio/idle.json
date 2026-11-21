@@ -1,0 +1,34 @@
+{
+  "title": "Idle in neutral",
+  "listen": "Steady idle near 4500 rpm with slight hunting; no clicks at the start.",
+  "durationS": 4,
+  "samplePeakDbfs": -20.29,
+  "truePeakDbtp": -20.29,
+  "loudnessLufs": -27.2,
+  "rmsDbfs": -29.5,
+  "dcOffset": 0.00000129,
+  "maxStep": 0.0068,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 92,
+    "medianErrorPct": 0.029,
+    "p95ErrorPct": 0.047,
+    "maxErrorPct": 0.053
+  },
+  "layersDbfs": {
+    "exhaust": -26.9,
+    "intake": -53.2,
+    "combustion": -83.7,
+    "turbo": -106.5,
+    "ers": null,
+    "crackle": null,
+    "shift": null,
+    "roll": null,
+    "wind": null,
+    "scrub": null,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 30.5
+}

@@ -12,6 +12,8 @@ package-lock.json
 design/
 # Committed track files are written byte for byte by tools/track-pipeline.
 packages/track/data/*.json
+# Racing-line and envelope artefacts are written byte for byte by tools/ai/build.mjs.
+packages/ai/data/*.json
 
 # Generated car assets and their stats are written byte for byte by tools/car.
 apps/web/public/assets/car/

@@ -1,4 +1,6 @@
-/** Engine, tyre and ambience audio. Placeholder until M1. */
-
-/** Audio buses the mixer will expose. */
-export type AudioBus = 'engine' | 'tyres' | 'ambience' | 'ui';
+/**
+ * Engine and road audio. This entry is the pure DSP core, safe to import anywhere (browser,
+ * worklet, Node). The browser facade is `@undercut/audio/web`; offline measurement helpers
+ * are `@undercut/audio/analysis`.
+ */
+export * from './dsp/index';
