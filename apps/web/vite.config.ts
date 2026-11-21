@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 // Relative import on purpose: the config is loaded by Node, which cannot import the
 // workspace package's TypeScript entry directly.
-import { GAME_NAME } from '../../packages/core/src/name';
+import { GAME_NAME } from '../../packages/core/src/name.ts';
 
 function buildHash(): string {
   if (process.env.BUILD_HASH) return process.env.BUILD_HASH;

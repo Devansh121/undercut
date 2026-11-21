@@ -17,12 +17,15 @@ async function main() {
     { name: 'ROOMS_PORT', port: roomsPort, host: '127.0.0.1' },
   ]);
 
+  // vite's package exports do not include its bin, so resolve it via package.json.
+  const vitePkg = require.resolve('vite/package.json', {
+    paths: [path.join(REPO_ROOT, 'apps/web')],
+  });
+  const viteBin = path.join(path.dirname(vitePkg), require(vitePkg).bin.vite);
+
   process.stdout.write(`Starting the rooms service on 127.0.0.1:${roomsPort} ...\n`);
   const rooms = await startRooms({ port: roomsPort });
 
-  const viteBin = require.resolve('vite/bin/vite.js', {
-    paths: [path.join(REPO_ROOT, 'apps/web')],
-  });
   const vite = spawn(
     process.execPath,
     [viteBin, '--host', '0.0.0.0', '--port', String(port), '--strictPort'],
