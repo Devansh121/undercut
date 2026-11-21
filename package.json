@@ -24,7 +24,8 @@
     "test:soak": "node -e \"console.log('no soak tests yet')\"",
     "build": "npm run build -w @undercut/web && node tools/budget/check.mjs",
     "check:assets": "node tools/assets/check-licences.mjs",
-    "check:secrets": "bash tools/ci/gitleaks.sh"
+    "check:secrets": "bash tools/ci/gitleaks.sh",
+    "telemetry": "node tools/telemetry/cli.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
