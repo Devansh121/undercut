@@ -1,12 +1,12 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1303948,
-    "triangles": 119602,
-    "draw_calls": 36,
+    "bytes": 1330564,
+    "triangles": 119710,
+    "draw_calls": 38,
     "nodes": {
       "body": {
-        "triangles": 76118,
+        "triangles": 74750,
         "primitives": 7,
         "materials": [
           "paint",
@@ -53,12 +53,14 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 590,
-        "primitives": 3,
+        "triangles": 2066,
+        "primitives": 5,
         "materials": [
           "carbon",
+          "dark",
           "display",
-          "paint"
+          "paint",
+          "metal_dark"
         ],
         "morph_targets": 0
       },
@@ -154,6 +156,11 @@
         "bytes": 9486
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 1052
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 19804
@@ -184,6 +191,10 @@
         1024,
         1024
       ],
+      "carbon_aniso": [
+        128,
+        128
+      ],
       "carbon_base": [
         512,
         512
@@ -208,12 +219,12 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 607428,
-    "triangles": 39616,
-    "draw_calls": 23,
+    "bytes": 624232,
+    "triangles": 39970,
+    "draw_calls": 24,
     "nodes": {
       "body": {
-        "triangles": 22058,
+        "triangles": 21826,
         "primitives": 3,
         "materials": [
           "paint",
@@ -256,10 +267,11 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 416,
-        "primitives": 2,
+        "triangles": 1002,
+        "primitives": 3,
         "materials": [
           "carbon",
+          "dark",
           "display"
         ],
         "morph_targets": 0
@@ -348,6 +360,11 @@
         "bytes": 3824
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 566
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 8710
@@ -378,6 +395,10 @@
         512,
         512
       ],
+      "carbon_aniso": [
+        64,
+        64
+      ],
       "carbon_base": [
         256,
         256
@@ -402,12 +423,12 @@
   },
   "far": {
     "file": "car_far.glb",
-    "bytes": 191000,
-    "triangles": 10584,
+    "bytes": 190784,
+    "triangles": 10392,
     "draw_calls": 11,
     "nodes": {
       "body": {
-        "triangles": 8082,
+        "triangles": 7890,
         "primitives": 3,
         "materials": [
           "paint",
@@ -481,6 +502,11 @@
         "bytes": 3824
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 566
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 8710
@@ -505,6 +531,10 @@
       "body_detail": [
         512,
         512
+      ],
+      "carbon_aniso": [
+        64,
+        64
       ],
       "carbon_base": [
         256,
@@ -563,5 +593,5 @@
       "bytes": 24244
     }
   },
-  "total_bytes": 2499426
+  "total_bytes": 2542630
 }

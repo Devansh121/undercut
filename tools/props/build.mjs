@@ -15,6 +15,9 @@ const log = execFileSync(
   [
     '-b',
     '--factory-startup',
+    // A Python exception must fail the build (Blender otherwise exits 0 and logs to stderr).
+    '--python-exit-code',
+    '1',
     '-t',
     '2',
     '-P',

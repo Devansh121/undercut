@@ -7,7 +7,7 @@ import bpy
 from mathutils import Vector
 
 
-def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
+def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=False):
     def mesh(name, verts, faces, mat):
         data = bpy.data.meshes.new(name)
         data.from_pydata(verts, [], faces)
@@ -59,19 +59,33 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
     shoulder = hip + Vector((.20 if crouched else -.02, 0, .42 if crouched else .51))
     torso_axis = shoulder - hip
     legs = cloth if mechanic else fabric
-    # Seat and hips in the trouser cloth; the transition hides under the belt.
-    rings('overall-seat', [(hip+torso_axis*t, d, w) for t, d, w in
-                           [(-.20,.07,.10),(-.14,.105,.145),(0,.115,.162),(.06,.112,.157)]], legs)
+    # Hips in the trouser cloth, closing to a rounded crotch inside the thigh tops: no flat
+    # bottom or rim. The lowest section sets the seat contact level with the simple LODs (0.424 m).
+    if seated:
+        # Seated: full-width hips down to a flat seat at the contact level (hidden by the chair).
+        hips = [(-.148,.07,.115,0),(-.135,.092,.145,0),(-.10,.106,.157,0),(-.05,.11,.16,0),(0,.11,.158,0),
+                (.06,.11,.156,0),(.10,.102,.146,0)]
+    elif crouched:
+        # Crouched: the rump pushes back and down behind the hip line instead of a narrowing bowl.
+        hips = [(-.16,.03,.06,-.03),(-.14,.07,.125,-.03),(-.10,.094,.15,-.022),(-.05,.105,.156,-.01),
+                (0,.108,.155,0),(.06,.11,.156,0),(.10,.102,.146,0)]
+    else:
+        # Standing: the thigh tops form the seat; the hips stay inside them below the waist.
+        hips = [(-.13,.012,.02,0),(-.10,.05,.08,0),(-.05,.085,.13,0),(0,.104,.152,0),(.06,.11,.156,0),
+                (.10,.102,.146,0)]
+    rings('overall-hips', [(hip+torso_axis*t+Vector((cx,0,0)), d, w) for t, d, w, cx in hips], legs)
     # Continuous tailored torso above the belt, narrowing at the waist and neck.
     sections = []
-    for t, depth, width in [(.05,.110,.155),(.10,.108,.152),(.18,.10,.145),
+    for t, depth, width in [(.03,.098,.142),(.07,.106,.150),(.10,.109,.153),(.18,.10,.145),
                             (.24,.112,.158),(.40,.125,.174),(.62,.132,.19),(.79,.125,.205),
                             (.90,.11,.20),(1,.085,.16),(1.04,.065,.092)]:
         sections.append((hip+torso_axis*t, depth, width))
     rings('overall-torso', sections, cloth)
     # Waist gathering and belt follow the garment, without a separate rectangular pelvis.
-    rings('waist-gather', [(hip+torso_axis*t, .116+e, .162+e) for t,e in [(0,.002),(.025,.009),(.05,.003)]], legs)
-    rings('belt-webbing', [(hip+torso_axis*t, .121, .169) for t in (.04,.085)], fabric)
+    if not mechanic:
+        # Engineers wear a slim belt over shirt and trousers. A one-piece pit overall has no belt
+        # and no gather: it runs smooth from chest to thigh.
+        rings('belt-webbing', [(hip+torso_axis*t, .114, .159) for t in (.045,.085)], fabric)
     # Raised collar, zip placket and shaped chest pocket seams.
     neck_base = shoulder + Vector((.004,0,.018))
     rings('collar', [(neck_base,.067,.079),(neck_base+Vector((.006,0,.05)),.060,.072)], cloth)
@@ -84,10 +98,12 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
                                  (shoulder.x+.07,side*.15,shoulder.z-.015),
                                  (shoulder.x+.02,side*.203,shoulder.z-.05)], fabric)
 
-    def limb(name, a, joint, b, widths, mat, top=.9):
+    def limb(name, a, joint, b, widths, mat, top=.9, lead=()):
         # Closely spaced uneven rings bunch at the bent knee/elbow, loose smooth fabric elsewhere.
-        # The tapered top ring starts inside the body so no tube end shows at the hip or shoulder.
-        points, radii = [], []
+        # The tapered top ring starts inside the body so no tube end shows at the hip or shoulder;
+        # optional lead rings start deeper inside and turn the tube out of the body (shoulder cap).
+        points = [tuple(p) for p, r in lead]
+        radii = [(r, r*.94) for p, r in lead]
         for t, scale in [(0,top),(.18,1.03),(.40,1),(.67,.96),(.83,1.13),(.91,.94),(1,1.06)]:
             points.append(tuple(Vector(a).lerp(Vector(joint),t)))
             r = widths[0]*(1-t)+widths[1]*t
@@ -107,8 +123,9 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
             knee, ankle = Vector((.36,y,.46)), Vector((.36,y,.11))
         else:
             knee, ankle = Vector((.025,y,.47)), Vector((0,y,.11))
-        a = hip+Vector((0,y*.8,.07))
-        limb('overall-trouser', a,knee,ankle,(.096,.073,.061), legs, top=.75)
+        # Seated thighs leave the hips higher so the seat contact stays level with the simple LODs.
+        a = hip+Vector((-.005,y*.82,.04 if seated else 0))
+        limb('overall-trouser', a,knee,ankle,(.096,.073,.061), legs, top=.85)
         # Shaped boot: a broad toe, narrower heel, ankle shaft and distinct rubber sole.
         footprint = [(-.08,-.047),(.10,-.055),(.165,-.036),(.18,0),(.165,.036),(.10,.055),(-.08,.047),(-.10,0)]
         verts=[]
@@ -120,27 +137,31 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
         rings('boot-ankle', [((ankle.x-.015,y,z),rx,ry) for z,rx,ry in [(.05,.09,.047),(.10,.064,.05),(.18,.055,.047)]], rubber)
         seam('boot-stitch',[(ankle.x+.03,y-.044,.066),(ankle.x+.13,y-.03,.065),(ankle.x+.15,y,.06),
                             (ankle.x+.13,y+.03,.065),(ankle.x+.03,y+.044,.066)],fabric,.0025)
-        sh=shoulder+Vector((0,side*.165,-.08))
-        # Rounded deltoid over the sleeve head, flush with the shoulder line: no flat tube end.
-        ellipsoid('deltoid',shoulder+Vector((0,side*.163,-.065)),(.07,.068,.068),cloth)
+        # The sleeve grows out of the torso through a lead ring near the neck, so the shoulder
+        # cap is one continuous surface rather than a separate deltoid lump.
+        sh=shoulder+Vector((0,side*.168,-.072))
         if crouched:
             elbow,wrist=Vector((.24,side*.22,.74)),Vector((.42,side*.14,.66))
         elif seated:
             elbow,wrist=hip+Vector((.08,side*.22,.26)),hip+Vector((.24,side*.14,.14))
         else:
             elbow,wrist=hip+Vector((.025,side*.22,.27)),hip+Vector((.07,side*.21,.07))
-        limb('overall-sleeve',sh,elbow,wrist,(.077,.058,.039),cloth,top=.85)
+        limb('overall-sleeve',sh,elbow,wrist,(.077,.058,.039),cloth,top=.98,
+             lead=[(shoulder+Vector((0,side*.10,-.045)),.06)])
         direction=(wrist-elbow).normalized()
         cuff=wrist-direction*.035
         sweep('sleeve-cuff',[cuff,wrist],[(.045,.043),(.041,.040)],fabric)
         palm=wrist+direction*.04
-        ellipsoid('glove-palm',palm,(.035,.034,.058),rubber if mechanic else fabric)
+        # Mechanics wear gloves; pit-wall engineers have bare hands. One material per hand.
+        hand=rubber if mechanic else skin
+        ellipsoid('glove-palm' if mechanic else 'hand-palm',palm,(.035,.034,.058),hand)
         # Four curled fingers and a separate opposing thumb give a readable grasp.
         for finger in range(4):
             f=palm+Vector((.022,(finger-1.5)*.015,-.018))
-            sweep('glove-finger',[f,f+Vector((.018,0,-.029)),f+Vector((.008,0,-.047))],[(.009,.008),(.01,.009),(.006,.006)],rubber,n=6)
-        sweep('glove-thumb',[palm+Vector((.005,-side*.03,.008)),palm+Vector((.035,-side*.037,-.013)),palm+Vector((.036,-side*.02,-.028))],[(.012,.012),(.012,.011),(.008,.008)],rubber,n=6)
-        seam('glove-stitch',[tuple(palm+Vector((-.027,-.022,z))) for z in (-.025,0,.025)],cloth,.002)
+            sweep('finger',[f,f+Vector((.018,0,-.029)),f+Vector((.008,0,-.047))],[(.009,.008),(.01,.009),(.006,.006)],hand,n=6)
+        sweep('thumb',[palm+Vector((.005,-side*.03,.008)),palm+Vector((.035,-side*.037,-.013)),palm+Vector((.036,-side*.02,-.028))],[(.012,.012),(.012,.011),(.008,.008)],hand,n=6)
+        if mechanic:
+            seam('glove-stitch',[tuple(palm+Vector((-.027,-.022,z))) for z in (-.025,0,.025)],cloth,.002)
 
     head=shoulder+Vector((.06 if crouched else .025,0,.225))
     # Mechanics wear a fire-resistant balaclava under the helmet.
@@ -173,16 +194,48 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass):
         profiles=[(-.105,.047,.048,.020),(-.087,.068,.072,.015),(-.05,.079,.084,.005),
                   (0,.086,.091,0),(.035,.088,.089,-.005),(.073,.075,.077,-.014),(.105,.044,.051,-.02),(.115,.004,.006,-.02)]
         rings('head',[(head+Vector((cx,0,z)),rx,ry) for z,rx,ry,cx in profiles],skin,n=20)
+        # Features sized to read at 3 to 5 m: brow ridge over recessed eyes, a full nose, chin.
         for side in (-1,1):
             ellipsoid('ear',head+Vector((-.008,side*.09,-.012)),(.021,.016,.035),skin)
-            seam('brow',[tuple(head+Vector((.081,side*y,z))) for y,z in [(.014,.032),(.038,.037),(.061,.027)]],fabric,.004)
-            seam('eye',[tuple(head+Vector((.087,side*y,.014))) for y in (.022,.04,.054)],rubber,.002)
-        mesh('nose',[tuple(head+Vector(v)) for v in [(.08,-.014,.025),(.08,.014,.025),(.121,0,-.022),(.091,-.018,-.038),(.091,.018,-.038)]],[(0,1,2),(0,2,3),(1,4,2),(2,4,3)],skin)
-        seam('mouth',[tuple(head+Vector((.091,y,-.062))) for y in (-.023,0,.023)],fabric,.002)
+            ellipsoid('brow-ridge',head+Vector((.079,side*.033,.033)),(.013,.03,.011),skin)
+            seam('brow',[tuple(head+Vector((.089,side*y,z))) for y,z in [(.012,.04),(.034,.045),(.056,.037)]],fabric,.0055)
+            if glasses:
+                ellipsoid('sunglass-lens',head+Vector((.095,side*.033,.014)),(.007,.027,.018),glass)
+                seam('sunglass-arm',[tuple(head+Vector(v)) for v in [(.09,side*.06,.02),(.05,side*.088,.02),(-.005,side*.093,.01)]],rubber,.0025)
+            else:
+                ellipsoid('eye',head+Vector((.083,side*.033,.013)),(.006,.013,.0075),rubber)
+        if glasses:
+            seam('sunglass-bridge',[tuple(head+Vector((.1,y,.02))) for y in (-.01,0,.01)],rubber,.003)
+        mesh('nose',[tuple(head+Vector(v)) for v in [(.081,-.011,.03),(.081,.011,.03),(.128,0,-.018),
+                                                    (.093,-.022,-.042),(.093,.022,-.042),(.107,0,-.048)]],
+             [(0,1,2),(0,2,3),(1,4,2),(2,5,3),(2,4,5)],skin)
+        ellipsoid('chin',head+Vector((.072,0,-.09)),(.03,.04,.022),skin)
+        seam('mouth',[tuple(head+Vector((.093,y,-.064))) for y in (-.024,-.008,.008,.024)],rubber,.003)
         # Hair cap is fitted to the skull, with a temple line, rather than a sphere head.
         # Hairline sits high at the forehead and low at the nape.
         rings('hair',[(head+Vector((cx,0,z)),rx,ry) for z,rx,ry,cx in
                       [(-.085,.03,.045,-.05),(-.075,.05,.07,-.05),(-.045,.07,.086,-.03),(-.01,.082,.094,-.016),
                        (.03,.09,.093,-.01),(.07,.08,.082,-.012),(.10,.055,.06,-.015),(.12,.02,.025,-.015),
                        (.125,.003,.004,-.015)]],fabric,n=20)
+        # Team cap in the clothing material (team tint) with a curved brim: it reads at distance.
+        rings('cap-crown',[(head+Vector((cx,0,z)),rx,ry) for z,rx,ry,cx in
+                           [(.03,.095,.099,-.008),(.07,.090,.093,-.01),(.10,.067,.072,-.012),
+                            (.122,.032,.036,-.013),(.13,.003,.004,-.013)]],cloth,n=20)
+        ellipsoid('cap-button',head+Vector((-.013,0,.131)),(.008,.008,.004),cloth)
+        top, bottom = [], []
+        for i in range(13):
+            t=-1.05+2.1*i/12
+            inner=Vector((.093*math.cos(t)-.008,.097*math.sin(t),0))
+            outer=inner+Vector((math.cos(t),math.sin(t),0))*(.075*math.cos(t)**1.5)+Vector((0,0,-.012))
+            top.extend([tuple(head+inner+Vector((0,0,.036))),tuple(head+outer+Vector((0,0,.036)))])
+            bottom.extend([tuple(head+inner+Vector((0,0,.029))),tuple(head+outer+Vector((0,0,.029)))])
+        verts=top+bottom
+        n=len(top)
+        faces=[]
+        for i in range(12):
+            a,b,c,d=2*i,2*i+1,2*i+3,2*i+2
+            faces.append((a,b,c,d))
+            faces.append((n+d,n+c,n+b,n+a))
+            faces.append((b,n+b,n+c,c))
+        mesh('cap-brim',verts,faces,cloth)
     return tuple(head)

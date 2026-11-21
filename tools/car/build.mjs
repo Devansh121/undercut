@@ -16,6 +16,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
 const ASSET_DIR = 'apps/web/public/assets/car';
 const LODS = ['high', 'mobile', 'far'];
+// Triangle budgets per level of detail (docs/adr/0005-car-model.md); the build fails above them.
+const TRIANGLE_BUDGET = { high: 120000, mobile: 40000, far: 12000 };
 const BLENDER_VERSION = '5.2.4';
 const BLENDER_DIR = path.join(os.homedir(), '.cache/undercut/blender');
 const BLENDER_NAME = `blender-${BLENDER_VERSION}-linux-x64`;
@@ -53,7 +55,17 @@ function blender() {
 function run(bin, args) {
   const out = execFileSync(
     bin,
-    ['-b', '--factory-startup', '-noaudio', '-P', path.join(here, 'car.py'), '--', ...args],
+    [
+      '-b',
+      '--factory-startup',
+      '-noaudio',
+      '--python-exit-code',
+      '1',
+      '-P',
+      path.join(here, 'car.py'),
+      '--',
+      ...args,
+    ],
     { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
   );
   const lines = out.split('\n').filter((l) => /^(EXPORTED|MASKS|STATS)/.test(l));
@@ -107,6 +119,11 @@ function build(outDir, statsDir) {
   for (const lod of LODS) {
     console.log(`Building ${lod}`);
     run(bin, ['--mode', 'export', '--lod', lod, '--out', outDir, '--stats-dir', statsDir]);
+    const { triangles } = glbStats(path.join(outDir, `car_${lod}.glb`));
+    if (triangles > TRIANGLE_BUDGET[lod])
+      throw new Error(
+        `car_${lod}.glb has ${triangles} triangles, over its ${TRIANGLE_BUDGET[lod]} budget`,
+      );
   }
   console.log('Drawing livery masks');
   run(bin, ['--mode', 'masks', '--out', outDir]);

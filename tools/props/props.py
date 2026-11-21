@@ -87,7 +87,7 @@ face = material('board-face', (.80, .79, .75), .62)
 red = material('lamp-red', (.42, .004, .002), .28, emission=2.4)
 cloth = material('clothing', (.52, .54, .56), .92, tex_kind='weave', contrast=.08)
 fabric = material('dark-fabric', (.025, .032, .043), .94, tex_kind='weave', contrast=.10)
-skin = material('skin', (.38, .22, .14), .84)
+skin = material('skin', (.46, .29, .19), .72)
 
 objects = []
 lod = 0
@@ -530,6 +530,36 @@ def tower_lattice(height=8.5, base_half=1.1, top_half=0.72):
                     rod('brace-x2', (r0, s * r0, h0), (-r1, s * r1, h1), .028, steel)
 
 
+# Per-figure complexion (multiplies the shared skin material) and warm/cool zones of a face,
+# written into COLOR_0 on top of the baked AO: cheeks, nose and ears warmer, lips darker, jaw
+# shadowed. Values stay at or below 1 so COLOR_0 remains a plain multiplier.
+SKIN_TONE = {'crew-engineer-standing': .62, 'crew-engineer-seated': 1.0}
+FACE_ZONES = [  # centre relative to the head (author frame), radius, RGB multiplier
+    ((.075, .05, -.02), .03, (1.0, .86, .82)), ((.075, -.05, -.02), .03, (1.0, .86, .82)),
+    ((.115, 0, -.015), .025, (1.0, .85, .82)), ((-.008, .095, -.012), .03, (1.0, .84, .80)),
+    ((-.008, -.095, -.012), .03, (1.0, .84, .80)), ((.092, 0, -.064), .018, (.72, .52, .52)),
+    ((.04, 0, -.15), .06, (.78, .76, .76)), ((.08, 0, .05), .035, (.97, .96, .95)),
+]
+
+
+def skin_tone(merged, head, scale):
+    hx, hy, hz = head
+    for ob in merged:
+        if ob.data.materials[0].name != 'skin':
+            continue
+        attr = ob.data.color_attributes['AO']
+        for v, c in zip(ob.data.vertices, attr.data):
+            # Merged meshes are laterally mirrored (author y -> -y); the zones are symmetric.
+            d = Vector((v.co.x - hx, -v.co.y - hy, v.co.z - hz))
+            rgb = [.92 * scale, .90 * scale, .90 * scale]
+            for centre, radius, tint in FACE_ZONES:
+                w = math.exp(-((d - Vector(centre)).length / radius) ** 2)
+                for i in range(3):
+                    rgb[i] *= 1 + (tint[i] - 1) * w
+            ao = c.color[0]
+            c.color = (ao * rgb[0], ao * rgb[1], ao * rgb[2], 1.0)
+
+
 specs = [
     ('armco-two', 4), ('armco-three', 4), ('concrete-wall', 4), ('tyre-wall', 4),
     ('absorber-block', 2), ('catch-fence', 4), ('grandstand', 10), ('grandstand-roof', 10),
@@ -649,7 +679,8 @@ for ident, module in specs:
             if lod == 0:
                 from crew import build as build_crew
                 pose = 'crouched' if 'crouched' in ident else 'seated' if 'seated' in ident else 'standing'
-                head_pos = build_crew(pose, mechanic, finish, cloth, fabric, rubber, skin, glass)
+                head_pos = build_crew(pose, mechanic, finish, cloth, fabric, rubber, skin, glass,
+                                      glasses=ident == 'crew-engineer-standing')
             elif 'crouched' in ident:
                 head_pos = person('crouched', 0, footwear=rubber, trousers=cloth)
             elif 'seated' in ident:
@@ -822,6 +853,8 @@ for ident, module in specs:
             bm.free()
             merged.append(ob)
         bake(merged, rays=8 if lod == 0 else 4, max_dist=.3, floor=.65)
+        if ident.startswith('crew-engineer'):
+            skin_tone(merged, head_pos, SKIN_TONE[ident])
         points = [v.co for ob in merged for v in ob.data.vertices]
         bounds = {
             'min': [min(p.x for p in points), min(p.z for p in points), min(-p.y for p in points)],
@@ -829,9 +862,15 @@ for ident, module in specs:
         }
         if 'seated' in ident:
             # Seat contact: the lowest point under the pelvis (thigh and seat undersides), measured
-            # from this LOD's geometry. Feet, shins and hands lie forward of |x| < 0.12.
+            # from this LOD's geometry. Feet, shins and hands lie forward of |x| < 0.12. Every LOD
+            # must agree with High, or the figure would pop on its seat at the LOD switch.
             under = [p.z for p in points if abs(p.x) < .12 and abs(p.y) < .16 and p.z > .3]
-            attachments.append({'name': 'seat', 'position': [0, round(min(under), 3), 0], 'front': '+X'})
+            seat = round(min(under), 3)
+            if lod == 0:
+                seat_high = seat
+            elif abs(seat - seat_high) > .006:
+                raise ValueError(f'{ident} LOD {lod} seat {seat} differs from High {seat_high}')
+            attachments.append({'name': 'seat', 'position': [0, seat, 0], 'front': '+X'})
         if lod == 0:
             entry['bounds'] = bounds
             entry['attachments'] = attachments

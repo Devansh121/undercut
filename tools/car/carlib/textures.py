@@ -45,7 +45,9 @@ def srgb_to_lin(c):
 # ---------------------------------------------------------------------------------------------
 # Carbon twill: 2x2 twill, four tows per repeat in each direction; the texture holds 2 repeats
 # ---------------------------------------------------------------------------------------------
-CARBON_TILE_M = 0.048  # one texture tile covers 48 mm (tows 6 mm wide)
+# 3K-class twill on visible parts has tows about 3 mm wide; the first build used 6 mm, which read
+# as coarse 12K cloth from the cockpit camera.
+CARBON_TILE_M = 0.024  # one texture tile covers 24 mm (tows 3 mm wide)
 
 
 def carbon(size=512):
@@ -74,6 +76,23 @@ def carbon(size=512):
     # back to sRGB-encoded values for a colour texture
     base = np.where(base <= 0.0031308, base * 12.92, 1.055 * np.power(base, 1 / 2.4) - 0.055)
     return normal, base
+
+
+def carbon_anisotropy(size=128):
+    """KHR_materials_anisotropy texture for the same twill: RG is the fibre direction in tangent
+    space (warp tows run along u, fill tows along v), B the strength, highest on each tow's crown
+    and falling off where it dives under its neighbour. Same tile and tow layout as carbon()."""
+    n_tows = 8
+    t = (np.arange(size) + 0.5) / size * n_tows
+    u, v = np.meshgrid(t, t)
+    iu, iv = np.floor(u).astype(int), np.floor(v).astype(int)
+    fu, fv = u - iu, v - iv
+    warp_on_top = ((iu + iv) // 2) % 2 == 0
+    crown = np.where(warp_on_top, np.sin(np.pi * fv), np.sin(np.pi * fu)) ** 0.5
+    r = np.where(warp_on_top, 1.0, 0.5)
+    g = np.where(warp_on_top, 0.5, 1.0)
+    b = 0.35 + 0.65 * crown
+    return np.stack([r, g, b], axis=2)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -204,6 +223,7 @@ def build_all(lod, tyre_profile_v):
     n, b = carbon(512 if big else 256)
     out["carbon_normal"] = to_image("carbon_normal", n, non_color=True)
     out["carbon_base"] = to_image("carbon_base", b)
+    out["carbon_aniso"] = to_image("carbon_aniso", carbon_anisotropy(128 if big else 64), non_color=True)
     rgb, nrm = tyre(tyre_profile_v, 2048 if big else 1024, 512 if big else 256)
     out["tyre_base"] = to_image("tyre_base", rgb)
     out["tyre_normal"] = to_image("tyre_normal", nrm, non_color=True)
