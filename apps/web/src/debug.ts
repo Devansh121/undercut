@@ -4,7 +4,8 @@
  * drive the game through it instead of timing key presses.
  *
  *   await __undercut.start()                 // launch screen -> Time Trial at Monza
- *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera
+ *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera,
+ *                                            // safety-net resets, barrier hits
  *   __undercut.telemetry()                   // CarTelemetry (SI units)
  *   __undercut.teleport(s, d?, kmh?)         // place the car on the lap; timing restarts
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
@@ -57,6 +58,8 @@ export interface DebugApi {
     aim?: { x: number; y: number; z: number },
   ): void;
   quality(): string;
+  /** Draw only the sky dome through one render path until cleared with null (RaceView.setSkyProbe). */
+  skyProbe(path: 'hdr' | 'direct' | null): void;
   setQuality(name: string): Promise<void>;
   /** World point at lap (s, d), height h above the ground, and the track edges there. */
   trackPoint(
@@ -139,6 +142,8 @@ export function installDebugApi(
       surface: s.surfaceUnderCar(),
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
+      safetyResets: s.safetyResets,
+      wallHits: s.wallHits,
       camera: d.view.cameraName,
       viewBuilds: d.viewBuilds,
       device: s.device,
@@ -197,6 +202,7 @@ export function installDebugApi(
     gridCars: (count) => need().gridCars(count),
     tvCamera: (x, y, z, fov, aim) => need().view.setTvCamera(x, y, z, fov, aim),
     quality: () => need().quality,
+    skyProbe: (path) => need().view.setSkyProbe(path),
     trackPoint: (s, d = 0, h = 0) => {
       const t = need().session.track;
       const p = { x: 0, y: 0, z: 0 };

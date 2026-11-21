@@ -14,6 +14,7 @@ import {
   Vector3,
   WebGLRenderer,
   type Material,
+  type ToneMapping,
 } from 'three';
 import type { CarPose } from '@undercut/sim';
 import type { Track } from '@undercut/track';
@@ -184,6 +185,7 @@ export class RaceView {
   private remoteKeys: string[] = [];
   private readonly contact: ContactShadows | null;
   private readonly pipeline: RenderPipeline;
+  private readonly toneMap: ToneMap;
   private readonly assets: SessionAssets;
   private readonly dynamic: DynamicResolution;
   private readonly gpu: GpuTimer;
@@ -340,7 +342,7 @@ export class RaceView {
       q,
       this.scene,
       this.camera,
-      options.toneMap ?? 'neutral',
+      (this.toneMap = options.toneMap ?? 'neutral'),
     );
     this.loadTimes = { environment: t1 - t0, track: t2 - t1, cars: performance.now() - t2 };
 
@@ -665,8 +667,82 @@ export class RaceView {
         ? speedBlur
         : 0;
     g.time = frame.time;
+    if (this.skyProbePath && this.skyProbeScene) {
+      const r = this.renderer;
+      if (this.skyProbePath === 'direct') {
+        r.toneMapping = NeutralToneMapping;
+        r.toneMappingExposure = g.exposure;
+        r.setRenderTarget(null);
+        r.render(this.skyProbeScene, this.camera);
+      } else if (this.skyProbePipeline) {
+        r.toneMapping = NoToneMapping;
+        const size = r.getDrawingBufferSize(new Vector2());
+        this.skyProbePipeline.setSize(size.x, size.y);
+        this.skyProbePipeline.render(this.skyProbeScene, this.camera, {
+          exposure: g.exposure,
+          speedBlur: 0,
+          time: 0,
+        });
+      }
+      this.gpu.end();
+      return;
+    }
     this.pipeline.render(this.scene, this.camera, g);
     this.gpu.end();
+  }
+
+  private skyProbePath: 'hdr' | 'direct' | null = null;
+  private skyProbeScene: Scene | null = null;
+  private skyProbePipeline: RenderPipeline | null = null;
+  private skyProbeSavedTone: { toneMapping: ToneMapping; exposure: number } | null = null;
+
+  /**
+   * Render-path check (tests): draw only the sky dome through one render path until cleared with
+   * `null`. 'direct' uses the renderer's tone map and sRGB output straight to the canvas; 'hdr'
+   * renders into a half-float target and through the final pass (no AO, bloom, grain or vignette).
+   * Reading the composited canvas avoids synchronous gl.readPixels stalls.
+   */
+  setSkyProbe(path: 'hdr' | 'direct' | null): void {
+    const r = this.renderer;
+    this.skyProbePipeline?.dispose();
+    this.skyProbePipeline = null;
+    this.skyProbeScene?.clear();
+    this.skyProbeScene = null;
+    if (path === null) {
+      this.skyProbePath = null;
+      if (this.skyProbeSavedTone) {
+        r.toneMapping = this.skyProbeSavedTone.toneMapping;
+        r.toneMappingExposure = this.skyProbeSavedTone.exposure;
+        this.skyProbeSavedTone = null;
+      }
+      return;
+    }
+    this.skyProbeSavedTone ??= {
+      toneMapping: r.toneMapping,
+      exposure: r.toneMappingExposure,
+    };
+    this.skyProbePath = path;
+    this.skyProbeScene = this.environment.skyOnlyScene();
+    if (path === 'hdr') {
+      const q: Quality = {
+        ...QUALITY.mobile,
+        post: true,
+        msaa: 0,
+        smaa: false,
+        ao: { ...QUALITY.mobile.ao, enabled: false },
+        bloom: { ...QUALITY.mobile.bloom, enabled: false },
+        grainVignette: false,
+        grain: 0,
+        speedBlur: false,
+      };
+      this.skyProbePipeline = new RenderPipeline(
+        r,
+        q,
+        this.skyProbeScene,
+        this.camera,
+        this.toneMap,
+      );
+    }
   }
 
   /** Estimated GPU memory of textures and targets in use, bytes (mipmaps counted as 4/3). */
@@ -730,6 +806,7 @@ export class RaceView {
     this.disposed = true;
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.observer.disconnect();
+    this.setSkyProbe(null);
     this.gpu.dispose();
     this.pipeline.dispose();
     this.trackView.dispose();

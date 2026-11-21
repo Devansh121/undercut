@@ -69,6 +69,7 @@ export class Hud {
   private readonly msgTag: Text;
   private readonly msgText: Text;
   private readonly invalidEl: HTMLElement;
+  private readonly invalidReason: Text;
   private readonly dot: SVGCircleElement;
   private readonly ghostDot: SVGCircleElement;
   private readonly othersLayer: SVGGElement;
@@ -110,7 +111,10 @@ export class Hud {
     const sw = el('div', 'hud-flag__sw');
     sw.append(icon('flag'));
     const ftxt = el('div', 'hud-flag__txt');
-    ftxt.append(el('strong', '', 'Lap invalid'), el('span', '', 'Track limits'));
+    const reason = el('span', '');
+    this.invalidReason = new Text(reason);
+    this.invalidReason.set('Track limits');
+    ftxt.append(el('strong', '', 'Lap invalid'), reason);
     this.invalidEl.append(sw, ftxt);
     this.invalidEl.dataset.testid = 'lap-invalid';
     this.msgEl = el('div', 'hud-msg');
@@ -241,6 +245,11 @@ export class Hud {
     cluster.append(drive);
 
     root.append(session, control, timing, map, cluster);
+  }
+
+  /** Why the running lap is invalid, shown in the flag while it is (track limits, a reset). */
+  setInvalidReason(text: string): void {
+    this.invalidReason.set(text);
   }
 
   update(h: HudState): void {
