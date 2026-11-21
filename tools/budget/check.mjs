@@ -76,12 +76,12 @@ await new Promise((resolve) => server.close(resolve));
 function sent(rel) {
   return sentCache.has(rel) ? sentCache.get(rel) : null;
 }
-// Build outputs the game loads: everything outside assets/{tex,env,car,draco} and the asset index,
-// except source maps, the input lab and the bundler's unused Draco decoder copies.
+// Build outputs the game loads: everything outside assets/{tex,env,car,draco,props} and the asset
+// index, except source maps, the input lab and the bundler's unused Draco decoder copies.
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
-    !/^assets\/(tex|env|car|draco)\//.test(f) &&
+    !/^assets\/(tex|env|car|draco|props)\//.test(f) &&
     f !== 'assets/index.json' &&
     !/input-?lab/i.test(f) &&
     !/^assets\/draco_(decoder|wasm_wrapper)-/.test(f),

@@ -101,13 +101,21 @@ window.inspect = async (id, mode) => {
     active[0].visible = true;
     active[1].visible = false;
     scene.add(car);
-    car.position.set(prop.bounds.max[0] + 3.5, 0, 0);
+    const cx = prop.bounds.max[0] + 3.6;
+    car.position.set(cx, 0, 0);
+    const combined = {
+      bounds: {
+        min: [Math.min(prop.bounds.min[0], cx - 2.9), 0, Math.min(prop.bounds.min[2], -1.1)],
+        max: [
+          Math.max(prop.bounds.max[0], cx + 2.9),
+          Math.max(prop.bounds.max[1], 1.1),
+          Math.max(prop.bounds.max[2], 1.1),
+        ],
+      },
+    };
     renderer.setViewport(0, 0, 1600, 1000);
     renderer.setScissor(0, 0, 1600, 1000);
-    frame(prop, Math.PI / 4, 1.6);
-    camera.position.multiplyScalar(1.3);
-    camera.lookAt(at);
-    env.update(camera, at, true);
+    frame(combined, Math.PI / 4, 1.6);
     renderer.render(scene, camera);
   }
   renderer.setScissorTest(false);
