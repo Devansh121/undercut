@@ -139,19 +139,24 @@ per-tick path uses reused buffers and passes no loose numbers into calls that mi
 `AiController` wraps a racing driver from `packages/ai` (the reference driver on the circuit's
 racing line) with what a lap driver does not do: it holds the car on the grid, goes at lights
 out after its reaction time and launches with wheelspin control until it is past 25 m/s and its
-racing driver asks for full throttle, lifts (throttle at most 0.85) while shown a blue flag, and
+racing driver asks for full throttle, lifts (throttle at most 0.85) while shown a blue flag (its racing driver also moves off line to
+the side away from the car lapping it), and
 drives the pit lane: when asked in it turns for the pit lane 120 m before it leaves the lap,
 follows the lane at the limit (reaching it 15 m before the first line, 0.8 m/s under), stops in
-its box, waits while held and drives out to the track. The pit-lane driving is a plain path
+its box, waits while held and drives out to the track, where its racing driver takes over as the
+car leaves the pit-lane surface and rejoins off line while the traffic passes. A car knocked off
+its path short of its box (stopped 3 s, not held) gives the stop up, drives out and comes in
+again next lap. The pit-lane driving is a plain path
 follower (`PathFollower` in `packages/ai`); a player can have the same as an assist.
 
 ## Known gaps
 
-- Cars do not touch each other (no contact in the sim) and the AI has no racecraft: in a race
-  they drive through each other as ghosts. In the 20-car, 5-lap acceptance run all 20 converge
-  on the racing line into the first chicane: 38 car pairs overlap on lap 1, at most 30 at once,
-  and the order after lap 1 is the grid order. The racecraft slice must give the AI a sense of
-  the cars around it (keep a lane, brake for the car ahead, pick a gap) before contact is on.
+- Cars touch (car-to-car contact in the sim, planar boxes, no damage yet) and the AI races with the
+  racing driver of `packages/ai` (gap keeping, lanes, passing, blue flags, spin recovery). There is
+  no slipstream or dirty air yet, so passes come from pace differences and DRS; no active defending
+  (one move) yet. In the 20-car, 5-lap proof at Monza with one stop per car (seeds 1, 2, 3, 4, 17,
+  404): no watchdog findings, 18 to 20 of 20 clean through turn one, longest contact under 2 s,
+  6 to 13 on-track position changes per race.
 - Pit loss at Monza comes out at about 33.2 s against the published 24.3 s (physics-validation
   4.5). Most of it is the track file's speed-limit lines, 511 m apart (110 m from each end of the
   OpenStreetMap pit way), so about 23 s at 80 km/h; the follower's conservative approach and stop
