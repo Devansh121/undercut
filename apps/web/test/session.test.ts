@@ -1,4 +1,5 @@
 import { NEUTRAL_INPUT, SurfaceKind, type ControlInput } from '@undercut/sim';
+import { circuitInfo } from '@undercut/race';
 import { createGround, createVec3 } from '@undercut/track';
 import { describe, expect, it } from 'vitest';
 import { assistsFor } from '../src/game/assists';
@@ -8,6 +9,8 @@ import { loadMonza } from './fixtures';
 
 const track = loadMonza();
 const STEP = 1 / 240;
+/** Monza's timing (control) line: laps and sectors run from here, not from s = 0. */
+const TIMING_LINE = circuitInfo(track).timingLine;
 
 /** A driver that holds one ControlInput and can raise one-shot actions. */
 class Scripted implements ControlSource {
@@ -68,14 +71,15 @@ function findGravel(): { s: number; d: number } {
 }
 
 describe('GameLoop and DriveSession', () => {
-  it('starts rolling on the grid behind the line, before the first timed lap', () => {
+  it('starts rolling before the timing line, before the first timed lap', () => {
     const { session } = setup();
     expect(session.phase).toBe('running');
     expect(session.timer.running).toBe(false);
     const t = session.readTelemetry();
     expect(t.speed).toBeGreaterThan(30);
-    expect(track.lapDelta(session.s, 0)).toBeGreaterThan(100);
-    expect(track.lapDelta(session.s, 0)).toBeLessThan(200);
+    expect(TIMING_LINE).toBeCloseTo(5472.5, 6);
+    expect(track.lapDelta(session.s, TIMING_LINE)).toBeGreaterThan(100);
+    expect(track.lapDelta(session.s, TIMING_LINE)).toBeLessThan(200);
   });
 
   it('samples input exactly once per sim tick', () => {
@@ -188,7 +192,9 @@ describe('GameLoop and DriveSession', () => {
   it('invalidates the running lap on a reset and on four wheels off', () => {
     const { loop, driver, session } = setup();
     driver.control.throttle = 1;
-    run(loop, 4);
+    // Just before the timing line, so a lap is running and valid with the wheel held straight.
+    session.teleport(TIMING_LINE - 20, 0, 60);
+    run(loop, 1);
     expect(session.timer.running).toBe(true);
     expect(session.timer.valid).toBe(true);
     const events = loop.resetToTrack();
@@ -205,7 +211,7 @@ describe('GameLoop and DriveSession', () => {
     loop.restartLap();
     expect(session.phase).toBe('running');
     expect(session.timer.running).toBe(false);
-    expect(track.lapDelta(session.s, 0)).toBeGreaterThan(100);
+    expect(track.lapDelta(session.s, TIMING_LINE)).toBeGreaterThan(100);
   });
 
   it('opens DRS only inside a DRS zone', () => {

@@ -15,6 +15,7 @@ export default defineConfig({
             '**/node_modules/**',
             'packages/sim/validation/**',
             'packages/ai/validation/**',
+            'packages/race/validation/**',
             '**/*.runtime.test.*',
           ],
         },
@@ -23,7 +24,11 @@ export default defineConfig({
         test: {
           name: 'physics',
           environment: 'node',
-          include: ['packages/sim/validation/**/*.test.ts', 'packages/ai/validation/**/*.test.ts'],
+          include: [
+            'packages/sim/validation/**/*.test.ts',
+            'packages/ai/validation/**/*.test.ts',
+            'packages/race/validation/**/*.test.ts',
+          ],
           exclude: ['**/node_modules/**', '**/*.soak.test.ts'],
         },
       },
