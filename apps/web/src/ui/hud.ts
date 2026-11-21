@@ -354,6 +354,11 @@ export class Hud {
     this.root.hidden = !on;
   }
 
+  /** Why the running lap is invalid, shown in the flag while it is (track limits, a reset). */
+  setInvalidReason(text: string): void {
+    this.invalidReason.set(text);
+  }
+
   update(h: HudState): void {
     const t = this.t;
     t.circuit?.set(h.circuit);
