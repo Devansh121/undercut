@@ -293,9 +293,14 @@ test.describe('drive', () => {
           },
           [camera, at] as const,
         );
-        // Cameras settle on real time; wait for the framing to converge. A busy runner can
-        // stall the page's frames, so also wait until 30 frames have been drawn since the switch.
-        await page.evaluate(() => window.__undercut?.resetFrameTimes());
+        // Let the car run briefly, then freeze the sim: the cameras settle on real time, and a
+        // busy runner can stall the page's frames, so wait for 30 drawn frames as well as the
+        // settle time, on a scene that does not move meanwhile.
+        await page.waitForTimeout(500);
+        await page.evaluate(() => {
+          window.__undercut?.setTimeScale(0);
+          window.__undercut?.resetFrameTimes();
+        });
         await page.waitForTimeout(1500);
         await page.waitForFunction(
           () => (window.__undercut?.frameTimes().length ?? 0) >= 30,

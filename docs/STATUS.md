@@ -40,6 +40,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
 - Physics: the reference controller laps Monza in 1:24.969; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The quasi-steady full-envelope profile on its line predicts 1:23.4, so the gap is mostly car, line and track model, not driving. It is recorded in `docs/physics-validation.md` section 7.6 and pinned by a test, not hidden.
 - Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
 - Sound: measured, never heard. The listening queue is in `docs/audio.md`.
