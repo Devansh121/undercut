@@ -70,3 +70,7 @@ Built by `npm run assets:build` (`tools/assets/build_textures.py`): resized and 
 | Kloppenheim 07 (Pure Sky) | Night time of day | Greg Zaal and Jarod Guest, Poly Haven | https://polyhaven.com/a/kloppenheim_07_puresky |
 
 Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Creative Commons CC0 1.0 Universal License.
+
+### Car
+
+The car (`apps/web/public/assets/car/`: three GLB levels of detail, ten team livery masks and the livery index) is generated from nothing by the repository's own scripts in `tools/car/` (`npm run car:build`) and is under the same MIT licence as the code. Its textures (carbon twill, bodywork panel detail, tyre sidewall with an invented maker's mark and compound ticks, brake-disc glow) are drawn procedurally; no third-party image or model is used. The build runs [Blender](https://www.blender.org/) 5.2 LTS (GPL-2.0-or-later) as a tool; Blender is not shipped. The studio lighting in the committed Blender reference renders is Poly Haven's `studio_small_09` HDRI (CC0), used for lighting only and not committed.

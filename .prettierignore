@@ -16,3 +16,6 @@ packages/track/data/*.json
 packages/ai/data/*.json
 # The asset index is written byte for byte by tools/assets/build_textures.py (its sha256 is in the manifest).
 apps/web/public/assets/index.json
+# Generated car assets and their stats are written byte for byte by tools/car.
+apps/web/public/assets/car/
+docs/evidence/m2-car/stats.json

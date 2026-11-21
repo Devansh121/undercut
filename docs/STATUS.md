@@ -92,6 +92,12 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Records and ghosts persist in Web Storage until IndexedDB lands in M6; when storage is blocked or full they last for the session and the HUD says so.
 - Engine load sent to the audio engine is the throttle the car applies (after traction control), not a torque ratio; turbo demand is that load times an engine-speed ramp from 6000 to 10 500 rpm; kerb rumble assumes ridges 0.25 m apart; plank scrape starts below 2 mm of floor height. All estimates, to be tuned by ear.
 - Default volumes: master 80 %, engine 100 %, effects 80 %.
+- Car geometry compressed with Draco, not meshopt (Blender writes Draco natively); car textures are WebP, not KTX2, until the client has a Basis transcoder path (ADR 0005).
+- Livery by texture masks in a shared atlas (R secondary, G accent, B bare carbon), not vertex colours, so thin pin lines stay sharp; one designed mask per team (ADR 0005).
+- Two livery patterns were reshaped after a lookalike check: the diagonal split now has the primary colour forward, and the sidepod block is a flank panel only.
+- Tyre compounds use an invented scheme (`design/compounds.json`): soft magenta with three ticks, medium orange with two, hard steel blue with one; the maker's mark appears once per sidewall. The HUD mock tokens follow it.
+- Car suspension links are one mesh with morph targets (bump per corner, steer per front corner) rather than one rotating node per link, to keep draw calls near 40 on High.
+- The far car LOD has no suspension links, uprights or decals; it is 10.6k triangles against the 12k budget.
 
 ## Optional, needs you
 
