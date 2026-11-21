@@ -88,6 +88,8 @@ export interface DriveOptions {
   onQuit(): void;
   /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
+  /** A short note for the pause menu about sound ('' when sound works). */
+  soundNote?: () => string;
   /** Session lifecycle and volumes for the page's audio engine; absent for no audio. */
   audio?: DriveAudio;
 }
@@ -115,6 +117,11 @@ export interface DriveHandle {
   quit(): void;
   /** Start-up phase times, ms. */
   loadTimes(): Record<string, number>;
+  /**
+   * Back to a known state without reloading, for tests that share one session: running,
+   * player's devices, real time, near chase, rolling start, no strip or message showing.
+   */
+  resetForTest(): void;
 }
 
 export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
@@ -233,7 +240,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
     ],
     () =>
-      `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}`,
+      `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}${o.soundNote?.() ? ` · ${o.soundNote()}` : ''}`,
     o.audio
       ? (
           [
@@ -601,5 +608,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     },
     quit,
     loadTimes: () => ({ ...loadTimes }),
+    resetForTest: () => {
+      // Drop any key or touch press that arrived after the previous test's last frame.
+      input.setContext('menu');
+      input.releaseAll();
+      input.sample(0, 0);
+      if (session.phase === 'paused') resume();
+      setSource('human');
+      loop.timeScale = 1;
+      view.setCamera('chase-near');
+      actions.restartLap();
+      results.hide();
+      message = null;
+    },
   };
 }

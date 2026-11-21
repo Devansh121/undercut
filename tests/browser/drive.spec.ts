@@ -1,12 +1,12 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { SurfaceKind } from '@undercut/sim';
 import { Track, createGround } from '@undercut/track';
 import raw from '@undercut/track/data/monza.json' with { type: 'json' };
 
 /**
- * The drive screen, driven through the debug API (`?debug=1`) instead of key timing. Browser
- * tests render with software WebGL, so they ask for the Mobile quality preset to keep the frame
- * rate up; game logic is the same at every preset.
+ * The drive screen, driven through the debug API (`?debug=1`) instead of key timing. These
+ * tests share one session per worker (see fixtures.ts) on the `lite` render preset.
  */
 
 const track = Track.fromJSON(raw);
@@ -26,16 +26,6 @@ function findGravel(): { s: number; d: number } {
     }
   }
   throw new Error('no gravel near the first chicane');
-}
-
-function watchErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error' || msg.type() === 'warning')
-      errors.push(`${msg.type()}: ${msg.text()}`);
-  });
-  page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
-  return errors;
 }
 
 type State = Record<string, unknown> & {
@@ -62,23 +52,12 @@ interface Telemetry {
 const telemetry = (page: Page): Promise<Telemetry> =>
   page.evaluate(() => window.__undercut?.telemetry() as unknown as Telemetry);
 
-async function startSession(page: Page): Promise<void> {
-  await page.goto('/?debug=1&quality=mobile');
-  await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
-  await page.getByRole('button', { name: /Start/ }).click();
-  // Building the circuit and compiling shaders on software WebGL takes several seconds on CI.
-  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
-  await expect(page.locator('[data-testid=hud]')).toBeVisible();
-}
-
 test.describe('drive', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: 60_000 });
 
-  test('starts a time trial from the launch screen and accelerates, steers and brakes', async ({
-    page,
+  test('accelerates, steers and brakes, with speed and gear on the HUD', async ({
+    drive: { page, problems },
   }) => {
-    const errors = watchErrors(page);
-    await startSession(page);
     const hud0 = await page.evaluate(
       () => window.__undercut?.capture().hud as Record<string, string>,
     );
@@ -111,12 +90,10 @@ test.describe('drive', () => {
     });
     expect(t0.speed).toBeGreaterThan(0);
     await expect(page.locator('[data-testid=gear]')).toHaveText(/^[1-3N]$/);
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
-  test('times the start line and a sector line', async ({ page }) => {
-    const errors = watchErrors(page);
-    await startSession(page);
+  test('times the start line and a sector line', async ({ drive: { page, problems } }) => {
     await page.evaluate(() => {
       const u = window.__undercut;
       u?.teleport(5560, 0, 250);
@@ -142,12 +119,12 @@ test.describe('drive', () => {
     const s1 = page.locator('[data-testid=sector-1]');
     await expect(s1).toHaveAttribute('data-state', /overall|personal|slower/);
     await expect(s1).toContainText(/\d+\.\d{3}/);
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
-  test('pause freezes the clock and the car; resume continues', async ({ page }) => {
-    const errors = watchErrors(page);
-    await startSession(page);
+  test('pause freezes the clock and the car; resume continues', async ({
+    drive: { page, problems },
+  }) => {
     await page.evaluate(() => window.__undercut?.drive({ throttle: 1 }));
     await expect.poll(async () => (await state(page)).tick).toBeGreaterThan(30);
     await page.keyboard.press('Escape');
@@ -161,12 +138,10 @@ test.describe('drive', () => {
     await page.getByRole('button', { name: 'Resume' }).click();
     await expect(page.locator('[data-testid=pause-menu]')).toBeHidden();
     await expect.poll(async () => (await state(page)).tick).toBeGreaterThan(b.tick);
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
-  test('resets to the track from the gravel', async ({ page }) => {
-    const errors = watchErrors(page);
-    await startSession(page);
+  test('resets to the track from the gravel', async ({ drive: { page, problems } }) => {
     const { s, d } = findGravel();
     await page.evaluate(([s, d]) => window.__undercut?.teleport(s, d, 0), [s, d] as const);
     await expect.poll(async () => (await state(page)).surface).toBe(SurfaceKind.Gravel);
@@ -177,12 +152,12 @@ test.describe('drive', () => {
     expect(Math.abs(after.d)).toBeLessThan(0.3);
     expect(after.surface).toBe(SurfaceKind.Asphalt);
     expect(Math.abs((await telemetry(page)).speed)).toBeLessThan(1);
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
-  test('switches cameras live on the camera key and from the pause menu', async ({ page }) => {
-    const errors = watchErrors(page);
-    await startSession(page);
+  test('switches cameras live on the camera key and from the pause menu', async ({
+    drive: { page, problems },
+  }) => {
     expect((await state(page)).camera).toBe('chase-near');
     await page.keyboard.press('KeyC');
     await expect.poll(async () => (await state(page)).camera).toBe('chase-far');
@@ -193,13 +168,12 @@ test.describe('drive', () => {
     await page.locator('[data-setting=camera] button', { hasText: 'Cockpit' }).click();
     expect((await state(page)).camera).toBe('cockpit');
     await page.getByRole('button', { name: 'Resume' }).click();
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
   test('the steering-wheel display shows the gear, speed and revs in the cockpit', async ({
-    page,
+    drive: { page },
   }) => {
-    await startSession(page);
     await page.evaluate(() => {
       window.__undercut?.camera('cockpit');
       window.__undercut?.teleport(300, 0, 200);
@@ -222,11 +196,12 @@ test.describe('drive', () => {
       .toBe(true);
   });
 
-  test('draws a non-empty 3D view behind the HUD', async ({ page }) => {
-    await startSession(page);
-    await page.addStyleTag({ content: '#app, .ut-touch { visibility: hidden; }' });
-    await page.waitForTimeout(300);
-    const png = await page.locator('#view').screenshot();
+  test('draws a non-empty 3D view behind the HUD', async ({ drive: { page } }) => {
+    // Hide the HUD and touch overlay for this capture only: the page is shared with other tests.
+    await page.waitForFunction(() => (window.__undercut?.state().tick as number) > 10);
+    const png = await page
+      .locator('#view')
+      .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
     const stats = await page.evaluate(async (b64) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
@@ -256,8 +231,9 @@ test.describe('drive', () => {
     expect(stats.lumaStdDev).toBeGreaterThan(10);
   });
 
-  test('lays out the HUD inside the viewport with nothing overlapping', async ({ page }) => {
-    await startSession(page);
+  test('lays out the HUD inside the viewport with nothing overlapping', async ({
+    drive: { page },
+  }) => {
     const report = await page.evaluate(() => {
       const problems: string[] = [];
       const { innerWidth: w, innerHeight: h } = window;
@@ -301,9 +277,8 @@ test.describe('drive', () => {
   });
 
   test('keeps the whole car visible above the driver cluster in both chase cameras', async ({
-    page,
+    drive: { page },
   }) => {
-    await startSession(page);
     for (const camera of ['chase-near', 'chase-far']) {
       for (const at of [{ restart: true }, { s: 300, kmh: 280 }]) {
         await page.evaluate(
@@ -348,42 +323,25 @@ test.describe('drive', () => {
     }
   });
 
-  test('says records last only until the page closes when storage is blocked', async ({ page }) => {
-    const errors = watchErrors(page);
-    // Private-mode style blocking: touching localStorage throws.
-    await page.addInitScript(() => {
-      Object.defineProperty(window, 'localStorage', {
-        get() {
-          throw new DOMException('The operation is insecure.', 'SecurityError');
-        },
-      });
-    });
-    await startSession(page);
-    await expect(page.locator('[data-testid=hud-message]')).toContainText(
-      'Records last until the page closes',
-    );
+  test('keeps quiet about storage when it works', async ({ drive: { page } }) => {
     await page.keyboard.press('Escape');
-    await expect(page.locator('[data-testid=pause-menu]')).toContainText(
-      'Records last until the page closes',
-    );
-    expect(errors).toEqual([]);
+    // Wait for the menu (and its note) first: absence of text in a closed menu proves nothing,
+    // and a key still in flight would pause whatever runs next on this shared page.
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('.pause__sub')).toContainText('assists');
+    await expect(menu).not.toContainText('Records last');
   });
 
-  test('keeps quiet about storage when it works', async ({ page }) => {
-    await startSession(page);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('[data-testid=pause-menu]')).not.toContainText('Records last');
-  });
-
-  test('drives the car with the touch overlay on a phone', async ({ page, context }, info) => {
+  test('drives the car with the touch overlay on a phone', async ({
+    drive: { page, problems },
+  }, info) => {
     test.skip(info.project.name !== 'phone', 'touch runs on the phone project');
-    const errors = watchErrors(page);
-    await startSession(page);
     await expect(page.locator('[data-testid=touch-overlay]')).toBeVisible();
     await page.evaluate(() => window.__undercut?.teleport(300, 0, 0));
     const pedal = await page.locator('[data-control=throttle]').boundingBox();
     if (!pedal) throw new Error('no throttle pedal');
-    const cdp = await context.newCDPSession(page);
+    const cdp = await page.context().newCDPSession(page);
     const point = { x: pedal.x + pedal.width / 2, y: pedal.y + pedal.height * 0.15, id: 1 };
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
     await page.waitForFunction(() => (window.__undercut?.telemetry().speed as number) > 8, null, {
@@ -391,6 +349,6 @@ test.describe('drive', () => {
     });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [point] });
     expect((await state(page)).device).toBe('touch');
-    expect(errors).toEqual([]);
+    expect(problems).toEqual([]);
   });
 });

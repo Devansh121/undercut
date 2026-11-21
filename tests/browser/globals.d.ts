@@ -15,6 +15,9 @@ interface UndercutDebugApi {
   capture(): Record<string, unknown>;
   frameTimes(): number[];
   quit(): void;
+  resetForTest(): void;
+  loadTimes(): Record<string, number>;
+  audioCapability(): { supported: boolean; fallback: string | null };
   /** Audio engine status, or 'none' before it is created. */
   audioStatus(): string;
   /** What the steering-wheel display last drew, or null before the cockpit was shown. */

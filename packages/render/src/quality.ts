@@ -1,5 +1,9 @@
-/** Render quality presets. High targets a laptop GPU at 1080p; Mobile a recent phone. */
-export type QualityName = 'high' | 'mobile';
+/**
+ * Render quality presets. High targets a laptop GPU at 1080p; Mobile a recent phone. Lite is
+ * for automated browser tests on software WebGL only: a small canvas, no shadow map and no
+ * environment prefilter. Scene, cameras and logic are identical; only pixels are cut.
+ */
+export type QualityName = 'high' | 'mobile' | 'lite';
 
 export interface Quality {
   readonly name: QualityName;
@@ -7,10 +11,10 @@ export interface Quality {
   readonly pixelRatioCap: number;
   /** Multisample anti-aliasing on the default framebuffer. */
   readonly antialias: boolean;
-  /** Sun shadow map size, texels, and the half-size of the fitted shadow box, m. */
+  /** Sun shadow map size, texels (0: no shadows), and the half-size of the fitted box, m. */
   readonly shadowMapSize: number;
   readonly shadowExtent: number;
-  /** Prefiltered environment cube size from the sky. */
+  /** Prefiltered environment cube size from the sky (0: no environment map, more sky fill). */
   readonly envSize: number;
   /** Track mesh level of detail (see MESH_LOD in @undercut/track). */
   readonly meshLod: 'high' | 'mobile';
@@ -51,6 +55,20 @@ export const QUALITY: Readonly<Record<QualityName, Quality>> = Object.freeze({
     clearcoat: false,
     textureSize: 256,
     anisotropy: 4,
+    sceneryShadows: false,
+    clouds: false,
+  }),
+  lite: Object.freeze({
+    name: 'lite',
+    pixelRatioCap: 0.4,
+    antialias: false,
+    shadowMapSize: 0,
+    shadowExtent: 30,
+    envSize: 0,
+    meshLod: 'mobile',
+    clearcoat: false,
+    textureSize: 128,
+    anisotropy: 1,
     sceneryShadows: false,
     clouds: false,
   }),

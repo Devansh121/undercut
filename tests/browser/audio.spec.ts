@@ -1,43 +1,50 @@
 import { expect, test } from '@playwright/test';
+import { coldStart, watchProblems } from './helpers';
 
-/** The player's car drives the audio engine: it starts on the Start click and follows pause. */
-test('the engine sound starts on the Start click and suspends on pause', async ({ page }) => {
-  const problems: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error' || msg.type() === 'warning')
-      problems.push(`${msg.type()}: ${msg.text()}`);
-  });
-  page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-  await page.goto('/?debug=1&quality=mobile');
-  await page.waitForFunction(() => Boolean(window.__undercut));
-  expect(await page.evaluate(() => window.__undercut?.audioStatus())).toBe('none');
-
-  // A real click: browsers only let audio start from a user gesture.
-  await page.getByRole('button', { name: /Start/ }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
-  await expect
-    .poll(() => page.evaluate(() => window.__undercut?.audioStatus()), { timeout: 15_000 })
-    .toBe('running');
+/**
+ * The player's car drives the audio engine: it starts on the Start click (a real gesture) and
+ * follows pause. Where the browser cannot run the audio worklet (no AudioWorklet, for example
+ * an insecure context), the documented behaviour is a clean silent fallback; the page reports
+ * which applies and the test checks that, whichever it is.
+ */
+test('engine sound starts on the Start click, suspends on pause, and keeps its volumes', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const problems = watchProblems(page);
+  await coldStart(page, 'lite');
+  const capability = await page.evaluate(() => window.__undercut?.audioCapability());
+  const status = (): Promise<string | undefined> =>
+    page.evaluate(() => window.__undercut?.audioStatus());
+  if (capability?.supported) {
+    await expect.poll(status, { timeout: 15_000 }).toBe('running');
+  } else {
+    await expect.poll(status, { timeout: 15_000 }).toBe('silent');
+  }
 
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid=pause-menu]')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__undercut?.audioStatus())).toBe('suspended');
+  if (capability?.supported) {
+    await expect.poll(status).toBe('suspended');
+  } else {
+    await expect(page.locator('[data-testid=pause-menu]')).toContainText(
+      'No sound in this browser',
+    );
+  }
 
-  // The volume sliders are in the pause menu and keep their values across a reload.
+  // Volume sliders in the pause menu; the value is saved with the settings.
   const engine = page.locator('[data-slider=engine] input');
   await engine.focus();
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('[data-slider=engine] output')).toHaveText('80%');
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('settings.audio') ?? '{}').engine),
+    )
+    .toBeCloseTo(0.8, 6);
 
   await page.getByRole('button', { name: 'Resume' }).click();
-  await expect.poll(() => page.evaluate(() => window.__undercut?.audioStatus())).toBe('running');
-
-  await page.reload();
-  await page.waitForFunction(() => Boolean(window.__undercut));
-  await page.getByRole('button', { name: /Start/ }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
-  await page.keyboard.press('Escape');
-  await expect(page.locator('[data-slider=engine] output')).toHaveText('80%');
+  if (capability?.supported) await expect.poll(status).toBe('running');
   expect(problems).toEqual([]);
 });

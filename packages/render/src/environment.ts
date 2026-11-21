@@ -96,7 +96,7 @@ export class Environment {
     scene.add(this.sky);
 
     this.sun = new DirectionalLight(preset.sunColour, preset.sunIntensity);
-    this.sun.castShadow = true;
+    this.sun.castShadow = quality.shadowMapSize > 0;
     const cam = this.sun.shadow.camera;
     const e = quality.shadowExtent;
     cam.left = -e;
@@ -105,7 +105,10 @@ export class Environment {
     cam.bottom = -e;
     cam.near = 1;
     cam.far = 600;
-    this.sun.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
+    this.sun.shadow.mapSize.set(
+      Math.max(1, quality.shadowMapSize),
+      Math.max(1, quality.shadowMapSize),
+    );
     // Normal offset beats depth bias on thin parts (wings, halo) without peter-panning the car.
     this.sun.shadow.bias = -0.0002;
     this.sun.shadow.normalBias = 0.03;
@@ -114,7 +117,9 @@ export class Environment {
     scene.add(this.sun, this.target);
 
     // Bounce from the parkland below, sky above; the environment map does most of the work.
-    this.fill = new HemisphereLight('#d9e0e4', '#5a5f3e', preset.fill);
+    // Without an environment map the sky's light comes from the hemisphere fill alone.
+    const fill = quality.envSize > 0 ? preset.fill : preset.fill + preset.envIntensity * 1.6;
+    this.fill = new HemisphereLight('#d9e0e4', '#5a5f3e', fill);
     scene.add(this.fill);
 
     scene.fog = new FogExp2(new Color(preset.fogColour), preset.fogDensity);
@@ -122,6 +127,7 @@ export class Environment {
 
   /** Prefilter the sky into the scene's environment map. Call once after construction. */
   bakeEnvironment(renderer: WebGLRenderer, scene: Scene): void {
+    if (this.quality.envSize <= 0) return;
     const pmrem = new PMREMGenerator(renderer);
     const skyScene = new Scene();
     // A temporary sky sharing the live sky's uniforms, with the sun disc hidden so the disc does
@@ -150,7 +156,7 @@ export class Environment {
   /** Centre the shadow box on `focus`, snapped to whole shadow texels so edges do not crawl. */
   follow(focus: Vector3): void {
     const e = this.quality.shadowExtent;
-    const texel = (2 * e) / this.quality.shadowMapSize;
+    const texel = (2 * e) / Math.max(1, this.quality.shadowMapSize);
     // Snap in the light's view plane: build its basis and quantise the focus along it.
     const dir = this.sunDirection;
     const right = new Vector3(0, 1, 0).cross(dir).normalize();

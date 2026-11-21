@@ -7,7 +7,9 @@ import { expect, test } from '@playwright/test';
  */
 test('starting and quitting five sessions on one page leaks nothing and warns about nothing', async ({
   page,
-}) => {
+}, info) => {
+  // The renderer's lifetime does not depend on the viewport: one project covers it.
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
   test.setTimeout(240_000);
   const problems: string[] = [];
   page.on('console', (msg) => {

@@ -38,10 +38,14 @@ export interface DebugApi {
   renderStats(): Record<string, unknown>;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
+  /** Known state without a reload, for tests sharing one session. */
+  resetForTest(): void;
   /** Start-up phase times of the current session, ms. */
   loadTimes(): Record<string, number>;
   /** Audio engine status ('none' before the first gesture creates it). */
   audioStatus(): string;
+  /** Can this browser run the audio worklet, and why sound fell back to silent if it did. */
+  audioCapability(): { supported: boolean; fallback: string | null };
   /** What the steering-wheel display last drew (cockpit camera), or null. */
   dashboard(): { gear: string; speed: string; revs: number } | null;
   /** The player's car's projected bounding box, CSS px. */
@@ -67,6 +71,7 @@ export function installDebugApi(
   start: () => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   audioStatus: () => string,
+  audioCapability: () => { supported: boolean; fallback: string | null },
 ): void {
   const need = (): DriveHandle => {
     const d = getDrive();
@@ -145,7 +150,9 @@ export function installDebugApi(
     dashboard: () => need().view.dashboard,
     rendererInfo,
     loadTimes: () => need().loadTimes(),
+    resetForTest: () => need().resetForTest(),
     audioStatus,
+    audioCapability,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),
   };

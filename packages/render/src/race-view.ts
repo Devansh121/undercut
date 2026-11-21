@@ -30,7 +30,7 @@ export function createRenderer(canvas: HTMLCanvasElement, quality: QualityName):
   });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = QUALITY[quality].shadowMapSize > 0;
   renderer.shadowMap.type = PCFShadowMap;
   return renderer;
 }

@@ -13,6 +13,7 @@ export class PageAudio {
   private engine: AudioEngine | null = null;
   private gestured = false;
   private active = false;
+  private fallback: string | null = null;
   readonly settings: AudioSettingsStore;
 
   constructor(storage: StoragePort, win: Window = window) {
@@ -23,6 +24,19 @@ export class PageAudio {
     for (const type of ['pointerdown', 'keydown', 'touchstart'] as const) {
       win.addEventListener(type, onGesture, { capture: true, passive: true });
     }
+  }
+
+  /**
+   * Whether this browser can run the audio worklet at all. AudioWorklet exists only in secure
+   * contexts (HTTPS or localhost); elsewhere the engine falls back to silent.
+   */
+  static get supported(): boolean {
+    return typeof AudioWorkletNode === 'function' && typeof AudioContext === 'function';
+  }
+
+  /** Why the engine went silent, or null. */
+  get fallbackReason(): string | null {
+    return this.fallback;
   }
 
   /** Engine status, or 'none' before the engine exists. */
@@ -62,7 +76,13 @@ export class PageAudio {
 
   private play(): void {
     // Created inside the gesture's call stack, so the AudioContext may start.
-    this.engine ??= createAudioEngine();
+    // A browser without the worklet is not an error: the game runs silent and the pause menu
+    // says so, without a console warning.
+    this.engine ??= createAudioEngine({
+      onFallback: (reason) => {
+        this.fallback = reason;
+      },
+    });
     this.applyVolumes();
     void this.engine.resume();
   }

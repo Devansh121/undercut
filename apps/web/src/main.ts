@@ -45,7 +45,7 @@ input.setContext('menu');
 
 function chooseQuality(): QualityName {
   const asked = params.get('quality');
-  if (asked === 'high' || asked === 'mobile') return asked;
+  if (asked === 'high' || asked === 'mobile' || asked === 'lite') return asked;
   return touch || Math.min(window.innerWidth, window.innerHeight) < 600 ? 'mobile' : 'high';
 }
 
@@ -104,6 +104,7 @@ async function start(): Promise<DriveHandle> {
         records,
         audio,
         onCarAudioState: audio.sink,
+        soundNote: () => (audio.status === 'silent' ? 'No sound in this browser' : ''),
         quality: chooseQuality(),
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
@@ -131,5 +132,6 @@ if (debugEnabled()) {
     start,
     () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
     () => audio.status,
+    () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),
   );
 }
