@@ -212,7 +212,9 @@ describe('GameLoop and DriveSession', () => {
     const { loop, driver, session } = setup();
     driver.control.drs = true;
     driver.control.throttle = 1;
-    // The main straight before the line is not a DRS zone at Monza (the zone starts at 12 m).
+    // Curva Biassono is outside both DRS zones at Monza. (The main-straight zone opens 12 m
+    // after the timing line, 320.5 m before the start line, so the rolling start is inside it.)
+    session.teleport(1108, 0, 80);
     run(loop, 0.5);
     expect(session.drsAvailable).toBe(false);
     expect(session.car.input.drs).toBe(false);
