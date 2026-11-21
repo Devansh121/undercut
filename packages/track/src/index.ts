@@ -46,3 +46,11 @@ export interface TrackCoord {
   s: number;
   d: number;
 }
+export {
+  MESH_LOD,
+  MeshSurface,
+  buildTrackMeshes,
+  type MeshData,
+  type TrackMeshOptions,
+  type TrackMeshes,
+} from './mesh';

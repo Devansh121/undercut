@@ -176,6 +176,11 @@ export class Track {
   readonly barriers: readonly Barrier[];
   /** White-line outer edges (track limits) as closed x, z polylines, one point per sample. */
   readonly trackLimits: readonly [Float64Array, Float64Array];
+  /**
+   * Per side and sample, how far out the (s, d) frame stays one-to-one: short of the centre of
+   * curvature of any bend on that side within 24 m. Meshes stop there.
+   */
+  readonly frameLimit: readonly [Float64Array, Float64Array];
   /** Per lap sample, a pit-path sample near it when the pit lane runs alongside, else -1. */
   readonly pitNear: Int32Array;
   readonly pitSide: SideIndex;
@@ -259,6 +264,26 @@ export class Track {
       const i0 = this.lap.sampleIndex(q.s - reach);
       const span = Math.ceil((2 * reach) / this.lap.step);
       for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
+    }
+
+    this.frameLimit = [new Float64Array(n), new Float64Array(n)];
+    for (const k of [LEFT, RIGHT] as const) {
+      const sign = k === LEFT ? 1 : -1;
+      for (let i = 0; i < n; i++) {
+        let kmax = 0;
+        for (let w = -12; w <= 12; w++)
+          kmax = Math.max(kmax, sign * this.lap.curvature[(i + w + n) % n]!);
+        this.frameLimit[k][i] = kmax > 0 ? 0.95 / kmax : 1e6;
+      }
+      // Let the limit grow by at most 0.5 m per metre away from a tight bend.
+      const lim = this.frameLimit[k];
+      const rise = 0.5 * this.lap.step;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let m = 1; m < 2 * n; m++)
+          lim[m % n] = Math.min(lim[m % n]!, lim[(m - 1) % n]! + rise);
+        for (let m = 2 * n - 2; m >= 0; m--)
+          lim[m % n] = Math.min(lim[m % n]!, lim[(m + 1) % n]! + rise);
+      }
     }
 
     this.barriers = this.buildBarriers();
@@ -422,7 +447,30 @@ export class Track {
     return out;
   }
 
-  /** Is (x, z), already projected to the lap at (s, d), on the pit-lane surface? Fills pitPoint. */
+  /**
+   * Unit ground normal at (s, d) from a cross-section `g` computed there: the cross product of
+   * the tangent along the lap (stretched by 1 - curvature * d, as on a parallel offset curve) and
+   * the tangent across it.
+   */
+  groundNormal(s: number, d: number, g: Ground, out: Vec3): Vec3 {
+    const t = this.lap.tangent(s, this.tmpNormal);
+    let m = 1 - this.curvatureAt(s) * d;
+    if (m < 0.05) m = 0.05;
+    const nx = t.z;
+    const nz = -t.x;
+    const ax = g.slopeS * nz - m * t.z * g.slopeD;
+    const ay = m;
+    const az = m * t.x * g.slopeD - g.slopeS * nx;
+    const len = Math.sqrt(ax * ax + ay * ay + az * az);
+    out.x = ax / len;
+    out.y = ay / len;
+    out.z = az / len;
+    return out;
+  }
+
+  private readonly tmpNormal = createVec3();
+
+  /** Is (x, z), already projected to the lap at (s, d), on the pit-lane surface? Fills `out`. */
   onPitLane(
     x: number,
     z: number,

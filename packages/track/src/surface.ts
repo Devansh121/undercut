@@ -76,20 +76,10 @@ export class TrackSurface implements SurfaceSampler {
     }
     hint.index = this.lapHint.index + segs * (pitIndex + 1);
 
-    // Normal from the two surface tangents: along the lap (scaled by 1 - curvature * d, the
-    // stretch of a parallel offset curve) and across it.
-    const t = track.lap.tangent(s, this.t);
-    let m = 1 - track.curvatureAt(s) * d;
-    if (m < 0.05) m = 0.05;
-    const nx = t.z;
-    const nz = -t.x;
-    const ax = g.slopeS * nz - m * t.z * g.slopeD;
-    const ay = m;
-    const az = m * t.x * g.slopeD - g.slopeS * nx;
-    const len = Math.sqrt(ax * ax + ay * ay + az * az);
-    out.normalX = ax / len;
-    out.normalY = ay / len;
-    out.normalZ = az / len;
+    const nrm = track.groundNormal(s, d, g, this.t);
+    out.normalX = nrm.x;
+    out.normalY = nrm.y;
+    out.normalZ = nrm.z;
     out.height = g.height;
     const props = kind === SurfaceKind.Kerb && g.highKerb ? HIGH_KERB : SURFACE_PROPERTIES[kind];
     out.grip = props.grip;
