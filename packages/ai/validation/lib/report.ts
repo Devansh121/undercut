@@ -3,10 +3,11 @@ import { REFERENCE_SKILL } from '../../src/driver/reference';
 import type { DrivingPlan } from '../../src/profile/plan';
 import { loadEnvelope, loadLine } from './artefacts';
 import type { CircuitSetup } from './circuits';
-import { runLaps, type LapRecord, type LapRunResult } from './lap';
+import { runLaps, type LapRecord, type LapRunResult, type LapRunOptions } from './lap';
 import { LAP_TARGETS, MONZA_M4_BAND, MONZA_PUBLISHED, MONZA_REFERENCE_LAP } from './targets';
 
 export interface ReferenceLapOptions {
+  onSample?: LapRunOptions['onSample'];
   laps?: number;
   fuel?: number;
   recordEvery?: number;
@@ -31,6 +32,7 @@ export function referenceLap(setup: CircuitSetup, o: ReferenceLapOptions = {}): 
   const result = runLaps({
     track,
     plan,
+    ...(o.onSample ? { onSample: o.onSample } : {}),
     trim: setup.trim,
     airDensity: setup.airDensity,
     fuel: o.fuel ?? setup.fuel,
