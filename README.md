@@ -48,7 +48,10 @@ Run `npx playwright install chromium` once before the browser tests.
 | `packages/render/`, `audio/`, `input/` | Rendering, audio and input layers |
 | `services/rooms/` | Cloudflare Worker with one Durable Object per room |
 | `tools/` | Local server, budget and licence checks, telemetry and screenshot tooling |
+| `tools/research/` | Standard-library Python scripts that fetch and measure circuit centrelines and elevation |
 | `docs/` | Status, roadmap, quality scorecard, decisions (`docs/adr/`) |
+| `docs/physics-validation.md` | Reference car parameters and the sourced validation targets with tolerances |
+| `docs/track-data.md` | Open geodata sources, licences and the build pipeline for the three circuits |
 | `assets/` | Third-party assets and `MANIFEST.json` |
 
 Conventions for anyone changing the code are in `AGENTS.md`.
