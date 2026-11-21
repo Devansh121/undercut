@@ -257,8 +257,11 @@ export class ReferenceDriver implements Driver {
     const vTarget = prof.v[i]! + (prof.v[j]! - prof.v[i]!) * f;
     const aHere = prof.ax[i]! + (prof.ax[j]! - prof.ax[i]!) * f;
     const aAhead = this.sampleAhead(prof.ax, s, v * g.speedPreview);
-    // Already under the profile: no reason to brake early for what comes next.
-    const aFf = v < vTarget - 1 ? Math.max(aHere, aAhead) : aAhead;
+    // Already under the speed the profile wants a moment ahead: no reason to brake early for
+    // it. (Compared with the target ahead, not here: braking early by design leaves the car
+    // under the target here at every braking onset.)
+    const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview);
+    const aFf = v < vAhead - 1 ? Math.max(aHere, aAhead) : aAhead;
     const aDemand = aFf + g.speedGain * (vTarget - v);
     const drsHere = plan.drsZone[i] === 1 && prof.phase[i] !== Phase.Brake;
     const deployHere = prof.deploying[i] === 1 && (this.crossedLine || this.deployBeforeLine);
