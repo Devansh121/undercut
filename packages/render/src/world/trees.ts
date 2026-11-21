@@ -51,18 +51,23 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
     idx.push(base, base + 1, base + 4, base, base + 4, base + 3);
     idx.push(base + 1, base + 2, base + 5, base + 1, base + 5, base + 4);
   }
-  // For near/medium trees, add a shallow tented canopy cap so elevated helicopter views see lush
-  // crown foliage instead of thin radial card edges.
+  // For near/medium trees, add a shallow upper canopy cap with upward normals so elevated views
+  // see full crowns without casting a horizontal seam inside the crown at eye level.
   if (planes >= 3) {
-    const r = half * 0.68;
-    const yRim = 0.6;
-    const yTop = 0.78;
+    const r = half * 0.48;
+    const yRim = 0.68;
+    const yTop = 0.82;
     const base = pos.length / 3;
-    push(0, yTop, 0, 0.5, 0.62);
-    push(-r, yRim, -r, 0.14, 0.34);
-    push(r, yRim, -r, 0.86, 0.34);
-    push(r, yRim, r, 0.86, 0.86);
-    push(-r, yRim, r, 0.14, 0.86);
+    const pushTop = (x: number, y: number, z: number, u: number, v: number): void => {
+      pos.push(x, y, z);
+      nor.push(0, 1, 0);
+      uv.push(u, v);
+    };
+    pushTop(0, yTop, 0, 0.5, 0.64);
+    pushTop(-r, yRim, -r, 0.2, 0.4);
+    pushTop(r, yRim, -r, 0.8, 0.4);
+    pushTop(r, yRim, r, 0.8, 0.84);
+    pushTop(-r, yRim, r, 0.2, 0.84);
     idx.push(base, base + 2, base + 1);
     idx.push(base, base + 3, base + 2);
     idx.push(base, base + 4, base + 3);

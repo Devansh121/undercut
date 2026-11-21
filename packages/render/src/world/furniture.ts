@@ -1117,7 +1117,12 @@ export function placeTracksideFurniture(options: {
     return dEntry < 38 || dExit < 38;
   };
 
-  /** Helper: world point & inward-facing normal at lap (s, side: 0=left, 1=right, extra m past barrier). */
+  const pA = createVec3();
+  const pB = createVec3();
+  const tA = createVec3();
+  const tB = createVec3();
+
+  /** Helper: world point & inward-facing normal following the actual barrier curve at (s, side, extra). */
   const atBarrier = (s: number, side: 0 | 1, extra = 0.25) => {
     const sw = wrapS(s);
     const idxS = Math.min(track.lap.count - 1, Math.round(sw / track.lap.step));
@@ -1130,9 +1135,38 @@ export function placeTracksideFurniture(options: {
     const tl = Math.hypot(t.x, t.z) || 1;
     const tx = t.x / tl;
     const tz = t.z / tl;
+
+    // Sample the barrier line ±2 m to align panels along flared barriers without sawtooth stepping.
+    const sPrev = wrapS(sw - 2);
+    const sNext = wrapS(sw + 2);
+    const idxPrev = Math.min(track.lap.count - 1, Math.round(sPrev / track.lap.step));
+    const idxNext = Math.min(track.lap.count - 1, Math.round(sNext / track.lap.step));
+    const barPrev = Math.abs(track.barrier[side][idxPrev] as number);
+    const barNext = Math.abs(track.barrier[side][idxNext] as number);
+    track.lap.pointAt(sPrev, sign * (barPrev + extra), pA);
+    track.lap.pointAt(sNext, sign * (barNext + extra), pB);
+    const bdx = pB.x - pA.x;
+    const bdz = pB.z - pA.z;
+    const bl = Math.hypot(bdx, bdz);
+    const btx = bl > 0.5 ? bdx / bl : tx;
+    const btz = bl > 0.5 ? bdz / bl : tz;
+
     // Left normal in x-z (+Y up, +Z south) is (tz, -tx). Inward toward track is (-tz, tx) from left (side 0), (tz, -tx) from right (side 1).
-    const nx = side === 0 ? -tz : tz;
-    const nz = side === 0 ? tx : -tx;
+    const nx = side === 0 ? -btz : btz;
+    const nz = side === 0 ? btx : -btx;
+
+    // Signed turn angle over ±18 m: positive when track curves toward `side` (tight inner apex).
+    track.lap.tangent(wrapS(sw - 18), tA);
+    track.lap.tangent(wrapS(sw + 18), tB);
+    const la = Math.hypot(tA.x, tA.z) || 1;
+    const lb = Math.hypot(tB.x, tB.z) || 1;
+    const ax = tA.x / la;
+    const az = tA.z / la;
+    const bx = tB.x / lb;
+    const bz = tB.z / lb;
+    const signedLeft = Math.atan2(bx * az - bz * ax, bx * ax + bz * az);
+    const turnTowardSide = side === 0 ? signedLeft : -signedLeft;
+
     return {
       x: p.x,
       y: track.groundHeightAt(p.x, p.z),
@@ -1142,19 +1176,28 @@ export function placeTracksideFurniture(options: {
       tx,
       tz,
       barD: Math.abs(barD),
+      barStep: Math.abs(barNext - barPrev),
       halfW: Math.abs(halfW),
       yawInward: Math.atan2(-nz, nx),
       yawOncoming: Math.atan2(tz, -tx),
       s: sw,
       nominalDist: Math.abs(barD) + extra,
+      turnTowardSide,
     };
   };
 
   /**
-   * Circuit-agnostic self-proximity guard: rejects any barrier-derived point that folded inside a
-   * tight chicane apex or encroached on an adjacent track leg (prevents catch-fence & barrier pile-ups).
+   * Circuit-agnostic self-proximity & inner-apex guard: rejects any barrier-derived point that
+   * folded inside a tight chicane apex, sits on a sharp inner kerb bend, or straddles a sudden
+   * barrier step-out (prevents catch-fence & barrier pile-ups on any circuit).
    */
-  const foldsAcrossTrack = (b: ReturnType<typeof atBarrier>, minClear = 1.6): boolean => {
+  const foldsAcrossTrack = (
+    b: ReturnType<typeof atBarrier>,
+    minClear = 1.6,
+    maxInnerTurn = 0.28,
+  ): boolean => {
+    if (b.turnTowardSide > maxInnerTurn) return true;
+    if (b.barStep > 1.6) return true;
     const hit = options.lap.nearest(b.x, b.z);
     if (hit.dist < b.halfW + minClear) return true;
     // If nearest centreline point is significantly closer than nominal offset, we folded across a sharp inner curve.
@@ -1215,13 +1258,13 @@ export function placeTracksideFurniture(options: {
       usedHoard.add(key);
       if (nearPitGap(s, run.side)) continue;
       const b = atBarrier(s, run.side, -0.26);
-      if (foldsAcrossTrack(b, 1.4)) continue;
+      if (foldsAcrossTrack(b, 1.4, 0.26)) continue;
       placeHoarding(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
-  // Neat rhythmic rows of angled advertising boards along wide grass verges (only where the verge
-  // is >= 6.5 m wide so angled boards sit cleanly ahead of the barrier hoarding without overlapping).
-  const vergeStep = mobile ? 20 : 9.5;
+  // Neat rhythmic rows of angled advertising boards along wide straight/outer grass verges (skipping
+  // inner sweeping curves so trackside cameras don't look across a row of dark backs).
+  const vergeStep = mobile ? 20 : 10.0;
   for (let s = 20; s < L - 20; s += vergeStep) {
     for (const side of [0, 1] as const) {
       if (nearPitGap(s, side)) continue;
@@ -1230,11 +1273,11 @@ export function placeTracksideFurniture(options: {
       if (outerSurf !== MeshSurface.Grass) continue;
       const barD = Math.abs(track.barrier[side][idxS] as number);
       const halfW = Math.abs(track.halfWidth[side][idxS] as number);
-      if (barD - halfW < 6.5) continue;
-      // Place cleanly on the grass verge ~2.6 m outside the track edge (leaving >= 3.9 m to barrier).
-      const extra = halfW + 2.6 - barD;
+      if (barD - halfW < 6.8) continue;
+      // Place cleanly on the grass verge ~2.7 m outside the track edge (leaving >= 4.1 m to barrier).
+      const extra = halfW + 2.7 - barD;
       const b = atBarrier(s, side, extra);
-      if (foldsAcrossTrack(b, 2.2)) continue;
+      if (foldsAcrossTrack(b, 2.2, 0.1)) continue;
       placeVergeBoard(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1312,7 +1355,7 @@ export function placeTracksideFurniture(options: {
       const b = atBarrier(s, side, 0.3);
       // Skip tight inner chicane islands and folded barriers.
       if (b.barD < b.halfW + 1.8) continue;
-      if (foldsAcrossTrack(b, 2.0)) continue;
+      if (foldsAcrossTrack(b, 2.0, 0.24)) continue;
       placeFence(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1371,7 +1414,7 @@ export function placeTracksideFurniture(options: {
     if (usedMarshal.has(bucket)) continue;
     usedMarshal.add(bucket);
     const b = atBarrier(s, side, 1.4);
-    if (foldsAcrossTrack(b, 2.0)) continue;
+    if (foldsAcrossTrack(b, 2.0, 0.28)) continue;
     props.place('marshal-post', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
     marshals++;
   }
@@ -1384,7 +1427,7 @@ export function placeTracksideFurniture(options: {
     const outSide: 0 | 1 = c.direction === 'right' ? 0 : 1;
     for (let s = c.start - 12; s <= c.end + 16; s += 1.65) {
       const b = atBarrier(s, outSide, -0.45);
-      if (foldsAcrossTrack(b, 1.4)) continue;
+      if (foldsAcrossTrack(b, 1.4, 0.22)) continue;
       props.place('tecpro-block', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
       tecpro++;
     }

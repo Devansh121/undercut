@@ -1,8 +1,9 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { DataTexture, type Mesh, type MeshStandardMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { Track, createVec3, type TrackData } from '@undercut/track';
+import monzaTrackJson from '@undercut/track/data/monza.json';
+import brandsJson from '../../../design/brands.json';
+import monzaDressingJson from '../data/monza.dressing.json';
 import { decodeTerrain, gridHeight, hash01, type DressingFile } from '../src/world/dressing';
 import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { buildStands, crowdSeats, fitStand, type StandFrame } from '../src/world/grandstands';
@@ -13,16 +14,11 @@ import {
   pitWallCanopyGeometry,
 } from '../src/world/pit-building';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
-const monzaTrackData = JSON.parse(
-  fs.readFileSync(path.join(REPO_ROOT, 'packages/track/data/monza.json'), 'utf8'),
-) as TrackData;
-const monzaDressing = JSON.parse(
-  fs.readFileSync(path.join(REPO_ROOT, 'packages/render/data/monza.dressing.json'), 'utf8'),
-) as DressingFile;
-const brandsFile = JSON.parse(
-  fs.readFileSync(path.join(REPO_ROOT, 'design/brands.json'), 'utf8'),
-) as { brands: { id: string; name: string; bg: string; fg: string; accent: string }[] };
+const monzaTrackData = monzaTrackJson as unknown as TrackData;
+const monzaDressing = monzaDressingJson as unknown as DressingFile;
+const brandsFile = brandsJson as {
+  brands: { id: string; name: string; bg: string; fg: string; accent: string }[];
+};
 
 function dummyTexture(): DataTexture {
   return new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -128,10 +124,10 @@ describe('grandstands, start gantry, and over-track bridges', () => {
 
   it('builds grandstands from dressing data facing the circuit with spectator seats', () => {
     const stands: StandFrame[] = [];
-    for (const f of monzaDressing.mapped.grandstand) {
-      const frame = fitStand(f, lap, heightAt);
+    monzaDressing.mapped.grandstand.forEach((f, idx) => {
+      const frame = fitStand(f, lap, heightAt, idx);
       if (frame) stands.push(frame);
-    }
+    });
     expect(stands.length).toBeGreaterThan(5);
     const geo = buildStands(stands);
     expect(geo.getAttribute('position').count).toBeGreaterThan(100);
