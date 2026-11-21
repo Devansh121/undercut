@@ -398,6 +398,7 @@ export class RaceView {
   /** Jump cameras to steady state (after a reset or teleport). */
   snapCamera(): void {
     this.rig.snap();
+    this.dynamic.rewarm();
   }
 
   /**
@@ -549,8 +550,9 @@ export class RaceView {
   render(frame: ViewFrame): void {
     if (this.contextLost) return;
     const dt = frame.dt;
-    if (frame.frameMs !== undefined && this.dynamic.update(this.gpu.latest ?? frame.frameMs))
-      this.resize(true);
+    // GPU time where the browser measures it (CPU-side stalls are not GPU load), else frame time.
+    const sample = this.gpu.available ? this.gpu.latest : (frame.frameMs ?? null);
+    if (sample !== null && this.dynamic.update(sample)) this.resize(true);
     this.camera.clearViewOffset();
     this.camera.aspect = this.width / Math.max(1, this.height);
     this.updateHeat(frame);

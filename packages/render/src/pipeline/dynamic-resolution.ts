@@ -2,6 +2,8 @@
  * Dynamic resolution: scales the canvas's drawing buffer (never the DOM HUD) to hold a frame-time
  * target. Pure logic, fed one frame time per frame.
  *
+ * - The first 60 samples after a start or `reset` (a teleport, a restart) are ignored: loading
+ *   and first-use stalls are not load.
  * - A smoothed frame time (exponential, ~0.5 s) is compared with the target. An isolated frame
  *   longer than four targets (a tab switch, a shader compile) is ignored; three or more in a row
  *   are overload, and count (capped at eight targets each) like any slow frame.
@@ -20,6 +22,7 @@ export interface DynamicResolutionOptions {
 }
 
 const STEP = 1 / 40;
+const WARMUP = 60;
 
 export class DynamicResolution {
   scale = 1;
@@ -28,6 +31,8 @@ export class DynamicResolution {
   private under = 0;
   /** Consecutive frames over four targets. */
   private stalls = 0;
+  /** Samples still to ignore after a start or reset. */
+  private warmup = WARMUP;
 
   constructor(private readonly options: DynamicResolutionOptions) {}
 
@@ -35,6 +40,10 @@ export class DynamicResolution {
   update(frameMs: number): boolean {
     const target = this.options.targetMs;
     if (target <= 0 || frameMs <= 0) return false;
+    if (this.warmup > 0) {
+      this.warmup--;
+      return false;
+    }
     if (frameMs > target * 4) {
       this.stalls++;
       if (this.stalls < 3) return false;
@@ -79,6 +88,16 @@ export class DynamicResolution {
 
   reset(): void {
     this.scale = 1;
+    this.smoothed = 0;
+    this.over = 0;
+    this.under = 0;
+    this.stalls = 0;
+    this.warmup = WARMUP;
+  }
+
+  /** Start ignoring samples again (after a teleport or restart), keeping the current scale. */
+  rewarm(): void {
+    this.warmup = WARMUP;
     this.smoothed = 0;
     this.over = 0;
     this.under = 0;

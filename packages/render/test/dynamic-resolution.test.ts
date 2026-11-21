@@ -69,6 +69,16 @@ describe('DynamicResolution', () => {
     expect(dr.scale).toBe(1);
   });
 
+  it('ignores the slow frames of a start or a teleport (warm-up), then works as usual', () => {
+    const dr = new DynamicResolution({ targetMs: 16.67, min: 0.6 });
+    for (let i = 0; i < 20; i++) dr.update(120);
+    for (let i = 0; i < 300; i++) dr.update(8);
+    expect(dr.scale).toBe(1);
+    dr.rewarm();
+    for (let i = 0; i < 20; i++) dr.update(120);
+    expect(dr.scale).toBe(1);
+  });
+
   it('is off when the target is 0', () => {
     const dr = new DynamicResolution({ targetMs: 0, min: 1 });
     run(dr, () => 80, 3);
