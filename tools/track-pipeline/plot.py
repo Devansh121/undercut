@@ -330,7 +330,7 @@ def write(svg_text, path, keep_svg):
     with open(svg_path, "w") as f:
         f.write(svg_text)
     if shutil.which("convert"):
-        subprocess.run(["convert", "-density", "96", svg_path, "-depth", "8", "-colors", "256", "+dither", "-define", "png:compression-level=9", "PNG8:" + path + ".png"], check=True)
+        subprocess.run(["convert", "-density", "96", svg_path, "-depth", "8", "-colors", "256", "+dither", "-strip", "-define", "png:exclude-chunks=date,time", "-define", "png:compression-level=9", "PNG8:" + path + ".png"], check=True)
         if not keep_svg:
             os.remove(svg_path)
         print(os.path.relpath(path + ".png", ROOT))
