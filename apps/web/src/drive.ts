@@ -288,16 +288,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
-  if (takeFirstStartHint())
-    say(
-      {
+  // The storage warning goes first; the first-start controls hint follows it.
+  let queued: HudMessage | null = takeFirstStartHint()
+    ? {
         tag: 'Controls',
         text: controlsHint(input.profile.bindings, input.activeDevice),
         tone: 'info',
-      },
-      6,
-    );
-  else if (!records.persistent)
+      }
+    : null;
+  if (!records.persistent)
     say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
@@ -437,6 +436,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (message) {
       messageLeft -= dt;
       if (messageLeft <= 0) message = null;
+    }
+    if (!message && queued) {
+      say(queued, 6);
+      queued = null;
     }
     results.tick(dt);
 
