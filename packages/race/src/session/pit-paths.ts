@@ -52,7 +52,7 @@ export function pitInPath(
   for (let sp = 0; sp <= box.s; sp += STEP) {
     const d = sp < turnIn ? 0 : box.d * smooth((sp - turnIn) / (box.s - turnIn));
     pit.path.pointAt(sp, d, v);
-    out.push({ x: v.x, z: v.z, v: sp >= circuit.pit.limitStart - 1 ? limit : Infinity });
+    out.push({ x: v.x, z: v.z, v: sp >= circuit.pit.limitStart - 15 ? limit : Infinity });
   }
   pit.path.pointAt(box.s, box.d, v);
   out.push({ x: v.x, z: v.z, v: limit });

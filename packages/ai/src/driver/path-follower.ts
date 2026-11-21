@@ -24,8 +24,9 @@ export interface FollowerGains {
   /** Pedal gains per m/s of speed error. */
   throttleGain: number;
   brakeGain: number;
-  /** Driven-wheel slip ratio above which throttle is reduced. */
+  /** Driven-wheel slip ratio above which throttle is reduced, and any wheel's below which brake is. */
   slipLimit: number;
+  lockLimit: number;
   /** Gear change rpm and the minimum time between changes, s. */
   upshiftRpm: number;
   downshiftRpm: number;
@@ -38,11 +39,12 @@ export const FOLLOWER_GAINS: Readonly<FollowerGains> = Object.freeze({
   lookMin: 6,
   lookMax: 30,
   brakeDecel: 16,
-  stopDecel: 6,
+  stopDecel: 10,
   lateralAccel: 18,
   throttleGain: 0.35,
   brakeGain: 0.3,
   slipLimit: 0.12,
+  lockLimit: -0.12,
   upshiftRpm: 11000,
   downshiftRpm: 6500,
   shiftHold: 0.3,
@@ -66,6 +68,7 @@ export class PathFollower {
   private stopAtEnd = false;
   private hint = 0;
   private throttleCap = 1;
+  private brakeCap = 1;
   private shiftTimer = 0;
   private progressValue = 0;
 
@@ -125,6 +128,7 @@ export class PathFollower {
   reset(): void {
     this.hint = 0;
     this.throttleCap = 1;
+    this.brakeCap = 1;
     this.shiftTimer = 0;
   }
 
@@ -198,6 +202,12 @@ export class PathFollower {
     if (slip > g.slipLimit) this.throttleCap = Math.max(0.05, this.throttleCap - 6 * dt);
     else this.throttleCap = Math.min(1, this.throttleCap + 2 * dt);
     throttle = Math.min(throttle, this.throttleCap);
+    // Lock-up: any wheel sliding under braking.
+    let lock = 0;
+    for (let w = 0; w < 4; w++) lock = Math.min(lock, tel.slipRatio[w] ?? 0);
+    if (lock < g.lockLimit && v > 2) this.brakeCap = Math.max(0.2, this.brakeCap - 6 * dt);
+    else this.brakeCap = Math.min(1, this.brakeCap + 3 * dt);
+    if (!(this.stopAtEnd && toStop < 0.4)) brake = Math.min(brake, this.brakeCap);
 
     // ---- Gears. ----
     let shift: -1 | 0 | 1 = 0;
