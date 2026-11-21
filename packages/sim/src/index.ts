@@ -25,6 +25,7 @@ export {
   AERO_MEDIUM,
   AERO_TRIMS,
   REFERENCE_CAR,
+  brakeCapacity,
   createCarParams,
   radToRpm,
   rpmToRad,

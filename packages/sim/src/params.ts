@@ -235,17 +235,40 @@ export interface DiffParams {
   rampCoast: number;
 }
 
+/**
+ * Brake hardware. The full-pedal torque follows from it (`brakeCapacity`), not from any
+ * operating point: the published peak braking powers (doc 1.5) are event figures, so they are
+ * checked against the model's output instead of being used to set a ceiling.
+ */
 export interface BrakeParams {
+  /** Peak pedal force, N. Doc 1.5: 145–162 kg at the hardest stops; 160 kg. */
+  pedalForce: number;
+  /** Pedal lever ratio. Estimate: about 3:1 on racing pedal boxes. */
+  pedalRatio: number;
+  /** Master-cylinder bore area, m². Estimate: 17.8 mm (0.7 in) bore. */
+  masterCylinderArea: number;
+  /** Front caliper piston area on one side of the disc, m². Estimate: three 36 mm pistons. */
+  frontPistonArea: number;
   /**
-   * Total friction-brake torque at full pedal, N·m. Doc 1.5: the hardest stop (Monza T1 2025)
-   * peaks at 2715 kW at 337 km/h, so the brakes deliver 2715 kW / 93.6 m/s × 0.355 m ≈ 10.3 kN·m.
-   * The other published events agree: Spa T5 2584 kW at 327 km/h, Singapore T7 2542 kW at
-   * 308 km/h and T14 2239 kW at 288 km/h all give 28–30 kN of friction force. MGU-K harvest on
-   * the rear axle comes on top of this at full pedal (brake-by-wire blends it in below).
+   * Front effective friction radius, m. Doc 1.5: front discs 325–330 mm ([1] Art. 11.3); the
+   * pad centre sits about 25 mm inside the 165 mm rim.
    */
-  maxTorque: number;
+  frontRadius: number;
+  /** Carbon–carbon pad friction coefficient in its operating window. Estimate. */
+  padFriction: number;
   /** Front share of friction torque. Doc 1.5: 57 % default, 52–62 % adjustable. */
   bias: number;
+}
+
+/**
+ * Total brake torque at full pedal, N·m, as the sum over both axles. The balance bar sends the
+ * bias share of the pedal force to the front master cylinder, so the front axle gets
+ * bias · F·ratio / A_mc of line pressure on its pistons, two pad faces at the effective radius,
+ * on two wheels; dividing by the bias gives the total the rear (brake-by-wire) matches to.
+ */
+export function brakeCapacity(b: BrakeParams): number {
+  const pressurePerBias = (b.pedalForce * b.pedalRatio) / b.masterCylinderArea;
+  return 2 * 2 * b.padFriction * pressurePerBias * b.frontPistonArea * b.frontRadius;
 }
 
 export interface CarParams {
@@ -422,7 +445,12 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     rampCoast: 0.25,
   },
   brakes: {
-    maxTorque: ((2715e3 / (337 / 3.6)) * 0.355) as number,
+    pedalForce: 160 * 9.80665,
+    pedalRatio: 3,
+    masterCylinderArea: Math.PI * 0.0089 * 0.0089,
+    frontPistonArea: 3 * Math.PI * 0.018 * 0.018,
+    frontRadius: 0.14,
+    padFriction: 0.55,
     bias: 0.57,
   },
 });

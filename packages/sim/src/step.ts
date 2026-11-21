@@ -481,8 +481,8 @@ function stepPowertrain(
   // Brake-by-wire: the pedal sets the torque each axle should get, independent of whether the
   // MGU-K can harvest. On the rear axle the MGU-K delivers what it can and friction supplies the
   // rest, so a full store, a spent harvest allowance or an open clutch changes only the split.
-  const frontBrake = (brake * p.brakes.maxTorque * s.brakeBias) / 2;
-  const rearRequest = brake * p.brakes.maxTorque * (1 - s.brakeBias);
+  const frontBrake = (brake * s.model.brakeCapacity * s.brakeBias) / 2;
+  const rearRequest = brake * s.model.brakeCapacity * (1 - s.brakeBias);
   if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5 && we > 1) {
     const room = Math.max(0, (ers.storeWindow - s.ersStore) / h - toStore);
     const lapRoom = Math.max(0, (ers.harvestPerLap - s.ersHarvestLap) / h);

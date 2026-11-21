@@ -14,6 +14,7 @@ import {
   ThresholdBrakeDriver,
   YawRateSteer,
   shiftForSpeed,
+  trailOffCap,
 } from './drivers';
 import {
   CIRCUITS,
@@ -173,7 +174,15 @@ export interface BrakingResult {
 export const BIAS_RANGE = [0.52, 0.54, 0.56, 0.58, 0.6, 0.62] as const;
 
 export function braking(
-  o: RunOptions & { circuit: Circuit; v1: number; v2: number; bias: number; fuel?: number },
+  o: RunOptions & {
+    circuit: Circuit;
+    v1: number;
+    v2: number;
+    bias: number;
+    fuel?: number;
+    /** 'event' (default) trails off into the corner; 'threshold' brakes flat out to v2. */
+    profile?: 'event' | 'threshold';
+  },
 ): BrakingResult {
   const c = CIRCUITS[o.circuit];
   const h = new Harness({
@@ -202,6 +211,7 @@ export function braking(
   const startTime = h.time;
   const startSpeed = h.car.vx;
   const driver = new ThresholdBrakeDriver();
+  if ((o.profile ?? 'event') === 'event') driver.cap = (v) => trailOffCap(v, o.v1, o.v2);
   const ma = new MovingAverage(PEAK_WINDOW);
   let peak = 0;
   let prevSpeed = startSpeed;
@@ -249,7 +259,13 @@ export function bestBraking(
 export function peakDeceleration(speed: number, circuit: Circuit = 'monza'): number {
   let best = 0;
   for (const bias of BIAS_RANGE) {
-    const r = braking({ circuit, v1: speed, v2: Math.max(speed - 60 * KMH, 20 * KMH), bias });
+    const r = braking({
+      circuit,
+      v1: speed,
+      v2: Math.max(speed - 60 * KMH, 20 * KMH),
+      bias,
+      profile: 'threshold',
+    });
     best = Math.max(best, r.peakG);
   }
   return best;

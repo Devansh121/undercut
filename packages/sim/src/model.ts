@@ -1,4 +1,4 @@
-import type { CarParams } from './params';
+import { brakeCapacity, type CarParams } from './params';
 import { createTyreCurve, type TyreCurve } from './tyre';
 import { STANDARD_GRAVITY } from './environment';
 
@@ -27,6 +27,8 @@ export interface CarModel {
   readonly cgFuel: number;
   /** Shaft efficiency of the ICE, set so full fuel flow gives `engine.peakPower`. */
   readonly iceEfficiency: number;
+  /** Total brake torque at full pedal, N·m (`brakeCapacity`). */
+  readonly brakeCapacity: number;
 }
 
 export function createCarModel(params: CarParams): CarModel {
@@ -64,5 +66,6 @@ export function createCarModel(params: CarParams): CarModel {
     cgDry: L * (1 - mass.frontShareDry),
     cgFuel: L * (1 - mass.fuelFrontShare),
     iceEfficiency: params.engine.peakPower / fuelEnergyAtFullFlow,
+    brakeCapacity: brakeCapacity(params.brakes),
   });
 }

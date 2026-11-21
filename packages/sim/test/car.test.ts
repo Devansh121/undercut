@@ -66,7 +66,6 @@ describe('car parameters', () => {
     expect(p.ers.mgukPower).toBe(120e3);
     expect(p.ers.deployPerLap).toBe(4e6);
     expect(p.ers.harvestPerLap).toBe(2e6);
-    expect(p.brakes.maxTorque).toBeCloseTo(10.3e3, -2);
     expect(Object.isFrozen(p.tyre)).toBe(true);
   });
 
@@ -165,6 +164,36 @@ describe('power unit', () => {
   });
 });
 
+describe('brakes', () => {
+  it('take their capacity from the hydraulics and discs, not from an operating point', () => {
+    const b = REFERENCE_CAR.brakes;
+    // Pedal force through the pedal ratio onto the master cylinders; the front share of that
+    // pressure on the front pistons, two pad faces at the effective radius, two front wheels,
+    // expressed as a total over the bias split.
+    const pressurePerBias = (b.pedalForce * b.pedalRatio) / b.masterCylinderArea;
+    const front = 2 * 2 * b.padFriction * pressurePerBias * b.frontPistonArea * b.frontRadius;
+    const capacity = createCarModel(REFERENCE_CAR).brakeCapacity;
+    expect(capacity).toBeCloseTo(front, 6);
+    expect(capacity).toBeGreaterThan(17e3);
+    expect(capacity).toBeLessThan(19e3);
+  });
+
+  it('can lock the tyres at full pedal from 330 km/h in high-downforce trim', () => {
+    const car = createCarState(createCarParams('high'), {
+      speed: 330 / 3.6,
+      fuel: 50,
+      ersStore: 4e6,
+    });
+    let lowest = 0;
+    for (let i = 0; i < 0.4 / DT; i++) {
+      stepCar(car, input({ brake: 1 }), FLAT_SURFACE, DT, env);
+      for (let w = 0; w < 4; w++) lowest = Math.min(lowest, car.slipRatio[w]!);
+    }
+    // Past the peak at 10 % slip: the tyres, not the brakes, limit the stop.
+    expect(lowest).toBeLessThan(-0.3);
+  });
+});
+
 describe('ERS', () => {
   it('keeps the MGU-K off at a standing start until 100 km/h', () => {
     const car = createCarState(REFERENCE_CAR, { ersMode: ErsMode.Overtake, gear: 2 });
@@ -259,7 +288,7 @@ describe('ERS', () => {
     const car = createCarState(REFERENCE_CAR, { speed: 80, gear: 8, ersStore: 0 });
     for (let lap = 0; lap < 12; lap++) {
       drive(car, input({ throttle: 1 }), 6);
-      drive(car, input({ brake: 0.5 }), 6, () => car.vx < 30);
+      drive(car, input({ brake: 0.3 }), 6, () => car.vx < 30);
       expect(car.ersHarvestLap).toBeLessThanOrEqual(2e6 + 1e-6);
       expect(car.ersStore).toBeLessThanOrEqual(4e6 + 1e-6);
       expect(car.ersStore).toBeGreaterThanOrEqual(-1e-6);
