@@ -1,6 +1,11 @@
 import { padAxis, padButton, parsePadControl, type ControlId } from '../controls';
 import { applyAxisCurve, type GamepadShaping } from '../shaping';
-import { pushPress, type ActivityClock, type DeviceChange, type DeviceSource } from './source';
+import {
+  MAX_PENDING_PRESSES,
+  type ActivityClock,
+  type DeviceChange,
+  type DeviceSource,
+} from './source';
 
 /** The parts of a browser `Gamepad` the input layer reads. A real `Gamepad` satisfies it. */
 export interface GamepadSnapshot {
@@ -33,6 +38,16 @@ interface PadState {
   /** Per axis: -1 or 1 while that direction is pressed, else 0. */
   axes: number[];
   lastActivity: number;
+  /**
+   * Controls held through a focus loss (or while unfocused). They read 0 and cannot press
+   * until they have been let go, so nothing held before alt-tab acts after it.
+   */
+  blocked: Set<ControlId>;
+}
+
+interface PendingPress {
+  pad: number;
+  control: ControlId;
 }
 
 /** Gamepads, polled once per sample. The most recently used pad drives the car. */
@@ -41,8 +56,11 @@ export class GamepadSource implements DeviceSource {
   lastActivity = 0;
   private readonly states = new Map<number, PadState>();
   private current: GamepadSnapshot | null = null;
-  private presses: ControlId[] = [];
-  private drained: ControlId[] = [];
+  /** Presses since the last drain, with the pad they came from. */
+  private pending: PendingPress[] = [];
+  private readonly drained: ControlId[] = [];
+  private suspended = false;
+  private latchHeld = false;
   private changes: DeviceChange[] = [];
   private drainedChanges: DeviceChange[] = [];
 
@@ -86,13 +104,15 @@ export class GamepadSource implements DeviceSource {
         state = undefined;
       }
       if (!state) {
-        state = { id: pad.id, buttons: [], axes: [], lastActivity: 0 };
+        state = { id: pad.id, buttons: [], axes: [], lastActivity: 0, blocked: new Set() };
         this.states.set(pad.index, state);
         this.changes.push({ type: 'connected', device: 'gamepad', id: pad.id });
       }
+      if (this.suspended || this.latchHeld) this.block(pad, state);
+      else this.unblock(pad, state);
       // Browsers reveal a pad only after a button press, so whatever is down on the first
       // poll counts as a press: it is the input that made the pad appear.
-      this.edges(pad, state);
+      this.edges(pad, state, pad.index);
       if (state.lastActivity > bestActivity) {
         best = pad;
         bestActivity = state.lastActivity;
@@ -105,14 +125,55 @@ export class GamepadSource implements DeviceSource {
       }
     }
     this.current = best;
+    if (!this.suspended) this.latchHeld = false;
+    // Activity belongs to pads, not to the source: a removed pad takes its stamp with it.
+    let activity = 0;
+    for (const state of this.states.values()) activity = Math.max(activity, state.lastActivity);
+    this.lastActivity = activity;
+  }
+
+  /** Stop reading the pads (page unfocused or hidden); everything held must be let go after. */
+  setSuspended(suspended: boolean): void {
+    this.suspended = suspended;
+    if (suspended) this.releaseAll();
+  }
+
+  /** Whether a control on this pad is engaged at all (past its dead zone, or reported pressed). */
+  private engaged(pad: GamepadSnapshot, control: ControlId): boolean {
+    const parsed = parsePadControl(control);
+    if (!parsed) return false;
+    if (parsed.kind === 'button') {
+      const b = pad.buttons[parsed.index];
+      return !!b && (b.pressed || this.shapedLevel(pad, control) > 0);
+    }
+    return this.shapedLevel(pad, control) > 0;
+  }
+
+  private block(pad: GamepadSnapshot, state: PadState): void {
+    for (let i = 0; i < pad.buttons.length; i++) {
+      const control = padButton(i);
+      if (this.engaged(pad, control)) state.blocked.add(control);
+    }
+    for (let i = 0; i < pad.axes.length; i++) {
+      for (const direction of [-1, 1] as const) {
+        const control = padAxis(i, direction);
+        if (this.engaged(pad, control)) state.blocked.add(control);
+      }
+    }
+  }
+
+  private unblock(pad: GamepadSnapshot, state: PadState): void {
+    for (const control of state.blocked) {
+      if (!this.engaged(pad, control)) state.blocked.delete(control);
+    }
   }
 
   /** Detect presses on one pad since its last poll. */
-  private edges(pad: GamepadSnapshot, state: PadState): void {
+  private edges(pad: GamepadSnapshot, state: PadState, index: number): void {
     for (let i = 0; i < pad.buttons.length; i++) {
       const b = pad.buttons[i];
       const down = b ? b.pressed || b.value > BUTTON_PRESS : false;
-      if (down && !state.buttons[i]) this.press(state, padButton(i));
+      if (down && !state.buttons[i]) this.press(state, index, padButton(i));
       state.buttons[i] = down;
     }
     for (let i = 0; i < pad.axes.length; i++) {
@@ -120,20 +181,26 @@ export class GamepadSource implements DeviceSource {
       const was = state.axes[i] ?? 0;
       const held = was !== 0 && v * was >= AXIS_RELEASE;
       const now = held ? was : v <= -AXIS_PRESS ? -1 : v >= AXIS_PRESS ? 1 : 0;
-      if (now !== 0 && now !== was) this.press(state, padAxis(i, now as -1 | 1));
+      if (now !== 0 && now !== was) this.press(state, index, padAxis(i, now as -1 | 1));
       state.axes[i] = now;
     }
   }
 
-  private press(state: PadState, control: ControlId): void {
-    pushPress(this.presses, control);
+  private press(state: PadState, pad: number, control: ControlId): void {
+    if (state.blocked.has(control)) return;
+    if (this.pending.length >= MAX_PENDING_PRESSES) this.pending.shift();
+    this.pending.push({ pad, control });
     state.lastActivity = this.clock.next();
-    this.lastActivity = state.lastActivity;
   }
 
   level(control: ControlId): number {
     const pad = this.current;
-    if (!pad) return 0;
+    if (!pad || this.suspended) return 0;
+    if (this.states.get(pad.index)?.blocked.has(control)) return 0;
+    return this.shapedLevel(pad, control);
+  }
+
+  private shapedLevel(pad: GamepadSnapshot, control: ControlId): number {
     const parsed = parsePadControl(control);
     if (!parsed) return 0;
     const shaping = this.shaping();
@@ -154,11 +221,13 @@ export class GamepadSource implements DeviceSource {
     return this.current?.buttons[index]?.value ?? 0;
   }
 
+  /** Presses from the pad being read only, so they agree with the levels it reports. */
   drainPresses(): readonly ControlId[] {
-    const out = this.presses;
-    this.presses = this.drained;
-    this.presses.length = 0;
-    this.drained = out;
+    const out = this.drained;
+    out.length = 0;
+    const index = this.current?.index;
+    for (const press of this.pending) if (press.pad === index) out.push(press.control);
+    this.pending.length = 0;
     return out;
   }
 
@@ -170,8 +239,13 @@ export class GamepadSource implements DeviceSource {
     return out;
   }
 
+  /**
+   * Focus lost: drop queued presses and, on the next poll, block every control still held until
+   * it is let go. Pads are polled, so without this a held trigger would act again at once.
+   */
   releaseAll(): void {
-    // Pads are polled, so there is nothing latched to release; presses already queued stay.
+    this.pending.length = 0;
+    this.latchHeld = true;
   }
 
   rumble(strong: number, weak: number, duration: number): void {

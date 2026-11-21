@@ -85,6 +85,7 @@ export class InputSystem {
   private readonly shifts: (-1 | 1)[] = [];
   private drsRequest = false;
   private pitLimiter = false;
+  private focused = true;
   private readonly frame: InputFrame;
 
   constructor(options: InputSystemOptions = {}) {
@@ -173,6 +174,23 @@ export class InputSystem {
     for (const source of this.sources) source.releaseAll();
   }
 
+  /** Whether the page has focus and is visible. */
+  get hasFocus(): boolean {
+    return this.focused;
+  }
+
+  /**
+   * Page focus. While unfocused or hidden every device is released, the car gets neutral
+   * demand and presses are dropped; after focus returns, anything still held on a gamepad must
+   * be let go before it counts again.
+   */
+  setFocused(focused: boolean): void {
+    if (focused === this.focused) return;
+    this.focused = focused;
+    this.releaseAll();
+    this.gamepad.setSuspended(!focused);
+  }
+
   private source(kind: DeviceKind): DeviceSource {
     return kind === 'keyboard' ? this.keyboard : kind === 'gamepad' ? this.gamepad : this.touch;
   }
@@ -193,6 +211,12 @@ export class InputSystem {
     }
     const device = this.arbiter.active;
     frame.device = device;
+
+    if (!this.focused) {
+      for (const source of this.sources) source.drainPresses();
+      this.neutral();
+      return frame;
+    }
 
     if (this.captureDevice !== null) {
       this.capture(events);
