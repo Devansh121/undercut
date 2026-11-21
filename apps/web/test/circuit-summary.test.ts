@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import monza from '@undercut/track/data/monza.json';
+import { CIRCUIT_DATA } from '@undercut/race';
+import { summarizeTrack, timesOfDayFor, type TrackFileLike } from '../src/ui/data/circuit-summary';
+
+describe('circuit summary', () => {
+  const data = CIRCUIT_DATA.monza as { timingLine: number; raceLaps: number };
+  const s = summarizeTrack(monza as unknown as TrackFileLike, data.raceLaps, data.timingLine);
+
+  it('reads the facts the circuit card shows from the track file', () => {
+    expect(s).toMatchObject({
+      id: 'monza',
+      name: 'Monza',
+      country: 'Italy',
+      direction: 'clockwise',
+      length: 5793,
+      corners: 11,
+      drsZones: 2,
+      raceLaps: 53,
+      airTemperature: null,
+      timesOfDay: ['monza-afternoon', 'overcast-day'],
+    });
+  });
+
+  it('fits the plan inside its box with three sectors and a start line', () => {
+    const { plan } = s;
+    const nums = [...plan.path.matchAll(/-?\d+(\.\d+)?/g)].map((m) => Number(m[0]));
+    const xs = nums.filter((_, i) => i % 2 === 0);
+    const ys = nums.filter((_, i) => i % 2 === 1);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(13.9);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(plan.width - 13.9);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(13.9);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(plan.height - 13.9);
+    expect(plan.path.endsWith('Z')).toBe(true);
+    expect(plan.sectorPaths).toHaveLength(3);
+    expect(plan.labels.map((l) => l.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    // The sector paths join end to start: sector 1 ends where sector 2 begins.
+    const end = (p: string): string => p.slice(p.lastIndexOf('L') + 1);
+    const start = (p: string): string => p.slice(1, p.indexOf('L'));
+    expect(end(plan.sectorPaths[0] as string)).toBe(start(plan.sectorPaths[1] as string));
+  });
+
+  it('picks sky presets by circuit, else by lighting', () => {
+    expect(timesOfDayFor('singapore', 'floodlit')).toEqual(['night-floodlit']);
+    expect(timesOfDayFor('elsewhere', 'floodlit')).toEqual(['night-floodlit']);
+    expect(timesOfDayFor('elsewhere', 'daylight')).toEqual(['overcast-day']);
+  });
+});

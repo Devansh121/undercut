@@ -5,6 +5,8 @@ import { defineConfig, type Plugin } from 'vite';
 // Relative import on purpose: the config is loaded by Node, which cannot import the
 // workspace package's TypeScript entry directly.
 import { GAME_NAME } from '../../packages/core/src/name.ts';
+import { CIRCUIT_DATA, fullRaceLaps } from '../../packages/race/src/circuit.ts';
+import { summarizeTrack, type TrackFileLike } from './src/ui/data/circuit-summary.ts';
 
 function buildHash(): string {
   if (process.env.BUILD_HASH) return process.env.BUILD_HASH;
@@ -67,11 +69,48 @@ function dracoDecoder(): Plugin {
   };
 }
 
+/**
+ * `virtual:undercut/circuits`: the menus' summary of every circuit whose track file is in
+ * packages/track/data (plan, length, corners, DRS zones, race laps), computed at build time so
+ * the menus never download a track to draw a card, and a circuit appears once its data lands.
+ */
+function circuitCatalog(): Plugin {
+  const id = 'virtual:undercut/circuits';
+  const resolved = `\0${id}`;
+  const dir = fileURLToPath(new URL('../../packages/track/data/', import.meta.url));
+  return {
+    name: 'circuit-catalog',
+    resolveId: (source) => (source === id ? resolved : null),
+    load(source) {
+      if (source !== resolved) return null;
+      const files = fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort();
+      const circuits = files.map((f) => {
+        this.addWatchFile(dir + f);
+        const t = JSON.parse(fs.readFileSync(dir + f, 'utf8')) as TrackFileLike;
+        const rules = CIRCUIT_DATA[t.id];
+        const line =
+          typeof t.timingLine === 'number'
+            ? t.timingLine
+            : (t.timingLine?.s ?? rules?.timingLine ?? 0);
+        return summarizeTrack(t, rules?.raceLaps ?? fullRaceLaps(t.length), line);
+      });
+      // Monza first (the default and round 1), then by name.
+      circuits.sort((a, b) =>
+        a.id === 'monza' ? -1 : b.id === 'monza' ? 1 : a.name.localeCompare(b.name),
+      );
+      return `export const CIRCUITS = ${JSON.stringify(circuits)};`;
+    },
+  };
+}
+
 const roomsPort = Number(process.env.ROOMS_PORT ?? 8787);
 
 export default defineConfig({
   base: './',
-  plugins: [gameName(), dracoDecoder()],
+  plugins: [gameName(), dracoDecoder(), circuitCatalog()],
   define: {
     __BUILD_HASH__: JSON.stringify(buildHash()),
   },

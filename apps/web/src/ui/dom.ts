@@ -22,26 +22,8 @@ export function svg<K extends keyof SVGElementTagNameMap>(
   return node;
 }
 
-/** Game icons on the 24 px grid (1.75 px square-cap strokes), as in design/mock. */
-export const ICON_PATHS = {
-  flag: 'M5 21V4 M5 4h13l-3 4.5 3 4.5H5',
-  camera: 'M3 8h4l2-3h6l2 3h4v11H3z M15.5 13a3.5 3.5 0 1 1-7 0a3.5 3.5 0 1 1 7 0z',
-  pause: 'M8 5v14M16 5v14',
-  play: 'M7 5l12 7-12 7z',
-  restart: 'M5 12a7 7 0 1 0 2.05-4.95 M5 4v4h4',
-  reset: 'M12 3v6 M8 7l4 4 4-4 M4 15h16 M6 19h12',
-  exit: 'M14 4h6v16h-6 M10 8l-4 4 4 4 M6 12h10',
-  stopwatch: 'M12 21a8 8 0 1 0 0-16a8 8 0 1 0 0 16z M12 9v4l2.5 2.5 M9.5 2.5h5',
-  chevron: 'M9 6l6 6-6 6',
-} as const;
-
-export type IconKey = keyof typeof ICON_PATHS;
-
-export function icon(name: IconKey, className = 'icon'): SVGSVGElement {
-  const s = svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', class: className });
-  s.append(svg('path', { d: ICON_PATHS[name] }));
-  return s;
-}
+// The icon set lives in kit/icons.ts; re-exported here for the screens that already use it.
+export { ICON_PATHS, icon, type IconKey } from './kit/icons';
 
 /** A text node holder that only touches the DOM when the value changes. */
 export class Text {
