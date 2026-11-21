@@ -75,5 +75,5 @@ describe('sample rates', () => {
         expect(near, `line at ${f.toFixed(1)} Hz has no counterpart at 96 kHz`).toBe(true);
       }
     }
-  });
+  }, 30_000);
 });

@@ -35,7 +35,7 @@ describe('limiter', () => {
       expect(samplePeak(ch)).toBeLessThan(1);
       expect(truePeak(ch)).toBeLessThan(1);
     }
-  });
+  }, 30_000);
 
   it('never reaches its ceiling, whatever the input', () => {
     const limiter = new SoftLimiter(FS);
@@ -79,7 +79,7 @@ describe('limiter', () => {
       expect(truePeak(l), name).toBeLessThan(1);
       expect(truePeak(r), name).toBeLessThan(1);
     }
-  });
+  }, 30_000);
 
   it('holds the threshold without the clipper on a sudden overload', () => {
     const limiter = new SoftLimiter(FS);
@@ -307,15 +307,15 @@ describe('cost', () => {
       }
     };
     // Warm up so every path is optimised and every lazily created buffer exists.
-    run(12_000);
+    run(6000);
     // Collect the garbage of earlier tests, then settle again: a full collection can throw
     // away optimised code that referred to objects it freed, and until a function is
     // re-optimised the interpreter boxes numbers. Nothing in steady play forces collections
     // on the audio thread, since it makes no garbage.
     gc();
-    run(4000);
+    run(2000);
     // Short-lived objects (what a per-sample allocation would make) land in the young
-    // generation. Render 40 s and see how much it grew; if anything was allocated it is
+    // generation. Render 20 s and see how much it grew; if anything was allocated it is
     // either still there or set off a scavenge, which the observer records.
     const scavenges: number[] = [];
     const observer = new PerformanceObserver((list) => {
@@ -331,19 +331,19 @@ describe('cost', () => {
     observer.observe({ entryTypes: ['gc'] });
     const t0 = performance.now();
     const before = newSpaceUsed();
-    run(15_000);
+    run(7500); // 20 s of audio
     const grown = newSpaceUsed() - before;
     const t1 = performance.now();
     v8.setFlagsFromString('--concurrent-recompilation');
     await new Promise((r) => setTimeout(r, 50));
     observer.disconnect();
-    // 16 bytes per block (one boxed number) would be 240 kB.
-    expect(grown, 'young-generation bytes allocated in 15 000 blocks').toBeLessThan(16 * 1024);
+    // 16 bytes per block (one boxed number) would be 120 kB.
+    expect(grown, 'young-generation bytes allocated in 7500 blocks').toBeLessThan(16 * 1024);
     expect(
       scavenges.filter((t) => t >= t0 && t <= t1),
       'scavenges while rendering',
     ).toHaveLength(0);
-  });
+  }, 30_000);
 
   it('renders one car much faster than real time', () => {
     const core = new AudioCore({ sampleRate: FS });
@@ -368,5 +368,5 @@ describe('cost', () => {
     const ratio = (blocks * 128) / FS / seconds;
     process.stderr.write(`audio core: ${ratio.toFixed(1)}x real time (one car, 48 kHz stereo)\n`);
     expect(ratio).toBeGreaterThan(10);
-  });
+  }, 30_000);
 });

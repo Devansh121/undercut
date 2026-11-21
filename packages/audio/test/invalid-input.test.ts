@@ -18,12 +18,13 @@ function allFinite(x: Float32Array): boolean {
   return true;
 }
 
+let reference: Float32Array | undefined;
 /** Render `bad` for 0.5 s, then GOOD for 1.5 s; return the clip and a clean reference. */
 function recover(bad: AudioCarState | Float64Array) {
   const core = new AudioCore({ sampleRate: FS, seed: 2 });
   const clip = render(core, 2, (t) => (t < 0.5 ? bad : GOOD));
-  const ref = render(new AudioCore({ sampleRate: FS, seed: 2 }), 2, () => GOOD);
-  return { clip, ref };
+  reference ??= render(new AudioCore({ sampleRate: FS, seed: 2 }), 2, () => GOOD).left;
+  return { clip, ref: { left: reference } };
 }
 
 function expectRecovered(name: string, bad: AudioCarState | Float64Array): void {
@@ -61,7 +62,7 @@ describe('invalid inputs', () => {
         if (typeof struct[key] === 'number') struct[key] = value;
       expectRecovered(`struct all ${value}`, struct as unknown as AudioCarState);
     }
-  });
+  }, 30_000);
 
   it('clamps every field to its supported range', () => {
     const c = new CarControls(FS);

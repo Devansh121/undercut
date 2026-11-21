@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { measure, type Measurement } from './measure';
 import { renderScenario, SCENARIOS } from './scenarios';
 
@@ -11,15 +11,16 @@ const DRIVING_SPREAD = 8; // LU between the loudest and quietest scenario with t
 
 const results = new Map<string, Measurement>();
 function result(name: string): Measurement {
-  let m = results.get(name);
-  if (!m) {
-    const scenario = SCENARIOS.find((s) => s.name === name);
-    if (!scenario) throw new Error(name);
-    m = measure(renderScenario(scenario));
-    results.set(name, m);
-  }
+  const m = results.get(name);
+  if (!m) throw new Error(`scenario ${name} was not rendered`);
   return m;
 }
+
+// Render and measure every scenario once, up front (about 2 s alone, more on a busy
+// machine); each test below then only checks numbers.
+beforeAll(() => {
+  for (const scenario of SCENARIOS) results.set(scenario.name, measure(renderScenario(scenario)));
+}, 120_000);
 
 describe('scenarios', () => {
   for (const scenario of SCENARIOS) {

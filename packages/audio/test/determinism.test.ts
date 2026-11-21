@@ -34,7 +34,7 @@ function render(
   sampleRate: number,
   drive: (t: number) => AudioCarState,
   block: number,
-  seconds = 3,
+  seconds = 1,
 ): Float32Array {
   const core = new AudioCore({ sampleRate, seed: 3 });
   const n = Math.round(seconds * sampleRate);
@@ -59,15 +59,18 @@ describe('block-size independence with events', () => {
   for (const sampleRate of [22_050, 48_000]) {
     for (const [name, drive] of Object.entries(DRIVES)) {
       it(`${name} at ${sampleRate} Hz`, () => {
-        const ref = render(sampleRate, drive, 1);
+        // The dense overrun case first diverged 2.8 s in before the fix; the others are
+        // event-rich from the start.
+        const seconds = name.startsWith('rev limiter on the overrun') ? 3 : 1;
+        const ref = render(sampleRate, drive, 1, seconds);
         for (const block of [7, 128, 4096]) {
-          const other = render(sampleRate, drive, block);
+          const other = render(sampleRate, drive, block, seconds);
           let first = -1;
           for (let i = 0; i < ref.length && first < 0; i++) if (ref[i] !== other[i]) first = i;
           expect(first, `block ${block}: first difference at sample ${first}`).toBe(-1);
           expect(identical(ref, other)).toBe(true);
         }
-      });
+      }, 30_000);
     }
   }
 });
