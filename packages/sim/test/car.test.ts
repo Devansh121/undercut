@@ -347,6 +347,20 @@ describe('aero', () => {
     expect(edge(a.stallHeight - a.leadingEdge * 0.03)).toBeCloseTo(a.stallHeight, 9);
   });
 
+  it('moves only the floor share of the downforce and its drag with the floor height', () => {
+    const a = createCarParams('low').aero;
+    expect(a.floorShare).toBeGreaterThan(0);
+    expect(a.floorShare).toBeLessThan(1);
+    const allFloor = { ...a, floorShare: 1 };
+    const rake = a.referenceRake;
+    for (const front of [0.022, 0.026, 0.03, 0.036]) {
+      const f = { ...aeroCoefficients(a, front, front + rake, 0, out) };
+      const w = aeroCoefficients(allFloor, front, front + rake, 0, { front: 0, rear: 0, drag: 0 });
+      expect(f.front + f.rear - a.clA).toBeCloseTo(a.floorShare * (w.front + w.rear - a.clA), 9);
+      expect(f.drag - a.cdA).toBeCloseTo(a.floorShare * (w.drag - a.cdA), 9);
+    }
+  });
+
   it('opens the DRS flap over its transient and closes it on the brake until released', () => {
     const car = createCarState(createCarParams('low'), { speed: 80, gear: 8 });
     run(car, input({ throttle: 1, drs: true }), 0.1);

@@ -148,14 +148,22 @@ export interface AeroParams {
   drsOpenTime: number;
   drsCloseTime: number;
   /**
-   * Ride-height map (doc 1.4, shape estimate). ClA·(1 + k·(h0 − h)) with h a front-weighted
-   * mean of the floor heights at the axles, a smooth stall of `stallLoss` over `stallWidth` once the floor's
-   * leading edge drops below `stallHeight`, and drag sensitivity one third of the downforce
-   * sensitivity. `referenceHeight` (h0) is the mean floor height at which the table ClA and
-   * CdA hold: the doc fitted them to speed-trap and braking data, so h0 is the height the car
-   * runs at 300 km/h on a flat straight in that trim (measured, see the Results section).
+   * Ride-height map (doc 1.4, shape estimate). ClA·(1 − f + f·(1 + k·(h0 − h))), f the floor
+   * share and h a front-weighted mean of the floor heights at the axles; a smooth stall of
+   * `stallLoss` over `stallWidth` once the floor's leading edge drops below `stallHeight`; drag
+   * sensitivity one third of the downforce sensitivity. `referenceHeight` (h0) is the mean
+   * floor height at which the table ClA and CdA hold: the doc fitted them to speed-trap and
+   * braking data, so h0 is the height the car runs at 300 km/h on a flat straight in that trim
+   * (measured, see the Results section).
    */
   heightSensitivity: number;
+  /**
+   * Share of the downforce (and of the drag's height sensitivity) made by the floor. Only that
+   * share follows the floor height: `heightSensitivity` is per metre of the floor's own
+   * downforce, and the wings and bodywork do not see the floor height. Estimate: the floor makes
+   * most of the downforce in this era (doc 1.4); 0.6.
+   */
+  floorShare: number;
   /** Weight of the front ride height in h; the floor's ground effect is led by its front. */
   frontHeightWeight: number;
   referenceHeight: number;
@@ -296,7 +304,8 @@ export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   rideHeightRear: 0.065,
   drsOpenTime: 0.2,
   drsCloseTime: 0.15,
-  heightSensitivity: 20, // doc 1.4: k_h ≈ 0.02 per mm
+  heightSensitivity: 20, // doc 1.4: k_h ≈ 0.02 per mm of the floor's downforce
+  floorShare: 0.6, // estimate (doc 1.4): the floor makes most of this era's downforce
   frontHeightWeight: 0.7, // estimate: "downforce rises as the floor's front ride height falls"
   referenceHeight: 0.0214, // measured at 300 km/h, 50 kg fuel (Results section)
   leadingEdge: 0.3, // estimate: the floor starts about 1.1 m behind the front axle
