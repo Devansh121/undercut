@@ -16,10 +16,12 @@ import type { CarAssets, CarLivery } from './car-assets';
 import { ensureCarShader } from './car-shader';
 import {
   Dashboard,
+  MEDIUM_COMPOUND,
   compoundMaterial,
   decalMaterial,
   liveryMaterial,
-  markingTexture,
+  markingsTexture,
+  type CompoundLook,
 } from './livery';
 
 export type { CarLivery } from './car-assets';
@@ -89,6 +91,7 @@ export class CarModel {
     quality: Quality,
     readonly geo: CarGeometry,
     mode: 'player' | 'ghost' | 'none' = 'player',
+    compound: CompoundLook = MEDIUM_COMPOUND,
   ) {
     const ghost = mode === 'ghost';
     this.lod = lod;
@@ -120,10 +123,10 @@ export class CarModel {
         mesh.material = g;
         mesh.castShadow = false;
         mesh.receiveShadow = false;
-        if (mesh.userData.decal) mesh.visible = false;
+        if (isDecal(mesh)) mesh.visible = false;
       });
     } else if (mode === 'player') {
-      this.dress(assets, livery, quality);
+      this.dress(assets, livery, quality, compound);
     }
     this.rig = new CarRig(this.asset, this.owned);
     this.rigPose = {
@@ -150,7 +153,7 @@ export class CarModel {
     if (!ghost) {
       this.asset.traverse((o) => {
         const mesh = o as Mesh;
-        if (mesh.isMesh && mesh.material instanceof MeshStandardMaterial && !mesh.userData.decal)
+        if (mesh.isMesh && mesh.material instanceof MeshStandardMaterial && !isDecal(mesh))
           ensureCarShader(mesh.material as never);
       });
     }
@@ -161,9 +164,14 @@ export class CarModel {
     this.bodyBox.applyMatrix4(this.body.matrixWorld.clone().invert());
   }
 
-  private dress(assets: CarAssets, livery: CarLivery, quality: Quality): void {
+  private dress(
+    assets: CarAssets,
+    livery: CarLivery,
+    quality: Quality,
+    compound: CompoundLook,
+  ): void {
     const paint = findMaterial(this.asset, 'paint');
-    const mask = assets.masks.get(livery.pattern);
+    const mask = assets.masks.get(livery.team);
     if (paint && mask) {
       const m = liveryMaterial(paint, mask, livery);
       this.owned.push(m);
@@ -171,25 +179,28 @@ export class CarModel {
     }
     const tyre = findMaterial(this.asset, 'tyre');
     if (tyre) {
-      const m = compoundMaterial(tyre, 'medium');
+      const m = compoundMaterial(tyre, compound);
       this.owned.push(m);
       replaceMaterial(this.asset, tyre, m);
     }
-    const numberTex = markingTexture(
-      String(livery.number),
-      1.6,
-      livery.primary,
+    // One canvas for the decal mesh: number left (u 0–0.4), code right (docs/car-asset.md).
+    const decals = this.asset.getObjectByName('decals');
+    if (!decals) return;
+    const info = decals.userData.decal as
+      { canvas?: [number, number]; number_u?: [number, number] } | undefined;
+    const tex = markingsTexture(
+      livery,
+      info?.canvas ?? [2048, 512],
+      info?.number_u?.[1] ?? 0.4,
       quality.anisotropy,
     );
-    const codeTex = markingTexture(livery.code, 3.4, livery.primary, quality.anisotropy);
-    this.textures.push(numberTex, codeTex);
-    const numberMat = decalMaterial(numberTex, quality.clearcoat);
-    const codeMat = decalMaterial(codeTex, quality.clearcoat);
-    this.owned.push(numberMat, codeMat);
-    this.asset.traverse((o) => {
+    this.textures.push(tex);
+    const mat = decalMaterial(tex, quality.clearcoat);
+    this.owned.push(mat);
+    decals.traverse((o) => {
       const mesh = o as Mesh;
-      if (!mesh.isMesh || !mesh.userData.decal) return;
-      mesh.material = mesh.userData.decal === 'number' ? numberMat : codeMat;
+      if (!mesh.isMesh) return;
+      mesh.material = mat;
       mesh.castShadow = false;
     });
   }
@@ -288,6 +299,11 @@ export class CarModel {
     for (const t of this.textures) t.dispose();
     this.root.removeFromParent();
   }
+}
+
+/** A mesh of the asset's `decals` node (the race number and driver code carriers). */
+export function isDecal(o: Object3D): boolean {
+  return o.name === 'decals' || o.parent?.name === 'decals';
 }
 
 export function findMaterial(root: Object3D, name: string): MeshStandardMaterial | null {

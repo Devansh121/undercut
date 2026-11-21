@@ -38,7 +38,7 @@ The numbers are in `packages/render/src/presets.json` (also read by the budget c
 | Bloom | yes | yes | yes | no | no |
 | Environment map | 256 | 256 | 128 | 64 | none (hemisphere) |
 | Sky / textures | 4k / hi | 4k / hi | 2k / hi | 2k / lo | 2k / lo |
-| Car levels | high → mobile at 14 m → far at 60 m | high → mobile 10 m → far 45 m | mobile → far 35 m | mobile → far 25 m | mobile → far 25 m |
+| Car levels (projected radius where the next takes over) | high → mobile 110 px → far 40 px | high → mobile 160 px → far 50 px | mobile → far 50 px | mobile → far 50 px | mobile → far 50 px |
 | Player's car | high | high | mobile | mobile | mobile |
 | Grain, vignette, speed blur | yes | yes | yes | no | no |
 | Dynamic resolution floor | 0.75 | 0.7 | 0.65 | 0.6 | off |
@@ -68,16 +68,17 @@ The shared surface shader (`materials/surface.ts`) adds: anti-tiling (a second, 
 - **Paint lines**: over the asphalt's own grain, worn through where the grain is high.
 - **Grass**: real lawn with lush-to-dry variation and a coarser sample of the same texture faded in with distance so the tile never repeats toward the horizon.
 
-Sizes and compression: WebP (quality 76–86 for maps, 95 for the sky) with GPU mipmaps and anisotropy. KTX2/Basis was not adopted: the transcoder path could not be verified on a phone-class GPU here, and WebP keeps the first race at 7.4 MB on High.
+Sizes and compression: WebP (quality 76–86 for maps, 95 for the sky) with GPU mipmaps and anisotropy. KTX2/Basis was not adopted: the transcoder path could not be verified on a phone-class GPU here, and WebP keeps the first race at 8.0 MB on High.
 
 ## The car
 
-Loaded per `docs/car-asset.md`: glTF with Draco (three.js's decoder, served from our origin at `assets/draco/` by a Vite plugin, never a CDN), WebP textures, three levels of detail.
+Loaded per `docs/car-asset.md`: glTF with Draco (three.js's decoder, served from our origin at `assets/draco/` by a Vite plugin, never a CDN; one decoder per load, disposed when it finishes or fails), WebP textures, three levels of detail.
 
-- **Placement** (`car/car-model.ts`): the yaw frame at the sim's (x, z), the sprung body pitched and rolled about the CoG, the asset inside it shifted from its wheelbase-centre origin to the CoG and down by its 40 mm floor plane, so the floor sits at the sim's ride height. Wheel centres go exactly to the sim's wheel heights, with the suspension nodes counter-rotated so wheels stay upright; links follow their joints (`car/car-rig.ts`).
-- **Animated from the sim**: wheel spin, steering (road wheels and steering wheel at 6:1), suspension travel, DRS flap, the driver's head turning into corners (steer and yaw rate), brake-disc glow from a braking-power heat model (heats with brake × speed, cools exponentially, fronts more), rain light (hooked up, off in the dry), steering-wheel display (gear, speed, rev lights) on the `display` material.
-- **Liveries**: any of the ten teams from `design/teams.json` through the mask contract; race numbers and driver codes drawn into canvas textures in the UI number family.
-- **Other cars** (`car/fleet.ts`): instanced. Each mesh of a level of detail is one draw for every car at that level, whatever the livery: colours are per-instance attributes over an array texture of the seven masks, numbers and codes come from one atlas, compounds are per material. Levels cross-fade over 4 m by complementary ordered dithering (`car/lod.ts`): during a switch each pixel is drawn by exactly one level, so there is no pop and no doubled frame. Frames where no car moved or changed level upload nothing.
+- **Placement** (`car/car-model.ts`): the yaw frame at the sim's (x, z), the sprung body pitched and rolled about the CoG, the asset inside it shifted from its wheelbase-centre origin to the CoG and down by its 40 mm floor plane, so the floor sits at the sim's ride height. Wheel centres go exactly to the sim's wheel heights, with the suspension nodes counter-rotated so wheels stay upright; the suspension links follow through their morph targets (bump per corner, steer on the fronts; `car/car-rig.ts`). The links do not cast shadows: thin and under the floor, their shadow does not read, and a morph-target caster needs its own shadow-depth shaders.
+- **Animated from the sim**: wheel spin, steering (road wheels and steering wheel at 6:1), suspension travel, DRS flap, the driver's head turning into corners (steer and yaw rate), brake-disc glow on the uprights from a braking-power heat model (heats with brake × speed, cools exponentially, fronts more), rain light (hooked up, off in the dry), steering-wheel display (gear, speed, rev lights) on the `display` material.
+- **Liveries**: each of the ten teams' own mask (`livery/<team>.png`) and colours; race number and driver code drawn into one canvas for the `decals` mesh (number left, code right) in the UI number family.
+- **Tyre compounds** from `design/compounds.json` (invented scheme: hard one steel-blue tick per group, medium two orange, soft three magenta): the listed tick slots on the sidewall are lit in the compound's colour, the maker's mark stays grey. The HUD has no compound display yet; when it gets one it should read the same file.
+- **Other cars** (`car/fleet.ts`): instanced. Each mesh of a level of detail is one draw for every car at that level, whatever the livery: colours are per-instance attributes over an array texture of the ten team masks, numbers and codes come from one atlas laid out like the decal canvas, compounds are per material. Levels switch by the car's projected size as the contract defines it (radius 3 m, High at 160 px and Mobile at 50 px on the High preset, back up only at 1.15 × the threshold) and cross-fade over 0.3 s by complementary ordered dithering (`car/lod.ts`): during a switch each pixel is drawn by exactly one level, so there is no pop and no doubled frame. Frames where no car moved, switched or faded upload nothing. The links stay at rest on these static cars.
 - **Cameras**: cockpit eye at the visor with the halo and live steering-wheel display in view; T-cam on the airbox top; chase cameras pull back on phone-landscape aspects so the road ahead stays below the timing panel; a trackside TV camera with a long lens (`setTvCamera`) for stations and replays.
 
 ## Loading and budget
@@ -88,9 +89,9 @@ Loaded per `docs/car-asset.md`: glTF with Draco (three.js's decoder, served from
 
 | Preset | First race at Monza |
 | --- | --- |
-| Ultra, High | 7.4 MB |
-| Medium | 6.4 MB |
-| Mobile | 2.9 MB |
+| Ultra, High | 8.0 MB |
+| Medium | 6.6 MB |
+| Mobile | 3.1 MB |
 
 ## Performance (RTX 4050 laptop, `npm run shots -- monza --no-shots --perf`)
 
@@ -98,10 +99,10 @@ Measured on the final build (`docs/evidence/m2-render/perf.json`); "drive" is th
 
 | Run | vsync avg / 1 % low | Uncapped mean frame | Draw calls | Triangles | Texture and target memory |
 | --- | --- | --- | --- | --- | --- |
-| High 1920×1080, drive | 60 / 59.5 fps | 3.1 ms | 366 | 0.76 M | ~370 MiB |
-| High 1920×1080, grid | 60 / 59.5 fps | 4.3 ms | 1016 | 3.8 M | ~370 MiB |
-| Mobile 844×390, drive | 60 / 59.5 fps | 0.9 ms | 147 | 0.15 M | ~95 MiB |
-| Mobile 844×390, grid | 60 / 59.5 fps | 1.9 ms | 318 | 0.98 M | ~95 MiB |
+| High 1920×1080, drive | 60 / 59.5 fps | 3.0 ms | 194 | 0.80 M | ~380 MiB |
+| High 1920×1080, grid | 60 / 59.5 fps | 5.1 ms | 468 | 4.3 M | ~380 MiB |
+| Mobile 844×390, drive | 60 / 59.5 fps | 1.6 ms | 63 | 0.16 M | ~97 MiB |
+| Mobile 844×390, grid | 60 / 59.5 fps | 2.1 ms | 130 | 0.85 M | ~97 MiB |
 
 Draw calls and triangles include every pass of a frame (three shadow cascades on High). Uncapped 1 % lows are dominated by the browser's frame pacing without vsync and are not a target. Nothing was cut to reach 60 fps on High with the full grid. A mid-range phone was not available to measure; the Mobile numbers are the laptop at phone resolution.
 

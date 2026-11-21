@@ -15,7 +15,8 @@ export {
 } from './cameras';
 export { CAR_FILES, type CarLivery } from './car/car-assets';
 export { CarModel, type CarGeometry } from './car/car-model';
-export { lodBlend } from './car/lod';
+export { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
+export { lodByPixels, projectedRadius } from './car/lod';
 export { LightPool, floodlightsAlong, type LocalLight } from './lighting/light-pool';
 export {
   MONZA_AFTERNOON,

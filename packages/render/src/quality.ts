@@ -47,9 +47,12 @@ export interface Quality {
     readonly threshold: number;
   };
   readonly clearcoat: boolean;
-  /** Car levels of detail this preset loads, and the distances where the next one takes over. */
+  /**
+   * Car levels of detail this preset loads, and the projected radius (px, docs/car-asset.md)
+   * below which the next one takes over.
+   */
   readonly carLods: readonly CarLod[];
-  readonly carLodDistances: readonly number[];
+  readonly carLodPixels: readonly number[];
   readonly playerLod: CarLod;
   /** Kerbs and barriers cast shadows. */
   readonly sceneryShadows: boolean;

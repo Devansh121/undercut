@@ -1,39 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { lodBlend, ditherCode } from '../src/car/lod';
+import { CAR_RADIUS_M, ditherCode, lodByPixels, projectedRadius } from '../src/car/lod';
 
-describe('lodBlend', () => {
-  const d = [10, 45];
+describe('projectedRadius', () => {
+  it('follows the contract formula r = R·H / (2·d·tan(fov/2))', () => {
+    const r = projectedRadius(30, 60, 1080);
+    expect(r).toBeCloseTo((CAR_RADIUS_M * 1080) / (2 * 30 * Math.tan(Math.PI / 6)), 9);
+    // Twice as far, half the size.
+    expect(projectedRadius(60, 60, 1080)).toBeCloseTo(r / 2, 9);
+  });
+});
 
-  it('is one level, fully visible, away from the switch distances', () => {
-    expect(lodBlend(5, d, 3)).toEqual([{ level: 0, fade: 1 }]);
-    expect(lodBlend(30, d, 3)).toEqual([{ level: 1, fade: 1 }]);
-    expect(lodBlend(200, d, 3)).toEqual([{ level: 2, fade: 1 }]);
+describe('lodByPixels (docs/car-asset.md thresholds, 1.15 hysteresis)', () => {
+  const t = [160, 50];
+
+  it('picks High at 160 px and above, Mobile from 50 px, Far below', () => {
+    expect(lodByPixels(400, t, 0)).toBe(0);
+    expect(lodByPixels(160, t, 0)).toBe(0);
+    expect(lodByPixels(159, t, 0)).toBe(1);
+    expect(lodByPixels(50, t, 1)).toBe(1);
+    expect(lodByPixels(49, t, 1)).toBe(2);
   });
 
-  it('cross-fades two neighbouring levels across the band, with weights summing to one', () => {
-    for (const x of [8.6, 9.5, 10, 10.9, 11.4]) {
-      const b = lodBlend(x, d, 3);
-      expect(b).toHaveLength(2);
-      expect(b[0]?.level).toBe(0);
-      expect(b[1]?.level).toBe(1);
-      expect((b[0]?.fade ?? 0) + (b[1]?.fade ?? 0)).toBeCloseTo(1, 9);
+  it('switches back up only at 1.15 × the threshold, so a car on the edge does not flicker', () => {
+    expect(lodByPixels(170, t, 1)).toBe(1);
+    expect(lodByPixels(183.5, t, 1)).toBe(1);
+    expect(lodByPixels(184.1, t, 1)).toBe(0);
+    expect(lodByPixels(55, t, 2)).toBe(2);
+    expect(lodByPixels(57.6, t, 2)).toBe(1);
+    // Once down to Mobile, sizes oscillating around the threshold never toggle back.
+    let level = 1;
+    const seen = new Set<number>();
+    for (let i = 0; i < 100; i++) {
+      level = lodByPixels(i % 2 ? 158 : 175, t, level);
+      seen.add(level);
     }
+    expect([...seen]).toEqual([1]);
   });
 
-  it('is continuous: no jump in weight anywhere along the distance', () => {
-    let prev = lodBlend(0, d, 3);
-    for (let x = 0; x < 60; x += 0.01) {
-      const b = lodBlend(x, d, 3);
-      const w = (list: typeof b, level: number): number =>
-        list.find((e) => e.level === level)?.fade ?? 0;
-      for (const level of [0, 1, 2])
-        expect(Math.abs(w(b, level) - w(prev, level))).toBeLessThan(0.02);
-      prev = b;
-    }
+  it('jumps straight to the right level after a teleport', () => {
+    expect(lodByPixels(10, t, 0)).toBe(2);
+    expect(lodByPixels(500, t, 2)).toBe(0);
   });
 
-  it('uses the first level everywhere when there is one distance at 0 (Mobile preset)', () => {
-    expect(lodBlend(3, [0, 25], 2)).toEqual([{ level: 1, fade: 1 }]);
+  it('with one threshold uses two levels (Mobile preset: mobile then far)', () => {
+    expect(lodByPixels(80, [50], 0)).toBe(0);
+    expect(lodByPixels(20, [50], 0)).toBe(1);
   });
 });
 

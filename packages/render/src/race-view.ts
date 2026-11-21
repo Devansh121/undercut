@@ -23,6 +23,7 @@ import { CarAssets, type CarLivery } from './car/car-assets';
 import { CarModel, type CarGeometry } from './car/car-model';
 import { ContactShadows } from './car/contact-shadows';
 import { CarFleet } from './car/fleet';
+import { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
 import { Environment } from './environment';
 import type { LocalLight } from './lighting/light-pool';
 import { nextLift } from './framing';
@@ -60,6 +61,8 @@ export interface RaceViewOptions {
   livery: CarLivery;
   car: CarGeometry;
   timeOfDay?: TimeOfDay;
+  /** Tyre compound on every car (design/compounds.json); Medium when absent. */
+  compound?: CompoundLook;
   /** Local lights (floodlights) for a night time of day. */
   localLights?: readonly LocalLight[];
   /** Racing-line lateral offset per lap sample (m), for the rubbered line. */
@@ -190,8 +193,8 @@ export class RaceView {
       if (!t) throw new Error(`no texture set ${id} in the asset index`);
       for (const f of Object.values(t[tier])) loader.expect(f, index.files[f]);
     }
-    const patterns = [
-      ...new Set([options.livery.pattern, ...(options.fleetLiveries ?? []).map((l) => l.pattern)]),
+    const teams = [
+      ...new Set([options.livery.team, ...(options.fleetLiveries ?? []).map((l) => l.team)]),
     ];
     const skyP = loader.image(skyMeta[q.skyTier]);
     const setP = Promise.all(
@@ -206,7 +209,7 @@ export class RaceView {
         return [id, { diff, nor, arm, sizeM: t.sizeM }] as const;
       }),
     );
-    const carP = CarAssets.load(loader, q, patterns, options.dracoPath);
+    const carP = CarAssets.load(loader, q, teams, options.dracoPath);
     const [skyImage, setImages, car] = await Promise.all([skyP, setP, carP]);
     const sets = {} as Record<TrackTextureId, PbrSet>;
     for (const [id, img] of setImages) sets[id] = pbrSet(img, img.sizeM, q.anisotropy);
@@ -241,7 +244,16 @@ export class RaceView {
     });
     this.scene.add(this.trackView.group);
     const t2 = performance.now();
-    this.car = new CarModel(assets.car, q.playerLod, options.livery, q, options.car, 'player');
+    const compound = options.compound ?? MEDIUM_COMPOUND;
+    this.car = new CarModel(
+      assets.car,
+      q.playerLod,
+      options.livery,
+      q,
+      options.car,
+      'player',
+      compound,
+    );
     this.ghostCar = new CarModel(
       assets.car,
       q.carLods[q.carLods.length - 1] ?? 'far',
@@ -252,7 +264,7 @@ export class RaceView {
     );
     this.ghostCar.root.visible = false;
     this.ghostCar.root.renderOrder = 2;
-    this.fleet = new CarFleet(assets.car, q, options.car);
+    this.fleet = new CarFleet(assets.car, q, options.car, compound);
     this.scene.add(this.car.root, this.ghostCar.root, this.fleet.group);
     this.contact = q.contactShadow
       ? new ContactShadows(32, q.shadow.cascades > 0 ? 0.35 : 0.6)
@@ -504,7 +516,7 @@ export class RaceView {
     }
     this.focus.set(frame.pose.x, frame.pose.y, frame.pose.z);
     this.environment.update(this.camera, this.focus, true);
-    this.fleet.update(this.camera.position);
+    this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
     if (this.contact) {
       this.contact.begin();

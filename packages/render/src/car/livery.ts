@@ -5,17 +5,71 @@ import {
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   SRGBColorSpace,
+  Vector3,
   type MeshStandardMaterial,
   type Texture,
 } from 'three';
 import type { CarLivery } from './car-assets';
-import { COMPOUND_GLSL } from './car-shader';
 
 /** Carbon where the livery mask's B channel says bare carbon (docs/car-asset.md). */
 export const CARBON = '#141518';
-/** Tyre compound colours: soft red, medium yellow, hard white. */
-export const COMPOUND_COLOURS = { soft: '#d8322a', medium: '#e6c229', hard: '#eeeeea' } as const;
-export type Compound = keyof typeof COMPOUND_COLOURS;
+
+/**
+ * A tyre compound as `design/compounds.json` describes it: its colour and the tick slots it
+ * lights in each group on the sidewall, with the sidewall layout (groups per sidewall, slot
+ * spacing in TEXCOORD_1 u).
+ */
+export interface CompoundLook {
+  colour: string;
+  slots: readonly number[];
+  groupsPerSidewall: number;
+  slotSpacingU: number;
+}
+
+/** Medium (two outer ticks, orange) as in design/compounds.json, for when none is given. */
+export const MEDIUM_COMPOUND: CompoundLook = Object.freeze({
+  colour: '#F2902F',
+  slots: [-1, 1],
+  groupsPerSidewall: 4,
+  slotSpacingU: 0.012,
+});
+
+/**
+ * Sidewall shading for a compound: the bright texels of the tyre texture are markings; in each
+ * group of three tick slots the compound's slots are lit in its colour, the others stay rubber,
+ * and the maker's lettering stays neutral grey. Needs uniforms uCompound, uLit, uGroups, uSlot.
+ */
+export const COMPOUND_GLSL = /* glsl */ `
+#ifdef USE_MAP
+{
+  float marking = smoothstep(0.05, 0.35, diffuseColor.r);
+  float f = fract(vMapUv.x * uGroups) - 0.5;
+  float slotIndex = f / (uSlot * uGroups);
+  float isTick = step(abs(f), 1.6 * uSlot * uGroups);
+  float k = clamp(floor(slotIndex + 0.5), -1.0, 1.0);
+  float lit = k < -0.5 ? uLit.x : (k > 0.5 ? uLit.z : uLit.y);
+  vec3 rubber = vec3(0.016);
+  vec3 tickCol = mix(rubber, uCompound * 0.85, lit);
+  diffuseColor.rgb = mix(rubber, mix(vec3(0.55), tickCol, isTick), marking);
+}
+#endif`;
+
+export const COMPOUND_PARS = /* glsl */ `
+uniform vec3 uCompound;
+uniform vec3 uLit;
+uniform float uGroups;
+uniform float uSlot;`;
+
+/** Uniforms for COMPOUND_GLSL. */
+export function compoundUniforms(c: CompoundLook): Record<string, { value: unknown }> {
+  const lit = [-1, 0, 1].map((k) => (c.slots.includes(k) ? 1 : 0));
+  return {
+    uCompound: { value: new Color(c.colour) },
+    uLit: { value: new Vector3(lit[0], lit[1], lit[2]) },
+    uGroups: { value: c.groupsPerSidewall },
+    uSlot: { value: c.slotSpacingU },
+  };
+}
 
 /** Shader fragment that turns the mask in `map` into paint (shared by single and fleet cars). */
 export const LIVERY_GLSL = /* glsl */ `
@@ -58,7 +112,7 @@ export function liveryMaterial(
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.42, liveryCarbon);',
+        '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.5, liveryCarbon);',
       );
   };
   m.customProgramCacheKey = () => 'car-livery';
@@ -66,17 +120,21 @@ export function liveryMaterial(
   return m;
 }
 
-/** Fill a canvas cell with a race number or driver code, light or dark on the primary colour. */
-export function drawMarking(
+/**
+ * Draw one car's markings into a canvas cell laid out like the decal mesh's UVs
+ * (docs/car-asset.md): the race number centred in u 0–0.4, the driver code in u 0.4–1, on
+ * transparent, light or dark against the primary colour.
+ */
+export function drawMarkings(
   ctx: CanvasRenderingContext2D,
-  text: string,
+  livery: Pick<CarLivery, 'number' | 'code' | 'primary'>,
   x: number,
   y: number,
   w: number,
   h: number,
-  primary: string,
+  split = 0.4,
 ): void {
-  const c = new Color(primary);
+  const c = new Color(livery.primary);
   const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
   const fill = lum > 0.35 ? '#15161a' : '#f2f0eb';
   const outline = lum > 0.35 ? 'rgba(242,240,235,0.85)' : 'rgba(21,22,26,0.85)';
@@ -85,32 +143,34 @@ export function drawMarking(
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-  ctx.font = `700 ${Math.round(h * 0.86)}px "Barlow Semi Condensed", Archivo, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = h * 0.07;
-  ctx.strokeStyle = outline;
-  ctx.strokeText(text, x + w / 2, y + h * 0.54);
-  ctx.fillStyle = fill;
-  ctx.fillText(text, x + w / 2, y + h * 0.54);
+  const draw = (text: string, x0: number, x1: number, size: number): void => {
+    ctx.font = `700 ${Math.round(size)}px "Barlow Semi Condensed", Archivo, sans-serif`;
+    ctx.lineWidth = h * 0.06;
+    ctx.strokeStyle = outline;
+    ctx.strokeText(text, (x0 + x1) / 2, y + h * 0.54);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, (x0 + x1) / 2, y + h * 0.54);
+  };
+  draw(String(livery.number), x, x + w * split, h * 0.86);
+  draw(livery.code, x + w * split, x + w, h * 0.78);
   ctx.restore();
 }
 
-/** A canvas texture with one marking, for a single car's decal carriers. */
-export function markingTexture(
-  text: string,
-  aspect: number,
-  primary: string,
+/** One car's markings canvas texture for its decal mesh (size from the node's extras). */
+export function markingsTexture(
+  livery: Pick<CarLivery, 'number' | 'code' | 'primary'>,
+  size: readonly [number, number],
+  split: number,
   anisotropy: number,
 ): CanvasTexture {
-  const h = 256;
-  const w = Math.round(h * aspect);
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = size[0];
+  canvas.height = size[1];
   const ctx = canvas.getContext('2d');
-  if (ctx) drawMarking(ctx, text, 0, 0, w, h, primary);
+  if (ctx) drawMarkings(ctx, livery, 0, 0, size[0], size[1], split);
   const t = new CanvasTexture(canvas);
   t.flipY = false;
   t.colorSpace = SRGBColorSpace;
@@ -133,22 +193,18 @@ export function decalMaterial(map: Texture, clearcoat: boolean): MeshPhysicalMat
   });
 }
 
-/** Sidewall markings take the compound colour; the rubber stays rubber. */
+/** Sidewall ticks in the compound's pattern and colour; the rubber stays rubber. */
 export function compoundMaterial(
   base: MeshStandardMaterial,
-  compound: Compound,
+  compound: CompoundLook,
 ): MeshStandardMaterial {
   const m = base.clone();
-  const uniforms = { uCompound: { value: new Color(COMPOUND_COLOURS[compound]) } };
+  const uniforms = compoundUniforms(compound);
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uCompound;')
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-${COMPOUND_GLSL}`,
-      );
+      .replace('#include <common>', `#include <common>\n${COMPOUND_PARS}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${COMPOUND_GLSL}`);
   };
   m.customProgramCacheKey = () => 'car-tyre';
   m.userData.compound = uniforms;

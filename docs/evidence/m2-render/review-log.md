@@ -39,10 +39,18 @@ New pipeline, HDRI sky, CC0 surfaces and the real car in the game for the first 
 - Thumbnail: yes. At thumbnail size the chase, T-cam, TV and pit-lane frames pass for a current racing sim; the cockpit nearly does.
 - Time of day: the same pipeline renders an overcast day (soft key, faint shadows, `time-of-day-overcast.jpg`) and a night lit by floodlights through the light pool (`time-of-day-night.jpg`).
 
+## Round 6: the merged car (`rounds/r6-1440x900.jpg`)
+
+PR #11 landed with a second modelling pass and a revised contract: 36 / 23 / 11 draw calls per level, one mask per team (ten designed liveries), one decal mesh, links on morph targets, discs on the uprights, an invented compound tick scheme (`design/compounds.json`) and level switches by projected size. The loader, rig, liveries, markings, compounds and fleet now follow it.
+
+- Thumbnail: yes, and the cockpit now passes too: the driver's gloves on the wheel and the painted halo give the view its foreground.
+- Compound ticks read on the sidewalls at the pit-lane station (two orange per group, Medium); numbers and codes sit on the nose and flanks.
+- The full grid's draw calls fell from 1016 to 468 per frame at 1080p High (shadow passes included); every vsync run still holds 60 fps.
+
 ## Remaining giveaways, ranked
 
 1. **Undressed surroundings.** A flat green plane to the horizon, a dark band of barrier tops, no trees, stands, boards, fences, marshal posts or skyline. Expected: the dressing slice uses the prop registry, board material and time-of-day hooks in `docs/render.md`.
-2. **Cockpit interior.** Dark and featureless around the steering wheel; the wheel's grips barely read. Needs a modelling pass (seat belts, wheel detail) and a small fill light for the cockpit camera.
+2. **Cockpit interior.** Better with the gloves and wheel of the merged car, but still dark below the wheel; a small fill for the cockpit camera would lift it.
 3. **Paint reads slightly plastic at distance.** Clear coat and base are right up close (pit-lane station), but from the chase camera large panels are uniform. A subtle flake or orange-peel normal and dirt build-up toward the rear would help.
 4. **Grass is uniform at mid distance.** Macro variation breaks tiling, but there are no mowing stripes, verge wear, tyre tracks or patches of dry grass where real circuits have them.
 5. **Far-field haze meets a flat horizon.** The height fog is tinted by the sky and works, but with no terrain or tree line the horizon is a straight edge.

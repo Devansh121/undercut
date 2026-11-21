@@ -29,18 +29,8 @@ export interface RigPose {
   rain: number;
 }
 
-interface Link {
-  o: Object3D;
-  follower: Object3D;
-  /** Outboard joint in the follower's frame. */
-  attach: Vector3;
-  /** Rest direction pivot → outboard, in the link's parent frame. */
-  rest: Vector3;
-}
-
 const v = new Vector3();
 const q = new Quaternion();
-const q2 = new Quaternion();
 
 export class CarRig {
   readonly wheels: (Object3D | undefined)[];
@@ -52,7 +42,10 @@ export class CarRig {
   readonly helmet: Object3D | undefined;
   readonly discMaterials: (MeshStandardMaterial | null)[] = [];
   readonly rainMaterial: MeshStandardMaterial | null = null;
-  private readonly links: Link[] = [];
+  /** `suspension_links` meshes and their morph-target references (docs/car-asset.md). */
+  private readonly linkMeshes: Mesh[] = [];
+  private readonly bumpRef: number = 0.03;
+  private readonly steerRef: number = 0.35;
   private readonly wheelAxis = new Vector3(-1, 0, 0);
   private readonly openRad: number;
 
@@ -73,23 +66,25 @@ export class CarRig {
     if (axis) this.wheelAxis.fromArray(axis).normalize();
     this.helmet = node('helmet');
 
-    root.updateMatrixWorld(true);
-    root.traverse((o) => {
-      const ud = o.userData as { outboard?: number[]; follows?: string };
-      if (!ud.outboard || !ud.follows) return;
-      const follower = node(ud.follows);
-      if (!follower) return;
-      const out = new Vector3().fromArray(ud.outboard);
-      const attach = follower.worldToLocal(root.localToWorld(out.clone()));
-      this.links.push({ o, follower, attach, rest: out.sub(o.position).normalize() });
-    });
+    const links = node('suspension_links');
+    if (links) {
+      const morph = links.userData.morph as
+        { bump_ref_m?: number; steer_ref_rad?: number } | undefined;
+      this.bumpRef = morph?.bump_ref_m ?? 0.03;
+      this.steerRef = morph?.steer_ref_rad ?? 0.35;
+      links.traverse((m) => {
+        const mesh = m as Mesh;
+        if (mesh.isMesh && mesh.morphTargetDictionary) this.linkMeshes.push(mesh);
+      });
+    }
 
+    // Brake discs sit on the uprights (they do not spin); one material copy per corner for glow.
     for (const c of CORNERS) {
-      const disc = node(`brake_disc_${c}`);
       let mat: MeshStandardMaterial | null = null;
-      disc?.traverse((m) => {
+      node(`upright_${c}`)?.traverse((m) => {
         const mesh = m as Mesh;
         if (!mesh.isMesh || !(mesh.material instanceof MeshStandardMaterial)) return;
+        if (mesh.material.name !== 'brake_disc') return;
         mat ??= this.own(mesh.material.clone());
         mat.emissiveIntensity = 0;
         mesh.material = mat;
@@ -150,15 +145,21 @@ export class CarRig {
       this.steeringWheel.quaternion.setFromAxisAngle(this.wheelAxis, p.wheelTurn);
     if (this.helmet) this.helmet.rotation.y = p.headYaw;
     if (this.rainMaterial) this.rainMaterial.emissiveIntensity = 6 * p.rain;
-    this.root.updateMatrixWorld(true);
-    for (const L of this.links) {
-      v.copy(L.attach);
-      L.follower.localToWorld(v);
-      this.root.worldToLocal(v);
-      v.sub(L.o.position).normalize();
-      q2.setFromUnitVectors(L.rest, v);
-      L.o.quaternion.copy(q2);
+    // Links follow the wheels through morph targets: bump per corner, steer on the fronts.
+    for (const m of this.linkMeshes) {
+      const d = m.morphTargetDictionary as Record<string, number>;
+      const inf = m.morphTargetInfluences as number[];
+      for (let i = 0; i < 4; i++) {
+        const k = d[`bump_${CORNERS[i]}`];
+        const s = this.suspension[i];
+        if (k !== undefined && s)
+          inf[k] = (s.position.y - (this.rest[i] as Vector3).y) / this.bumpRef;
+      }
+      for (const c of ['FL', 'FR']) {
+        const k = d[`steer_${c}`];
+        if (k !== undefined) inf[k] = p.steer / this.steerRef;
+      }
     }
-    for (const L of this.links) L.o.updateMatrixWorld(true);
+    this.root.updateMatrixWorld(true);
   }
 }

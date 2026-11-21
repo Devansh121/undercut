@@ -29,10 +29,12 @@ import {
   createRenderer,
   type CameraName,
   type CarLivery,
+  type CompoundLook,
   type QualityName,
   type ToneMap,
 } from '@undercut/render';
 import teams from '../../../design/teams.json';
+import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
@@ -124,7 +126,7 @@ function liveries(first: string): CarLivery[] {
   for (const t of ordered) {
     for (const d of t.drivers) {
       out.push({
-        pattern: t.liveryPattern,
+        team: t.id,
         primary: t.colours.primary,
         secondary: t.colours.secondary,
         accent: t.colours.accent,
@@ -134,6 +136,18 @@ function liveries(first: string): CarLivery[] {
     }
   }
   return out;
+}
+
+/** A compound's look on the tyre, from design/compounds.json (the HUD reads the same file). */
+function compoundLook(id: string): CompoundLook {
+  const c = compounds.compounds.find((k) => k.id === id) ?? compounds.compounds[0];
+  if (!c) throw new Error('design/compounds.json has no compounds');
+  return {
+    colour: c.colour,
+    slots: c.slots,
+    groupsPerSidewall: compounds.tyreMarking.groupsPerSidewall,
+    slotSpacingU: compounds.tyreMarking.slotSpacingU,
+  };
 }
 
 /** `?tonemap=agx|aces|neutral` (render comparisons); Khronos PBR Neutral otherwise. */
@@ -225,6 +239,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           racingLine: line,
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
+          compound: compoundLook('medium'),
           timeOfDay: tod,
           localLights: tod.localLightSlots > 0 ? floodlightsAlong(track, 36) : [],
           dracoPath: new URL('assets/draco/', document.baseURI).href,

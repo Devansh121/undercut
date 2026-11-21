@@ -24,13 +24,6 @@ export function patchCarShader(shader: WebGLProgramParametersWithUniforms): void
   );
 }
 
-/** Compound colour on the tyre's sidewall markings (the bright texels of its base colour). */
-export const COMPOUND_GLSL = /* glsl */ `
-{
-  float marking = smoothstep(0.05, 0.4, diffuseColor.r);
-  diffuseColor.rgb = mix(vec3(0.018), uCompound * 0.8, marking);
-}`;
-
 const patched = new WeakSet<object>();
 /** Glass and screens reflect or glow on their own; their housings' baked darkness must not apply. */
 const EXEMPT = new Set(['mirror_glass', 'visor', 'display', 'rain_light']);

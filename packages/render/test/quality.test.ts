@@ -7,7 +7,7 @@ describe('quality presets', () => {
     for (const n of QUALITY_NAMES) {
       const q = QUALITY[n];
       expect(q.name).toBe(n);
-      expect(q.carLods.length).toBe(q.carLodDistances.length + 1);
+      expect(q.carLods.length).toBe(q.carLodPixels.length + 1);
       expect(q.carLods).toContain(q.playerLod === 'high' ? 'high' : q.playerLod);
       if (!q.post) {
         // Lite: every post effect has its fallback (none of them run).

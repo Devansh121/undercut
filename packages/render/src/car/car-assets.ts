@@ -11,11 +11,12 @@ export const CAR_FILES: Readonly<Record<CarLod, string>> = Object.freeze({
   mobile: 'car/car_mobile.glb',
   far: 'car/car_far.glb',
 });
-export const liveryMaskFile = (pattern: string): string => `car/livery/${pattern}.png`;
+/** Each team has its own livery mask (docs/car-asset.md). */
+export const liveryMaskFile = (team: string): string => `car/livery/${team}.png`;
 
-/** A team's look on the car: livery mask pattern, colours (sRGB hex), race number, code. */
+/** A driver's look on the car: team (its livery mask), colours (sRGB hex), race number, code. */
 export interface CarLivery {
-  pattern: string;
+  team: string;
   primary: string;
   secondary: string;
   accent: string;
@@ -44,12 +45,15 @@ export class CarAssets {
   static async load(
     loader: AssetLoader,
     quality: Quality,
-    patterns: readonly string[],
+    teams: readonly string[],
     dracoPath: string,
   ): Promise<CarAssets> {
     const out = new CarAssets();
     const lods = new Set<CarLod>([...quality.carLods, quality.playerLod]);
-    const draco = sharedDraco(dracoPath);
+    // One decoder for every level, disposed when the loads finish or fail: it holds workers.
+    const draco = new DRACOLoader();
+    draco.setDecoderPath(dracoPath);
+    draco.setWorkerLimit(2);
     const gltf = new GLTFLoader().setDRACOLoader(draco);
     const parse = async (lod: CarLod): Promise<void> => {
       const buf = await loader.bytes(CAR_FILES[lod]);
@@ -60,17 +64,24 @@ export class CarAssets {
       prepare(root, quality);
       out.templates.set(lod, { lod, root });
     };
-    const mask = async (pattern: string): Promise<void> => {
-      const img = await loader.image(liveryMaskFile(pattern), 'image/png');
-      out.maskImages.set(pattern, img);
+    const mask = async (team: string): Promise<void> => {
+      const img = await loader.image(liveryMaskFile(team), 'image/png');
+      out.maskImages.set(team, img);
       const t = new Texture(img);
       t.flipY = false;
       t.needsUpdate = true;
       t.anisotropy = Math.min(4, quality.anisotropy);
-      out.masks.set(pattern, t);
+      out.masks.set(team, t);
     };
     for (const lod of lods) loader.expect(CAR_FILES[lod], undefined);
-    await Promise.all([...[...lods].map(parse), ...[...new Set(patterns)].map(mask)]);
+    try {
+      await Promise.all([...[...lods].map(parse), ...[...new Set(teams)].map(mask)]);
+    } catch (e) {
+      out.dispose();
+      throw e;
+    } finally {
+      draco.dispose();
+    }
     return out;
   }
 
@@ -102,23 +113,14 @@ export class CarAssets {
   }
 }
 
-let draco: DRACOLoader | null = null;
-/** One Draco decoder (its workers) for the page; the decoder files are served locally. */
-function sharedDraco(path: string): DRACOLoader {
-  if (!draco) {
-    draco = new DRACOLoader();
-    draco.setDecoderPath(path);
-    draco.setWorkerLimit(2);
-  }
-  return draco;
-}
-
 /** Per-preset material settings on a freshly parsed level of detail. */
 function prepare(root: Object3D, quality: Quality): void {
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
-    mesh.castShadow = true;
+    // The suspension links are thin and under the floor: their shadow does not read, and a
+    // morph-target caster would need its own shadow-depth shader variants.
+    mesh.castShadow = !(o.name === 'suspension_links' || o.parent?.name === 'suspension_links');
     mesh.receiveShadow = true;
     for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       if (m instanceof MeshPhysicalMaterial && !quality.clearcoat) m.clearcoat = 0;

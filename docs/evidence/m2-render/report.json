@@ -1,14 +1,14 @@
 {
-  "sha": "5503cd0",
+  "sha": "8b26fc2",
   "circuit": "monza",
   "shots": [
     {
       "framing": {
         "car": {
-          "left": 783.4393424633533,
-          "top": 435.11773293419384,
-          "right": 808.5002556346047,
-          "bottom": 447.46839335842276
+          "left": 783.4391750958265,
+          "top": 435.08034484648306,
+          "right": 808.5002807601637,
+          "bottom": 447.45124195493037
         },
         "cluster": {
           "left": 1113,
@@ -20,7 +20,7 @@
       },
       "station": "grid-front",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/grid-front-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/grid-front-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
@@ -65,10 +65,10 @@
     {
       "framing": {
         "car": {
-          "left": 430.543818547419,
-          "top": 459.5585787340614,
-          "right": 1009.2879410631235,
-          "bottom": 814.8516390928118
+          "left": 438.1422326993439,
+          "top": 458.7417180024839,
+          "right": 1001.910716254779,
+          "bottom": 804.3353450042564
         },
         "cluster": {
           "left": 1113,
@@ -80,16 +80,16 @@
       },
       "station": "chicane-braking",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/chicane-braking-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/chicane-braking-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 766,
-        "time": 3.1916666666666664,
+        "tick": 790,
+        "time": 3.2916666666666665,
         "timeScale": 0,
-        "s": 545.3171737266778,
-        "d": -0.005913022150819548,
+        "s": 549.0465058773943,
+        "d": -0.00690983695876867,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": true,
@@ -113,7 +113,7 @@
         "ghost": false
       },
       "hud": {
-        "speed": "136",
+        "speed": "132",
         "gear": "3",
         "lapTime": "0:00.000",
         "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
@@ -125,10 +125,10 @@
     {
       "framing": {
         "car": {
-          "left": 579.791917739297,
-          "top": 478.460542818912,
-          "right": 865.534244307148,
-          "bottom": 691.1011334125831
+          "left": 581.6964926880407,
+          "top": 477.70339027090745,
+          "right": 863.4062741064398,
+          "bottom": 686.2833617069155
         },
         "cluster": {
           "left": 1113,
@@ -140,16 +140,16 @@
       },
       "station": "fast-corner",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/fast-corner-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/fast-corner-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 1294,
-        "time": 5.391666666666667,
+        "tick": 1318,
+        "time": 5.491666666666666,
         "timeScale": 0,
-        "s": 1063.2530627519286,
-        "d": 1.593988761019616,
+        "s": 1063.29792562829,
+        "d": 1.5800233291502475,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -185,10 +185,10 @@
     {
       "framing": {
         "car": {
-          "left": 249.7356193610388,
-          "top": 114.73917569439307,
-          "right": 1185.3099187537084,
-          "bottom": 771.6859795698928
+          "left": 250.02026771546377,
+          "top": 114.5724694373791,
+          "right": 1185.5932853996412,
+          "bottom": 771.4142739281525
         },
         "cluster": {
           "left": 1113,
@@ -200,13 +200,13 @@
       },
       "station": "cockpit",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/cockpit-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/cockpit-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 2070,
-        "time": 8.625,
+        "tick": 2094,
+        "time": 8.725,
         "timeScale": 0,
         "s": 5183.061712636024,
         "d": 1.5745133687187252,
@@ -245,10 +245,10 @@
     {
       "framing": {
         "car": {
-          "left": 224.6113118674549,
-          "top": -180.49464073298407,
-          "right": 1214.1201445214817,
-          "bottom": 893.5045235727986
+          "left": 224.88672736531322,
+          "top": -180.61522057566464,
+          "right": 1214.643523682207,
+          "bottom": 893.5828534449537
         },
         "cluster": {
           "left": 1113,
@@ -260,16 +260,16 @@
       },
       "station": "tcam",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/tcam-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/tcam-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 2886,
-        "time": 12.025,
+        "tick": 2918,
+        "time": 12.158333333333333,
         "timeScale": 0,
-        "s": 1702.8030732095835,
-        "d": 0.19418370612555508,
+        "s": 1704.6272788095198,
+        "d": 0.19436084771947956,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -293,7 +293,7 @@
         "ghost": false
       },
       "hud": {
-        "speed": "198",
+        "speed": "196",
         "gear": "5",
         "lapTime": "0:00.000",
         "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
@@ -305,10 +305,10 @@
     {
       "framing": {
         "car": {
-          "left": 472.3020987298844,
-          "top": 464.4266530439072,
-          "right": 968.7207026008957,
-          "bottom": 767.292804336315
+          "left": 477.55805063638155,
+          "top": 464.59791791284636,
+          "right": 960.9203210326425,
+          "bottom": 758.5691954617027
         },
         "cluster": {
           "left": 1113,
@@ -320,16 +320,16 @@
       },
       "station": "straight",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/straight-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/straight-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3926,
-        "time": 16.358333333333334,
+        "tick": 3958,
+        "time": 16.491666666666667,
         "timeScale": 0,
-        "s": 5646.013131744582,
-        "d": -0.1566444764708129,
+        "s": 5645.819619702738,
+        "d": -0.15198039342770128,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -365,10 +365,10 @@
     {
       "framing": {
         "car": {
-          "left": 409.85987932859996,
-          "top": 386.2655939754195,
-          "right": 1113.6529746048943,
-          "bottom": 520.7315547348799
+          "left": 416.7190078079586,
+          "top": 385.7443480918376,
+          "right": 1115.4009567152818,
+          "bottom": 520.7451617865387
         },
         "cluster": {
           "left": 1113,
@@ -380,16 +380,16 @@
       },
       "station": "tv-kerb",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/tv-kerb-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/tv-kerb-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3986,
-        "time": 16.608333333333334,
+        "tick": 4022,
+        "time": 16.758333333333333,
         "timeScale": 0,
-        "s": 613.3328292140062,
-        "d": 6.0147696197292255,
+        "s": 613.7893621644151,
+        "d": 6.047913060953658,
         "surface": 2,
         "wheelsOff": 2,
         "drsAvailable": false,
@@ -425,10 +425,10 @@
     {
       "framing": {
         "car": {
-          "left": -563.6372425292523,
-          "top": 180.74233543854797,
-          "right": -537.8593177141831,
-          "bottom": 184.31482358816976
+          "left": -563.3541688108693,
+          "top": 180.73183245429416,
+          "right": -537.8602972905484,
+          "bottom": 184.31023656224107
         },
         "cluster": {
           "left": 1113,
@@ -440,13 +440,13 @@
       },
       "station": "pit-lane",
       "viewport": "1440x900",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/pit-lane-1440x900.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/pit-lane-1440x900.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3986,
-        "time": 16.608333333333334,
+        "tick": 4022,
+        "time": 16.758333333333333,
         "timeScale": 0,
         "s": 5000,
         "d": -3.686426679693777e-14,
@@ -485,10 +485,10 @@
     {
       "framing": {
         "car": {
-          "left": 449.4903817341198,
-          "top": 188.56688353802423,
-          "right": 460.35010252961683,
-          "bottom": 193.90297045531653
+          "left": 449.49030920819155,
+          "top": 188.53484399537047,
+          "right": 460.350121648206,
+          "bottom": 193.89553818046983
         },
         "cluster": {
           "left": 306,
@@ -500,13 +500,13 @@
       },
       "station": "grid-front",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/grid-front-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/grid-front-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 76,
-        "time": 0.31666666666666665,
+        "tick": 68,
+        "time": 0.2833333333333333,
         "timeScale": 0,
         "s": 5636,
         "d": 2.799999999999992,
@@ -545,10 +545,10 @@
     {
       "framing": {
         "car": {
-          "left": 333.7270176207276,
-          "top": 153.34904076989295,
-          "right": 510.2034947137818,
-          "bottom": 267.7769046247959
+          "left": 335.34217456591716,
+          "top": 155.5991399715222,
+          "right": 508.5708248546589,
+          "bottom": 267.79058093418473
         },
         "cluster": {
           "left": 306,
@@ -560,16 +560,16 @@
       },
       "station": "chicane-braking",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/chicane-braking-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/chicane-braking-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 779,
-        "time": 3.245833333333333,
+        "tick": 788,
+        "time": 3.283333333333333,
         "timeScale": 0,
-        "s": 545.3171737266778,
-        "d": -0.005913022150819548,
+        "s": 547.9700043128115,
+        "d": -0.0068474765750486995,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": true,
@@ -593,7 +593,7 @@
         "ghost": false
       },
       "hud": {
-        "speed": "136",
+        "speed": "134",
         "gear": "3",
         "lapTime": "0:00.000",
         "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
@@ -605,10 +605,10 @@
     {
       "framing": {
         "car": {
-          "left": 375.0807216488021,
-          "top": 195.7715610209666,
-          "right": 469.26706503612905,
-          "bottom": 267.4047715417341
+          "left": 376.06289079722575,
+          "top": 196.9555393378976,
+          "right": 469.303729633209,
+          "bottom": 267.72699814269396
         },
         "cluster": {
           "left": 306,
@@ -620,7 +620,7 @@
       },
       "station": "fast-corner",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/fast-corner-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/fast-corner-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
@@ -628,8 +628,8 @@
         "tick": 1315,
         "time": 5.479166666666667,
         "timeScale": 0,
-        "s": 1065.8952081343748,
-        "d": 1.668254437435109,
+        "s": 1062.8046591220643,
+        "d": 1.5757620826366037,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -653,7 +653,7 @@
         "ghost": false
       },
       "hud": {
-        "speed": "286",
+        "speed": "285",
         "gear": "7",
         "lapTime": "0:00.000",
         "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
@@ -665,10 +665,10 @@
     {
       "framing": {
         "car": {
-          "left": 218.75739922418592,
-          "top": 49.494104490128834,
-          "right": 624.1777927029163,
-          "bottom": 334.15835201845294
+          "left": 218.32552668982646,
+          "top": 49.68872120690117,
+          "right": 623.7413591823266,
+          "bottom": 334.28938220621893
         },
         "cluster": {
           "left": 306,
@@ -680,16 +680,16 @@
       },
       "station": "cockpit",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/cockpit-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/cockpit-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 2083,
-        "time": 8.679166666666667,
+        "tick": 2091,
+        "time": 8.7125,
         "timeScale": 0,
-        "s": 5180.6310587620355,
-        "d": 1.571121074351273,
+        "s": 5183.066278842658,
+        "d": 1.5699986002124824,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -713,7 +713,7 @@
         "ghost": false
       },
       "hud": {
-        "speed": "264",
+        "speed": "265",
         "gear": "7",
         "lapTime": "0:00.000",
         "last": "\u2014:\u2014\u2014.\u2014\u2014\u2014",
@@ -725,10 +725,10 @@
     {
       "framing": {
         "car": {
-          "left": 207.42099003923946,
-          "top": -78.32403739273414,
-          "right": 636.2985857831075,
-          "bottom": 387.0835832006403
+          "left": 207.37800106672466,
+          "top": -78.24568792039115,
+          "right": 636.2103489865319,
+          "bottom": 387.12535607355346
         },
         "cluster": {
           "left": 306,
@@ -740,16 +740,16 @@
       },
       "station": "tcam",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/tcam-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/tcam-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 2899,
-        "time": 12.079166666666666,
+        "tick": 2907,
+        "time": 12.1125,
         "timeScale": 0,
-        "s": 1702.8033032368064,
-        "d": 0.1923467364960602,
+        "s": 1702.8030732095835,
+        "d": 0.19418370612555508,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -785,10 +785,10 @@
     {
       "framing": {
         "car": {
-          "left": 344.82890436259595,
-          "top": 169.14233727521577,
-          "right": 498.383285951866,
-          "bottom": 267.8125
+          "left": 346.69070755955846,
+          "top": 170.97195555693213,
+          "right": 497.36108778022907,
+          "bottom": 267.41070498691096
         },
         "cluster": {
           "left": 306,
@@ -800,16 +800,16 @@
       },
       "station": "straight",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/straight-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/straight-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3939,
-        "time": 16.4125,
+        "tick": 3999,
+        "time": 16.6625,
         "timeScale": 0,
-        "s": 5646.013131744582,
-        "d": -0.1566444764708129,
+        "s": 5643.2046898589415,
+        "d": -0.13136505990651945,
         "surface": 0,
         "wheelsOff": 0,
         "drsAvailable": false,
@@ -845,10 +845,10 @@
     {
       "framing": {
         "car": {
-          "left": 287.64080136278784,
-          "top": 167.532891745433,
-          "right": 592.5829556621209,
-          "bottom": 225.65034038511456
+          "left": 291.0452909843979,
+          "top": 167.22431615255368,
+          "right": 592.5888929139765,
+          "bottom": 225.5743150066075
         },
         "cluster": {
           "left": 306,
@@ -860,13 +860,13 @@
       },
       "station": "tv-kerb",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/tv-kerb-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/tv-kerb-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3999,
-        "time": 16.6625,
+        "tick": 4059,
+        "time": 16.9125,
         "timeScale": 0,
         "s": 613.3328292140062,
         "d": 6.0147696197292255,
@@ -905,10 +905,10 @@
     {
       "framing": {
         "car": {
-          "left": -134.24063087771276,
-          "top": 78.32605124906172,
-          "right": -123.07237100947938,
-          "bottom": 79.8697568882069
+          "left": -134.12013812825938,
+          "top": 78.31713508253968,
+          "right": -123.07279549257099,
+          "bottom": 79.86776917697112
         },
         "cluster": {
           "left": 306,
@@ -920,13 +920,13 @@
       },
       "station": "pit-lane",
       "viewport": "844x390",
-      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/pit-lane-844x390.png",
+      "file": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/pit-lane-844x390.png",
       "state": {
         "screen": "drive",
         "phase": "running",
         "paused": false,
-        "tick": 3999,
-        "time": 16.6625,
+        "tick": 4059,
+        "time": 16.9125,
         "timeScale": 0,
         "s": 5000,
         "d": -3.686426679693777e-14,
@@ -963,12 +963,11 @@
       }
     }
   ],
-  "perf": [],
   "lap": null,
   "moving": {
-    "video": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/moving-1440x900.mp4",
-    "strip": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/moving-strip.jpg",
-    "burst": "../../../../.cache/undercut/scratch/m2-render-pipeline/r5/moving-burst.jpg"
+    "video": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/moving-1440x900.mp4",
+    "strip": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/moving-strip.jpg",
+    "burst": "../../../../.cache/undercut/scratch/m2-render-pipeline/r7/moving-burst.jpg"
   },
   "errors": []
 }

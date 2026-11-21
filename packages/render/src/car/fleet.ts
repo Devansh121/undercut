@@ -22,22 +22,30 @@ import {
 import { createCarPose, type CarPose } from '@undercut/sim';
 import type { CarLod, Quality } from '../quality';
 import type { CarAssets, CarLivery } from './car-assets';
-import { CarModel, type CarGeometry } from './car-model';
-import { COMPOUND_COLOURS, CARBON, LIVERY_GLSL, drawMarking } from './livery';
-import { COMPOUND_GLSL, ensureCarShader } from './car-shader';
-import { ditherCode, lodBlend } from './lod';
+import { CarModel, isDecal, type CarGeometry } from './car-model';
+import {
+  CARBON,
+  COMPOUND_GLSL,
+  COMPOUND_PARS,
+  LIVERY_GLSL,
+  MEDIUM_COMPOUND,
+  compoundUniforms,
+  drawMarkings,
+  type CompoundLook,
+} from './livery';
+import { ensureCarShader } from './car-shader';
+import { LOD_FADE_S, ditherCode, lodByPixels, projectedRadius } from './lod';
 
 /** Most cars a fleet draws (a full grid). */
 export const FLEET_CAPACITY = 24;
-const MASK_SIZE = 512;
-const CROSSFADE_M = 4;
-
-/** Decal atlas: per car a number cell (1.6:1) and a code cell (3.4:1), 128 px tall. */
+/**
+ * Markings atlas: per car one cell laid out like the decal mesh's own canvas (4:1, number in the
+ * left 40 %, code in the rest; docs/car-asset.md), 512 × 128 px.
+ */
+const CELL_W = 512;
 const CELL_H = 128;
-const NUMBER_W = 205;
-const CODE_W = 435;
-const ATLAS_W = 1280;
 const PER_ROW = 2;
+const ATLAS_W = CELL_W * PER_ROW;
 const ATLAS_H = Math.ceil(FLEET_CAPACITY / PER_ROW) * CELL_H;
 
 const BAYER = /* glsl */ `
@@ -64,6 +72,10 @@ interface FleetCar {
   pose: CarPose;
   livery: number;
   drs: number;
+  /** Level of detail drawn, the one it is fading from (−1: none) and the fade's progress. */
+  level: number;
+  from: number;
+  fade: number;
   /** A posed, never-drawn copy of the asset per level, whose node matrices feed the instances. */
   posed: Map<CarLod, { model: CarModel; meshes: Mesh[] }>;
   dirty: boolean;
@@ -72,8 +84,8 @@ interface FleetCar {
 /**
  * The other cars on track, drawn instanced: every mesh of a level of detail is one draw call for
  * all the cars at that level, whatever their livery. Liveries are per-instance colours over a mask
- * array, numbers and codes come from one atlas, and levels cross-fade by camera distance with
- * complementary dithering. Geometry and textures are the shared asset's; nothing is copied per car.
+ * array, numbers and codes come from one atlas. Levels switch by projected size with hysteresis
+ * (docs/car-asset.md) and cross-fade over 0.3 s with complementary dithering. Geometry and textures are the shared asset's; nothing is copied per car.
  */
 export class CarFleet {
   readonly group = new Group();
@@ -86,22 +98,23 @@ export class CarFleet {
   private readonly atlas: CanvasTexture;
   private readonly atlasCtx: CanvasRenderingContext2D | null;
   private readonly maskArray: DataArrayTexture;
-  private readonly patternIndex = new Map<string, number>();
+  private readonly teamIndex = new Map<string, number>();
   private readonly lodLevels: CarLod[];
-  private readonly distances: number[];
-  private lastKey = '';
+  private readonly thresholds: number[];
 
   constructor(
     private readonly assets: CarAssets,
     private readonly quality: Quality,
     private readonly geo: CarGeometry,
+    private readonly compound: CompoundLook = MEDIUM_COMPOUND,
   ) {
     this.group.name = 'fleet';
     this.lodLevels = [...quality.carLods];
-    this.distances = [...quality.carLodDistances];
-    // Masks as one array texture, one layer per pattern.
+    this.thresholds = [...quality.carLodPixels];
+    // Masks as one array texture, one layer per team.
+    const MASK_SIZE = quality.textureTier === 'hi' ? 1024 : 512;
     const patterns = [...assets.maskImages.keys()];
-    patterns.forEach((p, i) => this.patternIndex.set(p, i));
+    patterns.forEach((p, i) => this.teamIndex.set(p, i));
     const layers = Math.max(1, patterns.length);
     const data = new Uint8Array(MASK_SIZE * MASK_SIZE * 4 * layers);
     const canvas = document.createElement('canvas');
@@ -172,7 +185,7 @@ export class CarFleet {
       g.boundingSphere = mesh.geometry.boundingSphere;
       this.geometries.push(g);
       const base = mesh.material as Material;
-      const kind = mesh.userData.decal as string | undefined;
+      const kind = isDecal(mesh) ? 'markings' : undefined;
       const key = kind ? (`decal-${kind}` as unknown as Material) : base;
       let m = mats.get(key);
       if (!m) {
@@ -221,10 +234,8 @@ export class CarFleet {
     const uniforms = {
       uMasks: { value: this.maskArray },
       uCarbon: { value: new Color(CARBON) },
-      uCell: {
-        value: [decal === 'code' ? CODE_W / ATLAS_W : NUMBER_W / ATLAS_W, CELL_H / ATLAS_H],
-      },
-      uCompound: { value: new Color(COMPOUND_COLOURS.medium) },
+      uCell: { value: [CELL_W / ATLAS_W, CELL_H / ATLAS_H] },
+      ...(tyre ? compoundUniforms(this.compound) : {}),
     };
     m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
       Object.assign(shader.uniforms, uniforms);
@@ -241,7 +252,7 @@ export class CarFleet {
           '#include <uv_vertex>',
           `#include <uv_vertex>
           vFade = aFade; vPrimary = aPrimary; vSecondary = aSecondary; vAccent = aAccent; vMask = aMask;
-          ${decal ? `vMapUv = uv * uCell + ${decal === 'code' ? 'aDecal.zw' : 'aDecal.xy'};` : ''}`,
+          ${decal ? 'vMapUv = uv * uCell + aDecal.xy;' : ''}`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -261,7 +272,7 @@ export class CarFleet {
         );
       if (tyre) {
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec3 uCompound;')
+          .replace('#include <common>', `#include <common>\n${COMPOUND_PARS}`)
           .replace('#include <map_fragment>', `#include <map_fragment>\n${COMPOUND_GLSL}`);
       }
       if (paint) {
@@ -294,7 +305,16 @@ export class CarFleet {
     const p = createCarPose();
     copyPose(pose, p);
     this.liveries.push(livery);
-    this.cars.push({ pose: p, livery: index, drs, posed: new Map(), dirty: true });
+    this.cars.push({
+      pose: p,
+      livery: index,
+      drs,
+      level: -1,
+      from: -1,
+      fade: 1,
+      posed: new Map(),
+      dirty: true,
+    });
     this.drawMarkings(index, livery);
     return index;
   }
@@ -311,7 +331,6 @@ export class CarFleet {
     for (const car of this.cars) for (const { model } of car.posed.values()) model.dispose();
     this.cars.length = 0;
     this.liveries.length = 0;
-    this.lastKey = '';
     for (const s of this.sets) {
       for (const m of s.meshes) {
         m.count = 0;
@@ -327,10 +346,7 @@ export class CarFleet {
   private drawMarkings(i: number, l: CarLivery): void {
     const ctx = this.atlasCtx;
     if (!ctx) return;
-    const x = (i % PER_ROW) * (NUMBER_W + CODE_W);
-    const y = Math.floor(i / PER_ROW) * CELL_H;
-    drawMarking(ctx, String(l.number), x, y, NUMBER_W, CELL_H, l.primary);
-    drawMarking(ctx, l.code, x + NUMBER_W, y, CODE_W, CELL_H, l.primary);
+    drawMarkings(ctx, l, (i % PER_ROW) * CELL_W, Math.floor(i / PER_ROW) * CELL_H, CELL_W, CELL_H);
     this.atlas.needsUpdate = true;
   }
 
@@ -353,48 +369,69 @@ export class CarFleet {
     return p;
   }
 
-  /** Assign levels by distance from `eye` and write every instance. Call once per frame. */
-  update(eye: Vector3): void {
-    // Nothing moved and no car changed level or fade: keep last frame's instances (a static
-    // grid then costs no uploads at all).
-    let key = '';
-    let dirty = false;
+  /**
+   * Pick each car's level from its projected size (docs/car-asset.md: thresholds with 1.15
+   * hysteresis), advance cross-fades by `dt`, and write the instances. Call once per frame with
+   * the camera's position, vertical field of view (degrees) and the viewport height (CSS px).
+   */
+  update(eye: Vector3, fovDeg: number, viewportHeight: number, dt: number): void {
+    let changed = false;
     for (const car of this.cars) {
-      dirty ||= car.dirty;
       const dist = Math.hypot(car.pose.x - eye.x, car.pose.y - eye.y, car.pose.z - eye.z);
-      for (const w of lodBlend(dist, this.distances, CROSSFADE_M))
-        key += `${w.level}:${w.fade.toFixed(3)},`;
+      const px = projectedRadius(dist, fovDeg, viewportHeight);
+      const want = Math.min(
+        lodByPixels(px, this.thresholds, Math.max(0, car.level)),
+        this.sets.length - 1,
+      );
+      if (car.level < 0) {
+        car.level = want;
+        car.from = -1;
+        car.fade = 1;
+        changed = true;
+      } else if (want !== car.level) {
+        car.from = car.level;
+        car.level = want;
+        car.fade = 0;
+        changed = true;
+      }
+      if (car.from >= 0) {
+        car.fade = Math.min(1, car.fade + dt / LOD_FADE_S);
+        if (car.fade >= 1) car.from = -1;
+        changed = true;
+      }
+      changed ||= car.dirty;
     }
-    if (!dirty && key === this.lastKey) return;
-    this.lastKey = key;
+    // Nothing moved, switched or faded: keep last frame's instances (no uploads).
+    if (!changed) return;
     const counts = this.sets.map(() => 0);
     const c = new Color();
-    for (let ci = 0; ci < this.cars.length; ci++) {
-      const car = this.cars[ci] as FleetCar;
-      const dist = Math.hypot(car.pose.x - eye.x, car.pose.y - eye.y, car.pose.z - eye.z);
-      const blend = lodBlend(dist, this.distances, CROSSFADE_M);
-      const incoming = blend.length === 2 ? (blend[1]?.fade ?? 1) : 1;
-      blend.forEach((w, k) => {
-        const setIndex = Math.min(w.level, this.sets.length - 1);
-        const set = this.sets[setIndex] as LodSet;
+    for (const car of this.cars) {
+      const draws: [number, number][] =
+        car.from >= 0
+          ? [
+              [car.from, ditherCode(car.fade, false)],
+              [car.level, ditherCode(car.fade, true)],
+            ]
+          : [[car.level, 1]];
+      const l = this.liveries[car.livery] as CarLivery;
+      for (const [level, code] of draws) {
+        const set = this.sets[level] as LodSet;
         const posed = this.posed(car, set.lod);
-        const slot = counts[setIndex] as number;
-        counts[setIndex] = slot + 1;
-        const code = blend.length === 1 ? 1 : ditherCode(incoming, k === 1);
+        const slot = counts[level] as number;
+        counts[level] = slot + 1;
         set.fade.setX(slot, code);
-        const l = this.liveries[car.livery] as CarLivery;
         set.primary.setXYZ(slot, ...rgb(c, l.primary));
         set.secondary.setXYZ(slot, ...rgb(c, l.secondary));
         set.accent.setXYZ(slot, ...rgb(c, l.accent));
-        set.mask.setX(slot, this.patternIndex.get(l.pattern) ?? 0);
-        const x = (car.livery % PER_ROW) * (NUMBER_W + CODE_W);
+        set.mask.setX(slot, this.teamIndex.get(l.team) ?? 0);
+        const x = (car.livery % PER_ROW) * CELL_W;
         const y = Math.floor(car.livery / PER_ROW) * CELL_H;
-        set.decal.setXYZW(slot, x / ATLAS_W, y / ATLAS_H, (x + NUMBER_W) / ATLAS_W, y / ATLAS_H);
+        set.decal.setXYZW(slot, x / ATLAS_W, y / ATLAS_H, 0, 0);
         set.meshes.forEach((im, mi) => {
           const src = posed.meshes[mi];
           if (src) im.setMatrixAt(slot, src.matrixWorld);
         });
-      });
+      }
       car.dirty = false;
     }
     this.sets.forEach((set, si) => {
