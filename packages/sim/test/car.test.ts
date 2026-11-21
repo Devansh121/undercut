@@ -17,6 +17,7 @@ import {
   createEnvironment,
   engineFullLoadTorque,
   fuelFlow,
+  lateralMu,
   radToRpm,
   restoreCar,
   rpmToRad,
@@ -347,6 +348,38 @@ describe('chassis and suspension', () => {
     expect(car.rideHeightFront).toBeLessThan(slow - 0.008);
     expect(car.downforceFront + car.downforceRear).toBeGreaterThan(15e3);
   });
+});
+
+describe('tyre force limit at low speed', () => {
+  const curve = createCarModel(REFERENCE_CAR).curve;
+  const ellipse = (car: CarState, i: number) => {
+    const fz = car.load[i]!;
+    if (fz <= 0) return 0;
+    const dy = lateralMu(curve, fz) * fz * car.gripScale[i]!;
+    const dx = dy * curve.muXRatio;
+    return (car.forceX[i]! / dx) ** 2 + (car.forceY[i]! / dy) ** 2;
+  };
+
+  for (const [vx, vy] of [
+    [0.5, 0.5],
+    [1, -1],
+    [0.2, 0.3],
+    [0, 0.5],
+    [-0.5, 0.4],
+    [3, 2],
+    [0, 0],
+  ] as const) {
+    it(`keeps every tyre inside its friction ellipse sliding at (${vx}, ${vy}) m/s`, () => {
+      const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+      car.vx = vx;
+      car.vy = vy;
+      car.wheelSpeed.fill(0);
+      for (let k = 0; k < 48; k++) {
+        stepCar(car, input({ brake: 1 }), FLAT_SURFACE, 1 / 960, env);
+        for (let i = 0; i < 4; i++) expect(ellipse(car, i)).toBeLessThanOrEqual(1 + 1e-9);
+      }
+    });
+  }
 });
 
 describe('snapshots', () => {

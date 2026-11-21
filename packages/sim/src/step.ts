@@ -301,8 +301,17 @@ function substep(
     let fy = tf.fy;
     const w = 1 - speed / tyre.lowSpeed;
     if (w > 0 && tyreZ[i]! > 0) {
-      fx = clamp(fx + (w * tyre.carcassDampingX * (ux - oldX)) / h, -tf.dx, tf.dx);
-      fy = clamp(fy + (w * tyre.carcassDampingY * (uy - oldY)) / h, -tf.dy, tf.dy);
+      fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
+      fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
+      // The damped force obeys the same combined friction limit as the steady force.
+      const ex = fx / tf.dx;
+      const ey = fy / tf.dy;
+      const e = ex * ex + ey * ey;
+      if (e > 1) {
+        const k = 1 / Math.sqrt(e);
+        fx *= k;
+        fy *= k;
+      }
     }
     s.forceX[i] = fx;
     s.forceY[i] = fy;
