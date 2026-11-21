@@ -15,6 +15,7 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 | Time-trial HUD (live straight) | `hud-drive-1440x900.png` | — | `hud-drive-844x390.png` |
 | Time-trial HUD (invalid lap banner) | `hud-invalid-1440x900.png` | — | — |
 | Pause menu | `pause-1440x900.png` | — | `pause-844x390.png` |
+| Controls list (from the menu's top bar, and from the pause menu) | `controls-menu-1440x900.png` | — | `controls-pause-844x390.png` |
 
 ## Defects caught and fixed during visual inspection
 
@@ -34,6 +35,9 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 
 6. **Time-trial HUD did not read like a broadcast tower (`hud-drive-1440x900.png`, `hud-drive-844x390.png`)**
    - The top-left panel was a label list (lap, record, ghost) and the map sat bottom left. Rebuilt it as a timing tower: lap counter in the head with the team hairline, a flag banner (green in time trial, which has no other flags), and one row per car on the clock (position, team colour bar, driver code, best lap; the record below it with a dashed purple bar). The map moved to the right column under the lap timing, larger. On a phone the tower stays top left in a compact form (no footer) clear of the steering pad and the top-centre timing.
+
+7. **Controls list from master (#20) in the old pause style**
+   - Folded into the kit: a kit dialog (title, device with its icon, two columns of setting rows, the reverse note on a raised strip, Back with its prompt glyph), opened from a Controls button in the menu's top bar (every menu screen) and from the pause menu. Unbound inputs read in the label colour. Checked at `1440×900` (keyboard rows) and `844×390` (touch rows): two columns fit, nothing clipped.
 
 ## HUD frame-time benchmark
 
