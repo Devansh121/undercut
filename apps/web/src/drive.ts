@@ -307,14 +307,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           });
           break;
         case 'invalidated':
-          say(
-            {
-              tag: 'Lap invalid',
-              text: e.reason === 'limits' ? 'Track limits' : 'Reset to track',
-              tone: 'invalid',
-            },
-            3,
-          );
+          // The flag shows an invalid lap for as long as it lasts; a message as well showed the
+          // same words twice.
+          hud.setInvalidReason(e.reason === 'limits' ? 'Track limits' : 'Reset to track');
           break;
         case 'reset':
           view.snapCamera();

@@ -39,7 +39,6 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Sound: measured, never heard. The listening queue is in `docs/audio.md`.
 - Barrier contact is minimal: the body is a box against a line, every barrier type has the same restitution and friction, and there is no damage, no wheel-to-barrier contact and no car-to-car contact (M3b). The renderer draws a gap where a barrier offset jumps (the pit wall's two ends); the sim closes it with a slanted face.
 - Flat-out kerb and run-off strikes (review of PR 19): 9 of the review's 58 cases are fixed (rim and floor strikes now resolve where the rim or skid meets the ground). The other 49 are open and run as expected failures in `packages/track/validation/kerb-strikes.test.ts` and `apps/web/test/kerb-safety.test.ts`. Cause: inside the first chicane the run-off ground follows the centreline's grade through a nearly folded lap frame, so a 3 % grade becomes a ramp of up to 37 % (s 652–661, d about 11 m); a car crossing it at speed takes off and can break the pose limits, and the game's safety net then resets it. Fix: build run-off height so its world slope stays bounded (or keep barriers off the fold), then move the cases out of the expected-failure lists.
-- When a lap is invalidated the HUD can show two identical "Lap invalid" messages stacked (seen in the off-track screenshot); not looked into.
 
 ## Decided for you
 
