@@ -1,0 +1,606 @@
+import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
+import { createSurfaceSample } from './contracts';
+import type { Environment } from './environment';
+import type { AeroParams, EngineParams } from './params';
+import { ErsMode, computeMass, gearRatio, type CarState, type MassState } from './state';
+import { createTyreForce, tyreForce } from './tyre';
+
+/**
+ * Longest internal integration step, s. A 240 Hz world step runs as four substeps. The choice
+ * and its measured cost are in docs/adr/0007-sim-integrator.md.
+ */
+export const MAX_SUBSTEP = 1 / 960;
+
+/** Gauss–Seidel passes over the drivetrain constraints (clutch, differential, brakes). */
+const DRIVETRAIN_ITERATIONS = 12;
+/** Largest contact-patch deflection, as slip: the patch slides beyond this. */
+const MAX_DEFLECT_SLIP = 1.5;
+const MAX_DEFLECT_TAN = 3;
+/** Pedal travel below which the brake counts as released (DRS latch, harvest). */
+const BRAKE_ON = 0.02;
+/** Idle governor gain, N·m per rad/s. */
+const IDLE_GAIN = 10;
+/** Pit limiter: 80 km/h ([2] Art. 34.7, doc 4.5), throttle gain per m/s below it. */
+const PIT_LIMIT = 80 / 3.6;
+const PIT_GAIN = 0.5;
+
+/** ERS deployment per mode: power, the throttle it needs, and the speed it stops at. */
+const ERS_MODES = [
+  { power: 0, minThrottle: 2, maxSpeed: 0 },
+  { power: 120e3, minThrottle: 0.95, maxSpeed: 300 / 3.6 },
+  { power: 120e3, minThrottle: 0.5, maxSpeed: Infinity },
+] as const;
+
+// Per-step scratch. Module-level so the hot loop never allocates; the sim is single-threaded.
+const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
+const sample = createSurfaceSample();
+const tf = createTyreForce();
+const gh = new Float64Array(4);
+const ghRate = new Float64Array(4);
+const grip = new Float64Array(4);
+const rollDrag = new Float64Array(4);
+const tyreZ = new Float64Array(4);
+const bodyZ = new Float64Array(4);
+const bodyX = new Float64Array(4);
+const wheelX = new Float64Array(4);
+const aero = { front: 0, rear: 0, drag: 0 };
+
+/**
+ * Advance one car by `dt` seconds. `input` is what reaches the car this step (after assists).
+ * Deterministic: the same state, inputs and surface give bit-identical results on one machine.
+ */
+export function stepCar(
+  state: CarState,
+  input: ControlInput,
+  surface: SurfaceSampler,
+  dt: number,
+  env: Environment,
+): void {
+  if (!(dt > 0)) return;
+  const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-9));
+  const h = dt / n;
+  applyDriverRequests(state, input);
+  for (let k = 0; k < n; k++) substep(state, input, surface, h, env);
+}
+
+/** Begin a new ERS lap: the timing line (or pit entry) resets the per-lap counters. */
+export function beginErsLap(state: CarState): void {
+  state.ersDeployLap = 0;
+  state.ersHarvestLap = 0;
+}
+
+/** Once-per-step requests: gear change, DRS latch, steer. */
+function applyDriverRequests(s: CarState, input: ControlInput): void {
+  const p = s.model.params;
+  const steer = clamp(finite(input.steer), -1, 1);
+  s.steerAngle = steer * p.geometry.maxSteerAngle;
+
+  // DRS closes on the first brake application and stays shut until the request is released.
+  if (!input.drs) s.drsLatched = 0;
+  else if (finite(input.brake) > BRAKE_ON) s.drsLatched = 1;
+
+  if (s.shiftTimer > 0 || input.gearShift === 0) return;
+  const target = s.gear + (input.gearShift > 0 ? 1 : -1);
+  const top = p.gearbox.ratios.length;
+  if (target > top || target < -1) return;
+  if (target === -1 && Math.abs(s.vx) > 1) return;
+  // Gearbox output speed as the ECU judges it: locked rear wheels must not hide road speed.
+  const R = p.tyre.rollingRadius;
+  const carrier = Math.max(
+    Math.abs(s.wheelSpeed[2]! + s.wheelSpeed[3]!) / 2,
+    Math.abs(s.wheelSpeed[0]! + s.wheelSpeed[1]!) / 2,
+    Math.abs(s.vx) / R,
+  );
+  if (target >= 1) {
+    // Over-rev protection: refuse any shift that would put the engine past the limiter.
+    const after = Math.abs(gearRatio(p, target) * carrier);
+    if (after > rpm(p.engine.revLimit)) return;
+  }
+  s.shiftTarget = target;
+  s.shiftTimer = target > s.gear ? p.gearbox.upshiftTime : p.gearbox.downshiftTime;
+}
+
+function substep(
+  s: CarState,
+  input: ControlInput,
+  surface: SurfaceSampler,
+  h: number,
+  env: Environment,
+): void {
+  const model = s.model;
+  const p = model.params;
+  const tyre = p.tyre;
+  const susp = p.suspension;
+  const g = env.gravity;
+  const R = tyre.rollingRadius;
+
+  computeMass(model, s.fuelMass, mass);
+  const m = mass.total;
+  const ms = mass.sprung;
+
+  // ---- Pedals as the car applies them (fuel cut, pit limiter). ----
+  let throttle = clamp(finite(input.throttle), 0, 1);
+  const brake = clamp(finite(input.brake), 0, 1);
+  if (input.pitLimiter) throttle = Math.min(throttle, clamp((PIT_LIMIT - s.vx) * PIT_GAIN, 0, 1));
+  if (s.fuelMass <= 0) throttle = 0;
+  s.throttleApplied = throttle;
+  s.brakeApplied = brake;
+
+  // ---- Surface under each wheel. ----
+  const c = Math.cos(s.yaw);
+  const sn = Math.sin(s.yaw);
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < 4; i++) {
+    const bx = i < 2 ? mass.a : -mass.b;
+    wheelX[i] = bx;
+    bodyX[i] = i < 2 ? mass.sprungA : -mass.sprungB;
+    const by = model.wheelLeft[i]!;
+    surface.sample(
+      s.x + bx * c - by * sn,
+      s.z - bx * sn - by * c,
+      s.hints[i] as SurfaceHint,
+      sample,
+    );
+    const height = sample.height;
+    ghRate[i] = (height - s.groundY[i]!) / h;
+    gh[i] = height;
+    s.groundY[i] = height;
+    grip[i] = sample.grip * s.gripScale[i]!;
+    rollDrag[i] = sample.drag;
+    nx += sample.normalX;
+    ny += sample.normalY;
+    nz += sample.normalZ;
+  }
+  const nInv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+  nx *= nInv;
+  ny *= nInv;
+  nz *= nInv;
+  const gNormal = g * ny;
+  // Gravity along the surface, in the car's horizontal frame (forward, left).
+  const gravX = gNormal * (nx * c - nz * sn);
+  const gravY = gNormal * (-nx * sn - nz * c);
+
+  // ---- Vertical: tyres, springs, anti-roll bars, dampers. ----
+  const kt = tyre.verticalStiffness;
+  const ct = tyre.verticalDamping;
+  for (let i = 0; i < 4; i++) {
+    const comp = gh[i]! + tyre.freeRadius - s.wheelY[i]!;
+    let f = 0;
+    if (comp > 0) {
+      f = kt * comp + ct * (ghRate[i]! - s.wheelVy[i]!);
+      if (f < 0) f = 0;
+    }
+    tyreZ[i] = f;
+    s.load[i] = f;
+  }
+  for (let i = 0; i < 4; i++) {
+    const front = i < 2;
+    const yl = model.wheelLeft[i]!;
+    const xb = bodyX[i]!;
+    const len = s.y + xb * s.pitch + yl * s.roll - s.wheelY[i]!;
+    const lenRate = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - s.wheelVy[i]!;
+    const comp = model.springFree[i]! - len;
+    s.travel[i] = comp - model.staticCompression[i]!;
+    bodyZ[i] =
+      (front ? susp.springFront : susp.springRear) * comp -
+      (front ? susp.damperFront : susp.damperRear) * lenRate;
+  }
+  for (let axle = 0; axle < 2; axle++) {
+    const l = axle * 2;
+    const r = l + 1;
+    const front = axle === 0;
+    // Travel difference left minus right; positive pushes the left body corner up.
+    const diff = s.travel[l]! - s.travel[r]!;
+    const yl = model.wheelLeft[l]!;
+    const xb = bodyX[l]!;
+    const rateL = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - s.wheelVy[l]!;
+    const rateR = s.heaveRate + xb * s.pitchRate - yl * s.rollRate - s.wheelVy[r]!;
+    const f =
+      (front ? susp.antiRollFront : susp.antiRollRear) * diff -
+      (front ? susp.rollDamperFront : susp.rollDamperRear) * (rateL - rateR);
+    bodyZ[l] = bodyZ[l]! + f;
+    bodyZ[r] = bodyZ[r]! - f;
+  }
+
+  // ---- Ride heights, aero, floor contact. ----
+  const groundF = (gh[0]! + gh[1]!) / 2;
+  const groundR = (gh[2]! + gh[3]!) / 2;
+  const rideF = s.y + mass.sprungA * s.pitch - groundF;
+  const rideR = s.y - mass.sprungB * s.pitch - groundR;
+  s.rideHeightFront = rideF;
+  s.rideHeightRear = rideR;
+
+  const drsTarget = input.drs && s.drsLatched === 0 ? 1 : 0;
+  if (drsTarget > s.drsPosition) {
+    s.drsPosition = Math.min(1, s.drsPosition + h / p.aero.drsOpenTime);
+  } else if (drsTarget < s.drsPosition) {
+    s.drsPosition = Math.max(0, s.drsPosition - h / p.aero.drsCloseTime);
+  }
+  aeroCoefficients(p.aero, rideF, rideR, s.drsPosition, aero);
+  const q = 0.5 * env.airDensity * s.vx * s.vx;
+  const dfFront = q * aero.front * s.downforceScale;
+  const dfRear = q * aero.rear * s.downforceScale;
+  const drag = q * aero.drag * s.dragScale;
+  s.downforceFront = dfFront;
+  s.downforceRear = dfRear;
+  s.dragForce = drag;
+  // Floor contact: skid points at the floor edges by each axle. They take the plank's
+  // bottoming in heave and stop the body rolling past the point where the floor edge scrapes.
+  let skidHeave = 0;
+  let skidPitch = 0;
+  let skidRoll = 0;
+  let skidX = 0;
+  let skidY = 0;
+  let skidYaw = 0;
+  const halfWidth = susp.floorHalfWidth;
+  for (let k = 0; k < 4; k++) {
+    const front = k < 2;
+    const yl = k % 2 === 0 ? halfWidth : -halfWidth;
+    const xb = front ? mass.sprungA : -mass.sprungB;
+    const l = front ? 0 : 2;
+    const half = front ? model.wheelLeft[0]! : model.wheelLeft[2]!;
+    const across = yl / (2 * half);
+    const ground = (gh[l]! + gh[l + 1]!) / 2 + across * (gh[l]! - gh[l + 1]!);
+    const height = s.y + xb * s.pitch + yl * s.roll - ground;
+    if (height >= 0) continue;
+    const groundRate = (ghRate[l]! + ghRate[l + 1]!) / 2 + across * (ghRate[l]! - ghRate[l + 1]!);
+    const rate = s.heaveRate + xb * s.pitchRate + yl * s.rollRate - groundRate;
+    const n = -0.5 * susp.plankStiffness * height - 0.5 * susp.plankDamping * rate;
+    if (n <= 0) continue;
+    skidHeave += n;
+    skidPitch += n * xb;
+    skidRoll += n * yl;
+    const px = front ? mass.a : -mass.b;
+    const vpx = s.vx - s.yawRate * yl;
+    const vpy = s.vy + s.yawRate * px;
+    const scale = (susp.plankFriction * n) / (Math.sqrt(vpx * vpx + vpy * vpy) + 0.1);
+    skidX -= scale * vpx;
+    skidY -= scale * vpy;
+    skidYaw += px * -scale * vpy + yl * scale * vpx;
+  }
+
+  // ---- Tyre slip and force (transient contact-patch deflection). ----
+  const curve = model.curve;
+  const steer = s.steerAngle;
+  const cd = Math.cos(steer);
+  const sd = Math.sin(steer);
+  let sumX = 0;
+  let sumY = 0;
+  let yawMoment = 0;
+  for (let i = 0; i < 4; i++) {
+    const front = i < 2;
+    const yl = model.wheelLeft[i]!;
+    const vcx = s.vx - s.yawRate * yl;
+    const vcy = s.vy + s.yawRate * wheelX[i]!;
+    const ci = front ? cd : 1;
+    const si = front ? sd : 0;
+    const vLong = vcx * ci + vcy * si;
+    const vLat = -vcx * si + vcy * ci;
+    const speed = Math.abs(vLong);
+    // Implicit decay keeps this stable at any speed; at standstill it is a spring.
+    const oldX = s.deflectX[i]!;
+    const oldY = s.deflectY[i]!;
+    const limX = tyre.relaxationX * MAX_DEFLECT_SLIP;
+    const limY = tyre.relaxationY * MAX_DEFLECT_TAN;
+    const ux = clamp(
+      (oldX + h * (s.wheelSpeed[i]! * R - vLong)) / (1 + (h * speed) / tyre.relaxationX),
+      -limX,
+      limX,
+    );
+    const uy = clamp((oldY - h * vLat) / (1 + (h * speed) / tyre.relaxationY), -limY, limY);
+    s.deflectX[i] = ux;
+    s.deflectY[i] = uy;
+    const kappa = ux / tyre.relaxationX;
+    const tanA = uy / tyre.relaxationY;
+    s.slipRatio[i] = kappa;
+    s.slipTan[i] = tanA;
+    tyreForce(curve, tyreZ[i]!, kappa, tanA, grip[i]!, tf);
+    let fx = tf.fx;
+    let fy = tf.fy;
+    const w = 1 - speed / tyre.lowSpeed;
+    if (w > 0 && tyreZ[i]! > 0) {
+      fx = clamp(fx + (w * tyre.carcassDampingX * (ux - oldX)) / h, -tf.dx, tf.dx);
+      fy = clamp(fy + (w * tyre.carcassDampingY * (uy - oldY)) / h, -tf.dy, tf.dy);
+    }
+    s.forceX[i] = fx;
+    s.forceY[i] = fy;
+    const fbx = fx * ci - fy * si;
+    const fby = fx * si + fy * ci;
+    sumX += fbx;
+    sumY += fby;
+    yawMoment += wheelX[i]! * fby - yl * fbx;
+  }
+
+  // ---- Power unit, ERS, brakes, wheel spin. ----
+  stepPowertrain(s, throttle, brake, h);
+
+  // ---- Planar chassis (semi-implicit Euler). ----
+  const extX = s.externalForceX * c - s.externalForceZ * sn;
+  const extY = -s.externalForceX * sn - s.externalForceZ * c;
+  const dragX = s.vx >= 0 ? -drag : drag;
+  const groundX = sumX + skidX;
+  const groundY = sumY + skidY;
+  const specificX = (groundX + dragX + extX) / m;
+  const specificY = (groundY + extY) / m;
+  const ax = specificX + gravX + s.yawRate * s.vy;
+  const ay = specificY + gravY - s.yawRate * s.vx;
+  s.vx += h * ax;
+  s.vy += h * ay;
+  s.yawRate += (h * (yawMoment + skidYaw + s.externalTorque)) / mass.yawInertia;
+  s.x += h * (s.vx * c - s.vy * sn);
+  s.z += h * (-s.vx * sn - s.vy * c);
+  s.yaw += h * s.yawRate;
+  if (s.yaw > Math.PI) s.yaw -= 2 * Math.PI;
+  else if (s.yaw < -Math.PI) s.yaw += 2 * Math.PI;
+  s.distance += h * Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+  s.accelX = specificX;
+  s.accelY = specificY;
+
+  // ---- Sprung and unsprung vertical motion. ----
+  // Ground-level forces act below the sprung CoG: the sprung share of them pitches and rolls
+  // the body through the springs, so load transfer comes out of the suspension.
+  const arm = p.mass.cgHeight * (ms / m);
+  let heave = skidHeave - dfFront - dfRear;
+  let pitchM = skidPitch - dfFront * mass.sprungA + dfRear * mass.sprungB;
+  let rollM = skidRoll;
+  for (let i = 0; i < 4; i++) {
+    const f = bodyZ[i]!;
+    heave += f;
+    pitchM += f * bodyX[i]!;
+    rollM += f * model.wheelLeft[i]!;
+  }
+  pitchM += arm * groundX;
+  rollM += arm * groundY;
+  const heaveAcc = heave / ms - gNormal;
+  s.heaveRate += h * heaveAcc;
+  s.pitchRate += (h * pitchM) / p.mass.pitchInertia;
+  s.rollRate += (h * rollM) / p.mass.rollInertia;
+  s.y += h * s.heaveRate;
+  s.pitch += h * s.pitchRate;
+  s.roll += h * s.rollRate;
+  s.accelVertical = heaveAcc + gNormal;
+  for (let i = 0; i < 4; i++) {
+    const mu = i < 2 ? p.mass.unsprungFront : p.mass.unsprungRear;
+    s.wheelVy[i] = s.wheelVy[i]! + h * ((tyreZ[i]! - bodyZ[i]!) / mu - gNormal);
+    s.wheelY[i] = s.wheelY[i]! + h * s.wheelVy[i]!;
+    let a = s.wheelAngle[i]! + h * s.wheelSpeed[i]!;
+    if (a > Math.PI) a -= 2 * Math.PI;
+    else if (a < -Math.PI) a += 2 * Math.PI;
+    s.wheelAngle[i] = a;
+  }
+}
+
+/** Engine, clutch, gearbox, differential, ERS and brakes for one substep. */
+function stepPowertrain(s: CarState, throttle: number, brake: number, h: number): void {
+  const p = s.model.params;
+  const eng = p.engine;
+  const ers = p.ers;
+  const tyre = p.tyre;
+  const R = tyre.rollingRadius;
+  const If = tyre.wheelInertiaFront;
+  const Ir = tyre.wheelInertiaRear;
+  const Je = eng.inertia;
+
+  // Gear and shift. During a shift the clutch is open and the ECU matches engine speed to the
+  // target gear, so the ratio change carries no inertia shock into the wheels.
+  const carrier = (s.wheelSpeed[2]! + s.wheelSpeed[3]!) / 2;
+  let shifting = false;
+  if (s.shiftTimer > 0) {
+    shifting = true;
+    const targetRatio = gearRatio(p, s.shiftTarget);
+    const idle = rpm(eng.idleRpm);
+    const targetSpeed = Math.max(idle, Math.abs(targetRatio * carrier));
+    const remaining = s.shiftTimer;
+    s.engineSpeed += (targetSpeed - s.engineSpeed) * Math.min(1, h / remaining);
+    s.shiftTimer -= h;
+    if (s.shiftTimer <= 1e-12) {
+      s.shiftTimer = 0;
+      s.gear = s.shiftTarget;
+    }
+  }
+  const G = gearRatio(p, s.gear);
+
+  // Engine torque at the crank.
+  const we = s.engineSpeed;
+  const N = we / RPM;
+  const limiter = clamp((eng.revLimit - N) / eng.limiterWidth, 0, 1);
+  const thr = shifting ? 0 : throttle * limiter;
+  const wot = engineFullLoadTorque(eng, s.model.iceEfficiency, N);
+  const dragT = -(eng.dragTorqueBase + eng.dragTorquePerRpm * N);
+  let te = thr * wot + (1 - thr) * dragT;
+  const idle = rpm(eng.idleRpm);
+  if (we < idle) te += Math.min(IDLE_GAIN * (idle - we), 200);
+  if (s.fuelMass <= 0 && te > 0) te = 0;
+  const icePower = te > 0 ? te * we : 0;
+
+  // Fuel at the regulated flow for the power produced.
+  if (s.fuelMass > 0) {
+    const burn = thr * fuelFlow(eng, N) + eng.idleFlow;
+    s.fuelMass = Math.max(0, s.fuelMass - burn * h);
+  }
+
+  // ERS. The MGU-H feeds the MGU-K directly first; only energy drawn from the store counts
+  // toward the 4 MJ per-lap deployment limit (doc 1.3).
+  if (s.mgukLocked !== 0 && s.vx >= ers.startDeploySpeed) s.mgukLocked = 0;
+  const engaged = G !== 0 && !shifting && we > rpm(eng.clutchFullRpm);
+  // The MGU-H recovers exhaust energy under load; at idle or on the overrun there is none.
+  const mguh = thr > 0 ? Math.min(ers.mguhPower, (ers.mguhPower * icePower) / eng.peakPower) : 0;
+  const mode = ERS_MODES[s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
+  const wantsDeploy =
+    s.mgukLocked === 0 &&
+    engaged &&
+    throttle >= mode.minThrottle &&
+    s.vx < mode.maxSpeed &&
+    mode.power > 0;
+  let deploy = wantsDeploy ? Math.min(mode.power, ers.mgukPower, ers.mgukTorque * we) : 0;
+  const direct = Math.min(mguh, deploy);
+  let fromStore = deploy - direct;
+  const storeLimit = Math.min(ers.deployPerLap - s.ersDeployLap, s.ersStore) / h;
+  if (fromStore > storeLimit) fromStore = Math.max(0, storeLimit);
+  deploy = direct + fromStore;
+  let toStore = mguh - direct;
+  let harvest = 0;
+  // Brake-by-wire: the pedal asks for a rear torque out of friction plus MGU-K harvest; the
+  // harvest is used first and friction makes up the rest, up to its own limit.
+  const frontBrake = (brake * p.brakes.maxTorque * s.brakeBias) / 2;
+  const rearFrictionCap = p.brakes.maxTorque * (1 - s.brakeBias);
+  let harvestCap = 0;
+  if (deploy === 0 && brake > BRAKE_ON && engaged && s.vx > 5) {
+    const room = Math.max(0, (ers.storeWindow - s.ersStore) / h - toStore);
+    const lapRoom = Math.max(0, (ers.harvestPerLap - s.ersHarvestLap) / h);
+    harvestCap = Math.min(ers.mgukPower, ers.mgukTorque * we, room, lapRoom);
+  }
+  const harvestCapWheels = we > 1 ? (harvestCap / we) * Math.abs(G) : 0;
+  const rearDemand = brake * (rearFrictionCap + harvestCapWheels);
+  if (harvestCapWheels > 0) {
+    harvest = harvestCap * Math.min(1, rearDemand / harvestCapWheels);
+  }
+  toStore = Math.min(toStore, Math.max(0, (ers.storeWindow - s.ersStore) / h - harvest));
+  s.ersStore += (toStore + harvest - fromStore) * h;
+  s.ersDeployLap += fromStore * h;
+  s.ersHarvestLap += harvest * h;
+  s.mgukPower = deploy - harvest;
+  s.mguhPower = mguh;
+  const tk = we > 1 ? (deploy - harvest) / we : 0;
+  const harvestAtWheels = we > 1 ? (harvest / we) * Math.abs(G) : 0;
+
+  // Brakes (friction torque per wheel) plus rolling resistance as a torque on the wheel.
+  const rearBrake = Math.min(rearFrictionCap, Math.max(0, rearDemand - harvestAtWheels)) / 2;
+  const crr = tyre.rollingResistance * R;
+
+  // Front wheels: free spin with Coulomb friction from brake and rolling resistance.
+  for (let i = 0; i < 2; i++) {
+    const bound = ((frontBrake + crr * s.load[i]! * rollDrag[i]!) * h) / If;
+    let w = s.wheelSpeed[i]! - (h * s.forceX[i]! * R) / If;
+    if (Math.abs(w) <= bound) w = 0;
+    else w -= w > 0 ? bound : -bound;
+    s.wheelSpeed[i] = w;
+  }
+
+  // Rear axle: engine, clutch, differential and both wheels solved together.
+  const eff = p.gearbox.efficiency;
+  const engineDrive = te + tk;
+  const crank = engineDrive > 0 ? engineDrive * eff : engineDrive;
+  let wE = we + (h * crank) / Je;
+  if (shifting) wE = we;
+  let wL = s.wheelSpeed[2]! - (h * s.forceX[2]! * R) / Ir;
+  let wR = s.wheelSpeed[3]! - (h * s.forceX[3]! * R) / Ir;
+  const clutchCap =
+    G === 0 || shifting
+      ? 0
+      : eng.clutchCapacity *
+        clamp((we / RPM - eng.clutchStartRpm) / (eng.clutchFullRpm - eng.clutchStartRpm), 0, 1) *
+        h;
+  const inputTorque = Math.abs(s.driveTorque * G);
+  const ramp = s.driveTorque >= 0 ? p.diff.rampDrive : p.diff.rampCoast;
+  const lsdCap = (p.diff.preload + ramp * inputTorque) * h;
+  const brakeL = (rearBrake + crr * s.load[2]! * rollDrag[2]!) * h;
+  const brakeR = (rearBrake + crr * s.load[3]! * rollDrag[3]!) * h;
+  const clutchMass = clutchCap > 0 ? 1 / (1 / Je + (G * G) / (2 * Ir)) : 0;
+  const halfG = G / 2;
+  let lc = 0;
+  let ld = 0;
+  let lbl = 0;
+  let lbr = 0;
+  for (let it = 0; it < DRIVETRAIN_ITERATIONS; it++) {
+    if (clutchCap > 0) {
+      const v = wE - halfG * (wL + wR);
+      const next = clamp(lc - clutchMass * v, -clutchCap, clutchCap);
+      const d = next - lc;
+      lc = next;
+      wE += d / Je;
+      wL -= (d * halfG) / Ir;
+      wR -= (d * halfG) / Ir;
+    }
+    {
+      const v = wR - wL;
+      const next = clamp(ld - (Ir / 2) * v, -lsdCap, lsdCap);
+      const d = next - ld;
+      ld = next;
+      wL -= d / Ir;
+      wR += d / Ir;
+    }
+    {
+      const next = clamp(lbl - Ir * wL, -brakeL, brakeL);
+      wL += (next - lbl) / Ir;
+      lbl = next;
+    }
+    {
+      const next = clamp(lbr - Ir * wR, -brakeR, brakeR);
+      wR += (next - lbr) / Ir;
+      lbr = next;
+    }
+  }
+  s.engineSpeed = wE > 0 ? wE : 0;
+  s.wheelSpeed[2] = wL;
+  s.wheelSpeed[3] = wR;
+  // Torque the clutch passes to the gearbox, at the crank (positive when driving).
+  s.driveTorque = -lc / h;
+}
+
+/** Fuel-flow limit at engine speed `N` rpm, kg/s (doc 1.1, [1] Art. 5.2.4). */
+export function fuelFlow(eng: EngineParams, N: number): number {
+  if (N >= eng.flowCornerRpm) return eng.flowMax;
+  const q = eng.flowSlope * N + eng.flowOffset;
+  return q < eng.flowMax ? (q > 0 ? q : 0) : eng.flowMax;
+}
+
+/** Full-throttle crank torque at `N` rpm: fuel-flow-limited power, faded above the peak band. */
+export function engineFullLoadTorque(eng: EngineParams, efficiency: number, N: number): number {
+  let power = efficiency * fuelFlow(eng, N) * eng.fuelEnergy;
+  if (N > eng.powerFadeRpm) {
+    const x = (N - eng.powerFadeRpm) / 1000;
+    power *= Math.max(0, 1 - eng.powerFade * x * x);
+  }
+  const w = N * RPM;
+  if (w < 1) return eng.maxTorque;
+  const t = power / w;
+  return t < eng.maxTorque ? t : eng.maxTorque;
+}
+
+/**
+ * Aero coefficients at the given floor ride heights and DRS flap position: front and rear
+ * downforce areas and the drag area, m². See `AeroParams` for the shape.
+ */
+export function aeroCoefficients(
+  a: AeroParams,
+  rideFront: number,
+  rideRear: number,
+  drs: number,
+  out: { front: number; rear: number; drag: number },
+): { front: number; rear: number; drag: number } {
+  const mean = rideFront + (1 - a.frontHeightWeight) * (rideRear - rideFront);
+  const dh = a.referenceHeight - mean;
+  let lift = 1 + a.heightSensitivity * dh;
+  lift = clamp(lift, 0.3, 2);
+  const leadingEdge = rideFront + a.leadingEdge * (rideRear - rideFront);
+  const stall = clamp((a.stallHeight - leadingEdge) / a.stallWidth, 0, 1);
+  lift *= 1 - a.stallLoss * stall * stall * (3 - 2 * stall);
+  const dragFactor = clamp(1 + (a.heightSensitivity / 3) * dh, 0.5, 1.5);
+  const balance = clamp(
+    a.balance + a.rakeBalance * (rideRear - rideFront - a.referenceRake),
+    0.2,
+    0.8,
+  );
+  const total = a.clA * lift;
+  out.front = total * balance;
+  out.rear = total * (1 - balance) + a.clA * a.drsDownforce * drs;
+  out.drag = a.cdA * dragFactor * (1 + a.drsDrag * drs);
+  return out;
+}
+
+const RPM = (2 * Math.PI) / 60;
+
+function rpm(value: number): number {
+  return value * RPM;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+function finite(v: number): number {
+  return Number.isFinite(v) ? v : 0;
+}
