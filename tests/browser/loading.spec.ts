@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 
 /**
  * The loading screen: progress by bytes, and when a file fails, a plain message with Try again

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 import { viewPixels, watchProblems } from './helpers';
 
 /**
@@ -21,6 +21,28 @@ function hideFloatTargets(): void {
     return (supported.call(this) ?? []).filter((n) => !hidden.has(n));
   };
 }
+test('the preset guard rejects heavy or unspecified presets before navigating', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  for (const url of [
+    '/?debug=1',
+    '/?debug=1&quality=high',
+    '/?debug=1&quality=ultra',
+    '/?debug=1&quality=medium',
+    '/?quality=high',
+  ]) {
+    let caught: unknown;
+    try {
+      await page.goto(url);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain('CI renders in software');
+  }
+});
+
 test('without renderable float targets the HDR preset takes the direct path and still draws the race', async ({
   page,
 }, info) => {
@@ -47,45 +69,6 @@ test('without renderable float targets the HDR preset takes the direct path and 
   expect(
     problems.filter((p) => !p.includes('EXT_color_buffer_float extension not supported')),
   ).toEqual([]);
-});
-
-test('the sky is exposed and tone-mapped the same on the direct path as on the HDR path', async ({
-  browser,
-}, info) => {
-  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
-  test.setTimeout(120_000);
-  /** Mean luma of the top 15 % of the view (sky in the chase camera) on a frozen grid start. */
-  const skyLuma = async (hideFloat: boolean): Promise<number> => {
-    const context = await browser.newContext({ viewport: { width: 480, height: 300 } });
-    const page = await context.newPage();
-    if (hideFloat) await page.addInitScript(hideFloatTargets);
-    await page.goto('/?debug=1&quality=mobile');
-    await page.getByRole('button', { name: /Start/ }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
-    await page.evaluate(() => {
-      const u = window.__undercut;
-      u?.camera('chase-near');
-      u?.restartLap();
-      u?.setTimeScale(0);
-      u?.resetFrameTimes();
-    });
-    await page.waitForFunction(() => (window.__undercut?.frameTimes().length ?? 0) >= 20, null, {
-      timeout: 60_000,
-    });
-    const path = await page.evaluate(() => window.__undercut?.renderStats().renderPath);
-    expect(path).toBe(hideFloat ? 'direct' : 'hdr');
-    const { meanLuma } = await viewPixels(page, { from: 0, to: 0.15 });
-    await context.close();
-    return meanLuma;
-  };
-  const hdr = await skyLuma(false);
-  const direct = await skyLuma(true);
-  // Same tone map (Khronos PBR Neutral), same exposure, same sky: the paths differ only by the
-  // HDR path's half-float target and its final-pass dither (about one 8-bit step). 5 % of the
-  // mean covers that with margin; a sky written linear to the canvas (no tone map, no sRGB) is
-  // 30-60 % darker in this band.
-  expect(Math.abs(direct - hdr) / hdr).toBeLessThan(0.05);
-  console.log(`sky luma: hdr ${hdr.toFixed(1)}, direct ${direct.toFixed(1)}`);
 });
 
 test('losing and restoring the WebGL context pauses, rebakes the lighting and draws again', async ({

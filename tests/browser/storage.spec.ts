@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 import { coldStart, watchProblems } from './helpers';
 
 // A fresh page: storage has to be blocked before the game loads.
