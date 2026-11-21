@@ -25,6 +25,106 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     source: 'doc 2.2 [11]',
     role: 'validation',
   },
+  'spa-lap-m4': {
+    id: 'spa-lap-m4',
+    label: 'Spa reference lap, medium trim, qualifying fuel (M4 band, ±3 %)',
+    unit: 's',
+    low: 97.545,
+    high: 103.579,
+    stated: '1:40.562 ± 3 %',
+    source: 'doc 2.1 [25]',
+    role: 'validation',
+  },
+  'spa-trap': {
+    id: 'spa-trap',
+    label: 'Spa speed trap on the flying lap (30 m after T4), no tow',
+    unit: 'km/h',
+    low: 309,
+    high: 321,
+    stated: '315 ± 6',
+    source: 'doc 2.2 [12]',
+    role: 'validation',
+  },
+  'spa-s1': {
+    id: 'spa-s1',
+    label: 'Spa sector 1 against the session best (±3 %)',
+    unit: 's',
+    low: 28.868,
+    high: 30.654,
+    stated: '29.761 ± 3 %',
+    source: 'doc 2.2 [12]',
+    role: 'validation',
+  },
+  'spa-s2': {
+    id: 'spa-s2',
+    label: 'Spa sector 2 against the session best (±3 %)',
+    unit: 's',
+    low: 41.256,
+    high: 43.808,
+    stated: '42.532 ± 3 %',
+    source: 'doc 2.2 [12]',
+    role: 'validation',
+  },
+  'spa-s3': {
+    id: 'spa-s3',
+    label: 'Spa sector 3 against the session best (±3 %)',
+    unit: 's',
+    low: 27.021,
+    high: 28.693,
+    stated: '27.857 ± 3 %',
+    source: 'doc 2.2 [12]',
+    role: 'validation',
+  },
+  'singapore-lap-m4': {
+    id: 'singapore-lap-m4',
+    label: 'Singapore reference lap, high trim, qualifying fuel (M4 band, ±3 %)',
+    unit: 's',
+    low: 86.483,
+    high: 91.833,
+    stated: '1:29.158 ± 3 %',
+    source: 'doc 2.1 [26]',
+    role: 'validation',
+  },
+  'singapore-trap': {
+    id: 'singapore-trap',
+    label: 'Singapore speed trap on the flying lap (150 m before T1), no tow',
+    unit: 'km/h',
+    low: 298,
+    high: 310,
+    stated: '304 ± 6',
+    source: 'doc 2.2 [13]',
+    role: 'validation',
+  },
+  'singapore-s1': {
+    id: 'singapore-s1',
+    label: 'Singapore sector 1 against the session best (±3 %)',
+    unit: 's',
+    low: 25.623,
+    high: 27.207,
+    stated: '26.415 ± 3 %',
+    source: 'doc 2.2 [13]',
+    role: 'validation',
+  },
+  'singapore-s2': {
+    id: 'singapore-s2',
+    label: 'Singapore sector 2 against the session best (±3 %)',
+    unit: 's',
+    low: 36.209,
+    high: 38.449,
+    stated: '37.329 ± 3 %',
+    source: 'doc 2.2 [13]',
+    role: 'validation',
+  },
+  'singapore-s3': {
+    id: 'singapore-s3',
+    label: 'Singapore sector 3 against the session best (±3 %)',
+    unit: 's',
+    low: 24.463,
+    high: 25.977,
+    stated: '25.22 ± 3 %',
+    source: 'doc 2.2 [13]',
+    role: 'validation',
+  },
 });
 
 /** The M4 band (±3 %) the lap must reach later, for the report. */
@@ -60,6 +160,90 @@ export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
       'full-envelope profile on that line is a quasi-steady prediction of 83.45 s; the rest is ' +
       'the car and the track as modelled. docs/physics-validation.md section 7.6.',
   },
+  'spa-lap-m4': {
+    measured: 109.072,
+    reason:
+      'First reference lap on the Spa line (medium trim): 8.5 % over the 2025 pole. The gap is ' +
+      'mostly in sector 2, the downforce sector (+14 % on the session best), as at Monza the ' +
+      "car is slower than the era's cars in fast corners. docs/physics-validation.md section 7.7.",
+  },
+  'spa-s1': {
+    measured: 31.75,
+    reason: 'Sector 1 on the first Spa reference lap, 6.7 % over the session best (section 7.7).',
+  },
+  'spa-s2': {
+    measured: 48.486,
+    reason: 'Sector 2 on the first Spa reference lap, 14 % over the session best (section 7.7).',
+  },
+  'spa-s3': {
+    measured: 28.836,
+    reason: 'Sector 3 on the first Spa reference lap, 3.5 % over the session best (section 7.7).',
+  },
+  'singapore-s1': {
+    measured: 27.234,
+    reason:
+      'Sector 1 on the first Singapore reference lap, 3.1 % over the session best, while the ' +
+      'lap is inside its band (section 7.7).',
+  },
+  'singapore-s3': {
+    measured: 26.257,
+    reason:
+      'Sector 3 on the first Singapore reference lap, 4.1 % over the session best (section 7.7).',
+  },
 });
 
 export { gapSlack, outside };
+
+/** Per-circuit reference figures for the lap report and the tests (doc 2.1 and 2.2). */
+export interface CircuitReference {
+  lapTarget: string;
+  trapTarget: string;
+  /** Sector targets, or null where the doc sets none (Monza's sectors are reported only). */
+  sectorTargets: readonly [string, string, string] | null;
+  /** The era's pole lap, s, and the M4 (±3 %) band. */
+  reference: number;
+  m4: readonly [number, number];
+  /** Sectors of the pole lap where published, else the session-best sectors, and the best. */
+  sectors: readonly number[];
+  best: readonly number[];
+  sectorsAre: 'pole lap' | 'session best';
+  /** Fastest speed published at the timing line, km/h. */
+  finishLine: number;
+}
+
+export const CIRCUIT_REFERENCE: Readonly<Record<string, CircuitReference>> = Object.freeze({
+  monza: {
+    lapTarget: 'monza-lap-m1',
+    trapTarget: 'monza-trap',
+    sectorTargets: null,
+    reference: MONZA_REFERENCE_LAP,
+    m4: MONZA_M4_BAND,
+    sectors: MONZA_PUBLISHED.poleSectors,
+    best: MONZA_PUBLISHED.bestSectors,
+    sectorsAre: 'pole lap',
+    finishLine: MONZA_PUBLISHED.finishLine,
+  },
+  spa: {
+    lapTarget: 'spa-lap-m4',
+    trapTarget: 'spa-trap',
+    sectorTargets: ['spa-s1', 'spa-s2', 'spa-s3'],
+    reference: 100.562,
+    m4: [97.545, 103.579],
+    // The pole-holder's best sectors came from different laps (doc 2.2): the session bests.
+    sectors: [29.761, 42.532, 27.857],
+    best: [29.761, 42.532, 27.857],
+    sectorsAre: 'session best',
+    finishLine: 234.9,
+  },
+  singapore: {
+    lapTarget: 'singapore-lap-m4',
+    trapTarget: 'singapore-trap',
+    sectorTargets: ['singapore-s1', 'singapore-s2', 'singapore-s3'],
+    reference: 89.158,
+    m4: [86.483, 91.833],
+    sectors: [26.415, 37.329, 25.22],
+    best: [26.415, 37.329, 25.22],
+    sectorsAre: 'session best',
+    finishLine: 264.8,
+  },
+});
