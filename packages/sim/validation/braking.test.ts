@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BRAKING_EVENTS, measureBrakingCurve, measureBrakingEvent } from './lib/index';
+import {
+  BRAKING_EVENTS,
+  KMH,
+  braking,
+  measureBrakingCurve,
+  measureBrakingEvent,
+} from './lib/index';
 import { expectTarget, targetName } from './expect-target';
 
 // Doc 2.4 test 1: straight-line braking from v1 to v2 in the circuit's trim, race fuel 50 kg,
@@ -13,6 +19,17 @@ describe('validation: published braking events (doc 2.4)', () => {
         const id = `${e.id}-${what}`;
         it(targetName(id), () => expectTarget(id, values[id]!));
       }
+    });
+  }
+});
+
+describe('braking runs start and end where the event says', () => {
+  for (const e of BRAKING_EVENTS) {
+    it(`${e.label}: brakes from ${e.v1} km/h and stops the clock at ${e.v2} km/h`, () => {
+      const r = braking({ circuit: e.circuit, v1: e.v1 * KMH, v2: e.v2 * KMH, bias: 0.57 });
+      expect(Math.abs(r.v1 / KMH - e.v1)).toBeLessThan(0.05);
+      expect(r.v2 / KMH).toBeCloseTo(e.v2, 9);
+      expect(r.distance).toBeGreaterThan(0);
     });
   }
 });

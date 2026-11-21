@@ -182,41 +182,52 @@ export function braking(
     speed: o.v1,
     airDensity: c.airDensity,
     brakeBias: o.bias,
-    ersMode: ErsMode.Balanced,
-    // The store is part-used at the end of a straight, so the MGU-K can harvest.
+    // Every published event ends a DRS straight with the MGU-K deploying; the store is
+    // part-used by then, so the MGU-K can harvest under the brakes.
+    ersMode: ErsMode.Overtake,
     ersStore: 2e6,
     recordEvery: harnessRecord(o),
     ...paramsOf(o),
   });
-  // Settle the suspension under the aero load at v1 for half a second.
-  const hold = new SpeedHold(o.v1);
-  while (h.time < 0.5) {
+  // Settle the suspension under the aero load while holding v1 with the throttle, DRS open,
+  // then brake on the first tick that is within 0.05 km/h of v1.
+  h.input.drs = true;
+  const hold = new SpeedHold(o.v1, 2, 4, 0.8);
+  while (h.time < 0.5 || Math.abs(h.car.vx - o.v1) > 0.05 * KMH) {
+    if (h.time > 5) throw new Error(`cannot hold ${(o.v1 / KMH).toFixed(1)} km/h to brake from it`);
     hold.tick(h);
     h.step();
   }
-  // Brake from exactly v1 (the hold leaves it within a few hundredths of a km/h).
   const startDistance = h.car.distance;
   const startTime = h.time;
   const startSpeed = h.car.vx;
   const driver = new ThresholdBrakeDriver();
   const ma = new MovingAverage(PEAK_WINDOW);
   let peak = 0;
+  let prevSpeed = startSpeed;
+  let prevDistance = startDistance;
+  let prevTime = startTime;
   while (h.car.vx > o.v2 && h.time - startTime < 10) {
+    prevSpeed = h.car.vx;
+    prevDistance = h.car.distance;
+    prevTime = h.time;
     driver.tick(h);
     h.step();
     const avg = ma.push(-h.tel.longG);
     if (ma.full && avg > peak) peak = avg;
   }
-  const distance = h.car.distance - startDistance;
+  // Interpolate the crossing of v2 inside the last step.
+  const f = prevSpeed > h.car.vx ? (prevSpeed - o.v2) / (prevSpeed - h.car.vx) : 1;
+  const distance = prevDistance + f * (h.car.distance - prevDistance) - startDistance;
   const r: BrakingResult = {
     circuit: o.circuit,
     v1: startSpeed,
-    v2: h.car.vx,
+    v2: o.v2,
     bias: o.bias,
     distance,
-    time: h.time - startTime,
+    time: prevTime + f * (h.time - prevTime) - startTime,
     peakG: peak,
-    meanG: (startSpeed * startSpeed - h.car.vx * h.car.vx) / (2 * distance) / G,
+    meanG: (startSpeed * startSpeed - o.v2 * o.v2) / (2 * distance) / G,
   };
   if (h.trace) r.trace = h.trace;
   return r;

@@ -90,11 +90,12 @@ export class ThresholdBrakeDriver {
 
 /** Throttle (and if needed brake) to hold a forward speed. */
 export class SpeedHold {
-  private integral = 0;
   constructor(
     public target: number,
     readonly kp = 0.6,
     readonly ki = 0.4,
+    /** Starting throttle held by the integrator (a feedforward guess). */
+    private integral = 0,
   ) {}
   tick(h: Harness): void {
     const err = this.target - h.car.vx;
