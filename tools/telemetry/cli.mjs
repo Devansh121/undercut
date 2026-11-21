@@ -119,7 +119,10 @@ async function lap(options) {
   const laps = Number(options.laps ?? 1);
   const setups = { monza: ai.MONZA, spa: ai.SPA, singapore: ai.SINGAPORE };
   const setup = setups[options.circuit ?? 'monza'];
-  if (!setup) throw new Error(`no racing line for ${options.circuit}; one of ${Object.keys(setups).join(', ')}`);
+  if (!setup)
+    throw new Error(
+      `no racing line for ${options.circuit}; one of ${Object.keys(setups).join(', ')}`,
+    );
   // Fuel a lap with a margin, as the soak carries (packages/ai/validation/soak).
   const perLap = { monza: 2.2, spa: 2.7, singapore: 2.0 }[setup.id];
   const fuel = Number(options.fuel ?? (laps > 1 ? setup.fuel + perLap * (laps + 1) : setup.fuel));
