@@ -315,7 +315,7 @@ def profile_svg(tr, title, values, unit, fmt, marks, zero=False, band=None):
     out.append('<text x="%d" y="%d" font-family="DejaVu Sans" font-size="12" fill="#aab3ad">%s</text>' % (pad, pad - 10, unit))
     if band:
         for a, b, col in band:
-            out.append('<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="%s" opacity="0.18"/>' % (X(a), pad, X(b) - X(a), H - 2 * pad, col))
+            out.append('<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="%s"/>' % (X(a), pad, X(b) - X(a), H - 2 * pad, col))
     pts = " ".join("%.1f,%.1f" % (X(i * tr.step), Y(v)) for i, v in enumerate(values))
     out.append('<polyline points="%s" fill="none" stroke="#3ad6ff" stroke-width="1.6"/>' % pts)
     for s, label in marks:
@@ -330,7 +330,7 @@ def write(svg_text, path, keep_svg):
     with open(svg_path, "w") as f:
         f.write(svg_text)
     if shutil.which("convert"):
-        subprocess.run(["convert", "-density", "96", svg_path, path + ".png"], check=True)
+        subprocess.run(["convert", "-density", "96", svg_path, "-depth", "8", "-colors", "256", "+dither", "-define", "png:compression-level=9", "PNG8:" + path + ".png"], check=True)
         if not keep_svg:
             os.remove(svg_path)
         print(os.path.relpath(path + ".png", ROOT))
@@ -392,7 +392,7 @@ def main(argv):
     kappa = geom.curvature(tr.pts, True)
     geo_step = data["source"]["smoothedLength"] / tr.n
     found, ks = corner_rule.detect(kappa, geo_step)
-    band = [(c[2] * tr.step, c[3] * tr.step, "#ffd23f") for c in found]
+    band = [(c[2] * tr.step, c[3] * tr.step, "#3d3a1e") for c in found]
     title = "%s: signed curvature (1/m, left positive), smoothed %.0f m; shaded: %d corners found by the curvature rule" % (name, corner_rule.SMOOTH_SIGMA_M, len(found))
     write(profile_svg(tr, title, ks, "1/m", lambda v: "%.3f" % v, marks, zero=True, band=band), os.path.join(out_dir, cid + "-curvature"), keep_svg)
     return 0
