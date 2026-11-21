@@ -29,7 +29,7 @@ npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only tar
 | `validate` | The table of every target: result, stated target, band, verdict (pass, gap, fail) |
 | `lap` | The reference driver on the committed racing line (`packages/ai`): an out-lap, then timed lap(s) from the control line at Monza in the doc 2.1 conditions; lap, sector, corner, corner-geometry and trap tables against the published figures, driver cost per tick; `lap-monza.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-monza.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
 
-`calibrate` is the calibration harness: the 32 component targets (result, band, in or out,
+`calibrate` is the calibration harness: the 32 component targets (role, result, band, in or out,
 miss in band half-widths, the recorded gap), then the Monza lap with a freshly measured envelope
 (driven lap, the driver's plan and the full-envelope plan, sectors, corners, the corner-geometry
 table and the doc 2.6 reference corner speeds), and a score: the summed misses of every target

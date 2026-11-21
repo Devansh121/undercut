@@ -24,12 +24,12 @@ there and has not moved by more than 5 % of the band's half-width. So the test t
 the gap closes (move it to passing) or when it widens (find out why). The Results section of
 `docs/physics-validation.md` lists the same gaps.
 
-Five targets are fits, not checks (`FIT_TARGETS` in `lib/targets.ts`, marked `fit` in the
-table): the tyre's longitudinal friction and its load slope were fitted to 0–100 km/h and the
-Monza T1 2025 and Singapore T7 2025 braking peaks, the lateral friction to the low-trim
-slow-corner lateral, and the low-trim drag area to the top speed. A test asserts the marked set is
-exactly that list; every other target checks the model. The doc's Results section has the fit
-method and the targets used only to choose among estimates.
+Every target has one of three roles (`role`, from `FIT_TARGETS` and `SELECTION_TARGETS` in
+`lib/targets.ts`): a direct fit (a parameter was solved for it: 0–100 km/h and the Monza T1
+2025 peak for the tyre's longitudinal friction, the low-trim slow corner for its lateral
+friction, the low-trim top speed for the drag area), a selection check (looked at while choosing
+an estimate: the other braking peaks), or withheld validation (everything else). Tests assert
+the sets. The doc's Results section has the method and why each target is where it is.
 
 The published braking events are driven as the source describes them, with one pedal profile for
 all of them (`TRAIL_OFF` in `lib/drivers.ts`): full pedal within 80 ms, eased whenever a wheel
