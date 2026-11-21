@@ -11,6 +11,9 @@ describe('twenty AI cars at Monza, race distance', () => {
     expect(r.anomalies).toEqual([]);
     expect(r.entries.every((e) => e.status === 'finished')).toBe(true);
     expect(r.entries.every((e) => e.pitStops === 1 && e.compounds.length === 2)).toBe(true);
+    expect(run.cars.filter((c) => c.turnOne === 'clean').length).toBeGreaterThanOrEqual(18);
+    expect(run.cars.every((c) => c.beyondBarrier <= 0)).toBe(true);
+    expect(run.cars.every((c) => c.longestContact < 5)).toBe(true);
   });
 });
 

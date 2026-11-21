@@ -78,7 +78,7 @@ const IN_PATH = CAR_WIDTH + 0.5;
 /** Room kept between the body and the track edge, m. */
 const EDGE_MARGIN = 0.25;
 /** How fast the driver moves across the track, m/s. */
-const LATERAL_RATE = 2;
+const LATERAL_RATE = 0.8;
 /** Gap control: standstill gap, m, speed gain, 1/s, and the deceleration assumed for safety, m/s². */
 const STANDSTILL_GAP = 2;
 const GAP_GAIN = 0.8;
@@ -394,6 +394,7 @@ export class RaceDriver implements Driver {
     const oMax = this.room.hi;
     const reachAhead = Math.max(80, 40 + v * 3);
     const lookBehind = -(CAR_LENGTH + 2);
+    const approachingCorner = this.cornerSign(s0) !== 0;
 
     // The car ahead in this car's path, and the cars alongside (or about to be).
     let leader: TrafficCar | null = null;
@@ -412,7 +413,10 @@ export class RaceDriver implements Driver {
       if (ds > reachAhead || ds < lookBehind) continue;
       const od = c.d - this.at(line.d, c.s);
       const lateral = Math.abs(od - myO);
-      const inPath = lateral < IN_PATH || Math.abs(od - this.o) < IN_PATH;
+      const inPath =
+        lateral < IN_PATH ||
+        Math.abs(od - this.o) < IN_PATH ||
+        (approachingCorner && ds > CAR_LENGTH);
       // Ahead and in the way (or overlapping it already): follow it.
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH)) {
         if (ds < leaderDs) {
@@ -497,7 +501,7 @@ export class RaceDriver implements Driver {
         }
       }
     }
-    if (this.passId < 0 && leader && this.cooldown <= 0) {
+    if (this.passId < 0 && leader && this.cooldown <= 0 && !approachingCorner) {
       const gap = leaderDs - CAR_LENGTH;
       const faster = this.at(profV, leader.s) > leader.speed + 3 - 2 * aggression;
       const held = this.heldTime > 3 - 2 * aggression;
@@ -533,14 +537,15 @@ export class RaceDriver implements Driver {
     // The target offset: as close to the base as the cars alongside and the edges allow.
     const target = Math.max(lo, Math.min(hi, base));
     const yielding = yieldTo !== null;
-    this.o = this.approach(this.o, target, dt);
+    // Keep the grid lane while traction is limited during the launch.
+    this.o = v < 10 ? myO : this.approach(this.o, target, dt);
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
     let limit = Number.POSITIVE_INFINITY;
     if (leader) {
       const gap = leaderDs - CAR_LENGTH;
       const vl = Math.max(0, leader.speed);
-      const headway = 0.25 + 0.2 * (1 - aggression);
+      const headway = 0.8 + 0.3 * (1 - aggression);
       const want = STANDSTILL_GAP + v * headway;
       const vSafe = vl + (gap - want) * GAP_GAIN;
       const room = gap - STANDSTILL_GAP;
@@ -598,7 +603,7 @@ export class RaceDriver implements Driver {
       const sx = s0 + x;
       const k = this.at(plan.line.curvature, sx);
       const tight = k * o;
-      let f = 0.985;
+      let f = Math.abs(k) > 1 / 150 ? 0.85 : 0.985;
       if (tight > 0) f *= Math.sqrt(Math.max(0.4, 1 - 1.2 * tight));
       const vMax = this.at(plan.profile.v, sx) * f;
       if (v <= vMax) continue;
