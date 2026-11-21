@@ -11,6 +11,11 @@ export interface TrafficCar {
   d: number;
   /** Forward speed, m/s. */
   speed: number;
+  /**
+   * Half the width the car takes across the track, m: half a car's width when it points along
+   * the lap, up to half its length when it is across it (spun, turning round).
+   */
+  halfWidth: number;
 }
 
 export interface TrafficView {
@@ -21,6 +26,8 @@ export interface TrafficView {
   count: number;
   /** A blue flag is shown to this car: a car a lap up is close behind. */
   blueFlag: boolean;
+  /** The car the blue flag is for (the one lapping this car), or -1. */
+  blueBy: number;
   /**
    * The racing driver has the car: racing, past its start reaction, not held, not in the pit
    * lane's hands. Only then can it be stuck.
@@ -31,7 +38,7 @@ export interface TrafficView {
 }
 
 export function createTrafficCar(): TrafficCar {
-  return { id: -1, s: 0, d: 0, speed: 0 };
+  return { id: -1, s: 0, d: 0, speed: 0, halfWidth: 1 };
 }
 
 export function createTrafficView(capacity: number): TrafficView {
@@ -40,6 +47,7 @@ export function createTrafficView(capacity: number): TrafficView {
     cars: Array.from({ length: capacity }, createTrafficCar),
     count: 0,
     blueFlag: false,
+    blueBy: -1,
     active: false,
     launching: false,
   };

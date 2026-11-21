@@ -1,12 +1,19 @@
 import {
   PathFollower,
+  createTrafficCar,
   createTrafficView,
   type Driver,
   type DriverMemory,
   type FollowerState,
   type TrafficView,
 } from '@undercut/ai';
-import { NEUTRAL_INPUT, type CarParams, type CarTelemetry, type ControlInput } from '@undercut/sim';
+import {
+  BODY_HALF_WIDTH,
+  NEUTRAL_INPUT,
+  type CarParams,
+  type CarTelemetry,
+  type ControlInput,
+} from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import type { CircuitInfo } from '../circuit';
 import type { RaceControl } from '../control';
@@ -70,6 +77,8 @@ interface PitLaneState {
   still?: number;
 }
 
+/** Half a car's length, m (5.6 m nose to tail). */
+const CAR_HALF_LENGTH = 2.8;
 /** Seconds stopped short of the box before a car gives the stop up and drives out. */
 const PIT_STALL = 3;
 /** How far past the track edge a car in the pit lane still counts as traffic, m. */
@@ -265,7 +274,7 @@ export class AiController implements CarController {
     if (!driver.sense) return;
     const view = this.traffic;
     const field = ctx.field;
-    while (view.cars.length < field.length) view.cars.push({ id: -1, s: 0, d: 0, speed: 0 });
+    while (view.cars.length < field.length) view.cars.push(createTrafficCar());
     const me = ctx.facts;
     view.self.id = ctx.car;
     view.self.s = me.s;
@@ -287,10 +296,15 @@ export class AiController implements CarController {
       c.s = f.s;
       c.d = f.d;
       c.speed = f.speed;
+      // The footprint across the track: half its width aligned, up to half its length across.
+      const h = f.heading;
+      c.halfWidth =
+        CAR_HALF_LENGTH * Math.abs(Math.sin(h)) + BODY_HALF_WIDTH * Math.abs(Math.cos(h));
     }
     view.count = n;
     const c = ctx.control;
-    view.blueFlag = c.blueFlag(ctx.car) >= 0;
+    view.blueBy = c.blueFlag(ctx.car);
+    view.blueFlag = view.blueBy >= 0;
     const out0 = c.lightsOutAt;
     view.active =
       (c.phase === 'green' || c.phase === 'chequered') &&

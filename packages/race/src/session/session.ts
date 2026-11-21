@@ -112,6 +112,7 @@ export class RaceSession {
   private readonly pitHints: { index: number }[];
   private readonly q = createPathPoint();
   private readonly pq = createPathPoint();
+  private readonly tangent = createVec3();
 
   constructor(o: RaceSessionOptions) {
     this.track = o.track;
@@ -279,6 +280,9 @@ export class RaceSession {
     f.s = q.s;
     f.d = q.d;
     f.speed = st.vx;
+    const t = this.track.tangentAt(q.s, this.tangent);
+    const h = st.yaw - Math.atan2(-t.z, t.x);
+    f.heading = Math.atan2(Math.sin(h), Math.cos(h));
     f.wheelsOff = this.limits[i]!.wheelsOff(st);
     const inPit = this.track.onPitLane(st.x, st.z, q.s, q.d, this.pitHints[i]!, this.pq);
     if (!inPit) this.pitHints[i]!.index = -1;

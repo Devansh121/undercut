@@ -100,7 +100,7 @@ const HEADWAY_ATTACK = 0.12;
  * What a driver perceives of the other cars: how far ahead and behind (mirrors), m, and how late,
  * s (a car is seen where it was that long ago).
  */
-const SEE_AHEAD = 160;
+const SEE_AHEAD = 300;
 const SEE_BEHIND = 40;
 const SEE_DELAY = 0.12;
 /** Curvature from which the line counts as a corner, 1/m (a radius under 150 m). */
@@ -174,6 +174,7 @@ export class RaceDriver implements Driver {
   private stillTime = 0;
   private backTime = 0;
   private wasActive = false;
+  private blueSide = 0;
   private biasX = 0;
   private biasZ = 0;
   private haveSense = false;
@@ -235,6 +236,7 @@ export class RaceDriver implements Driver {
     this.stillTime = 0;
     this.backTime = 0;
     this.wasActive = false;
+    this.blueSide = 0;
     this.biasX = 0;
     this.biasZ = 0;
     this.haveSense = false;
@@ -257,6 +259,7 @@ export class RaceDriver implements Driver {
     out.stillTime = this.stillTime;
     out.backTime = this.backTime;
     out.wasActive = this.wasActive;
+    out.blueSide = this.blueSide;
     out.biasX = this.biasX;
     out.biasZ = this.biasZ;
     out.haveSense = this.haveSense;
@@ -297,6 +300,7 @@ export class RaceDriver implements Driver {
     this.stillTime = num('stillTime');
     this.backTime = num('backTime');
     this.wasActive = m.wasActive === true;
+    this.blueSide = typeof m.blueSide === 'number' ? m.blueSide : 0;
     this.biasX = num('biasX');
     this.biasZ = num('biasZ');
     this.haveSense = m.haveSense === true;
@@ -352,8 +356,10 @@ export class RaceDriver implements Driver {
     }
     // Where the car is: a slowly drifting error of up to 0.15 m at full noise.
     if (noise > 0) {
+      // The error drifts with distance driven, not with time: at walking pace a drift per
+      // second would swamp the car's own motion and read as a slide.
       const amp = 0.15 * noise;
-      const k = amp * Math.sqrt(dt);
+      const k = amp * Math.sqrt(dt) * Math.min(1, Math.abs(tel.speed) / 20);
       this.biasX = Math.max(-amp, Math.min(amp, this.biasX + this.rng.range(-1, 1) * k));
       this.biasZ = Math.max(-amp, Math.min(amp, this.biasZ + this.rng.range(-1, 1) * k));
       seen.x = tel.x + this.biasX;
@@ -417,6 +423,7 @@ export class RaceDriver implements Driver {
     car: null as unknown as TrafficCar,
     ds: 0,
     od: 0,
+    sep: 0,
     left: false,
   }));
 
@@ -458,10 +465,13 @@ export class RaceDriver implements Driver {
       if (ds < -(CAR_LENGTH + 2)) continue;
       const od = c.d - this.at(line.d, c.s);
       const lateral = Math.abs(od - myO);
+      // Clearances grow with the width the other car takes across the track (spun, turning).
+      const wide = c.halfWidth - BODY_HALF_WIDTH;
+      const inPathAt = IN_PATH + wide;
       const owns = cornering && ds >= 0.6 * CAR_LENGTH && c.id !== this.passId;
-      const inPath = lateral < IN_PATH || Math.abs(od - this.o) < IN_PATH || owns;
+      const inPath = lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns;
       // Ahead and in the way (or overlapping it already): follow it.
-      if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH)) {
+      if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
         if (ds < leaderDs) {
           leaderDs = ds;
           leader = c;
@@ -475,6 +485,7 @@ export class RaceDriver implements Driver {
         e.car = c;
         e.ds = ds;
         e.od = od;
+        e.sep = SIDE_BY_SIDE + wide;
         e.left = myO >= od;
       }
     }
@@ -492,8 +503,8 @@ export class RaceDriver implements Driver {
       for (let k = 0; k < ns; k++) {
         const e = side[k]!;
         if (e.ds <= skipBelow) continue;
-        if (e.left) lo = Math.max(lo, e.od + SIDE_BY_SIDE);
-        else hi = Math.min(hi, e.od - SIDE_BY_SIDE);
+        if (e.left) lo = Math.max(lo, e.od + e.sep);
+        else hi = Math.min(hi, e.od - e.sep);
       }
       if (lo <= hi) break;
       let rear = -1;
@@ -546,7 +557,7 @@ export class RaceDriver implements Driver {
       } else {
         this.passTime += dt;
         const od = passCar!.d - this.at(line.d, passCar!.s);
-        base = od + this.passSide * SIDE_BY_SIDE;
+        base = od + this.passSide * (SIDE_BY_SIDE + passCar!.halfWidth - BODY_HALF_WIDTH);
         const fits = this.passSide > 0 ? base <= oMax : base >= oMin;
         this.passBlocked = fits ? 0 : this.passBlocked + dt;
         if (this.passBlocked > 0.6) {
@@ -569,8 +580,9 @@ export class RaceDriver implements Driver {
       const held = this.heldTime > 1.5 - aggression;
       if (gapAhead < 25 + v * 0.25 && (faster || held)) {
         const od = leader.d - this.at(line.d, leader.s);
-        const left = od + SIDE_BY_SIDE <= oMax;
-        const right = od - SIDE_BY_SIDE >= oMin;
+        const sep = SIDE_BY_SIDE + leader.halfWidth - BODY_HALF_WIDTH;
+        const left = od + sep <= oMax;
+        const right = od - sep >= oMin;
         let side = 0;
         if (left && right) {
           // The inside of the next corner, else the side the car is already on.
@@ -583,12 +595,23 @@ export class RaceDriver implements Driver {
           this.passSide = side;
           this.passTime = 0;
           this.passBlocked = 0;
-          base = od + side * SIDE_BY_SIDE;
+          base = od + side * sep;
         } else this.cooldown = 1;
       }
     }
-    if (this.passId < 0 && view.blueFlag) {
-      base = oMax >= -oMin ? Math.min(SIDE_BY_SIDE, oMax) : Math.max(-SIDE_BY_SIDE, oMin);
+    // Blue flag: move over to the side away from the car lapping this one, and stay there
+    // until it is by (the side chosen once, so the line crossing the track does not swing the
+    // car back into its way).
+    if (!view.blueFlag) this.blueSide = 0;
+    else if (this.passId < 0) {
+      if (this.blueSide === 0) {
+        let lapper: TrafficCar | null = null;
+        for (let k = 0; k < view.count; k++)
+          if (view.cars[k]!.id === view.blueBy) lapper = view.cars[k]!;
+        const theirs = lapper ? lapper.d - this.at(line.d, lapper.s) : 0;
+        this.blueSide = lapper ? (theirs > myO ? -1 : 1) : oMax >= -oMin ? 1 : -1;
+      }
+      base = this.blueSide > 0 ? Math.min(SIDE_BY_SIDE, oMax) : Math.max(-SIDE_BY_SIDE, oMin);
     }
     // Back in the racing driver's hands after the pit lane (or any spell without it): rejoin
     // from where the car is, as after a spin.
@@ -600,7 +623,8 @@ export class RaceDriver implements Driver {
     if (this.rejoinTime > 0) {
       // Just rejoined after a spin: come back to the line only as the traffic allows.
       this.rejoinTime = Math.max(0, this.rejoinTime - dt);
-      if (this.carApproaching(view, s0, self.d, 80)) base = myO;
+      // (A move away from the line, to pass or for a blue flag, still stands.)
+      if (this.carApproaching(view, s0, self.d, 80) && Math.abs(myO) > Math.abs(base)) base = myO;
     }
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
@@ -622,7 +646,8 @@ export class RaceDriver implements Driver {
       const vSafe = vl + (gap - want) * GAP_GAIN;
       // Never closer than could be stopped from if the car ahead braked now as hard as this one
       // can, noticed after this driver's perception and reaction delay (Gipps' safe speed).
-      const b = this.brakeAt(v);
+      // Grip falls with speed (downforce), so count on what the brakes give at the slower end.
+      const b = this.brakeAt(Math.min(v, vl));
       const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
       const room = gap - STANDSTILL_GAP;
       const vKin =
@@ -630,7 +655,8 @@ export class RaceDriver implements Driver {
       let vOk = Math.min(vSafe, vKin);
       // Going round a car that is (nearly) stopped: creep past once the held offset clears it.
       const od = leader.d - this.at(line.d, leader.s);
-      if (attacking && Math.abs(od - this.o) >= IN_PATH && gap > 1.5) {
+      const clear = IN_PATH + leader.halfWidth - BODY_HALF_WIDTH;
+      if (attacking && Math.abs(od - this.o) >= clear && gap > 1.5) {
         vOk = Math.max(vOk, Math.min(5, gap));
       }
       limit = SPEED_GAIN * (vOk - v);

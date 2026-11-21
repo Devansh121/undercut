@@ -9,6 +9,8 @@ export interface CarFacts {
   d: number;
   /** Forward speed, m/s. */
   speed: number;
+  /** Heading relative to the lap's direction at s, rad in (-π, π] (0: pointing along the lap). */
+  heading: number;
   /** Wheels wholly past the track-limit lines (0 to 4). */
   wheelsOff: number;
   /** On the pit-lane surface, with its pit-frame position (NaN when not in the lane). */
@@ -22,6 +24,7 @@ export function createFacts(): CarFacts {
     s: 0,
     d: 0,
     speed: 0,
+    heading: 0,
     wheelsOff: 0,
     inPitLane: false,
     pitS: Number.NaN,
@@ -33,6 +36,7 @@ export function copyFacts(from: CarFacts, to: CarFacts): CarFacts {
   to.s = from.s;
   to.d = from.d;
   to.speed = from.speed;
+  to.heading = from.heading;
   to.wheelsOff = from.wheelsOff;
   to.inPitLane = from.inPitLane;
   to.pitS = from.pitS;
@@ -46,6 +50,7 @@ export function factsToJson(f: CarFacts): Record<string, number | boolean | null
     s: f.s,
     d: f.d,
     speed: f.speed,
+    heading: f.heading,
     wheelsOff: f.wheelsOff,
     inPitLane: f.inPitLane,
     pitS: Number.isFinite(f.pitS) ? f.pitS : null,
@@ -57,6 +62,7 @@ export function factsFromJson(j: Record<string, number | boolean | null>, out: C
   out.s = j.s as number;
   out.d = j.d as number;
   out.speed = j.speed as number;
+  out.heading = typeof j.heading === 'number' ? j.heading : 0;
   out.wheelsOff = j.wheelsOff as number;
   out.inPitLane = j.inPitLane as boolean;
   out.pitS = typeof j.pitS === 'number' ? j.pitS : Number.NaN;
