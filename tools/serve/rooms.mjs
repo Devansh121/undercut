@@ -24,6 +24,16 @@ const sleep = (ms, signal) =>
     signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
   });
 
+/** Memory-backed /dev/shm when it is writable, else the system temp directory. */
+function stateRoot() {
+  try {
+    fs.accessSync('/dev/shm', fs.constants.W_OK);
+    return '/dev/shm';
+  } catch {
+    return os.tmpdir();
+  }
+}
+
 /** True while any process in group `pgid` exists. */
 function groupAlive(pgid) {
   try {
@@ -57,7 +67,9 @@ function signalGroup(pgid, signal) {
  * stop. With wrangler's default (.wrangler/state beside the config) every runtime on the
  * machine shares the same SQLite files, and two at once (a test run's service beside the
  * servers the tools/serve runtime tests start) fail with "database is locked" (SQLITE_BUSY).
- * Rooms are short-lived; nothing needs to outlive the process.
+ * Rooms are short-lived; nothing needs to outlive the process. The directory is on /dev/shm
+ * (memory) where there is one: the room still awaits its alarm writes behind the runtime's
+ * output gate, and on a busy machine a disk write there delays relayed snapshots.
  *
  * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
  */
@@ -87,7 +99,7 @@ export function createRoomsService({
     const inspectorPort = await freePort();
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
-    persistDir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
+    persistDir = fs.mkdtempSync(path.join(stateRoot(), 'undercut-rooms-state-'));
     child = spawn(
       process.execPath,
       [
