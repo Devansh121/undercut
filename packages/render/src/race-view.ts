@@ -156,6 +156,11 @@ export class RaceView {
       frame.lookBack,
     );
     this.car.setHelmetVisible(mode.helmet);
+    if (frame.ghost) {
+      const dx = frame.ghost.x - this.camera.position.x;
+      const dz = frame.ghost.z - this.camera.position.z;
+      this.ghostCar.setGhostFade(Math.hypot(dx, dz));
+    }
     this.focus.set(frame.pose.x, frame.pose.y, frame.pose.z);
     // Bias the shadow box ahead of the car, where the camera looks.
     const ahead = Math.min(this.quality.shadowExtent * 0.5, 4 + frame.speed * 0.25);

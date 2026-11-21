@@ -246,6 +246,9 @@ export class Hud {
     t.lap?.set(h.lap > 0 ? String(h.lap) : 'Out lap');
     t.lapNo?.set(h.lap > 0 ? `Lap ${h.lap}` : 'Out lap');
     t.record?.set(formatLapTime(h.record));
+    setClass(this.t.record?.node as HTMLElement, 'is-empty', h.record === null);
+    setClass(this.t.best?.node as HTMLElement, 'is-empty', h.best === null);
+    setClass(this.lastEl, 'is-empty', h.last === null);
     t.lapTime?.set(h.running ? formatLapTime(h.lapTime) : formatLapTime(0));
     t.speed?.set(formatSpeedKmh(h.speed));
     t.gear?.set(formatGear(h.gear));

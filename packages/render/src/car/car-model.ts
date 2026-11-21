@@ -96,6 +96,7 @@ export class CarModel {
   private readonly materials: Material[] = [];
   private readonly textures: Texture[] = [];
   private readonly geo: CarGeometry;
+  private ghostMaterial: MeshStandardMaterial | null = null;
 
   constructor(geo: CarGeometry, livery: Livery, quality: Quality, ghost = false) {
     this.geo = geo;
@@ -132,6 +133,7 @@ export class CarModel {
         depthWrite: false,
       });
       this.materials.push(ghostMat);
+      this.ghostMaterial = ghostMat;
       return {
         paint: ghostMat,
         carbon: ghostMat,
@@ -449,10 +451,11 @@ export class CarModel {
     );
     this.add(this.driverHead, visor, m.visor, 'visor');
     this.cockpitEye.set(c - 0.12, 0.79, 0);
-    this.tcamMount.set(a - 2.1, 0.98, 0);
+    this.tcamMount.set(a - 2.4, 1.2, 0);
 
     // Steering wheel: a flat-bottomed grip plate with a dark display, turning on the column.
-    this.steeringWheel.position.set(c + 0.32, 0.6, 0);
+    this.steeringWheel.position.set(c + 0.26, 0.665, 0);
+    this.steeringWheel.rotation.order = 'XYZ';
     const wheel = plate(
       [
         [-0.13, -0.05],
@@ -645,6 +648,14 @@ export class CarModel {
       tmpQ.setFromUnitVectors(up, tmpB.multiplyScalar(1 / Math.max(1e-6, len)));
       mesh.quaternion.copy(tmpQ);
     }
+  }
+
+  /** Ghost only: fade out as it nears the camera so it never fills the screen. */
+  setGhostFade(distanceToCamera: number): void {
+    if (!this.ghostMaterial) return;
+    const f = Math.min(1, Math.max(0, (distanceToCamera - 4) / 8));
+    this.ghostMaterial.opacity = 0.32 * f;
+    this.root.visible = f > 0.01;
   }
 
   /** Show or hide the driver's helmet (hidden for the cockpit camera). */

@@ -1195,3 +1195,8 @@ button {
 [data-paused] .ut-touch {
   display: none;
 }
+
+/* A time not set yet reads as a placeholder, never in a timing colour. */
+.hud .num.is-empty {
+  color: var(--c-text-3);
+}

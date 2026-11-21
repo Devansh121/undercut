@@ -210,7 +210,7 @@ export class CameraRig {
     const list: CameraMode[] = [
       new ChaseCamera('chase-near', 4.9, 1.45, 60),
       new ChaseCamera('chase-far', 7.6, 2.15, 56, 0.14),
-      new BodyCamera('tcam', true, (car) => car.tcamMount, 68, 0.004, -0.04),
+      new BodyCamera('tcam', true, (car) => car.tcamMount, 66, 0.004, -0.085),
       new BodyCamera('cockpit', false, (car) => car.cockpitEye, 74, 0.02, -0.07),
       new LookBackCamera(),
     ];

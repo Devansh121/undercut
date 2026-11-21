@@ -32,11 +32,11 @@ if (circuit !== 'monza') {
 }
 
 const LOCK = path.join(os.homedir(), '.cache/undercut/gpu.lock');
-if (!process.env.UNDERCUT_GPU_LOCKED) {
+if (!process.env.SHOTS_GPU_LOCKED) {
   fs.mkdirSync(path.dirname(LOCK), { recursive: true });
   const r = spawnSync('flock', [LOCK, process.execPath, fileURLToPath(import.meta.url), ...args], {
     stdio: 'inherit',
-    env: { ...process.env, UNDERCUT_GPU_LOCKED: '1' },
+    env: { ...process.env, SHOTS_GPU_LOCKED: '1' },
   });
   process.exit(r.status ?? 1);
 }
@@ -129,7 +129,7 @@ async function stopServer(server) {
   if (server.child.exitCode === null) server.child.kill('SIGKILL');
 }
 
-async function openGame(browser, vp, extraQuery = '') {
+async function openGame(browser, vp, extraQuery = '', launchShot = null) {
   const context = await browser.newContext({
     viewport: vp.viewport,
     deviceScaleFactor: vp.deviceScaleFactor,
@@ -144,6 +144,10 @@ async function openGame(browser, vp, extraQuery = '') {
     `http://127.0.0.1:${PORT}/?debug=1&storage=memory&quality=${vp.quality}${extraQuery}`,
   );
   await page.waitForFunction(() => Boolean(globalThis.__undercut));
+  if (launchShot) {
+    await page.evaluate(() => globalThis.document.fonts.ready);
+    await page.screenshot({ path: launchShot });
+  }
   await page.evaluate(() => globalThis.__undercut.start());
   await page.waitForFunction(() => globalThis.document.documentElement.dataset.ready !== undefined);
   return { context, page, errors };
@@ -179,7 +183,9 @@ async function shots(browser, report) {
   const sizes = option('viewport')?.split(',');
   for (const vp of VIEWPORTS) {
     if (sizes && !sizes.includes(vp.label)) continue;
-    const { context, page, errors } = await openGame(browser, vp);
+    const launchFile = path.join(outDir, `launch-${vp.label}.png`);
+    const { context, page, errors } = await openGame(browser, vp, '', launchFile);
+    console.log(`  ${path.relative(root, launchFile)}`);
     for (const station of STATIONS) {
       if (only && !only.includes(station.name)) continue;
       await runStation(page, station);
@@ -201,6 +207,12 @@ async function shots(browser, report) {
         u.setTimeScale(1);
       });
     }
+    // The pause menu over the frozen frame.
+    await page.evaluate(() => globalThis.__undercut.pause());
+    await page.waitForTimeout(300);
+    const pauseFile = path.join(outDir, `pause-${vp.label}.png`);
+    await page.screenshot({ path: pauseFile });
+    console.log(`  ${path.relative(root, pauseFile)}`);
     if (errors.length) report.errors.push(...errors.map((e) => `${vp.label}: ${e}`));
     await context.close();
   }
