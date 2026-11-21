@@ -229,6 +229,12 @@ export class EngineVoice implements Voice {
   private evSpeed = 0;
   /** Sample index in the chunk of the event being handled. */
   private evIndex = 0;
+  /**
+   * Oscillator partials fade linearly to silence between 0.40 and 0.45 of the sample rate,
+   * so none aliases and none switches on or off abruptly as its frequency moves.
+   */
+  private readonly fadeTop: number;
+  private readonly fadeScale: number;
   private readonly popRing: number;
   private readonly clackLength: number;
 
@@ -265,6 +271,8 @@ export class EngineVoice implements Voice {
   ) {
     this.dt = 1 / sampleRate;
     this.invLimiter = 1 / spec.limiterSpeed;
+    this.fadeTop = 0.45 * sampleRate;
+    this.fadeScale = 1 / (0.05 * sampleRate);
     this.popRing = Math.round(sampleRate * 0.03);
     this.clackLength = Math.round(sampleRate * 0.003);
     const tables = pulseTables(sampleRate);
@@ -510,7 +518,8 @@ export class EngineVoice implements Voice {
     const noise = this.noiseBuf;
     const idle = this.spec.turboWhine.idle;
     const span = this.spec.turboWhine.full - idle;
-    const nyquistGuard = 0.45 * this.sampleRate;
+    const fadeTop = this.fadeTop;
+    const fadeScale = this.fadeScale;
     for (let i = 0; i < n; i++) {
       let target = boost[i] as number;
       target = (target < 0 ? 0 : target > 1 ? 1 : target) * (this.envBuf[i] as number);
@@ -521,8 +530,14 @@ export class EngineVoice implements Voice {
       if (this.turboPhase >= 1) this.turboPhase -= 1;
       const p = TWO_PI * this.turboPhase;
       const level = this.spool * (0.35 + 0.65 * (load[i] as number));
-      const second = 2 * fw < nyquistGuard ? 0.3 * Math.sin(2 * p) : 0;
-      tone[i] = (Math.sin(p) + second) * this.spool * level * LEVEL.turboWhine;
+      // Each partial fades out linearly between 0.40 and 0.45 of the sample rate (see fadeTop).
+      let g1 = (fadeTop - fw) * fadeScale;
+      g1 = g1 < 0 ? 0 : g1 > 1 ? 1 : g1;
+      let g2 = (fadeTop - 2 * fw) * fadeScale;
+      g2 = g2 < 0 ? 0 : g2 > 1 ? 1 : g2;
+      const first = g1 > 0 ? g1 * Math.sin(p) : 0;
+      const second = g2 > 0 ? 0.3 * g2 * Math.sin(2 * p) : 0;
+      tone[i] = (first + second) * this.spool * level * LEVEL.turboWhine;
       hissIn[i] = level * LEVEL.turboHiss;
     }
     this.hissNoise.fill(noise, n);
@@ -543,7 +558,8 @@ export class EngineVoice implements Voice {
     const speed = controls.buffers[F.engineSpeed] as Float64Array;
     const toHz = (this.spec.mgukRatio * this.spec.mgukPolePairs) / TWO_PI;
     const invMax = 1 / this.spec.mgukMaxPower;
-    const nyquistGuard = 0.45 * this.sampleRate;
+    const fadeTop = this.fadeTop;
+    const fadeScale = this.fadeScale;
     let e = 0;
     for (let i = 0; i < n; i++) {
       const p = power[i] as number;
@@ -558,9 +574,15 @@ export class EngineVoice implements Voice {
       this.ersPhase += fe * this.dt;
       if (this.ersPhase >= 1) this.ersPhase -= 1;
       const ph = TWO_PI * this.ersPhase;
-      const s1 = Math.sin(ph);
-      const h2 = 2 * fe < nyquistGuard ? Math.sin(2 * ph) : 0;
-      const h3 = 3 * fe < nyquistGuard ? Math.sin(3 * ph) : 0;
+      let g1 = (fadeTop - fe) * fadeScale;
+      g1 = g1 < 0 ? 0 : g1 > 1 ? 1 : g1;
+      let g2 = (fadeTop - 2 * fe) * fadeScale;
+      g2 = g2 < 0 ? 0 : g2 > 1 ? 1 : g2;
+      let g3 = (fadeTop - 3 * fe) * fadeScale;
+      g3 = g3 < 0 ? 0 : g3 > 1 ? 1 : g3;
+      const s1 = g1 > 0 ? g1 * Math.sin(ph) : 0;
+      const h2 = g2 > 0 ? g2 * Math.sin(2 * ph) : 0;
+      const h3 = g3 > 0 ? g3 * Math.sin(3 * ph) : 0;
       const d = this.deploy > 1.5 ? 1.5 : this.deploy;
       const h = this.harvest > 1.5 ? 1.5 : this.harvest;
       const v =

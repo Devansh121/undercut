@@ -3,6 +3,7 @@
  * browser has no Web Audio or no AudioWorklet, or loading fails, it gets a silent engine with
  * the same interface, and the game runs without sound instead of crashing.
  */
+import { MIN_SAMPLE_RATE } from '../dsp/core';
 import { CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../dsp/state';
 import type { GainId } from '../dsp/voice';
 import { PROCESSOR_NAME, type ProcessorOptions, type ToProcessor } from './messages';
@@ -36,6 +37,7 @@ export interface AudioEngine {
 /** The parts of an AudioContext this facade uses, so tests can supply a fake. */
 export interface AudioContextLike {
   readonly state: string;
+  readonly sampleRate: number;
   readonly destination: unknown;
   readonly audioWorklet?: { addModule(url: string): Promise<void> } | undefined;
   resume(): Promise<void>;
@@ -190,6 +192,9 @@ class WorkletAudioEngine implements AudioEngine {
       // Ask for resume now, while still inside the gesture; the module loads meanwhile.
       const resumed = context.resume().catch(() => undefined);
       if (!context.audioWorklet) throw new Error('AudioWorklet is not supported');
+      if (!(context.sampleRate >= MIN_SAMPLE_RATE)) {
+        throw new Error(`sample rate ${context.sampleRate} Hz is below ${MIN_SAMPLE_RATE} Hz`);
+      }
       await context.audioWorklet.addModule(this.options.workletUrl);
       const processorOptions: ProcessorOptions = { seed: this.options.seed };
       const node = this.options.createNode(context, PROCESSOR_NAME, {

@@ -10,6 +10,7 @@ import { PROCESSOR_NAME, type ToProcessor } from '../src/web/messages';
 
 class FakeContext implements AudioContextLike {
   state = 'suspended';
+  sampleRate = 48_000;
   destination = {};
   calls: string[] = [];
   audioWorklet: AudioContextLike['audioWorklet'] = {
@@ -222,5 +223,17 @@ describe('worklet processor', () => {
     processor.port.onmessage({ data: { type: 'pause', paused: true } });
     for (let i = 0; i < 40; i++) processor.process([], [out]);
     expect(Math.max(...(out[0] as Float32Array).map(Math.abs))).toBe(0);
+  });
+});
+
+describe('unsupported sample rates', () => {
+  it('falls back to silent when the context runs below the supported rate', async () => {
+    const context = new FakeContext();
+    context.sampleRate = 16_000;
+    const { engine, fallbacks, nodes } = setup({ context });
+    await engine.resume();
+    expect(engine.status).toBe('silent');
+    expect(nodes).toHaveLength(0);
+    expect(fallbacks[0]).toMatch(/sample rate/);
   });
 });

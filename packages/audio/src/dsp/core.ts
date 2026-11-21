@@ -9,6 +9,14 @@ import { DEFAULT_POWER_UNIT, type PowerUnitSoundSpec } from './spec';
 import type { AudioCarState } from './state';
 import type { BusId, GainId } from './voice';
 
+/**
+ * Lowest supported sample rate. The tonal sources (pulse train up to 15 000 rpm, turbo
+ * whine, MGU-K whine) are designed to stay under 0.45 of the rate from here up; browsers
+ * run at 44.1 or 48 kHz.
+ */
+export const MIN_SAMPLE_RATE = 22_050;
+export const MAX_SAMPLE_RATE = 384_000;
+
 export interface AudioCoreOptions {
   sampleRate: number;
   /** Seed for every noise source. Same seed and inputs give the same samples. */
@@ -70,8 +78,10 @@ export class AudioCore {
 
   constructor(options: AudioCoreOptions) {
     const { sampleRate } = options;
-    if (!(sampleRate >= 8000 && sampleRate <= 384000)) {
-      throw new RangeError(`sampleRate ${sampleRate} is outside 8–384 kHz`);
+    if (!(sampleRate >= MIN_SAMPLE_RATE && sampleRate <= MAX_SAMPLE_RATE)) {
+      throw new RangeError(
+        `sampleRate ${sampleRate} is outside ${MIN_SAMPLE_RATE}–${MAX_SAMPLE_RATE} Hz`,
+      );
     }
     this.sampleRate = sampleRate;
     const rng = createRng(options.seed ?? 1);
