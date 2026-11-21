@@ -436,7 +436,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'braking',
         label: 'Braking help',
-        description: 'Brakes for the corner ahead when you arrive faster than the driving line.',
+        description:
+          'Brakes for you when you arrive at a corner faster than the driving line. On by default for keys (Low) and touch (Medium).',
         choices: levels,
         get: () => session.assists.braking,
         set: (v) => session.setAssist('braking', Number(v)),

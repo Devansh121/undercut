@@ -299,8 +299,10 @@ function stabilityControl(
         amount = Math.min(ESC.maxUnder, ESC.underGain * under);
       }
     }
-    // A wheel the extra brake would lock gets none.
-    if (target >= 0 && -car.slipRatio[target]! > ESC.lock * curve.peakSlipRatio) amount = 0;
+    // A rear wheel the extra brake would lock gets none: a locked rear swings the car round.
+    // The outer front in oversteer keeps its brake even locked (on grass or gravel the least
+    // brake locks it): a sliding front still drags the nose back and turns the car less.
+    if (target >= 2 && -car.slipRatio[target]! > ESC.lock * curve.peakSlipRatio) amount = 0;
   } else {
     memory.refYaw = car.yawRate;
   }

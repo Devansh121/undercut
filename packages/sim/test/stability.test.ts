@@ -186,10 +186,15 @@ describe('stability assist', () => {
     expect(out.throttle).toBe(1);
   });
 
-  it('drops its wheel brake on a wheel that would lock', () => {
-    const car = turning(50, 0.9);
-    car.slipRatio[1] = -0.5;
-    expect(hold(STABILITY, car, driver({})).wheelBrake).toBeUndefined();
+  it('drops its brake on a rear wheel that would lock, keeps it on a locking outer front', () => {
+    // Understeer to the left: the inner rear (RL) is the target; locked, it gets nothing.
+    const under = turning(30, 0.05, 4, 'front');
+    under.slipRatio[2] = -0.5;
+    expect(hold(STABILITY, under, driver({ steer: 0.3 }), 120).wheelBrake).toBeUndefined();
+    // Oversteer to the left on grass: the outer front (FR) locks at once and keeps braking.
+    const over = turning(50, 0.9);
+    over.slipRatio[1] = -0.5;
+    expect(hold(STABILITY, over, driver({})).wheelBrake?.[1]).toBeGreaterThan(0.2);
   });
 
   it('a car with no per-wheel brake is bit for bit the car without the field', () => {

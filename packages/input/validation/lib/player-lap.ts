@@ -55,6 +55,9 @@ export const ROLLING_START_RUN_UP = 160;
  */
 export const NEWCOMER_SCALE: Readonly<EnvelopeScale> = DRIVING_LINE_SCALE;
 
+/** Stopped this long in a timed lap, the car is put back and it counts as a spin, s. */
+export const STUCK_TIME = 3;
+
 /** Default cost of a spin, s (see `PlayerRunOptions.spinCost`). */
 export const SPIN_COST = 5;
 
@@ -162,6 +165,8 @@ export interface PlayerRunResult {
   spins: SpinEvent[];
   /** Spins that ended against a barrier (struck in the 1.5 s before). */
   wallSpins: number;
+  /** Of the spins, times the car sat stopped for `STUCK_TIME` and was put back. */
+  stuck: number;
   /**
    * Ticks with the car's centre on grass or gravel, plus `spinCost` seconds of ticks for each
    * spin.
@@ -247,6 +252,7 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
     cleanLaps: [],
     spins: [],
     wallSpins: 0,
+    stuck: 0,
     offTicks: 0,
     overrideTicks: 0,
     maxSideslipDeg: 0,
@@ -256,6 +262,7 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
   let lapStart = 0;
   let lapSpins = 0;
   let penalty = 0;
+  let stopped = 0;
   let lastWall = -Infinity;
   const spinCost = o.spinCost ?? SPIN_COST;
   const ground = createGround();
@@ -332,8 +339,13 @@ export function runPlayer(o: PlayerRunOptions): PlayerRunResult {
       const centre = track.ground(q.s, q.d, ground).kind;
       if (centre === SurfaceKind.Grass || centre === SurfaceKind.Gravel) result.offTicks++;
       result.maxSideslipDeg = Math.max(result.maxSideslipDeg, (Math.abs(beta) * 180) / Math.PI);
-      const spun = (Math.abs(beta) > SPIN_SIDESLIP && st.vx > 8) || off > Math.PI / 2;
+      // Stopped (against a barrier, beached): a player would reset; it counts as a spin.
+      stopped = Math.hypot(st.vx, st.vy) < 1 ? stopped + STEP : 0;
+      const stuck = stopped >= STUCK_TIME;
+      const spun = (Math.abs(beta) > SPIN_SIDESLIP && st.vx > 8) || off > Math.PI / 2 || stuck;
       if (spun) {
+        stopped = 0;
+        if (stuck) result.stuck++;
         result.spins.push({
           lap: lapIndex,
           s,
