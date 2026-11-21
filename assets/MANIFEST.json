@@ -558,5 +558,749 @@
     "licence": "CC0-1.0",
     "changes": "resized to 512 px with Lanczos, normals renormalised, encoded as WebP quality 86 by tools/assets/build_textures.py",
     "sha256": "a1d8eac4f77ef467a7e2abcb3e516a43c985dcd31184bc7fbf6923a04c74d1d4"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-two_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "650132d6863d10e881e22415d0c758affad9ef043c1c374e37bc523ba05b6710"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-two_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "ba79e397d8e94ab99f9aa578345a1fb74ed075baa8eb32552f592eefe3b571e2"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-two_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "fb4d73319fc31d0e1248cb1b7354db54efb58de595b950799afade7c8429211c"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-three_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "d81e4b73ef9114b6810c514e16ba7f13875ede062880538ea81714e29fae00f9"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-three_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "2231462ace00fa357d2dc9f0cd7d2b4406c8e8459dec17c87631ded2806e6bc7"
+  },
+  {
+    "file": "apps/web/public/assets/props/armco-three_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "fe01862b84fc68379d5a24e7bfe06a013469745047a98782bedb00cddf8c511f"
+  },
+  {
+    "file": "apps/web/public/assets/props/concrete-wall_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "5e1b30d5079a63d0312e696b1a844937a430bc76a92bb33dcdaf48a734c3004d"
+  },
+  {
+    "file": "apps/web/public/assets/props/concrete-wall_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "0c86a8445c111992deeaa9b465d3171cef95808ed78c623d1eaafde9be34acb6"
+  },
+  {
+    "file": "apps/web/public/assets/props/concrete-wall_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "1cef6c7ed8a10d396d0df8838f62d4cc31a38a2eaab9e4b43deb5a7dd6bd2415"
+  },
+  {
+    "file": "apps/web/public/assets/props/tyre-wall_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "4048178925304341d1495b221b330f76a9ca3a2b84e551b187f905c1069a878f"
+  },
+  {
+    "file": "apps/web/public/assets/props/tyre-wall_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "10981881da3667e54a2f6cecba0449a24444296d3f12976630a10f66484a603a"
+  },
+  {
+    "file": "apps/web/public/assets/props/tyre-wall_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "1ff554ce13a54b4dc57b8e5fac12b42924a48d2073264095e63a890f9688aa93"
+  },
+  {
+    "file": "apps/web/public/assets/props/absorber-block_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "dc62c319cc2de186928bc5a369cc22da07aa4bf52a2197e7fd5ca1a408030824"
+  },
+  {
+    "file": "apps/web/public/assets/props/absorber-block_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "804b1641a594632f9000375d38b3a40bb735f8369ef29c255df9eb8761614b0a"
+  },
+  {
+    "file": "apps/web/public/assets/props/absorber-block_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "8d81013eaec03ba601f2de105f3e75be2a5dcf9709b680b864737c05f24dd9bc"
+  },
+  {
+    "file": "apps/web/public/assets/props/catch-fence_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "f674a8af6ad018ef2d7e32260c3528b56f5ba0d87cc86dddeb7127fab3f83fd7"
+  },
+  {
+    "file": "apps/web/public/assets/props/catch-fence_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "1350710702d28af11ca3cadbdd51a79b2ea5a01d8b800581b3574fa995c88807"
+  },
+  {
+    "file": "apps/web/public/assets/props/catch-fence_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "244ccdae030891406bbb2d5d52b7654b8b732da1c8ac9921b877976ae44034fa"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "eb16c98c0d3f3ab7b26b6004c6a111a5bdfaf801c09c97ab0ca92c25f101ca7c"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "20e3d852f88e0565fcb512915b5e8ce75fe485fdad6697e8809fe27052e7462f"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "600c97ee9d6d7e2c4fef91dfb741a4ea1fc0a5b6b2ed1bec98eb8a19d80a0703"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand-roof_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c05e7550d874e160e410dbfebc2412d427091cc4699216e49a0ffe519d9c8acf"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand-roof_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "09f97509ed6f1ffdd9a6cae806975eefc0e4b114f95c2438825a9ca648c71345"
+  },
+  {
+    "file": "apps/web/public/assets/props/grandstand-roof_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "268d824271d72d302f8819fe19c750796a451fc617078d4b6abc39a60bcf6f32"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-garage_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "3b8d2b57187935de51603829bb05d4f6e30a38275d66e0c7f4e7ea99469852ae"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-garage_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "f0c87df3b66d6618e1b56b9ee0f52906fe34c97c4aff0b6eb5c209fd41c11ec5"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-garage_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "6658a31b263d7831358f5a93a13c608b28069e00977bb3a59ea06c56a6a14bc5"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-wall_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "db5792264d9530d4a6e1ff19e33626fad1bc5efd7d8e2040b712521ad5223746"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-wall_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "6ffdca09557c539e27e291d9307882bc715356d799e3d0e6c931c89acfae5bbc"
+  },
+  {
+    "file": "apps/web/public/assets/props/pit-wall_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "17b4726d4703d1596b586144b164baa35a6302d973e6893a38be1d11338bbfa5"
+  },
+  {
+    "file": "apps/web/public/assets/props/start-gantry_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "321f4a64f43d9cf4f2dadec4ff36e7bce7fd095aa17a500302c3eb5b9cf738f1"
+  },
+  {
+    "file": "apps/web/public/assets/props/start-gantry_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "369fb7176b315187e3333d70d12224af657bbdc35e07444b9d236ba2c5eccb6e"
+  },
+  {
+    "file": "apps/web/public/assets/props/start-gantry_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "319ca7dd1d85ee8c15265bb9bf022cfdb1fdefc1fb715d5c5d064a9ccc88717d"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-standing_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "33ccfa0bad012858f87c05b4961a10029edd57e10adbc8eb0212f35f85d080a2"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-standing_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "35d4757680d6d8ea32bf5aa737cb62e1c339008ee4aec34ea6ebe315b7f2fee0"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-standing_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c382ab57082af9655b27d107178649414ed868cf2ef3a80c47c26ac17817a5ef"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-crouched_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "36245a87cf6d6ca8f2239fa65ec7309ae1fdf999b1a78bf9c91d416486fed5cf"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-crouched_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "e88ec0b1e7a89573aa3781cde089de87f27edb285a2cbad71d8977552b57f6f7"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-mechanic-crouched_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "f8912763608f5af06b926e5883c223b59afc7615e97adb4d1d399262fdac0439"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-standing_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "319aee51cbf4aa43bedc337c2a0b0fd86abc5a84b06c1be82301b88139c3a943"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-standing_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "df21f3059d37850c9156431947e78c04fca7e4a77ada41c94c7602664515b33c"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-standing_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c4e6dc68b329efddc5f7ac3252cecf63005811a89e15a92ed4cf177ba1f4c2dc"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-seated_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "052c3382a24767cf6955ca1128f2a62b6bc05f01a8eec381a37b238175169849"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-seated_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "d3b51c9e912e3f68f9f72e6358ccededf82beab219ead3f7119db00268189074"
+  },
+  {
+    "file": "apps/web/public/assets/props/crew-engineer-seated_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "2a1c3c0cb37e2b0bdfc18ca8baaa725b53d59a896eddacc4c7319f3a400ff035"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-0_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "e1ed7abf35e699ac9b5bc23d92c3fd87a156b6f906f1fcb531ce66dd848719cf"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-0_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "73e9cfd8819cbe1ae2b72cffeb15603aaf2a49bad71f6ae3dc19bdcf8aee1949"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-0_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "63fa7abcea7802296fed6db4194b1058f62513cb087b71ed6f626f4f3e9f7adb"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-1_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "2674898a7ca1405b70b24c3d2b454046b1f75aa75047323bb9b5d9db5b035521"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-1_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "8c9829ca9636be60bbf209854989864a77b76bacf40022d2be30eeafab527432"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-1_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "7a192b05bcb2800173bf35dad519981fde26bc5866d83271ffae0696550b2c7e"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-2_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "4c3a83217e2494fdaa70783905617b84e93d593b756ac041aad48f608dd7f2c4"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-2_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "7bb8c8a67ef957a85242b0175341d2d11805ee1c0d8733abeed3ef40a4f97d6d"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-seated-2_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "19021caca5bbf1982c7ce0f70d39283b9fecee303bf3958a7ace946d71fd4005"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-0_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "7c08539c534537c0eff3a0f96f39093bd8e85d4bd961ab15bb415a3e142d2d8a"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-0_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "58119f90ba3a2c1f213f86f7243a9a84a6c2ec9215f79a0a795dfa6b5c95d979"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-0_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "f8ba72dc6733493e367c31805925264d9619f5a88b69602bac960784e048ddf5"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-1_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "abe5717e13755df404b629f209c3e3cd280d1f645a7e7ae5753e3fdc609a4c35"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-1_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "60431b222db9525cf7fe3da87f4cc893c28edf004bf9309a46b881bf439ba07f"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-1_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "51f05e1fb54f2675214d7f36d95ba099fffa85a390ab66251f17a1481d2f5661"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-2_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "0aa0172a1ec7714c8d1c74267c3eae7c9e1c1d2e066b38d97869ec4836edb476"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-2_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c4084e130d963b8b76758c7ae43a3e1125c10951e112f94ac24d36160b35fa0a"
+  },
+  {
+    "file": "apps/web/public/assets/props/crowd-standing-2_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "bf795553d333d6f719f2e3cb0afadf5311f02f771e1fc1921576c404bb3226de"
+  },
+  {
+    "file": "apps/web/public/assets/props/braking-board_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "4e40e322dcdf8baa0cdfefd05eac16d3c1366a0c8506015727c50e2ac456809e"
+  },
+  {
+    "file": "apps/web/public/assets/props/braking-board_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "5df5f4acd19a31fb85973535f115672c6e24556cb3247d8f7ac72c369af53d7e"
+  },
+  {
+    "file": "apps/web/public/assets/props/braking-board_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "730bd9f93c2c6e50f42b5681026fd915954741fbb39ee0827f9eaf2adee1c4b1"
+  },
+  {
+    "file": "apps/web/public/assets/props/zone-board_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "9cd6519eb94ddcc07afb65b7f3b8e9104bc4e7e9dfcdb6358b8149aaf199f08b"
+  },
+  {
+    "file": "apps/web/public/assets/props/zone-board_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "74bf305d5916fcc06c8211655c65b1c755bcb304d0449f0c195c2bb24e3a4ad7"
+  },
+  {
+    "file": "apps/web/public/assets/props/zone-board_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "9140c3666f6f6fa9102615f773e7ac8c197cdf2527d99d6fa138d2019c92482c"
+  },
+  {
+    "file": "apps/web/public/assets/props/corner-board_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "7f28873c10b6d784653f9bad232204e2cc7406c21720674a5e41b62c64e3c3ae"
+  },
+  {
+    "file": "apps/web/public/assets/props/corner-board_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "f8351adc2dcc2a2b3effdc76ba83a72d60b9ee1157534bd8ec91d620b5fad4b2"
+  },
+  {
+    "file": "apps/web/public/assets/props/corner-board_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "26c49d78e3edf70376a0d4a550f00e1fb2f7137b1da5c49bf98aaddad5400d29"
+  },
+  {
+    "file": "apps/web/public/assets/props/kilometre-board_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "0999e04abe34c7f95b77cf7d13e4730590a572a4a6f108c50ae617c691e89b0f"
+  },
+  {
+    "file": "apps/web/public/assets/props/kilometre-board_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "d2ab552ee1018fd9780956aa00cbb18427f6fa0d7c76ba74c94cbcd7cff57920"
+  },
+  {
+    "file": "apps/web/public/assets/props/kilometre-board_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "464b3ee0f670bc65b999b8757f46bb7f560fad6ef5b5f60d4a3c8f6d9d63a53f"
+  },
+  {
+    "file": "apps/web/public/assets/props/marshal-post_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "8befeacfa1654c8f04077bf8a66b9db8d37b71fc976e5c742e36ea4c258a3959"
+  },
+  {
+    "file": "apps/web/public/assets/props/marshal-post_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "48030b05b4e103946101a9636606f5ff28510c6c852c7484c1a097244e9525b7"
+  },
+  {
+    "file": "apps/web/public/assets/props/marshal-post_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "ea8404835050d19b9eca447cfdeeca9f1fd00c37d838a995d60fbf20286ed9bd"
+  },
+  {
+    "file": "apps/web/public/assets/props/hoarding_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "a16f835df709733b78dd63c809c563a6ca8cd6a912ce749ab13299a5376bb882"
+  },
+  {
+    "file": "apps/web/public/assets/props/hoarding_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "3a576537faa8951a1bd19a23f1d017b71e31742dfd192ab6d22596502abdb32e"
+  },
+  {
+    "file": "apps/web/public/assets/props/hoarding_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c21518ede8619c39eac3c143390ea3e055dd98dedc530aa7ae79f248deb0426b"
+  },
+  {
+    "file": "apps/web/public/assets/props/bridge-banner_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "c73d4b8d88f6d8735d7e2a63e87f2e37eff6181db493e4a96f59186e92c65b71"
+  },
+  {
+    "file": "apps/web/public/assets/props/bridge-banner_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "8a4146e661a00b62a042a86bb658616b6e535ec114deab8091548dd03e4766af"
+  },
+  {
+    "file": "apps/web/public/assets/props/bridge-banner_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "76f1a59335b9e7d9d372546fbfabd67ba48ae1a78fbe706e9ad3e1b7eb97780e"
+  },
+  {
+    "file": "apps/web/public/assets/props/pedestrian-bridge_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "021a555cb50d089d55674fe2d8697b6e0dfeb79742d056b70f0c5f070e76c9b2"
+  },
+  {
+    "file": "apps/web/public/assets/props/pedestrian-bridge_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "58b5176e9c7cccaea528fbbe78b1fdd2124b4ffa63912e332dafb6e411a43c81"
+  },
+  {
+    "file": "apps/web/public/assets/props/pedestrian-bridge_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "d868237b45d7e9d5ad57e48508f5363c7e03af9530ce05090c65386646cb8e5b"
+  },
+  {
+    "file": "apps/web/public/assets/props/screen-tower_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "dd0bd174890f0c0f851a60dc93b05dea7d4e72761390406cc5cffd797662fb4f"
+  },
+  {
+    "file": "apps/web/public/assets/props/screen-tower_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "3593867c0bedcacdbe2cecdee873c3795c549a5119f812d4445e3ea2da23ca01"
+  },
+  {
+    "file": "apps/web/public/assets/props/screen-tower_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "14d545490ffdeb51b78d8b5fd440f68740c1f465d9a50f078b3bd171ad0b1fcb"
+  },
+  {
+    "file": "apps/web/public/assets/props/camera-tower_high.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "2b0800cddae670d395b8e60cac12c274777e7e89214b127469bd8aafff36f458"
+  },
+  {
+    "file": "apps/web/public/assets/props/camera-tower_mobile.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "b05addad84de0c06c91fec13ba702fa96ceae88e8c9d552f70a26616b6e0b687"
+  },
+  {
+    "file": "apps/web/public/assets/props/camera-tower_far.glb",
+    "source_url": "tools/props/props.py (this repository)",
+    "author": "Project contributors",
+    "licence": "MIT",
+    "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
+    "sha256": "02429216a0e9d15dfb45c9ecbddcfacc66d63fea4080517bfba50437b411b46b"
   }
 ]

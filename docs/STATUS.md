@@ -10,6 +10,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- Controls list: a Controls panel in the pause menu and on the launch screen lists every driving input for the device in use (keyboard, gamepad or touch), read from the live bindings, with the reverse-gear rule. The first start of a page session shows a six-second HUD hint with the brake and throttle inputs and how to open the list.
 - M6 Cloudflare deploy: top-level `wrangler.jsonc` composes the built client (staged into `dist/cloudflare` with `tools/deploy/_headers`) and the `/rooms` Durable Objects API on one origin, with `npm run deploy`, `npm run deploy:check` (`wrangler deploy --dry-run` assertions in the `build` CI job), composed-Worker runtime tests (`npm run test:deploy`), SQLite-persisted creation rate limits, a global creation cap, same-origin enforcement and a 4-hour room lifetime cap. Local `./start.sh` and `services/rooms/wrangler.jsonc` are unchanged. See `docs/DEPLOY.md`.
 - M3 race core: a pure `packages/race` runs the race rules for every session type (time trial, practice, qualifying, race, race weekend, championship): five-light start with a seeded hold and jump starts, timing from the circuit's control line with mini-sector gaps, track limits with strikes and penalties, yellow, blue, chequered and black-and-white flags, race DRS, ERS laps, pit stops with the limiter, boxes, service time and penalties served, results and points, JSON snapshots, and a stuck-car watchdog. AI cars launch, race (as ghosts to each other: no contact yet), make their pit stops and finish. Rules and values: `docs/race-rules.md`.
 - Headless races: `npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1` (and `weekend`) prints the classification, the event log and the watchdog's findings and writes JSON to `artifacts/telemetry/`. Twenty cars run about 22× faster than real time.
@@ -152,3 +153,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 ## Optional, needs you
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
+
+### Decided for you — modular prop kit
+
+- Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
+- Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
+- Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
+- Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.
