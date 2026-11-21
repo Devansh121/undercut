@@ -30,6 +30,27 @@ describe('shipped prop catalogue', () => {
         expect(data.readUInt32LE(0)).toBe(0x46546c67);
         expect(data.readUInt32LE(8)).toBe(data.length);
         const gltf = JSON.parse(data.subarray(20, 20 + data.readUInt32LE(12)).toString());
+        for (const node of gltf.nodes) {
+          expect(node.translation ?? [0, 0, 0]).toEqual([0, 0, 0]);
+          expect(node.rotation ?? [0, 0, 0, 1]).toEqual([0, 0, 0, 1]);
+          expect(node.scale ?? [1, 1, 1]).toEqual([1, 1, 1]);
+        }
+        if (lod === prop.lods[0]) {
+          const positions = gltf.meshes.flatMap((m) =>
+            m.primitives.map((p) => gltf.accessors[p.attributes.POSITION]),
+          );
+          for (let axis = 0; axis < 3; axis++) {
+            expect(Math.min(...positions.map((a) => a.min[axis]))).toBeCloseTo(
+              prop.bounds.min[axis],
+              4,
+            );
+            expect(Math.max(...positions.map((a) => a.max[axis]))).toBeCloseTo(
+              prop.bounds.max[axis],
+              4,
+            );
+          }
+          expect(gltf.materials.map((m) => m.name).sort()).toEqual([...prop.materials].sort());
+        }
         const count = gltf.meshes.reduce(
           (n, m) =>
             n +

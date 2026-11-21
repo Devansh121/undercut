@@ -1,6 +1,6 @@
 /* global window, document */
 import fs from 'node:fs';
-import { format } from 'prettier';
+import { format, resolveConfig } from 'prettier';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
 
@@ -63,7 +63,13 @@ try {
   );
   for (const name of ['capture', 'corridor']) {
     const file = `docs/evidence/m2-models/${name}.json`;
-    fs.writeFileSync(file, await format(fs.readFileSync(file, 'utf8'), { parser: 'json' }));
+    fs.writeFileSync(
+      file,
+      await format(fs.readFileSync(file, 'utf8'), {
+        ...(await resolveConfig(file)),
+        parser: 'json',
+      }),
+    );
   }
 } finally {
   await browser.close();

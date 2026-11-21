@@ -15,3 +15,5 @@
 - A material group is one mesh for instancing. Extract each material mesh as its own registry kind and repeat the placement transform; preserve the five lamp nodes independently. Register every material with the game's Environment and cascaded shadows. Retain AO vertex colours and stock glTF PBR properties.
 
 Trees remain owned by the dressing branch. The tall catch fence (3.5 m upright plus 0.65 m overhang) uses real wire geometry rather than alpha cards; its 20 cm near grid avoids transparent sorting while remaining an approximation of catch mesh. The far level drops the infill to suppress shimmer; this needs a moving trackside review after integration.
+
+The geometry and dimensions are scripted; byte-identical exports are not guaranteed for the smooth figure primitives (Draco sizes can vary by a few bytes). The build always measures the shipped output and updates its manifest hashes.

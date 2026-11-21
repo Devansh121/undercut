@@ -1,4 +1,4 @@
-"""Deterministic modular circuit kit. Author in the delivery frame, convert at export."""
+"""Scripted modular circuit kit. Author in the delivery frame, convert at export."""
 import argparse
 import json
 import math

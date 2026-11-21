@@ -1,6 +1,6 @@
 # Circuit kit delivery — Slice 1
 
-31 original props, 93 Draco GLBs, 2,183,484 bytes (2.08 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
+31 original props, 93 Draco GLBs, 2,183,356 bytes (2.08 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
 
 ## Measurements
 
@@ -17,16 +17,16 @@
 | pit-garage | 1240 / 584 / 380 | 34032 / 18160 / 15804 |
 | pit-wall | 1556 / 720 / 404 | 34952 / 20440 / 13084 |
 | start-gantry | 3904 / 2000 / 1500 | 52220 / 31996 / 27132 |
-| crew-mechanic-standing | 1016 / 456 / 456 | 23676 / 13916 / 13908 |
-| crew-mechanic-crouched | 1016 / 456 / 456 | 23832 / 13532 / 13512 |
-| crew-engineer-standing | 896 / 468 / 468 | 23312 / 15392 / 15380 |
-| crew-engineer-seated | 896 / 468 / 468 | 23392 / 15360 / 15368 |
-| crowd-seated-0 | 732 / 368 / 368 | 19252 / 13016 / 13012 |
-| crowd-seated-1 | 732 / 368 / 368 | 19180 / 13104 / 13104 |
-| crowd-seated-2 | 732 / 368 / 368 | 19172 / 12800 / 12804 |
-| crowd-standing-0 | 732 / 368 / 368 | 19172 / 13140 / 13116 |
-| crowd-standing-1 | 732 / 368 / 368 | 19120 / 13068 / 13128 |
-| crowd-standing-2 | 732 / 368 / 368 | 19108 / 13000 / 12992 |
+| crew-mechanic-standing | 1016 / 456 / 456 | 23672 / 13920 / 13912 |
+| crew-mechanic-crouched | 1016 / 456 / 456 | 23800 / 13496 / 13528 |
+| crew-engineer-standing | 896 / 468 / 468 | 23308 / 15356 / 15372 |
+| crew-engineer-seated | 896 / 468 / 468 | 23388 / 15372 / 15356 |
+| crowd-seated-0 | 732 / 368 / 368 | 19236 / 13012 / 13020 |
+| crowd-seated-1 | 732 / 368 / 368 | 19200 / 13104 / 13104 |
+| crowd-seated-2 | 732 / 368 / 368 | 19196 / 12804 / 12800 |
+| crowd-standing-0 | 732 / 368 / 368 | 19168 / 13112 / 13144 |
+| crowd-standing-1 | 732 / 368 / 368 | 19116 / 13068 / 13064 |
+| crowd-standing-2 | 732 / 368 / 368 | 19096 / 13024 / 12992 |
 | braking-board | 232 / 72 / 72 | 9588 / 5884 / 5884 |
 | zone-board | 232 / 72 / 72 | 9132 / 5780 / 5780 |
 | corner-board | 232 / 72 / 72 | 9188 / 5828 / 5828 |
@@ -52,7 +52,9 @@ Inspected all 62 individual images through contact sheets, with the pit garage a
 - Full unit suite: 89 files, 1,230 tests passed, two workers.
 - Asset licence and hash check passed.
 - Production build passed: High first race 7.83 MiB. Complete-kit reserve plus first race 9.91 MiB against 25 MiB. The inventory excludes unloaded props so it remains equal to the browser's actual requests; the additional reserve check accounts conservatively for every prop LOD.
-- Lint/typecheck and CI results are recorded in the PR once final.
+- Lint and all workspace typechecks passed. Browser transfer inventory passed (one desktop test, one intentional phone skip), one worker.
+- A clean scripted rebuild retained all geometry counts and bounds; some smooth figure primitives have a few bytes of Draco encoding variation between exports. The manifest records the final shipped bytes; byte-identical figure exports are a known tooling gap.
+- CI results are recorded in the PR once final.
 
 ## Contract and decisions
 
