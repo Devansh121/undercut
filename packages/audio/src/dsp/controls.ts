@@ -129,7 +129,8 @@ export class CarControls {
     const remaining = this.remaining;
     const held = this.held;
     const heldFrames = this.heldFrames;
-    for (let i = 0; i < CAR_STATE_LENGTH; i++) {
+    const fields = CAR_STATE_LENGTH;
+    for (let i = 0; i < fields; i++) {
       const buf = this.buffers[i] as Float64Array;
       let v = this.value[i] as number;
       const step = this.step[i] as number;
@@ -149,7 +150,8 @@ export class CarControls {
         // Same bits: equal, and for zero the same sign.
         const same = v === h && (v !== 0 || 1 / v === 1 / h);
         if (!same || (heldFrames[i] as number) < frames) {
-          buf.fill(v, 0, frames);
+          // A loop, not `fill`: passing a fractional number to a builtin boxes it.
+          for (let f = 0; f < frames; f++) buf[f] = v;
           held[i] = v;
           heldFrames[i] = frames;
         }
