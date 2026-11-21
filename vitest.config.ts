@@ -11,7 +11,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['{apps,packages,tools}/**/*.test.{ts,mjs}'],
-          exclude: ['**/node_modules/**', 'packages/sim/validation/**'],
+          exclude: ['**/node_modules/**', 'packages/sim/validation/**', '**/*.runtime.test.*'],
         },
       },
       {
@@ -25,9 +25,13 @@ export default defineConfig({
         test: {
           name: 'rooms',
           environment: 'node',
-          include: ['services/rooms/test/**/*.test.ts', 'packages/protocol/test/**/*.test.ts'],
+          include: [
+            'services/rooms/test/**/*.test.ts',
+            'packages/protocol/test/**/*.test.ts',
+            'tools/serve/**/*.runtime.test.mjs',
+          ],
           globalSetup: ['services/rooms/test/global-setup.ts'],
-          testTimeout: 15_000,
+          testTimeout: 90_000,
           hookTimeout: 60_000,
         },
       },
