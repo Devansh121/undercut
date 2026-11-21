@@ -117,6 +117,14 @@ export class CarState {
   }
 }
 
+/** Select the MGU-K deployment mode (driver setting, HUD or AI). Throws on an unknown mode. */
+export function setErsMode(state: CarState, mode: ErsMode): void {
+  if (mode !== ErsMode.None && mode !== ErsMode.Balanced && mode !== ErsMode.Overtake) {
+    throw new RangeError(`unknown ERS mode ${String(mode)}`);
+  }
+  state.ersMode = mode;
+}
+
 const SCALAR_KEYS = [
   'x',
   'z',

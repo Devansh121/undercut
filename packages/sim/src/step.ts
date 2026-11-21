@@ -314,7 +314,7 @@ function substep(
   }
 
   // ---- Power unit, ERS, brakes, wheel spin. ----
-  stepPowertrain(s, throttle, brake, h);
+  stepPowertrain(s, throttle, brake, input.overtake, h);
 
   // ---- Planar chassis (semi-implicit Euler). ----
   const extX = s.externalForceX * c - s.externalForceZ * sn;
@@ -373,7 +373,13 @@ function substep(
 }
 
 /** Engine, clutch, gearbox, differential, ERS and brakes for one substep. */
-function stepPowertrain(s: CarState, throttle: number, brake: number, h: number): void {
+function stepPowertrain(
+  s: CarState,
+  throttle: number,
+  brake: number,
+  overtake: boolean,
+  h: number,
+): void {
   const p = s.model.params;
   const eng = p.engine;
   const ers = p.ers;
@@ -429,7 +435,9 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   const engaged = G !== 0 && !shifting && we > rpm(eng.clutchFullRpm);
   // The MGU-H recovers exhaust energy under load; at idle or on the overrun there is none.
   const mguh = thr > 0 ? Math.min(ers.mguhPower, (ers.mguhPower * icePower) / eng.peakPower) : 0;
-  const mode = ERS_MODES[s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
+  // The overtake button overrides the selected mode while held; the limits below still apply.
+  const mode =
+    ERS_MODES[overtake ? ErsMode.Overtake : s.ersMode | 0] ?? ERS_MODES[ErsMode.Balanced];
   const wantsDeploy =
     s.mgukLocked === 0 &&
     engaged &&

@@ -50,6 +50,7 @@ export {
   createCarState,
   gearRatio,
   restoreCar,
+  setErsMode,
   snapshotCar,
   type CarStartOptions,
   type MassState,

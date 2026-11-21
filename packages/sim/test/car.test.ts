@@ -20,6 +20,7 @@ import {
   radToRpm,
   restoreCar,
   rpmToRad,
+  setErsMode,
   snapshotCar,
   stepCar,
   type CarState,
@@ -188,6 +189,44 @@ describe('ERS', () => {
     expect(car.mgukPower).toBeGreaterThan(0);
     beginErsLap(car);
     expect(car.ersDeployLap).toBe(0);
+  });
+
+  it('deploys on the overtake button where the mode alone would not, within the limits', () => {
+    const start = () =>
+      createCarState(createCarParams('low'), {
+        speed: 310 / 3.6,
+        fuel: 10,
+        ersMode: ErsMode.Balanced,
+        ersStore: 3e6,
+      });
+    const released = start();
+    run(released, input({ throttle: 1 }), 0.1);
+    expect(released.mgukPower).toBe(0); // Balanced stops deploying above 300 km/h
+    const pressed = start();
+    run(pressed, input({ throttle: 1, overtake: true }), 0.1);
+    expect(pressed.mgukPower).toBeCloseTo(120e3, 6);
+    // With the lap's store allowance used, only the MGU-H's direct feed remains.
+    const spent = start();
+    spent.ersDeployLap = 4e6;
+    run(spent, input({ throttle: 1, overtake: true }), 0.1);
+    expect(spent.mgukPower).toBeGreaterThan(0);
+    expect(spent.mgukPower).toBeLessThanOrEqual(spent.mguhPower + 1e-6);
+    expect(spent.ersDeployLap).toBe(4e6);
+  });
+
+  it('sets the deployment mode through the public API', () => {
+    const car = createCarState(createCarParams('low'), {
+      speed: 310 / 3.6,
+      fuel: 10,
+      ersStore: 3e6,
+    });
+    setErsMode(car, ErsMode.Overtake);
+    run(car, input({ throttle: 1 }), 0.1);
+    expect(car.mgukPower).toBeCloseTo(120e3, 6);
+    setErsMode(car, ErsMode.None);
+    run(car, input({ throttle: 1, overtake: false }), 0.1);
+    expect(car.mgukPower).toBe(0);
+    expect(() => setErsMode(car, 7 as ErsMode)).toThrow(RangeError);
   });
 
   it('harvests under braking up to 2 MJ per lap and never past the store window', () => {
