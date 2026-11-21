@@ -1,0 +1,34 @@
+{
+  "title": "On the rev limiter in 6th",
+  "listen": "Rpm climbs into the limiter and holds: the ignition-cut stutter, then a lift.",
+  "durationS": 4.5,
+  "samplePeakDbfs": -7.13,
+  "truePeakDbtp": -7.06,
+  "loudnessLufs": -19.1,
+  "rmsDbfs": -22.8,
+  "dcOffset": 0.0000035,
+  "maxStep": 0.1149,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 97,
+    "medianErrorPct": 0.202,
+    "p95ErrorPct": 0.369,
+    "maxErrorPct": 0.4
+  },
+  "layersDbfs": {
+    "exhaust": -23.8,
+    "intake": -35.6,
+    "combustion": -43.9,
+    "turbo": -42.4,
+    "ers": -43.4,
+    "crackle": -53.3,
+    "shift": null,
+    "roll": -45.4,
+    "wind": -35.8,
+    "scrub": null,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 50.7
+}

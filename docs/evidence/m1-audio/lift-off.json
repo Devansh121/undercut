@@ -1,0 +1,34 @@
+{
+  "title": "Lift-off and coast from high rpm",
+  "listen": "Full throttle in 7th, then a lift: tone goes hollow, a few subtle pops, turbo whine winds down, harvest whine.",
+  "durationS": 7,
+  "samplePeakDbfs": -7.88,
+  "truePeakDbtp": -7.84,
+  "loudnessLufs": -20.5,
+  "rmsDbfs": -23.8,
+  "dcOffset": 0.00000176,
+  "maxStep": 0.1069,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 163,
+    "medianErrorPct": 0.042,
+    "p95ErrorPct": 0.098,
+    "maxErrorPct": 0.287
+  },
+  "layersDbfs": {
+    "exhaust": -23.5,
+    "intake": -38.3,
+    "combustion": -46.2,
+    "turbo": -49.8,
+    "ers": -47.1,
+    "crackle": -65.8,
+    "shift": null,
+    "roll": -46.3,
+    "wind": -36.6,
+    "scrub": null,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 46
+}

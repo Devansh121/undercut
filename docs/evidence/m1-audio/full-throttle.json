@@ -1,0 +1,34 @@
+{
+  "title": "Full throttle through all eight gears",
+  "listen": "Pitch climbs in each gear and drops on every upshift; cut on each shift, turbo and ERS whine rising.",
+  "durationS": 13,
+  "samplePeakDbfs": -7.44,
+  "truePeakDbtp": -7.35,
+  "loudnessLufs": -15.8,
+  "rmsDbfs": -19.3,
+  "dcOffset": 0.00000288,
+  "maxStep": 0.1154,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 185,
+    "medianErrorPct": 0.03,
+    "p95ErrorPct": 0.08,
+    "maxErrorPct": 0.109
+  },
+  "layersDbfs": {
+    "exhaust": -20.3,
+    "intake": -32,
+    "combustion": -39.3,
+    "turbo": -41.4,
+    "ers": -43.1,
+    "crackle": null,
+    "shift": -68.6,
+    "roll": -45,
+    "wind": -35.2,
+    "scrub": -42.8,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 45.2
+}

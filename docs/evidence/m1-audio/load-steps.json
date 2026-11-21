@@ -1,0 +1,34 @@
+{
+  "title": "Fixed 11 000 rpm, throttle on and off",
+  "listen": "Same pitch throughout; the tone must change between full load and trailing throttle.",
+  "durationS": 6,
+  "samplePeakDbfs": -7.57,
+  "truePeakDbtp": -7.57,
+  "loudnessLufs": -18,
+  "rmsDbfs": -21.6,
+  "dcOffset": 0.00000137,
+  "maxStep": 0.1039,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 139,
+    "medianErrorPct": 0.016,
+    "p95ErrorPct": 0.124,
+    "maxErrorPct": 0.569
+  },
+  "layersDbfs": {
+    "exhaust": -22,
+    "intake": -34.9,
+    "combustion": -42.5,
+    "turbo": -46.3,
+    "ers": null,
+    "crackle": -63.6,
+    "shift": null,
+    "roll": -44.8,
+    "wind": -35.1,
+    "scrub": null,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 59
+}
