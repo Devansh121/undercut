@@ -11,6 +11,7 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from 'three';
 import { MeshSurface, createVec3, type Track } from '@undercut/track';
+import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
 import type { DressingFile, MappedFeature } from './dressing';
@@ -918,6 +919,7 @@ export function placeTracksideFurniture(options: {
   pitComplex: PitComplexData | null;
   heightAt: (x: number, z: number) => number;
   props: PropRegistry;
+  propKit?: PropKitAssets | null;
   brandAtlasTex: Texture;
   signageAtlasTex: Texture;
   fenceTex: Texture;
@@ -925,6 +927,7 @@ export function placeTracksideFurniture(options: {
   mobile: boolean;
   geometries: BufferGeometry[];
   materials: Material[];
+  textures?: Texture[];
 }): Record<string, number> {
   const {
     track,
@@ -933,6 +936,7 @@ export function placeTracksideFurniture(options: {
     pitComplex,
     heightAt,
     props,
+    propKit,
     brandAtlasTex,
     signageAtlasTex,
     fenceTex,
@@ -940,12 +944,12 @@ export function placeTracksideFurniture(options: {
     mobile,
     geometries,
     materials,
+    textures,
   } = options;
   const counts: Record<string, number> = {};
+  let kitPropsUsed = 0;
 
-  // 1. Register modular prop kinds.
-  const hoardFrontGeo = hoardingFrontGeometry();
-  const hoardFrameGeo = hoardingFrameGeometry();
+  // 1. Register modular prop kinds (prefer catalogue GLBs from props.catalog.json when present).
   const hoardMat = brandHoardingMaterial(brandAtlasTex);
   const steelMat = new MeshStandardMaterial({
     vertexColors: true,
@@ -953,8 +957,6 @@ export function placeTracksideFurniture(options: {
     metalness: 0.28,
   });
   steelMat.name = 'furniture-steel';
-  const fencePostGeo = catchFencePostsGeometry();
-  const fenceMeshGeo = catchFenceMeshGeometry();
   const fenceMeshMat = new MeshStandardMaterial({
     map: fenceTex,
     alphaTest: 0.16,
@@ -980,43 +982,45 @@ export function placeTracksideFurniture(options: {
     metalness: 0.05,
   });
   screenMat.name = 'big-screen-led';
-  const vergeFrontGeo = vergeBoardFrontGeometry();
-  const vergeFrameGeo = vergeBoardFrameGeometry();
-  const marshalGeo = marshalPostGeometry();
-  const tecproGeo = tecproBlockGeometry();
-  const screenParts = bigScreenTowerGeometry();
-  const camTowerGeo = cameraTowerGeometry();
-  const trussTowerGeo = trussTowerGeometry();
-
-  geometries.push(
-    hoardFrontGeo,
-    hoardFrameGeo,
-    vergeFrontGeo,
-    vergeFrameGeo,
-    fencePostGeo,
-    fenceMeshGeo,
-    marshalGeo,
-    tecproGeo,
-    screenParts.frame,
-    screenParts.screen,
-    camTowerGeo,
-    trussTowerGeo,
-  );
   materials.push(hoardMat, steelMat, fenceMeshMat, signMat, screenMat);
 
   const farDist = mobile ? 450 : 950;
-  props.define({
-    id: 'hoarding-front',
-    castShadow: false,
-    receiveShadow: true,
-    lods: [{ geometry: hoardFrontGeo, material: hoardMat, maxDistance: farDist }],
+  const distScale = mobile ? 0.55 : 1;
+
+  const kitHoarding = propKit?.lodsFor('hoarding', {
+    materialOverrides: { 'board-face': hoardMat },
+    maxDistanceScale: distScale,
   });
-  props.define({
-    id: 'hoarding-frame',
-    castShadow: castShadows,
-    receiveShadow: true,
-    lods: [{ geometry: hoardFrameGeo, material: steelMat, maxDistance: farDist * 0.65 }],
-  });
+  const hasKitHoarding = Boolean(kitHoarding);
+  if (kitHoarding) {
+    kitPropsUsed++;
+    props.define({
+      id: 'hoarding-front',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: kitHoarding,
+    });
+  } else {
+    const hoardFrontGeo = hoardingFrontGeometry();
+    const hoardFrameGeo = hoardingFrameGeometry();
+    geometries.push(hoardFrontGeo, hoardFrameGeo);
+    props.define({
+      id: 'hoarding-front',
+      castShadow: false,
+      receiveShadow: true,
+      lods: [{ geometry: hoardFrontGeo, material: hoardMat, maxDistance: farDist }],
+    });
+    props.define({
+      id: 'hoarding-frame',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: [{ geometry: hoardFrameGeo, material: steelMat, maxDistance: farDist * 0.65 }],
+    });
+  }
+
+  const vergeFrontGeo = vergeBoardFrontGeometry();
+  const vergeFrameGeo = vergeBoardFrameGeometry();
+  geometries.push(vergeFrontGeo, vergeFrameGeo);
   props.define({
     id: 'verge-board-front',
     castShadow: false,
@@ -1029,48 +1033,127 @@ export function placeTracksideFurniture(options: {
     receiveShadow: true,
     lods: [{ geometry: vergeFrameGeo, material: steelMat, maxDistance: farDist * 0.55 }],
   });
-  props.define({
-    id: 'catch-fence-post',
-    castShadow: false,
-    receiveShadow: true,
-    lods: [{ geometry: fencePostGeo, material: steelMat, maxDistance: mobile ? 300 : 650 }],
+
+  const kitFence = propKit?.lodsFor('catch-fence', { maxDistanceScale: distScale });
+  const hasKitFence = Boolean(kitFence);
+  if (kitFence) {
+    kitPropsUsed++;
+    props.define({
+      id: 'catch-fence-post',
+      castShadow: false,
+      receiveShadow: true,
+      lods: kitFence,
+    });
+  } else {
+    const fencePostGeo = catchFencePostsGeometry();
+    const fenceMeshGeo = catchFenceMeshGeometry();
+    geometries.push(fencePostGeo, fenceMeshGeo);
+    props.define({
+      id: 'catch-fence-post',
+      castShadow: false,
+      receiveShadow: true,
+      lods: [{ geometry: fencePostGeo, material: steelMat, maxDistance: mobile ? 300 : 650 }],
+    });
+    props.define({
+      id: 'catch-fence-mesh',
+      castShadow: false,
+      receiveShadow: false,
+      lods: [{ geometry: fenceMeshGeo, material: fenceMeshMat, maxDistance: mobile ? 220 : 480 }],
+    });
+  }
+
+  const kitMarshal = propKit?.lodsFor('marshal-post', { maxDistanceScale: distScale });
+  if (kitMarshal) {
+    kitPropsUsed++;
+    props.define({
+      id: 'marshal-post',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: kitMarshal,
+    });
+  } else {
+    const marshalGeo = marshalPostGeometry();
+    geometries.push(marshalGeo);
+    props.define({
+      id: 'marshal-post',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: [{ geometry: marshalGeo, material: steelMat, maxDistance: farDist }],
+    });
+  }
+
+  const kitAbsorber = propKit?.lodsFor('absorber-block', { maxDistanceScale: distScale });
+  if (kitAbsorber) {
+    kitPropsUsed++;
+    props.define({
+      id: 'tecpro-block',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: kitAbsorber,
+    });
+  } else {
+    const tecproGeo = tecproBlockGeometry();
+    geometries.push(tecproGeo);
+    props.define({
+      id: 'tecpro-block',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: [{ geometry: tecproGeo, material: steelMat, maxDistance: farDist * 0.8 }],
+    });
+  }
+
+  const kitScreen = propKit?.lodsFor('screen-tower', {
+    materialOverrides: { 'screen-face': screenMat },
+    maxDistanceScale: distScale,
   });
-  props.define({
-    id: 'catch-fence-mesh',
-    castShadow: false,
-    receiveShadow: false,
-    lods: [{ geometry: fenceMeshGeo, material: fenceMeshMat, maxDistance: mobile ? 220 : 480 }],
-  });
-  props.define({
-    id: 'marshal-post',
-    castShadow: castShadows,
-    receiveShadow: true,
-    lods: [{ geometry: marshalGeo, material: steelMat, maxDistance: farDist }],
-  });
-  props.define({
-    id: 'tecpro-block',
-    castShadow: castShadows,
-    receiveShadow: true,
-    lods: [{ geometry: tecproGeo, material: steelMat, maxDistance: farDist * 0.8 }],
-  });
-  props.define({
-    id: 'big-screen-frame',
-    castShadow: castShadows,
-    receiveShadow: true,
-    lods: [{ geometry: screenParts.frame, material: steelMat, maxDistance: farDist * 1.4 }],
-  });
-  props.define({
-    id: 'big-screen-led',
-    castShadow: false,
-    receiveShadow: false,
-    lods: [{ geometry: screenParts.screen, material: screenMat, maxDistance: farDist * 1.4 }],
-  });
-  props.define({
-    id: 'camera-tower',
-    castShadow: castShadows,
-    receiveShadow: true,
-    lods: [{ geometry: camTowerGeo, material: steelMat, maxDistance: farDist * 1.2 }],
-  });
+  const hasKitScreen = Boolean(kitScreen);
+  if (kitScreen) {
+    kitPropsUsed++;
+    props.define({
+      id: 'big-screen-frame',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: kitScreen,
+    });
+  } else {
+    const screenParts = bigScreenTowerGeometry();
+    geometries.push(screenParts.frame, screenParts.screen);
+    props.define({
+      id: 'big-screen-frame',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: [{ geometry: screenParts.frame, material: steelMat, maxDistance: farDist * 1.4 }],
+    });
+    props.define({
+      id: 'big-screen-led',
+      castShadow: false,
+      receiveShadow: false,
+      lods: [{ geometry: screenParts.screen, material: screenMat, maxDistance: farDist * 1.4 }],
+    });
+  }
+
+  const kitCamera = propKit?.lodsFor('camera-tower', { maxDistanceScale: distScale });
+  if (kitCamera) {
+    kitPropsUsed++;
+    props.define({
+      id: 'camera-tower',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: kitCamera,
+    });
+  } else {
+    const camTowerGeo = cameraTowerGeometry();
+    geometries.push(camTowerGeo);
+    props.define({
+      id: 'camera-tower',
+      castShadow: castShadows,
+      receiveShadow: true,
+      lods: [{ geometry: camTowerGeo, material: steelMat, maxDistance: farDist * 1.2 }],
+    });
+  }
+
+  const trussTowerGeo = trussTowerGeometry();
+  geometries.push(trussTowerGeo);
   props.define({
     id: 'truss-tower',
     castShadow: castShadows,
@@ -1079,14 +1162,46 @@ export function placeTracksideFurniture(options: {
   });
 
   // Register braking & DRS board slots (0:150, 1:100, 2:50, 4:DRS, 5:DRS det).
-  const signKinds: [string, number, number][] = [
-    ['board-150', 0, 1.35],
-    ['board-100', 1, 1.35],
-    ['board-50', 2, 1.35],
-    ['board-drs', 4, 1.45],
-    ['board-drs-det', 5, 1.3],
+  const signKinds: [string, number, number, string][] = [
+    ['board-150', 0, 1.35, 'braking-board'],
+    ['board-100', 1, 1.35, 'braking-board'],
+    ['board-50', 2, 1.35, 'braking-board'],
+    ['board-drs', 4, 1.45, 'zone-board'],
+    ['board-drs-det', 5, 1.3, 'zone-board'],
   ];
-  for (const [id, slot, sz] of signKinds) {
+  const kitSigns = new Set<string>();
+  for (const [id, slot, sz, catId] of signKinds) {
+    if (propKit?.has(catId)) {
+      const col = slot % 4;
+      const row = Math.floor(slot / 4);
+      const slotTex = signageAtlasTex.clone();
+      slotTex.repeat.set(0.25, 0.5);
+      slotTex.offset.set(col * 0.25, (1 - row) * 0.5);
+      slotTex.needsUpdate = true;
+      textures?.push(slotTex);
+      const slotMat = new MeshStandardMaterial({
+        map: slotTex,
+        roughness: 0.5,
+        metalness: 0.04,
+      });
+      slotMat.name = `sign-${id}`;
+      materials.push(slotMat);
+      const lods = propKit.lodsFor(catId, {
+        materialOverrides: { 'board-face': slotMat },
+        maxDistanceScale: distScale,
+      });
+      if (lods) {
+        kitSigns.add(id);
+        kitPropsUsed++;
+        props.define({
+          id: `${id}-face`,
+          castShadow: castShadows,
+          receiveShadow: true,
+          lods,
+        });
+        continue;
+      }
+    }
     const parts = signBoardGeometry(slot, sz, 0.72);
     geometries.push(parts.face, parts.posts);
     props.define({
@@ -1102,6 +1217,7 @@ export function placeTracksideFurniture(options: {
       lods: [{ geometry: parts.posts, material: steelMat, maxDistance: farDist * 0.75 }],
     });
   }
+  counts.kitFurnitureKinds = kitPropsUsed;
 
   const p = createVec3();
   const t = createVec3();
@@ -1216,7 +1332,7 @@ export function placeTracksideFurniture(options: {
   let hoardings = 0;
   const placeHoarding = (x: number, y: number, z: number, yaw: number, s: number): void => {
     props.place('hoarding-front', { x, y, z, yaw, s });
-    props.place('hoarding-frame', { x, y, z, yaw, s });
+    if (!hasKitHoarding) props.place('hoarding-frame', { x, y, z, yaw, s });
     hoardings++;
   };
   const placeVergeBoard = (x: number, y: number, z: number, yaw: number, s: number): void => {
@@ -1296,7 +1412,7 @@ export function placeTracksideFurniture(options: {
   let fences = 0;
   const placeFence = (x: number, y: number, z: number, yaw: number, s: number): void => {
     props.place('catch-fence-post', { x, y, z, yaw, s });
-    props.place('catch-fence-mesh', { x, y, z, yaw, s });
+    if (!hasKitFence) props.place('catch-fence-mesh', { x, y, z, yaw, s });
     fences++;
   };
   // Pit-wall catch fence.
@@ -1465,13 +1581,14 @@ export function placeTracksideFurniture(options: {
       yaw: b.yawInward,
       s: b.s,
     });
-    props.place('big-screen-led', {
-      x: b.x,
-      y: heightAt(b.x, b.z),
-      z: b.z,
-      yaw: b.yawInward,
-      s: b.s,
-    });
+    if (!hasKitScreen)
+      props.place('big-screen-led', {
+        x: b.x,
+        y: heightAt(b.x, b.z),
+        z: b.z,
+        yaw: b.yawInward,
+        s: b.s,
+      });
     screens++;
   }
 

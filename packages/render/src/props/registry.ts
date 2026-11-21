@@ -23,7 +23,7 @@ import {
  */
 export interface PropLod {
   geometry: BufferGeometry;
-  material: Material;
+  material: Material | Material[];
   /** Drawn while the chunk centre is nearer than this, m (the last level: up to it, then culled). */
   maxDistance: number;
   /** Shadow depth material (alpha-tested cards whose uv the vertex shader changes). */
