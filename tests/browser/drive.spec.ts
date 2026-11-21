@@ -367,4 +367,58 @@ test.describe('drive', () => {
     expect((await state(page)).device).toBe('touch');
     expect(problems).toEqual([]);
   });
+
+  test('shows every assist with a description in the pause menu and toggles stability', async ({
+    drive: { page, problems },
+  }) => {
+    await page.keyboard.press('Escape');
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    for (const id of ['tc', 'abs', 'stability', 'gears', 'steering']) {
+      const row = menu.locator(`[data-setting=${id}]`);
+      await expect(row).toBeVisible();
+      await expect(row.locator('.pause__help')).not.toBeEmpty();
+    }
+    const stab = menu.locator('[data-setting=stability]');
+    await stab.getByRole('radio', { name: 'Off' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(0);
+    await stab.getByRole('radio', { name: 'On' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(1);
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(menu).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+
+  test('completes a keyboard lap without spinning on the default assists', async ({
+    drive: { page, problems },
+  }) => {
+    await page.evaluate(() => {
+      const u = window.__undercut;
+      u?.teleport(5400, 0, 250);
+      u?.autopilot(true);
+      u?.setTimeScale(8);
+    });
+    let maxRearSlipDeg = 0;
+    let lastLap: number | null = null;
+    const deadline = Date.now() + 50_000;
+    while (Date.now() < deadline) {
+      const sample = await page.evaluate(() => {
+        const st = window.__undercut?.state() as { lastLap?: number | null };
+        const tel = window.__undercut?.telemetry() as { speed: number; slipAngle: number[] };
+        const rear = Math.max(Math.abs(tel.slipAngle[2] ?? 0), Math.abs(tel.slipAngle[3] ?? 0));
+        return { lastLap: st.lastLap ?? null, speed: tel.speed, rearDeg: (rear * 180) / Math.PI };
+      });
+      if (sample.speed > 8) maxRearSlipDeg = Math.max(maxRearSlipDeg, sample.rearDeg);
+      if (sample.lastLap !== null) {
+        lastLap = sample.lastLap;
+        break;
+      }
+      await page.waitForTimeout(100);
+    }
+    expect(lastLap).not.toBeNull();
+    expect(lastLap as number).toBeGreaterThan(84);
+    expect(lastLap as number).toBeLessThan(140);
+    expect(maxRearSlipDeg).toBeLessThan(30);
+    expect(problems).toEqual([]);
+  });
 });
