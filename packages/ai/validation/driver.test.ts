@@ -8,8 +8,9 @@ import { measureEnvelope } from '../src/envelope/measure';
 import { buildCorridor } from '../src/line/corridor';
 import { minimumCurvatureLine } from '../src/line/min-curvature';
 import { buildPlan } from '../src/profile/plan';
-import { runLaps } from '../validation/lib/lap';
+import { runLaps } from './lib/lap';
 
+// Physics job: these drive the sim for several laps, which is too heavy for the unit job.
 // The reference driver on the stadium fixture, with the car's real envelope (measured from the
 // sim, a second of work) and the same world the game builds.
 const rho = airDensity(180, 25);
