@@ -3,6 +3,7 @@ import {
   ClampToEdgeWrapping,
   LinearFilter,
   LinearMipmapLinearFilter,
+  RepeatWrapping,
   SRGBColorSpace,
 } from 'three';
 
@@ -358,8 +359,8 @@ export function catchFenceTexture(anisotropy = 8): CanvasTexture {
   ctx.clearRect(0, 0, size, size);
 
   // Fine galvanized steel wire diamond grid (mipmaps cleanly into light translucent mesh).
-  ctx.strokeStyle = 'rgba(168, 174, 180, 0.78)';
-  ctx.lineWidth = 1.45;
+  ctx.strokeStyle = 'rgba(130, 136, 144, 0.72)';
+  ctx.lineWidth = 1.5;
   const step = 16;
   ctx.beginPath();
   for (let i = -size; i <= size * 2; i += step) {
@@ -371,8 +372,8 @@ export function catchFenceTexture(anisotropy = 8): CanvasTexture {
   ctx.stroke();
 
   // Horizontal high-tension retaining cables (6 crisp dark-steel wires per panel height).
-  ctx.strokeStyle = 'rgba(72, 78, 86, 0.92)';
-  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = 'rgba(62, 68, 76, 0.88)';
+  ctx.lineWidth = 1.9;
   for (const frac of [0.1, 0.26, 0.42, 0.58, 0.74, 0.9]) {
     ctx.beginPath();
     ctx.moveTo(0, size * frac);
@@ -382,6 +383,8 @@ export function catchFenceTexture(anisotropy = 8): CanvasTexture {
 
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
   tex.minFilter = LinearMipmapLinearFilter;
   tex.magFilter = LinearFilter;
   tex.anisotropy = anisotropy;

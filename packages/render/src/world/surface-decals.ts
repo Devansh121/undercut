@@ -204,6 +204,8 @@ export function buildSurfaceDecals(
   }
 
   // 2. Painted grid slot numbers (1..20) ahead of each grid box.
+  // Track +d is LEFT and -d is RIGHT when facing +s, so pass d0 = slot.d + 0.8 (left -> u0)
+  // and d1 = slot.d - 0.8 (right -> u1) so digits read left-to-right from behind the car.
   if (track.gridSlots.length > 0) {
     const tex = gridNumberAtlas(anisotropy);
     textures.push(tex);
@@ -223,8 +225,8 @@ export function buildSurfaceDecals(
         track,
         slot.s + 0.55,
         slot.s + 2.15,
-        slot.d - 0.8,
         slot.d + 0.8,
+        slot.d - 0.8,
         pos,
         nor,
         uv,
@@ -245,6 +247,112 @@ export function buildSurfaceDecals(
     const mesh = new Mesh(g, decalMat(tex, 'grid-numbers', 0.88));
     mesh.receiveShadow = true;
     group.add(mesh);
+  }
+
+  // 2b. Rubbered twin-tyre braking zones before corners and subtle burnout marks on the grid.
+  {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, 256, 256);
+    // Longitudinal feathered tyre-rubber tracks (two wheel tracks + subtle rubber dusting).
+    const gradY = ctx.createLinearGradient(0, 0, 0, 256);
+    gradY.addColorStop(0, 'rgba(12, 13, 16, 0.0)');
+    gradY.addColorStop(0.22, 'rgba(12, 13, 16, 0.34)');
+    gradY.addColorStop(0.78, 'rgba(12, 13, 16, 0.42)');
+    gradY.addColorStop(1, 'rgba(12, 13, 16, 0.0)');
+    for (const [cx, rx] of [
+      [82, 34],
+      [174, 34],
+      [128, 74],
+    ] as const) {
+      ctx.save();
+      ctx.globalAlpha = rx > 50 ? 0.28 : 0.72;
+      ctx.fillStyle = gradY;
+      ctx.fillRect(cx - rx * 0.5, 0, rx, 256);
+      ctx.restore();
+    }
+    const rubberTex = new CanvasTexture(c);
+    rubberTex.colorSpace = SRGBColorSpace;
+    rubberTex.minFilter = LinearMipmapLinearFilter;
+    rubberTex.magFilter = LinearFilter;
+    rubberTex.anisotropy = anisotropy;
+    textures.push(rubberTex);
+
+    const pos: number[] = [];
+    const nor: number[] = [];
+    const uv: number[] = [];
+    const idx: number[] = [];
+
+    // Braking-zone rubber approaching each corner along the outside braking entry line.
+    let lastZoneS = -999;
+    for (const corner of track.corners) {
+      if (corner.end - corner.start > 450) continue;
+      if (corner.start - lastZoneS < 220) continue;
+      lastZoneS = corner.start;
+      const outSide: 0 | 1 = corner.direction === 'right' ? 0 : 1;
+      const sign = outSide === 0 ? 1 : -1;
+      const s0 = corner.start - 115;
+      const s1 = corner.start + 15;
+      const segs = 10;
+      for (let k = 0; k < segs; k++) {
+        const sa = s0 + ((s1 - s0) * k) / segs;
+        const sb = s0 + ((s1 - s0) * (k + 1)) / segs;
+        const idxS = Math.min(
+          track.lap.count - 1,
+          Math.round((((sa % track.length) + track.length) % track.length) / track.lap.step),
+        );
+        const hw = track.halfWidth[outSide][idxS] ?? 6;
+        const dCenter = sign * Math.max(1.2, hw - 2.6);
+        pushTrackQuad(
+          track,
+          sa,
+          sb,
+          dCenter + 1.85,
+          dCenter - 1.85,
+          pos,
+          nor,
+          uv,
+          idx,
+          0,
+          k / segs,
+          1,
+          (k + 1) / segs,
+        );
+      }
+    }
+    // Subtle launch burnout strips behind the top 14 grid slots.
+    for (const slot of track.gridSlots.slice(0, 14)) {
+      pushTrackQuad(
+        track,
+        slot.s - 4.4,
+        slot.s + 0.3,
+        slot.d + 1.15,
+        slot.d - 1.15,
+        pos,
+        nor,
+        uv,
+        idx,
+        0,
+        0,
+        1,
+        1,
+      );
+    }
+
+    if (pos.length > 0) {
+      const g = new BufferGeometry();
+      g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+      g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
+      g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+      g.setIndex(idx);
+      g.computeBoundingSphere();
+      geometries.push(g);
+      const mesh = new Mesh(g, decalMat(rubberTex, 'track-rubber-marks', 0.78));
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
   }
 
   // 3. Pit-lane fast/working lane dividing line & garage apron boundary line.

@@ -42,10 +42,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.44,
     crownRy: 0.36,
     bole: 0.22,
-    leaf: [0.19, 0.27, 0.1],
-    clump: 0.05,
-    clumps: 520,
-    bark: '#3b342c',
+    leaf: [0.115, 0.175, 0.052],
+    clump: 0.046,
+    clumps: 560,
+    bark: '#352e26',
   },
   {
     name: 'hornbeam',
@@ -53,10 +53,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.34,
     crownRy: 0.4,
     bole: 0.18,
-    leaf: [0.2, 0.3, 0.11],
-    clump: 0.042,
-    clumps: 560,
-    bark: '#5a564e',
+    leaf: [0.13, 0.195, 0.058],
+    clump: 0.04,
+    clumps: 600,
+    bark: '#4f4b44',
   },
   {
     name: 'plane',
@@ -64,10 +64,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.42,
     crownRy: 0.4,
     bole: 0.24,
-    leaf: [0.24, 0.31, 0.12],
-    clump: 0.055,
-    clumps: 440,
-    bark: '#8a8270',
+    leaf: [0.16, 0.215, 0.068],
+    clump: 0.05,
+    clumps: 490,
+    bark: '#726b5c',
   },
   {
     name: 'chestnut',
@@ -75,10 +75,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.4,
     crownRy: 0.38,
     bole: 0.2,
-    leaf: [0.15, 0.24, 0.08],
-    clump: 0.06,
-    clumps: 470,
-    bark: '#3a3029',
+    leaf: [0.09, 0.148, 0.044],
+    clump: 0.052,
+    clumps: 520,
+    bark: '#332922',
   },
   {
     name: 'poplar',
@@ -86,10 +86,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.14,
     crownRy: 0.43,
     bole: 0.08,
-    leaf: [0.22, 0.3, 0.12],
+    leaf: [0.14, 0.198, 0.062],
     clump: 0.032,
-    clumps: 520,
-    bark: '#5d5a50',
+    clumps: 560,
+    bark: '#524e45',
   },
   {
     name: 'spruce',
@@ -98,10 +98,10 @@ export const SPECIES: readonly Species[] = [
     crownRy: 0.48,
     cone: true,
     bole: 0.05,
-    leaf: [0.08, 0.15, 0.07],
-    clump: 0.035,
-    clumps: 620,
-    bark: '#3d2f25',
+    leaf: [0.055, 0.105, 0.045],
+    clump: 0.034,
+    clumps: 660,
+    bark: '#35281e',
   },
   {
     name: 'oak2',
@@ -109,10 +109,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.46,
     crownRy: 0.3,
     bole: 0.26,
-    leaf: [0.21, 0.28, 0.1],
-    clump: 0.05,
-    clumps: 480,
-    bark: '#433a30',
+    leaf: [0.145, 0.185, 0.055],
+    clump: 0.046,
+    clumps: 540,
+    bark: '#3c3329',
   },
   {
     name: 'young',
@@ -120,10 +120,10 @@ export const SPECIES: readonly Species[] = [
     crownRx: 0.3,
     crownRy: 0.3,
     bole: 0.3,
-    leaf: [0.27, 0.34, 0.13],
-    clump: 0.04,
-    clumps: 330,
-    bark: '#4e463b',
+    leaf: [0.175, 0.228, 0.068],
+    clump: 0.038,
+    clumps: 400,
+    bark: '#463e34',
   },
 ];
 
@@ -197,9 +197,9 @@ function paintTree(
     tips.push([x1, y1]);
   };
   const trunkTop = sp.cone ? sp.crownY + sp.crownRy * 0.9 : sp.bole + 0.04;
-  // Trunk.
+  // Trunk with sunlit edge highlight.
   ctx.strokeStyle = sp.bark;
-  ctx.lineWidth = Math.max(1.5, size * (sp.cone ? 0.022 : 0.03));
+  ctx.lineWidth = Math.max(1.5, size * (sp.cone ? 0.022 : 0.032));
   ctx.beginPath();
   ctx.moveTo(X(0.5), Y(0));
   ctx.lineTo(X(0.5 + (R(0, 9) - 0.5) * 0.02), Y(trunkTop));
@@ -222,30 +222,38 @@ function paintTree(
   const clumps: Clump[] = [];
   for (let k = 0; k < sp.clumps; k++) {
     const t = tips[Math.floor(R(k, 11) * tips.length)] ?? [0.5, sp.crownY];
-    const x = t[0] + (R(k, 12) - 0.5) * sp.clump * 3;
-    const y = t[1] + (R(k, 13) - 0.5) * sp.clump * 3;
+    const x = t[0] + (R(k, 12) - 0.5) * sp.clump * 3.1;
+    const y = t[1] + (R(k, 13) - 0.5) * sp.clump * 3.1;
     const inside = inCrown(sp, x, y);
     if (inside < 0) continue;
-    // Depth: a pseudo-z on the crown ellipsoid, front clumps catch more light.
+    // Depth: a pseudo-z on the crown ellipsoid, front clumps catch more light, deep core is occluded.
     const z = Math.sqrt(Math.max(0, inside)) * (R(k, 14) * 2 - 1);
     const ny = (y - sp.crownY) / sp.crownRy;
     const nx = (x - 0.5) / Math.max(0.05, sp.crownRx);
-    const light = 0.55 + 0.35 * ny + 0.25 * z - 0.12 * nx + (1 - inside) * 0.25;
-    clumps.push({ x, y, r: sp.clump * (0.6 + R(k, 15) * 0.7), z, light });
+    const coreAO = 0.72 + 0.34 * (1 - inside);
+    const light = (0.48 + 0.42 * ny + 0.26 * z - 0.14 * nx) * coreAO;
+    clumps.push({ x, y, r: sp.clump * (0.55 + R(k, 15) * 0.65), z, light });
   }
   clumps.sort((a, b) => a.z - b.z);
   for (const [k, c] of clumps.entries()) {
-    // Each clump: a few overlapping leaves, darker core, lighter top edge.
-    const base = Math.max(0.25, c.light);
-    const hue = 0.9 + R(k, 16) * 0.2;
-    const leaf: [number, number, number] = [sp.leaf[0] * hue, sp.leaf[1], sp.leaf[2] * (2 - hue)];
-    for (let j = 0; j < 5; j++) {
-      const lx = c.x + (R(k, 20 + j) - 0.5) * c.r * 1.2;
-      const ly = c.y + (R(k, 30 + j) - 0.5) * c.r * 1.0;
-      const lr = c.r * (0.35 + R(k, 40 + j) * 0.3);
-      ctx.fillStyle = shade(leaf, base * (0.75 + 0.35 * (j / 4)) * (0.85 + R(k, 50 + j) * 0.3));
+    // High-frequency serrated foliage cluster: darker shadowed under-sprigs, warmer sunlit outer tips.
+    const base = Math.max(0.18, c.light);
+    const warmShift = 0.88 + R(k, 16) * 0.28;
+    const leaf: [number, number, number] = [
+      sp.leaf[0] * warmShift,
+      sp.leaf[1] * (0.94 + R(k, 17) * 0.12),
+      sp.leaf[2] * (1.9 - warmShift),
+    ];
+    for (let j = 0; j < 10; j++) {
+      const ang = R(k, 60 + j) * Math.PI * 2;
+      const dist = Math.sqrt(R(k, 20 + j)) * c.r * 0.95;
+      const lx = c.x + Math.cos(ang) * dist;
+      const ly = c.y + Math.sin(ang) * dist * 0.85;
+      const lr = c.r * (0.16 + R(k, 40 + j) * 0.19);
+      const lift = 0.62 + 0.52 * (j / 9);
+      ctx.fillStyle = shade(leaf, base * lift * (0.82 + R(k, 50 + j) * 0.36));
       ctx.beginPath();
-      ctx.ellipse(X(lx), Y(ly), lr * size, lr * size * 0.8, R(k, 60 + j) * Math.PI, 0, Math.PI * 2);
+      ctx.ellipse(X(lx), Y(ly), lr * size, lr * size * 0.58, ang, 0, Math.PI * 2);
       ctx.fill();
     }
   }

@@ -196,11 +196,11 @@ export function vergeBoardFrameGeometry(): BufferGeometry {
  */
 export function trussTowerGeometry(): BufferGeometry {
   const b = new PropBuilder();
-  const steel = [0.16, 0.17, 0.185];
-  const dark = [0.07, 0.075, 0.085];
-  const lamp = [0.46, 0.47, 0.48];
+  const steel = [0.32, 0.34, 0.36];
+  const dark = [0.1, 0.11, 0.125];
+  const lamp = [0.68, 0.69, 0.7];
   // Concrete plinth.
-  b.box(-0.85, 0.85, 0.0, 0.65, -0.85, 0.85, [0.18, 0.18, 0.175]);
+  b.box(-0.85, 0.85, 0.0, 0.65, -0.85, 0.85, [0.22, 0.22, 0.215]);
   // Four tapered lattice legs (wider at base, narrower at top).
   const levels = [0.65, 4.2, 7.8, 11.4, 15.0];
   const widths = [0.62, 0.52, 0.42, 0.34, 0.28];
@@ -263,33 +263,33 @@ export function brandHoardingMaterial(atlas: Texture): MeshStandardMaterial {
 }
 
 /**
- * Modular catch fence (4 m wide along Z, 3.8 m tall, +X facing the track with 0.55 m angled top
+ * Modular catch fence (4 m wide along Z, 3.8 m tall, +X facing the track with 0.52 m angled top
  * overhang toward +X): separated into steel posts/arm (opaque) and wire mesh (alpha-tested).
  */
 export function catchFencePostsGeometry(): BufferGeometry {
   const b = new PropBuilder();
-  const steel = [0.24, 0.25, 0.265];
+  const steel = [0.28, 0.295, 0.31];
   // Main upright steel I-post at z = -2.0 m (tiling cleanly every 4 m) + top cantilever arm.
-  b.box(-0.055, 0.055, 0.0, 3.25, -2.04, -1.96, steel);
+  b.box(-0.04, 0.04, 0.0, 3.25, -2.035, -1.965, steel);
   // Angled overhang arm projecting toward track (+X).
   b.quad(
-    [-0.03, 3.22, -1.96],
-    [0.54, 3.78, -1.96],
-    [0.54, 3.85, -1.96],
-    [-0.03, 3.29, -1.96],
+    [-0.02, 3.22, -1.965],
+    [0.5, 3.78, -1.965],
+    [0.5, 3.84, -1.965],
+    [-0.02, 3.28, -1.965],
     steel,
   );
   b.quad(
-    [0.54, 3.78, -2.04],
-    [-0.03, 3.22, -2.04],
-    [-0.03, 3.29, -2.04],
-    [0.54, 3.85, -2.04],
+    [0.5, 3.78, -2.035],
+    [-0.02, 3.22, -2.035],
+    [-0.02, 3.28, -2.035],
+    [0.5, 3.84, -2.035],
     steel,
   );
-  // Top horizontal tie bar (slightly overlapped to stay continuous on curves).
-  b.box(0.49, 0.55, 3.79, 3.85, -2.08, 2.08, steel);
+  // Slim top horizontal tie bar (slightly overlapped to stay continuous on curves).
+  b.box(0.46, 0.52, 3.79, 3.84, -2.08, 2.08, steel);
   // Base mounting bracket.
-  b.box(-0.12, 0.12, 0.0, 0.12, -2.08, -1.92, [0.14, 0.145, 0.155]);
+  b.box(-0.09, 0.09, 0.0, 0.1, -2.07, -1.93, [0.16, 0.165, 0.175]);
   return b.build(true);
 }
 
@@ -514,15 +514,15 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   group.position.set(p.x, groundY, p.z);
   group.rotation.y = yaw;
 
-  const clearH = 6.8;
-  const topH = 9.0;
+  const clearH = 6.7;
+  const topH = 9.2;
   const halfSpan = span / 2;
 
   // Steel gantry structure.
   const sb = new PropBuilder();
-  const steel = [0.1, 0.11, 0.125];
-  const dark = [0.055, 0.06, 0.07];
-  const concrete = [0.2, 0.2, 0.195];
+  const steel = [0.34, 0.36, 0.38];
+  const dark = [0.06, 0.065, 0.075];
+  const concrete = [0.26, 0.26, 0.255];
 
   // Left & right concrete plinths + twin steel portal legs.
   for (const sz of [-halfSpan, halfSpan]) {
@@ -530,14 +530,14 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
     for (const sx of [-0.75, 0.75]) {
       sb.box(sx - 0.24, sx + 0.24, 0.8, topH + 0.3, sz - 0.32, sz + 0.32, steel);
     }
-    // Diagonal bracing in portal legs.
+    // Horizontal bracing in portal legs.
     sb.box(-0.75, 0.75, 2.8, 3.05, sz - 0.22, sz + 0.22, steel);
     sb.box(-0.75, 0.75, 5.2, 5.45, sz - 0.22, sz + 0.22, steel);
   }
   // Main horizontal gantry deck & truss box.
   sb.box(-1.1, 1.1, clearH, clearH + 0.26, -halfSpan - 0.4, halfSpan + 0.4, dark);
   sb.box(-1.1, 1.1, topH - 0.24, topH, -halfSpan - 0.4, halfSpan + 0.4, dark);
-  sb.box(-1.05, 1.05, clearH + 0.26, topH - 0.24, -halfSpan, halfSpan, [0.07, 0.075, 0.085]);
+  sb.box(-1.05, 1.05, clearH + 0.26, topH - 0.24, -halfSpan, halfSpan, [0.08, 0.085, 0.095]);
   // Slim hanging start-light beam bar beneath the gantry centred over the racing lane (offset -midD).
   const laneZ = -midD;
   sb.box(-0.52, 0.12, clearH - 0.65, clearH, laneZ - 4.2, laneZ + 4.2, dark);
@@ -550,8 +550,8 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   const structGeo = sb.build(true);
   const structMat = new MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.65,
-    metalness: 0.35,
+    roughness: 0.6,
+    metalness: 0.32,
   });
   structMat.name = 'start-gantry-steel';
   geometries.push(structGeo);
@@ -571,13 +571,13 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   const v1 = (vRow + 1) / BRAND_ATLAS_ROWS;
 
   const bb = new PropBuilder();
-  const bw = Math.min(halfSpan - 1.0, 12.5);
+  const bw = Math.min(halfSpan - 0.8, 13.5);
   // Facing oncoming cars (-X).
   bb.quad(
-    [-1.13, clearH + 0.2, -bw],
-    [-1.13, clearH + 0.2, bw],
-    [-1.13, topH - 0.15, bw],
-    [-1.13, topH - 0.15, -bw],
+    [-1.13, clearH + 0.18, -bw],
+    [-1.13, clearH + 0.18, bw],
+    [-1.13, topH - 0.14, bw],
+    [-1.13, topH - 0.14, -bw],
     [1, 1, 1],
     [
       [u0, v0],
@@ -588,10 +588,10 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   );
   // Facing down-straight (+X).
   bb.quad(
-    [1.13, clearH + 0.2, bw],
-    [1.13, clearH + 0.2, -bw],
-    [1.13, topH - 0.15, -bw],
-    [1.13, topH - 0.15, bw],
+    [1.13, clearH + 0.18, bw],
+    [1.13, clearH + 0.18, -bw],
+    [1.13, topH - 0.14, -bw],
+    [1.13, topH - 0.14, bw],
     [1, 1, 1],
     [
       [u0, v0],
@@ -604,7 +604,7 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
   const bannerMat = new MeshStandardMaterial({
     map: brandAtlasTex,
     roughness: 0.48,
-    metalness: 0.05,
+    metalness: 0.04,
   });
   bannerMat.name = 'start-gantry-banner';
   geometries.push(bannerGeo);
@@ -715,9 +715,9 @@ export function buildTrackBridges(
 
   const sb = new PropBuilder();
   const bb = new PropBuilder();
-  const steel = [0.13, 0.14, 0.15];
-  const concrete = [0.2, 0.2, 0.195];
-  const dark = [0.065, 0.07, 0.08];
+  const steel = [0.3, 0.32, 0.34];
+  const concrete = [0.25, 0.25, 0.245];
+  const dark = [0.075, 0.08, 0.09];
   const p = createVec3();
   const t = createVec3();
 
@@ -732,18 +732,18 @@ export function buildTrackBridges(
     const tl = Math.hypot(t.x, t.z) || 1;
     const fx = t.x / tl;
     const fz = t.z / tl;
-    // Left normal (-fz, fx).
-    const lx = -fz;
-    const lz = fx;
+    // Right-handed +Z = X × Y = (-fz, 0, fx) (pointing RIGHT of track).
+    const rx = -fz;
+    const rz = fx;
     const gy = track.groundHeightAt(p.x, p.z);
-    const clearH = 6.2;
-    const topH = 9.0;
+    const clearH = 6.3;
+    const topH = 9.2;
     const halfSpan = span / 2;
 
     const W = (xLocal: number, yLocal: number, zLocal: number): number[] => [
-      p.x + fx * xLocal + lx * zLocal,
+      p.x + fx * xLocal + rx * zLocal,
       gy + yLocal,
-      p.z + fz * xLocal + lz * zLocal,
+      p.z + fz * xLocal + rz * zLocal,
     ];
     const addBoxWorld = (
       x0: number,
@@ -754,28 +754,29 @@ export function buildTrackBridges(
       z1: number,
       c: readonly number[],
     ): void => {
-      // +x face
-      sb.quad(W(x1, y0, z0), W(x1, y0, z1), W(x1, y1, z1), W(x1, y1, z0), c);
-      // -x face
-      sb.quad(W(x0, y0, z1), W(x0, y0, z0), W(x0, y1, z0), W(x0, y1, z1), c);
-      // +z face
-      sb.quad(W(x1, y0, z1), W(x0, y0, z1), W(x0, y1, z1), W(x1, y1, z1), c);
-      // -z face
-      sb.quad(W(x0, y0, z0), W(x1, y0, z0), W(x1, y1, z0), W(x0, y1, z0), c);
-      // top
-      sb.quad(W(x0, y1, z0), W(x1, y1, z0), W(x1, y1, z1), W(x0, y1, z1), c);
-      // bottom
-      sb.quad(W(x0, y0, z1), W(x1, y0, z1), W(x1, y0, z0), W(x0, y0, z0), c);
+      // +x face (outward +X)
+      sb.quad(W(x1, y0, z1), W(x1, y0, z0), W(x1, y1, z0), W(x1, y1, z1), c);
+      // -x face (outward -X)
+      sb.quad(W(x0, y0, z0), W(x0, y0, z1), W(x0, y1, z1), W(x0, y1, z0), c);
+      // +z face (outward +Z)
+      sb.quad(W(x0, y0, z1), W(x1, y0, z1), W(x1, y1, z1), W(x0, y1, z1), c);
+      // -z face (outward -Z)
+      sb.quad(W(x1, y0, z0), W(x0, y0, z0), W(x0, y1, z0), W(x1, y1, z0), c);
+      // top (outward +Y)
+      sb.quad(W(x0, y1, z1), W(x1, y1, z1), W(x1, y1, z0), W(x0, y1, z0), c);
+      // bottom (outward -Y)
+      sb.quad(W(x0, y0, z0), W(x1, y0, z0), W(x1, y0, z1), W(x0, y0, z1), c);
     };
 
-    // Concrete abutment towers outside both barriers.
+    // Concrete abutment towers + twin steel truss piers outside both barriers.
     for (const sz of [-halfSpan, halfSpan]) {
-      addBoxWorld(-1.8, 1.8, -0.8, topH + 0.4, sz - 1.1, sz + 1.1, concrete);
+      addBoxWorld(-1.8, 1.8, -0.8, 1.4, sz - 1.1, sz + 1.1, concrete);
+      addBoxWorld(-1.55, 1.55, 1.4, topH + 0.3, sz - 0.9, sz + 0.9, steel);
     }
-    // Overhead bridge deck + enclosed steel walkway box.
-    addBoxWorld(-1.9, 1.9, clearH, clearH + 0.4, -halfSpan - 1.1, halfSpan + 1.1, dark);
-    addBoxWorld(-1.75, 1.75, clearH + 0.4, topH - 0.25, -halfSpan, halfSpan, steel);
-    addBoxWorld(-1.95, 1.95, topH - 0.25, topH + 0.1, -halfSpan - 1.1, halfSpan + 1.1, dark);
+    // Overhead bridge deck + enclosed broadcast fascia box.
+    addBoxWorld(-1.9, 1.9, clearH, clearH + 0.35, -halfSpan - 1.1, halfSpan + 1.1, dark);
+    addBoxWorld(-1.75, 1.75, clearH + 0.35, topH - 0.25, -halfSpan, halfSpan, dark);
+    addBoxWorld(-1.95, 1.95, topH - 0.25, topH + 0.12, -halfSpan - 1.1, halfSpan + 1.1, steel);
 
     // Double-sided brand banner face across the bridge span.
     const slot = (bi * 3 + 2) % (BRAND_ATLAS_COLS * BRAND_ATLAS_ROWS);
@@ -786,35 +787,35 @@ export function buildTrackBridges(
     const vRow = BRAND_ATLAS_ROWS - 1 - row;
     const v0 = vRow / BRAND_ATLAS_ROWS;
     const v1 = (vRow + 1) / BRAND_ATLAS_ROWS;
-    const bw = Math.min(halfSpan - 0.8, 14);
+    const bw = Math.min(halfSpan - 0.6, 14.5);
     const uvRect = [
       [u0, v0],
       [u1, v0],
       [u1, v1],
       [u0, v1],
     ];
-    // Oncoming (-x) face.
+    // Oncoming (-x) face: driver's left is -bw, right is +bw, normal points -X.
     bb.quad(
-      W(-1.96, clearH + 0.2, bw),
-      W(-1.96, clearH + 0.2, -bw),
-      W(-1.96, topH - 0.15, -bw),
-      W(-1.96, topH - 0.15, bw),
+      W(-1.96, clearH + 0.25, -bw),
+      W(-1.96, clearH + 0.25, bw),
+      W(-1.96, topH - 0.18, bw),
+      W(-1.96, topH - 0.18, -bw),
       [1, 1, 1],
       uvRect,
     );
-    // Trailing (+x) face.
+    // Trailing (+x) face: viewer's left is +bw, right is -bw, normal points +X.
     bb.quad(
-      W(1.96, clearH + 0.2, -bw),
-      W(1.96, clearH + 0.2, bw),
-      W(1.96, topH - 0.15, bw),
-      W(1.96, topH - 0.15, -bw),
+      W(1.96, clearH + 0.25, bw),
+      W(1.96, clearH + 0.25, -bw),
+      W(1.96, topH - 0.18, -bw),
+      W(1.96, topH - 0.18, bw),
       [1, 1, 1],
       uvRect,
     );
   });
 
   const sg = sb.build(true);
-  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.18 });
+  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
   sm.name = 'track-bridge-struct';
   const bg = bb.build(false);
   const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
@@ -956,11 +957,12 @@ export function placeTracksideFurniture(options: {
   const fenceMeshGeo = catchFenceMeshGeometry();
   const fenceMeshMat = new MeshStandardMaterial({
     map: fenceTex,
-    alphaTest: 0.22,
+    alphaTest: 0.16,
+    alphaToCoverage: !mobile,
     transparent: false,
     side: DoubleSide,
     roughness: 0.55,
-    metalness: 0.5,
+    metalness: 0.45,
   });
   fenceMeshMat.name = 'catch-fence-mesh';
   const signMat = new MeshStandardMaterial({
@@ -1144,7 +1146,22 @@ export function placeTracksideFurniture(options: {
       yawInward: Math.atan2(-nz, nx),
       yawOncoming: Math.atan2(tz, -tx),
       s: sw,
+      nominalDist: Math.abs(barD) + extra,
     };
+  };
+
+  /**
+   * Circuit-agnostic self-proximity guard: rejects any barrier-derived point that folded inside a
+   * tight chicane apex or encroached on an adjacent track leg (prevents catch-fence & barrier pile-ups).
+   */
+  const foldsAcrossTrack = (b: ReturnType<typeof atBarrier>, minClear = 1.6): boolean => {
+    const hit = options.lap.nearest(b.x, b.z);
+    if (hit.dist < b.halfW + minClear) return true;
+    // If nearest centreline point is significantly closer than nominal offset, we folded across a sharp inner curve.
+    if (hit.dist < b.nominalDist - 1.6) return true;
+    const ds = Math.min(Math.abs(hit.s - b.s), L - Math.abs(hit.s - b.s));
+    if (ds > 22 && hit.dist < b.halfW + 4.5) return true;
+    return false;
   };
 
   // Main straight span derived strictly from pit entry/exit and first corner.
@@ -1198,25 +1215,26 @@ export function placeTracksideFurniture(options: {
       usedHoard.add(key);
       if (nearPitGap(s, run.side)) continue;
       const b = atBarrier(s, run.side, -0.26);
+      if (foldsAcrossTrack(b, 1.4)) continue;
       placeHoarding(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
-  // Neat rhythmic rows of angled advertising boards along grass verges (outside kerbs/run-off,
-  // right inside the barrier corridor on straights and sweeping approaches).
-  const vergeStep = mobile ? 18 : 7.5;
+  // Neat rhythmic rows of angled advertising boards along wide grass verges (only where the verge
+  // is >= 6.5 m wide so angled boards sit cleanly ahead of the barrier hoarding without overlapping).
+  const vergeStep = mobile ? 20 : 9.5;
   for (let s = 20; s < L - 20; s += vergeStep) {
     for (const side of [0, 1] as const) {
       if (nearPitGap(s, side)) continue;
       const idxS = Math.min(track.lap.count - 1, Math.round(s / track.lap.step));
-      // Only place verge boards where the outer strip is grass and the barrier sits well off the track.
       const outerSurf = track.outer[side][idxS] as number;
       if (outerSurf !== MeshSurface.Grass) continue;
       const barD = Math.abs(track.barrier[side][idxS] as number);
       const halfW = Math.abs(track.halfWidth[side][idxS] as number);
-      if (barD - halfW < 5.0) continue;
-      // Place cleanly on the grass verge, ~2.2 m inside the barrier (never encroaching on the track).
-      const b = atBarrier(s, side, -2.2);
-      if (barD - 2.2 < halfW + 2.8) continue;
+      if (barD - halfW < 6.5) continue;
+      // Place cleanly on the grass verge ~2.6 m outside the track edge (leaving >= 3.9 m to barrier).
+      const extra = halfW + 2.6 - barD;
+      const b = atBarrier(s, side, extra);
+      if (foldsAcrossTrack(b, 2.2)) continue;
       placeVergeBoard(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1292,8 +1310,9 @@ export function placeTracksideFurniture(options: {
       const s = slot * fenceSlotStep;
       if (nearPitGap(s, side)) continue;
       const b = atBarrier(s, side, 0.3);
-      // Skip narrow tight-apex islands where barrier sits right against the kerb.
-      if (b.barD < b.halfW + 1.4) continue;
+      // Skip tight inner chicane islands and folded barriers.
+      if (b.barD < b.halfW + 1.8) continue;
+      if (foldsAcrossTrack(b, 2.0)) continue;
       placeFence(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
@@ -1352,6 +1371,7 @@ export function placeTracksideFurniture(options: {
     if (usedMarshal.has(bucket)) continue;
     usedMarshal.add(bucket);
     const b = atBarrier(s, side, 1.4);
+    if (foldsAcrossTrack(b, 2.0)) continue;
     props.place('marshal-post', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
     marshals++;
   }
@@ -1364,6 +1384,7 @@ export function placeTracksideFurniture(options: {
     const outSide: 0 | 1 = c.direction === 'right' ? 0 : 1;
     for (let s = c.start - 12; s <= c.end + 16; s += 1.65) {
       const b = atBarrier(s, outSide, -0.45);
+      if (foldsAcrossTrack(b, 1.4)) continue;
       props.place('tecpro-block', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
       tecpro++;
     }

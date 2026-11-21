@@ -496,19 +496,20 @@ export function pitFacadeMaterial(teamColours: readonly string[]): MeshStandardM
         pitGlow = 0.0;
         vec3 concrete = vec3(0.21, 0.21, 0.205);
         if (vFacade.x < -3.5) {
-          // Canopy and parapet dark architectural trim.
-          diffuseColor.rgb = vec3(0.08, 0.085, 0.095);
-          pitMetal = 0.65;
+          // Canopy and parapet architectural silver-charcoal trim.
+          diffuseColor.rgb = vec3(0.16, 0.17, 0.185);
+          pitMetal = 0.6;
         } else if (vFacade.x < -2.5) {
           // Canopy soffit.
-          diffuseColor.rgb = vec3(0.14, 0.145, 0.15);
+          diffuseColor.rgb = vec3(0.22, 0.225, 0.23);
           pitMetal = 0.35;
         } else if (vFacade.x < -1.5) {
-          // Gravel / membrane flat roof.
-          diffuseColor.rgb = vec3(0.16, 0.165, 0.16);
+          // Ribbed standing-seam architectural roof membrane (subtle strips visible from heli view).
+          float seam = 0.92 + 0.08 * step(0.88, fract(vFacade.y * 0.45));
+          diffuseColor.rgb = vec3(0.21, 0.215, 0.22) * seam;
         } else if (vFacade.x < -0.5) {
           // Back and end concrete walls.
-          diffuseColor.rgb = concrete * 0.85;
+          diffuseColor.rgb = concrete * 0.9;
         } else {
           float u = vFacade.x;
           float v = vFacade.y;
@@ -522,22 +523,22 @@ export function pitFacadeMaterial(teamColours: readonly string[]): MeshStandardM
           vec3 c = concrete * panelShade;
           if (v < ${(B.garageHeight - 0.42).toFixed(2)}) {
             float open = step(0.08, f) * step(f, 0.92);
-            // Recessed garage interior: dark concrete floor, team accent stripe on back wall,
-            // bright linear workshop lights near the ceiling.
+            // Recessed garage interior: painted epoxy floor, team colour back wall band,
+            // bright linear workshop LED strips near the ceiling.
             float hFrac = v / ${(B.garageHeight - 0.42).toFixed(2)};
-            float stripe = smoothstep(0.32, 0.36, hFrac) * (1.0 - smoothstep(0.64, 0.68, hFrac));
-            vec3 inside = mix(vec3(0.03, 0.032, 0.036), team * 0.28, stripe * 0.85) * (0.55 + 0.55 * hFrac);
-            float strip = smoothstep(0.16, 0.0, abs(v - ${(B.garageHeight - 0.68).toFixed(2)})) * step(0.16, f) * step(f, 0.84);
-            // Subtle work-bench silhouette low on the back wall.
+            float stripe = smoothstep(0.30, 0.35, hFrac) * (1.0 - smoothstep(0.68, 0.72, hFrac));
+            vec3 inside = mix(vec3(0.055, 0.058, 0.064), team * 0.48, stripe * 0.9) * (0.65 + 0.55 * hFrac);
+            float strip = smoothstep(0.20, 0.0, abs(v - ${(B.garageHeight - 0.65).toFixed(2)})) * step(0.14, f) * step(f, 0.86);
+            // Work-bench / tyre-rack silhouette low on the back wall.
             float bench = (1.0 - smoothstep(0.18, 0.24, hFrac)) * step(0.18, f) * step(f, 0.82);
-            inside = mix(inside, vec3(0.06, 0.062, 0.068), bench * 0.6);
+            inside = mix(inside, vec3(0.09, 0.095, 0.105), bench * 0.65);
             pitGlow = open * strip;
-            c = mix(c * (0.78 + 0.22 * smoothstep(0.0, 1.0, v)), inside, open);
+            c = mix(c * (0.82 + 0.18 * smoothstep(0.0, 1.0, v)), inside, open);
           } else if (v < ${B.garageHeight.toFixed(2)}) {
-            c = vec3(0.12, 0.125, 0.13);
-            pitMetal = 0.4;
+            c = vec3(0.28, 0.29, 0.305);
+            pitMetal = 0.45;
           } else if (v < ${(B.garageHeight + B.fascia).toFixed(2)}) {
-            c = vec3(0.028, 0.03, 0.036);
+            c = vec3(0.032, 0.035, 0.042);
             pitMetal = 0.25;
           } else if (v < ${(B.garageHeight + B.fascia + B.upperHeight).toFixed(2)}) {
             float uvY = (v - ${(B.garageHeight + B.fascia).toFixed(2)}) / ${B.upperHeight.toFixed(2)};
@@ -545,15 +546,15 @@ export function pitFacadeMaterial(teamColours: readonly string[]): MeshStandardM
             float frame = step(mull, 0.07) + step(0.92, uvY) + step(uvY, 0.14) + step(abs(uvY - 0.42), 0.025);
             frame = clamp(frame, 0.0, 1.0);
             // Warm interior ceiling hint inside upper hospitality lounges.
-            float lounge = step(0.55, fract(sin(floor(u / 6.6) * 41.3) * 4375.5));
-            vec3 glass = mix(vec3(0.02, 0.026, 0.034), vec3(0.055, 0.05, 0.042), lounge * smoothstep(0.5, 0.9, uvY));
-            c = mix(glass, vec3(0.12, 0.13, 0.14), frame);
+            float lounge = step(0.45, fract(sin(floor(u / 6.6) * 41.3) * 4375.5));
+            vec3 glass = mix(vec3(0.028, 0.038, 0.052), vec3(0.09, 0.082, 0.068), lounge * smoothstep(0.45, 0.9, uvY));
+            c = mix(glass, vec3(0.24, 0.25, 0.27), frame);
             pitGlass = 1.0 - frame;
-            pitMetal = frame * 0.5;
+            pitMetal = frame * 0.55;
           } else {
-            // Weathered architectural silver-grey roof parapet (not stark white).
-            c = vec3(0.32, 0.33, 0.34);
-            pitMetal = 0.3;
+            // Crisp architectural light-aluminium roof parapet fascia.
+            c = vec3(0.46, 0.47, 0.485);
+            pitMetal = 0.35;
           }
           diffuseColor.rgb = c;
         }`,
@@ -561,7 +562,7 @@ export function pitFacadeMaterial(teamColours: readonly string[]): MeshStandardM
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, 0.45, pitMetal);
+        roughnessFactor = mix(roughnessFactor, 0.42, pitMetal);
         roughnessFactor = mix(roughnessFactor, 0.06, pitGlass);`,
       )
       .replace(
@@ -572,10 +573,10 @@ export function pitFacadeMaterial(teamColours: readonly string[]): MeshStandardM
       )
       .replace(
         '#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.95, 0.86) * pitGlow * 2.8;',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.96, 0.88) * pitGlow * 3.8;',
       );
   };
-  m.customProgramCacheKey = () => `pit-building-v2-${palette.length}`;
+  m.customProgramCacheKey = () => `pit-building-v3-${palette.length}`;
   return m;
 }
 
@@ -700,22 +701,25 @@ export function pitWallCanopyGeometry(): BufferGeometry {
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
     }
   };
-  const frame = [0.06, 0.065, 0.075];
-  const desk = [0.09, 0.095, 0.11];
-  const roof = [0.11, 0.115, 0.125];
+  const frame = [0.09, 0.095, 0.11];
+  const desk = [0.13, 0.135, 0.15];
+  const roof = [0.15, 0.155, 0.17];
   const teamBand = [1, 1, 1]; // tinted by instance colour
-  const screen = [0.05, 0.16, 0.24];
+  const monitorHousing = [0.05, 0.055, 0.065];
+  const screenGlow = [0.14, 0.56, 0.78];
 
   // Floor platform + back desk console (facing +X toward track).
   box(-0.9, 0.85, 0.0, 0.22, -2.3, 2.3, frame);
   box(0.25, 0.82, 0.22, 1.05, -2.2, 2.2, desk);
-  // Team-coloured fascia band along the front edge of the desk and roof.
+  // Team-coloured fascia bands on BOTH track-facing (+X) and pit-lane-facing (-X) edges.
   box(0.82, 0.88, 0.28, 0.96, -2.22, 2.22, teamBand);
-  box(0.84, 0.92, 2.72, 3.02, -2.35, 2.35, teamBand);
-  // 4 timing monitor banks on the desk.
+  box(0.84, 0.92, 2.72, 3.04, -2.35, 2.35, teamBand);
+  box(-0.98, -0.9, 2.72, 3.04, -2.35, 2.35, teamBand);
+  // 4 timing monitor banks on the desk with cyan-teal telemetry screen faces toward engineers (-X).
   for (let k = 0; k < 4; k++) {
     const zc = -1.5 + k * 1.0;
-    box(0.45, 0.65, 1.08, 1.44, zc - 0.36, zc + 0.36, screen);
+    box(0.45, 0.65, 1.08, 1.52, zc - 0.38, zc + 0.38, monitorHousing);
+    box(0.41, 0.45, 1.13, 1.47, zc - 0.33, zc + 0.33, screenGlow);
   }
   // 4 corner steel uprights + cantilevered roof canopy.
   for (const sx of [-0.82, 0.72]) {
@@ -723,7 +727,7 @@ export function pitWallCanopyGeometry(): BufferGeometry {
       box(sx - 0.05, sx + 0.05, 0.22, 2.8, sz - 0.05, sz + 0.05, frame);
     }
   }
-  box(-0.95, 0.9, 2.75, 2.95, -2.35, 2.35, roof);
+  box(-0.92, 0.88, 2.75, 2.95, -2.35, 2.35, roof);
 
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));

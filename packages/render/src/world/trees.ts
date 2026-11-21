@@ -51,6 +51,23 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
     idx.push(base, base + 1, base + 4, base, base + 4, base + 3);
     idx.push(base + 1, base + 2, base + 5, base + 1, base + 5, base + 4);
   }
+  // For near/medium trees, add a shallow tented canopy cap so elevated helicopter views see lush
+  // crown foliage instead of thin radial card edges.
+  if (planes >= 3) {
+    const r = half * 0.68;
+    const yRim = 0.6;
+    const yTop = 0.78;
+    const base = pos.length / 3;
+    push(0, yTop, 0, 0.5, 0.62);
+    push(-r, yRim, -r, 0.14, 0.34);
+    push(r, yRim, -r, 0.86, 0.34);
+    push(r, yRim, r, 0.86, 0.86);
+    push(-r, yRim, r, 0.14, 0.86);
+    idx.push(base, base + 2, base + 1);
+    idx.push(base, base + 3, base + 2);
+    idx.push(base, base + 4, base + 3);
+    idx.push(base, base + 1, base + 4);
+  }
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
