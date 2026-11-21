@@ -49,6 +49,18 @@ export interface CarSummary {
   allOffTicks: number;
   /** Largest |d| from the centreline outside the pit lane, m. */
   maxOffset: number;
+  /** Ticks in contact with another car, the largest closing speed at a contact (m/s), and the total impulse (N·s). */
+  contactTicks: number;
+  maxContactSpeed: number;
+  contactImpulse: number;
+  /** Longest unbroken spell in contact with another car, s. */
+  longestContact: number;
+  /** Largest distance of the CoG past the barrier line on its side, m (negative: never reached it). */
+  beyondBarrier: number;
+  /** Spins after the start (heading more than 0.8 rad off the track's direction, outside the pit lane). */
+  spins: number;
+  /** Through the first corners on lap 1 cleanly, or what went wrong there. */
+  turnOne: 'clean' | 'contact' | 'spin' | 'off' | 'stopped' | 'pending';
 }
 
 /** Cars that would have touched on the first lap if the sim had car-to-car contact. */
@@ -157,7 +169,19 @@ export function runSession(
     maxWheelsOff: 0,
     allOffTicks: 0,
     maxOffset: 0,
+    contactTicks: 0,
+    maxContactSpeed: 0,
+    contactImpulse: 0,
+    longestContact: 0,
+    beyondBarrier: Number.NEGATIVE_INFINITY,
+    spins: 0,
+    turnOne: 'pending',
   }));
+  const contactRun = new Float64Array(n);
+  const spinning = new Array<boolean>(n).fill(false);
+  const offTime = new Float64Array(n);
+  const tangent = { x: 0, y: 0, z: 0 };
+  const track = session.track;
   const asked = new Array<boolean>(n).fill(false);
   let firstLap: RaceRun['firstLap'] = null;
   let leaderLap1At = 0;
@@ -218,6 +242,34 @@ export function runSession(
         s.maxWheelsOff = Math.max(s.maxWheelsOff, f.wheelsOff);
         if (f.wheelsOff >= 4) s.allOffTicks++;
         s.maxOffset = Math.max(s.maxOffset, Math.abs(f.d));
+        const st = session.worldCar(i).state;
+        const dt = session.world.step;
+        if (st.carContacts > 0) {
+          s.contactTicks++;
+          contactRun[i] = contactRun[i]! + dt;
+          s.longestContact = Math.max(s.longestContact, contactRun[i]!);
+        } else contactRun[i] = 0;
+        s.maxContactSpeed = Math.max(s.maxContactSpeed, st.carContactSpeed);
+        s.contactImpulse += st.carContactImpulse;
+        const side = f.d >= 0 ? 0 : 1;
+        const barrier = track.lap.interpolate(track.barrier[side], f.s);
+        s.beyondBarrier = Math.max(s.beyondBarrier, Math.abs(f.d) - barrier);
+        track.tangentAt(f.s, tangent);
+        const err = st.yaw - Math.atan2(-tangent.z, tangent.x);
+        const off = Math.abs(Math.atan2(Math.sin(err), Math.cos(err)));
+        if (off > 0.8 && !spinning[i]) s.spins++;
+        spinning[i] = off > 0.8 ? true : off < 0.3 ? false : spinning[i]!;
+        offTime[i] = f.wheelsOff >= 4 ? offTime[i]! + dt : 0;
+        // Turn one: lap 1, from the grid to 50 m past the end of the first corners.
+        if (s.turnOne === 'pending' && c.strategy.kind === 'race') {
+          const sinceGreen = session.time - (c.lightsOutAt ?? 0);
+          if (c.timer(i).lap > 1 || (f.s > cornerTo + 50 && f.s < cornerTo + 2000)) {
+            s.turnOne = 'clean';
+          } else if (st.carContactSpeed > 3) s.turnOne = 'contact';
+          else if (off > 0.8) s.turnOne = 'spin';
+          else if (offTime[i]! > 0.5) s.turnOne = 'off';
+          else if (sinceGreen > 10 && f.speed < 3) s.turnOne = 'stopped';
+        }
       }
       const lap = o.pitLap ? o.pitLap(i) : null;
       if (lap !== null && !asked[i] && c.timer(i).lap === lap && c.racing(i)) {

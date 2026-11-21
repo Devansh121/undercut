@@ -207,7 +207,17 @@ function printRun(lib, run) {
   for (const c of run.cars) {
     console.log(
       `  ${c.code}  after lap 1 P${c.positionAfterLap1 ?? '-'}  min ${c.minSpeedKmh.toFixed(0)} km/h at s=${c.minSpeedAt.toFixed(0)}  ` +
-        `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m`,
+        `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m  ` +
+        `contact ${(c.contactTicks / 240).toFixed(2)} s (longest ${c.longestContact.toFixed(2)} s, ` +
+        `${c.maxContactSpeed.toFixed(1)} m/s, ${c.contactImpulse.toFixed(0)} N·s)  spins ${c.spins}  ` +
+        `turn one ${c.turnOne}  barrier ${c.beyondBarrier > 0 ? `${c.beyondBarrier.toFixed(1)} m past` : 'clear'}`,
+    );
+  }
+  if (run.result.kind === 'race') {
+    const clean = run.cars.filter((c) => c.turnOne === 'clean').length;
+    console.log(
+      `\nTurn one: ${clean} of ${run.cars.length} clean; longest contact ${Math.max(...run.cars.map((c) => c.longestContact)).toFixed(2)} s; ` +
+        `spins ${run.cars.reduce((a, c) => a + c.spins, 0)}; past a barrier line ${run.cars.filter((c) => c.beyondBarrier > 0).length}`,
     );
   }
   const a = run.result.anomalies;
@@ -222,7 +232,7 @@ function printRun(lib, run) {
   if (run.result.kind === 'race') {
     const o = run.overlaps;
     console.log(
-      `First lap (cars are ghosts to each other): ${o.pairs} car pairs overlapped (${o.pairsInFirstCorner} in the first corner), ` +
+      `First lap, footprints overlapping: ${o.pairs} car pairs overlapped (${o.pairsInFirstCorner} in the first corner), ` +
         `at most ${o.peak} at once near s=${o.peakAtS.toFixed(0)}; last car crossed the line ${run.firstLap ? run.firstLap.spread.toFixed(3) : '-'} s after the leader.`,
     );
   }
