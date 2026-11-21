@@ -6,7 +6,7 @@ import { viewPixels, watchProblems } from './helpers';
  * covers both (the logic does not depend on the viewport), at a small viewport: software WebGL
  * in CI pays for every pixel.
  */
-test.use({ viewport: { width: 800, height: 500 } });
+test.use({ viewport: { width: 480, height: 300 } });
 test('without renderable float targets the HDR preset takes the direct path and still draws the race', async ({
   page,
 }, info) => {

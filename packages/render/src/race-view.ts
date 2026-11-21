@@ -548,11 +548,10 @@ export class RaceView {
   }
 
   render(frame: ViewFrame): void {
-    if (this.contextLost) return;
     const dt = frame.dt;
     // GPU time where the browser measures it (CPU-side stalls are not GPU load), else frame time.
     const sample = this.gpu.available ? this.gpu.latest : (frame.frameMs ?? null);
-    if (sample !== null && this.dynamic.update(sample)) this.resize(true);
+    if (!this.contextLost && sample !== null && this.dynamic.update(sample)) this.resize(true);
     this.camera.clearViewOffset();
     this.camera.aspect = this.width / Math.max(1, this.height);
     this.updateHeat(frame);
@@ -614,6 +613,9 @@ export class RaceView {
       c.end();
     }
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
+    // Without a context only the CPU side runs (cameras, poses), so screen-space queries such as
+    // carScreenRect stay right; nothing touches GL.
+    if (this.contextLost) return;
     if (this.checkRegistration && --this.framesToCheck <= 0) {
       this.framesToCheck = 120;
       for (const m of unregisteredLitMaterials(this.scene, (x) =>

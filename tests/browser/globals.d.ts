@@ -26,6 +26,8 @@ interface UndercutDebugApi {
   carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** The page's renderer: live geometries, textures and compiled programs. */
   rendererInfo(): Record<string, number>;
+  /** Clear the recorded frame intervals. */
+  resetFrameTimes(): void;
   /** The view's frame statistics: draw calls, render path, environment bakes and more. */
   renderStats(): Record<string, unknown>;
 }

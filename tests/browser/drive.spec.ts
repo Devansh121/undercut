@@ -292,8 +292,17 @@ test.describe('drive', () => {
           },
           [camera, at] as const,
         );
-        // Cameras settle on real time; wait for the framing to converge.
+        // Cameras settle on real time; wait for the framing to converge. A busy runner can
+        // stall the page's frames, so also wait until 30 frames have been drawn since the switch.
+        await page.evaluate(() => window.__undercut?.resetFrameTimes());
         await page.waitForTimeout(1500);
+        await page.waitForFunction(
+          () => (window.__undercut?.frameTimes().length ?? 0) >= 30,
+          null,
+          {
+            timeout: 30_000,
+          },
+        );
         const r = await page.evaluate(() => {
           const car = window.__undercut?.carScreenRect() as {
             left: number;
