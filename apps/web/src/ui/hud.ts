@@ -42,7 +42,8 @@ export interface HudState {
   ghostX: number | null;
   ghostZ: number | null;
   message: HudMessage | null;
-  opponents?: readonly { x: number; z: number }[];
+  /** Other cars on the map (online): world position, team colour and opacity. Optional. */
+  others?: readonly { x: number; z: number; colour: string; opacity: number }[];
 }
 
 const REV_COLOURS = ['g', 'g', 'g', 'g', 'g', 'r', 'r', 'r', 'r', 'r', 'b', 'b', 'b', 'b', 'b'];
@@ -68,14 +69,17 @@ export class Hud {
   private readonly msgTag: Text;
   private readonly msgText: Text;
   private readonly invalidEl: HTMLElement;
+  private readonly invalidReason: Text;
   private readonly dot: SVGCircleElement;
-  private readonly opponentDots: SVGCircleElement[] = [];
   private readonly ghostDot: SVGCircleElement;
+  private readonly othersLayer: SVGGElement;
+  private readonly otherDots: SVGCircleElement[] = [];
   private readonly plan: MinimapPlan;
   private lastErs = '';
   private lastMark = '';
 
-  constructor(plan: MinimapPlan, modeLabel = 'Time trial') {
+  /** `mode`: the session panel's title ("Time trial", "Online race"). */
+  constructor(plan: MinimapPlan, mode = 'Time trial') {
     this.plan = plan;
     const root = el('div', 'hud');
     root.dataset.testid = 'hud';
@@ -89,7 +93,7 @@ export class Hud {
     const session = el('section', 'hud-session panel');
     session.setAttribute('aria-label', 'Session');
     const sHead = el('header', 'panel-head');
-    sHead.append(el('span', 'label', modeLabel), txt('circuit', el('span', 'label label--strong')));
+    sHead.append(el('span', 'label', mode), txt('circuit', el('span', 'label label--strong')));
     const sBody = el('div', 'hud-session__body');
     const lapRow = el('div', 'hud-row');
     lapRow.append(el('span', 'label', 'Lap'), txt('lap', el('b', 'num')));
@@ -105,7 +109,10 @@ export class Hud {
     const sw = el('div', 'hud-flag__sw');
     sw.append(icon('flag'));
     const ftxt = el('div', 'hud-flag__txt');
-    ftxt.append(el('strong', '', 'Lap invalid'), el('span', '', 'Track limits'));
+    const reason = el('span', '');
+    this.invalidReason = new Text(reason);
+    this.invalidReason.set('Track limits');
+    ftxt.append(el('strong', '', 'Lap invalid'), reason);
     this.invalidEl.append(sw, ftxt);
     this.invalidEl.dataset.testid = 'lap-invalid';
     this.msgEl = el('div', 'hud-msg');
@@ -191,12 +198,8 @@ export class Hud {
       opacity: 0,
     });
     this.dot = svg('circle', { r: 5, fill: '#3d6fe0', stroke: '#f2f0eb', 'stroke-width': 2 });
-    for (let i = 0; i < 19; i++) {
-      const dot = svg('circle', { r: '2', fill: '#b6bdc8', opacity: '0' });
-      this.opponentDots.push(dot);
-      s.append(dot);
-    }
-    s.append(this.ghostDot, this.dot);
+    this.othersLayer = svg('g', { 'data-testid': 'map-others' });
+    s.append(this.ghostDot, this.othersLayer, this.dot);
     map.append(mHead, s);
 
     // Driver cluster (bottom right).
@@ -242,18 +245,14 @@ export class Hud {
     root.append(session, control, timing, map, cluster);
   }
 
+  /** Why the running lap is invalid, shown in the flag while it is (track limits, a reset). */
+  setInvalidReason(text: string): void {
+    this.invalidReason.set(text);
+  }
+
   update(h: HudState): void {
     const t = this.t;
     t.circuit?.set(h.circuit);
-    this.opponentDots.forEach((dot, i) => {
-      const p = h.opponents?.[i];
-      dot.setAttribute('opacity', p ? '1' : '0');
-      if (p) {
-        const [x, y] = this.plan.project(p.x, p.z);
-        dot.setAttribute('cx', x.toFixed(1));
-        dot.setAttribute('cy', y.toFixed(1));
-      }
-    });
     t.mapName?.set(h.circuit);
     t.mapLen?.set(`${h.lengthKm} km`);
     t.lap?.set(h.lap > 0 ? String(h.lap) : 'Out lap');
@@ -325,5 +324,24 @@ export class Hud {
       this.ghostDot.setAttribute('cy', gy.toFixed(1));
       this.ghostDot.setAttribute('opacity', '1');
     } else this.ghostDot.setAttribute('opacity', '0');
+
+    const others = h.others ?? [];
+    while (this.otherDots.length < others.length) {
+      const dot = svg('circle', { r: 4, stroke: '#0b0c0e', 'stroke-width': 1.2 });
+      this.othersLayer.append(dot);
+      this.otherDots.push(dot);
+    }
+    this.otherDots.forEach((dot, i) => {
+      const o = others[i];
+      if (!o) {
+        dot.setAttribute('opacity', '0');
+        return;
+      }
+      const [ox, oy] = this.plan.project(o.x, o.z);
+      dot.setAttribute('cx', ox.toFixed(1));
+      dot.setAttribute('cy', oy.toFixed(1));
+      dot.setAttribute('fill', o.colour);
+      dot.setAttribute('opacity', o.opacity.toFixed(2));
+    });
   }
 }

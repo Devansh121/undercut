@@ -1,12 +1,17 @@
 import { GAME_NAME } from '@undercut/core';
 import { formatLapTime } from './game/format';
+import { ControlsPanel, type ControlsSource } from './ui/controls-help';
 import { el, icon } from './ui/dom';
 
 export interface LaunchScreenOptions {
   buildHash: string;
   /** Best lap at the circuit from storage, if any. */
   record: number | null;
+  /** Start a session: Quick Race (true) or Time Trial (false). */
   onStart(quickRace?: boolean): void;
+  onOnline?(): void;
+  /** Where the controls list reads bindings and the device in use. */
+  controls?: ControlsSource;
 }
 
 export interface LaunchScreen {
@@ -16,9 +21,13 @@ export interface LaunchScreen {
   setRecord(record: number | null): void;
   /** Start as if the button was pressed (keyboard or gamepad accept). */
   start(): void;
+  /** Menu accept from a gamepad: press the focused control in the controls list, else Start. */
+  accept(): void;
+  /** Close the controls list if it is open (gamepad back). Returns true when it closed it. */
+  back(): boolean;
 }
 
-/** The launch screen: the name, one mode for M1 (Time Trial at Monza) and the build. */
+/** The launch screen: the name, Quick Race and Time Trial at Monza, online rooms and the build. */
 export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOptions): LaunchScreen {
   const screen = el('main', 'launch');
   screen.setAttribute('aria-labelledby', 'launch-title');
@@ -49,16 +58,38 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const build = el('footer', 'launch__build');
   build.append('Build ', el('code', '', options.buildHash));
 
+  const online = el('button', 'button', 'Online rooms');
+  online.type = 'button';
+  online.onclick = () => options.onOnline?.();
+  const panel = options.controls ? new ControlsPanel(options.controls) : null;
+  const help = el('button', 'button');
+  help.type = 'button';
+  help.dataset.action = 'controls';
+  help.append(el('span', 'button__label', 'Controls'));
+  help.addEventListener('click', () => panel?.show());
+  screen.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel?.open) {
+      e.preventDefault();
+      panel.hide();
+    }
+  });
+
   const trial = el('button', 'button', 'Time Trial');
   trial.type = 'button';
+  trial.dataset.action = 'time-trial';
   trial.addEventListener('click', () => options.onStart(false));
-  bar.append(mode, start, trial, build);
+  bar.append(mode, start, trial, online, build);
+  if (panel) bar.insertBefore(help, start);
   screen.append(stage, bar);
+  if (panel) screen.append(panel.root);
   root.replaceChildren(screen);
 
   const setRecord = (r: number | null): void => {
+    // The mode on offer is the race; the time-trial record rides along when there is one.
     record.textContent =
-      r === null ? 'No lap set on this device yet' : `Record ${formatLapTime(r)}`;
+      r === null
+        ? 'Five laps from a standing start'
+        : `Five laps from a standing start · Time trial record ${formatLapTime(r)}`;
   };
   setRecord(options.record);
   start.focus({ preventScroll: true });
@@ -73,7 +104,16 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
     },
     setRecord,
     start() {
+      if (!start.disabled && !panel?.open) start.click();
+    },
+    accept() {
+      if (panel?.accept()) return;
       if (!start.disabled) start.click();
+    },
+    back() {
+      if (!panel?.open) return false;
+      panel.hide();
+      return true;
     },
   };
 }

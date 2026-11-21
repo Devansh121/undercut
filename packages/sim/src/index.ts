@@ -13,12 +13,14 @@ export {
   SurfaceKind,
   createSurfaceHint,
   createSurfaceSample,
+  createWallSample,
   resetControlInput,
   type ControlInput,
   type PatchSample,
   type SurfaceHint,
   type SurfaceSample,
   type SurfaceSampler,
+  type WallSample,
 } from './contracts';
 export {
   AERO_HIGH_DOWNFORCE,
@@ -57,13 +59,34 @@ export {
   type CarStartOptions,
   type MassState,
 } from './state';
-export { FL, FR, RL, RR, createCarModel, type CarModel } from './model';
+export {
+  BODY_HALF_WIDTH,
+  BODY_NOSE,
+  BODY_TAIL,
+  BUMP_STOP_GAP,
+  DROOP_STOP_GAP,
+  FL,
+  FR,
+  RIM_RADIUS,
+  RL,
+  RR,
+  createCarModel,
+  WALL_FRICTION,
+  WALL_RESTITUTION,
+  tyreBottomDeflection,
+  type CarModel,
+} from './model';
+export {
+  AIRBORNE_ALLOWANCE,
+  PLANK_ALLOWANCE,
+  checkCarInvariants,
+  invariantLimits,
+  type InvariantLimits,
+  type InvariantOptions,
+} from './invariants';
 export {
   CAR_FRICTION,
-  CAR_HALF_WIDTH,
-  CAR_NOSE,
   CAR_RESTITUTION,
-  CAR_TAIL,
   CONTACT_PASSES,
   CONTACT_SLOP,
   carFootprint,
@@ -87,6 +110,7 @@ export {
   MAX_SUBSTEP,
   aeroCoefficients,
   beginErsLap,
+  bodyCorners,
   engineFullLoadTorque,
   fuelFlow,
   stepCar,

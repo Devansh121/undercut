@@ -1,6 +1,6 @@
 import { createRng, type Rng } from '@undercut/core';
 import {
-  CAR_HALF_WIDTH,
+  BODY_HALF_WIDTH,
   createCarTelemetry,
   type CarParams,
   type CarTelemetry,
@@ -70,7 +70,7 @@ export function driverSkillFor(skill: RaceSkill): DriverSkill {
 
 /** Car body length and width the driver keeps clear of, m. */
 const CAR_LENGTH = 5.6;
-const CAR_WIDTH = 2 * CAR_HALF_WIDTH;
+const CAR_WIDTH = 2 * BODY_HALF_WIDTH;
 /** Centre-to-centre lateral distance held side by side, m: a car's width and some air. */
 const SIDE_BY_SIDE = CAR_WIDTH + 0.8;
 /** Lateral distance below which a car ahead is in this car's path, m. */
@@ -353,7 +353,7 @@ export class RaceDriver implements Driver {
   private bounds(s: number, reach: number, out: { lo: number; hi: number }): void {
     const track = this.plan.track;
     const line = this.plan.line.d;
-    const margin = CAR_HALF_WIDTH + EDGE_MARGIN;
+    const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
     let lo = Number.NEGATIVE_INFINITY;
     let hi = Number.POSITIVE_INFINITY;
     for (let x = 0; x <= reach; x += 6) {

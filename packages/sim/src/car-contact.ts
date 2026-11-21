@@ -1,8 +1,9 @@
+import { BODY_HALF_WIDTH, BODY_NOSE, BODY_TAIL } from './model';
 import { computeMass, type CarState, type MassState } from './state';
 
 /**
- * Car-to-car contact: each car's body is an oriented box in the ground plane (the footprint from
- * the nose to the tail and across the wheels), and boxes that overlap after a step are pushed
+ * Car-to-car contact: each car's body is an oriented box in the ground plane, the same footprint
+ * the barrier contact uses (`BODY_NOSE`, `BODY_TAIL`, `BODY_HALF_WIDTH`, ADR 0009), and boxes that overlap after a step are pushed
  * apart and given an impulse along the contact normal.
  *
  * - Narrow phase: separating axes of the two boxes. The axis of least overlap gives the normal
@@ -25,14 +26,6 @@ import { computeMass, type CarState, type MassState } from './state';
  * of least overlap stays the right one.
  */
 
-/**
- * The body's footprint, m: nose ahead of the front axle, tail behind the rear axle, half the
- * overall width. The same footprint the barrier contact uses (ADR 0008): a 5.6 m car on a 3.6 m
- * wheelbase at the 2 m width limit; the front wing's end plates and the rear wing set the corners.
- */
-export const CAR_NOSE = 1.2;
-export const CAR_TAIL = 0.8;
-export const CAR_HALF_WIDTH = 1.0;
 /**
  * Restitution of the normal speed between two bodies and their friction sliding on each other.
  * Estimates: carbon on carbon keeps little of the closing speed (wings and bodywork crush), and
@@ -102,8 +95,8 @@ function newBox(): CarFootprint {
 /** Fill `out` with the car's footprint box (allocates one when absent). */
 export function carFootprint(s: CarState, out: CarFootprint = newBox()): CarFootprint {
   const m = computeMass(s.model, s.fuelMass, massScratch);
-  const nose = m.a + CAR_NOSE;
-  const tail = m.b + CAR_TAIL;
+  const nose = m.a + BODY_NOSE;
+  const tail = m.b + BODY_TAIL;
   const c = Math.cos(s.yaw);
   const sn = Math.sin(s.yaw);
   const ahead = (nose - tail) / 2;
@@ -112,7 +105,7 @@ export function carFootprint(s: CarState, out: CarFootprint = newBox()): CarFoot
   out.cx = s.x + ahead * c;
   out.cz = s.z - ahead * sn;
   out.halfLength = (nose + tail) / 2;
-  out.halfWidth = CAR_HALF_WIDTH;
+  out.halfWidth = BODY_HALF_WIDTH;
   return out;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAR_HALF_WIDTH,
+  BODY_HALF_WIDTH,
   REFERENCE_CAR,
   addCar,
   carFootprint,
@@ -74,7 +74,7 @@ describe('car footprint', () => {
     // About 5.6 m long and 2 m wide for the 3.6 m wheelbase car.
     expect(f.halfLength * 2).toBeGreaterThan(5.4);
     expect(f.halfLength * 2).toBeLessThan(5.8);
-    expect(f.halfWidth).toBe(CAR_HALF_WIDTH);
+    expect(f.halfWidth).toBe(BODY_HALF_WIDTH);
     // Facing +X: the box centre lies along +X of the CoG (the nose reaches further).
     expect(f.cx).toBeGreaterThan(10 - 1);
     expect(f.cz).toBeCloseTo(-4, 9);

@@ -4,7 +4,8 @@
  * drive the game through it instead of timing key presses.
  *
  *   await __undercut.start()                 // launch screen -> Time Trial at Monza
- *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera
+ *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera,
+ *                                            // safety-net resets, barrier hits
  *   __undercut.telemetry()                   // CarTelemetry (SI units)
  *   __undercut.teleport(s, d?, kmh?)         // place the car on the lap; timing restarts
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
@@ -23,8 +24,14 @@ import { isQuality } from './game/quality-setting';
 import type { QuickRaceOptions } from './game/session';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
+import type { OnlineState } from './online/session';
+import type { OnlineRaceReport } from './online/race';
 
 export interface DebugApi {
+  online(): {
+    state: OnlineState | null;
+    race: OnlineRaceReport | null;
+  };
   start(): Promise<void>;
   startQuickRace(laps?: number, options?: Omit<QuickRaceOptions, 'laps'>): Promise<void>;
   state(): Record<string, unknown>;
@@ -104,7 +111,7 @@ export function debugEnabled(): boolean {
 
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
-  start: (quickRace?: QuickRaceOptions) => Promise<DriveHandle>,
+  start: (o?: { quickRace?: QuickRaceOptions }) => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   audioStatus: () => string,
   audioCapability: () => { supported: boolean; fallback: string | null },
@@ -142,6 +149,8 @@ export function installDebugApi(
       surface: s.surfaceUnderCar(),
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
+      safetyResets: s.safetyResets,
+      wallHits: s.wallHits,
       camera: d.view.cameraName,
       viewBuilds: d.viewBuilds,
       device: s.device,
@@ -162,12 +171,13 @@ export function installDebugApi(
     getDrive()?.quit();
   };
   window.__undercut = {
+    online: () => ({ state: null, race: null }),
     start: async () => {
       if (!getDrive()) await start();
     },
     startQuickRace: async (laps = 5, options?: Omit<QuickRaceOptions, 'laps'>) => {
       needQuit();
-      await start({ laps, ...options });
+      await start({ quickRace: { laps, ...options } });
     },
     state,
     telemetry,

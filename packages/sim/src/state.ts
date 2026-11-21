@@ -33,6 +33,13 @@ export class CarState {
     createSurfaceHint(),
     createSurfaceHint(),
   ];
+  /** Barrier search hints, one per body corner (front left, front right, rear left, rear right). */
+  readonly wallHints: readonly SurfaceHint[] = [
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+    createSurfaceHint(),
+  ];
   /** Hints for the contact-patch sample points, `PATCH_HINTS` per wheel. Caches only. */
   readonly patchHints: readonly SurfaceHint[] = Array.from(
     { length: 4 * PATCH_HINTS },
@@ -91,6 +98,20 @@ export class CarState {
   externalForceX = 0;
   externalForceZ = 0;
   externalTorque = 0;
+  /**
+   * Contact diagnostics (see `liftOutOfGround` in step.ts). `groundSteps`: substeps that met a
+   * step in the ground, the last line of defence, which never acts on a continuous track.
+   * `contactLifts`: floor or rim strikes resolved inelastically; zero on the racing line, and off
+   * it only on raised kerbs taken hard.
+   */
+  groundSteps = 0;
+  contactLifts = 0;
+  /**
+   * Barrier contact on the last step: the largest speed into a barrier at a contact, m/s (0 when
+   * nothing hit), and 1 while any body corner touches a barrier. For damage and audio later.
+   */
+  wallImpactSpeed = 0;
+  wallContact = 0;
 
   // Per wheel, in FL, FR, RL, RR order.
   readonly wheelSpeed = new Float64Array(4);
@@ -187,6 +208,10 @@ const SCALAR_KEYS = [
   'externalForceX',
   'externalForceZ',
   'externalTorque',
+  'groundSteps',
+  'contactLifts',
+  'wallImpactSpeed',
+  'wallContact',
 ] as const satisfies readonly (keyof CarState)[];
 
 const WHEEL_KEYS = [
@@ -233,6 +258,7 @@ export function restoreCar(state: CarState, snapshot: ArrayLike<number>): void {
     for (let i = 0; i < 4; i++) arr[i] = snapshot[k++] as number;
   }
   for (const hint of state.hints) hint.index = -1;
+  for (const hint of state.wallHints) hint.index = -1;
   for (const hint of state.patchHints) hint.index = -1;
 }
 
