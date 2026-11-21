@@ -32,6 +32,11 @@ export interface CircuitSummary {
   airTemperature: number | null;
   /** Time-of-day presets the renderer has for this circuit, first is the default. */
   timesOfDay: string[];
+  /**
+   * The AI drivers have a racing line for this circuit (packages/ai/data): race modes need one.
+   * Without it the circuit offers Time Trial only.
+   */
+  raceReady: boolean;
   plan: CircuitPlan;
 }
 
@@ -52,13 +57,16 @@ export interface CircuitPlan {
 const TIMES: Readonly<Record<string, readonly string[]>> = {
   monza: ['monza-afternoon', 'overcast-day'],
   spa: ['overcast-day'],
-  singapore: ['night-floodlit'],
+  // Raced at night, but the floodlit night preset is not built yet: the day preset until it is.
+  singapore: ['overcast-day'],
 };
 
 export function timesOfDayFor(id: string, lighting: string | undefined): string[] {
   const listed = TIMES[id];
   if (listed) return [...listed];
-  return lighting === 'floodlit' ? ['night-floodlit'] : ['overcast-day'];
+  // The floodlit night preset is not built yet; every other circuit gets the day preset.
+  void lighting;
+  return ['overcast-day'];
 }
 
 const round1 = (v: number): string => (Math.round(v * 10) / 10).toString();
@@ -170,6 +178,7 @@ export function summarizeTrack(
   t: TrackFileLike,
   raceLaps: number,
   timingLine: number,
+  raceReady = false,
 ): CircuitSummary {
   const corners = new Set(t.corners.map((c) => c.number)).size;
   return {
@@ -187,6 +196,7 @@ export function summarizeTrack(
     airTemperature:
       typeof t.environment?.airTemperature === 'number' ? t.environment.airTemperature : null,
     timesOfDay: timesOfDayFor(t.id, t.environment?.lighting),
+    raceReady,
     plan: buildPlan(t, 208, 150, 14, timingLine),
   };
 }

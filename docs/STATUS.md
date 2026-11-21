@@ -10,6 +10,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M2 interface: a launch screen, then a main menu on one designed kit (tokens, icon set, prompt glyphs that follow the device, components) with the five modes, circuit select (Monza, Spa-Francorchamps and Singapore Marina Bay, each with its plan, length, corners, direction and the record on this device), team and driver pick with a studio image of the car in that livery, and session settings with per-device assist presets. Time Trial runs at any of the three circuits; Online Rooms opens the lobby; Quick Race, Race Weekend and Championship say plainly that they arrive with the race screen. The time-trial HUD is a timing tower top left with the map in the right column. Keyboard, gamepad (D-pad, A, B, LB and RB or Q and E for modes) and touch reach every control. Evidence: `docs/evidence/m2-ui/`.
 - M5 online client: Online rooms on the launch screen, create or join by invite, ready countdown, server-clock start lights, remote cars and minimap, official results and rematch. A desktop host and landscape phone guest complete the two-browser acceptance test against the local service.
 - Controls list: a Controls panel in the pause menu and on the launch screen lists every driving input for the device in use (keyboard, gamepad or touch), read from the live bindings, with the reverse-gear rule. The first start of a page session shows a six-second HUD hint with the brake and throttle inputs and how to open the list.
 - M6 Cloudflare deploy: top-level `wrangler.jsonc` composes the built client (staged into `dist/cloudflare` with `tools/deploy/_headers`) and the `/rooms` Durable Objects API on one origin, with `npm run deploy`, `npm run deploy:check` (`wrangler deploy --dry-run` assertions in the `build` CI job), composed-Worker runtime tests (`npm run test:deploy`), SQLite-persisted creation rate limits, a global creation cap, same-origin enforcement and a 4-hour room lifetime cap. Local `./start.sh` and `services/rooms/wrangler.jsonc` are unchanged. See `docs/DEPLOY.md`.
@@ -47,6 +48,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Singapore is raced at night, but the floodlit night preset is not built yet: Singapore (and Spa) use the day preset (`overcast-day`) until it is. Spa and Singapore have no AI racing line yet, so the menus mark them "Time Trial only" and race modes there are not offered; the rubbered racing line on the asphalt is drawn at Monza only.
+- The online lobby and results screens keep their own plain styling; they are not yet restyled on the interface kit. They are reached from the main menu (Online Rooms) and by invite link, and run on the menus' input loop.
 - Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
 
 - Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
@@ -59,6 +62,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Menus without a framework (ADR 0009). The team cars on the main menu are pre-rendered studio images of the real car model, not a live 3D view. Label text was raised to `#8d8c88` so it meets 4.5:1 on every panel. Time trial's tower shows the green flag only: time trial has no other flags. The controls list opens from the menu's top bar and the pause menu.
 - Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
 - Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
 - Start release happens at the first fixed simulation tick on or after server lights-out. Each frame maps its catch-up ticks to the elapsed server-clock interval, so ticks before lights-out remain held even when rendering stalls. The acceptance test compares the actual released ticks within one 240 Hz tick plus clock error, using the normal referee floors.

@@ -95,7 +95,16 @@ function circuitCatalog(): Plugin {
           typeof t.timingLine === 'number'
             ? t.timingLine
             : (t.timingLine?.s ?? rules?.timingLine ?? 0);
-        return summarizeTrack(t, rules?.raceLaps ?? fullRaceLaps(t.length), line);
+        // Race modes need the AI drivers' racing line for the circuit.
+        const aiLine = fileURLToPath(
+          new URL(`../../packages/ai/data/${t.id}-low.line.json`, import.meta.url),
+        );
+        return summarizeTrack(
+          t,
+          rules?.raceLaps ?? fullRaceLaps(t.length),
+          line,
+          fs.existsSync(aiLine),
+        );
       });
       // Monza first (the default and round 1), then by name.
       circuits.sort((a, b) =>

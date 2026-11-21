@@ -37,7 +37,6 @@ import {
 } from '@undercut/render';
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
-import monza from '@undercut/track/data/monza.json';
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
@@ -117,6 +116,8 @@ export interface DriveOptions {
   audio?: DriveAudio;
   /** No saved or requested preset: benchmark the first seconds and pick one. */
   autoQuality?: boolean;
+  /** Circuit id (packages/track/data); Monza when absent. */
+  circuit?: string;
   /** The player's team (design/teams.json id) and driver (0 or 1). */
   team?: string;
   driver?: 0 | 1;
@@ -212,9 +213,23 @@ function toneMapParam(): ToneMap {
   return t === 'aces' || t === 'agx' ? t : 'neutral';
 }
 
-function racingLineOffsets(count: number): Float64Array | null {
+/** Every circuit's track file, each its own chunk, fetched when a session there starts. */
+const TRACK_FILES = import.meta.glob<unknown>('../../../packages/track/data/*.json', {
+  import: 'default',
+});
+
+async function loadTrack(id: string): Promise<Track> {
+  const load =
+    TRACK_FILES[`../../../packages/track/data/${id}.json`] ??
+    TRACK_FILES['../../../packages/track/data/monza.json'];
+  if (!load) throw new Error('no track files in the build');
+  return Track.fromJSON(await load());
+}
+
+function racingLineOffsets(track: Track): Float64Array | null {
+  // The rubbered line is Monza's AI racing line; other circuits have none yet.
   const raw = monzaLine as { count: number; offsetTenthMm: number[] };
-  if (raw.count !== count) return null;
+  if (track.id !== 'monza' || raw.count !== track.lap.count) return null;
   return Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
 }
 
@@ -258,7 +273,7 @@ export interface DriveHandle {
 
 export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const loadStart = performance.now();
-  const track = Track.fromJSON(monza);
+  const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
   const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
@@ -294,7 +309,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     trackRear: params.geometry.trackRear,
     tyreRadius: params.tyre.rollingRadius,
   };
-  const line = racingLineOffsets(track.lap.count);
+  const line = racingLineOffsets(track);
   const loadView = async (quality: QualityName, screen: LoadingScreen): Promise<RaceView> => {
     for (;;) {
       try {

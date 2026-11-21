@@ -211,6 +211,7 @@ async function start(
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
+        circuit: choice.circuit,
         team: choice.team,
         driver: choice.driver,
         timeOfDay: choice.timeOfDay,

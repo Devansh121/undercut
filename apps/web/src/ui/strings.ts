@@ -110,6 +110,9 @@ export const S = {
     air: (celsius: number) => `Air ${celsius}°`,
     km: 'km',
     onlyOne: 'More circuits arrive with their track data.',
+    timeTrialOnly: 'Time Trial only',
+    noRaceLine: (name: string) =>
+      `The AI drivers have no racing line at ${name} yet, so race modes are not available there. Time Trial is.`,
   },
 
   timeOfDay: {

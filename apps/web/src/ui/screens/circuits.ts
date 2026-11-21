@@ -45,6 +45,8 @@ export class CircuitSelectScreen implements Screen {
         el('span', 'label', S.circuit.round(i + 1, c.country)),
         el('span', 'ccard__name', c.name),
       );
+      // No AI racing line here yet: race modes are not available, Time Trial is.
+      if (!c.raceReady) head.append(el('span', 'ccard__tag', S.circuit.timeTrialOnly));
       const facts = el('dl', 'ccard__facts');
       const fact = (k: string, v: string): void => {
         const d = el('div', 'ccard__fact');

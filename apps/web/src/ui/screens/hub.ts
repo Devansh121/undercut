@@ -376,6 +376,7 @@ export class HubScreen implements Screen {
       chip('route', c.direction === 'clockwise' ? S.circuit.clockwise : S.circuit.anticlockwise),
       chip('drop', S.circuit.dry),
     );
+    if (!c.raceReady) chips.append(chip('stopwatch', S.circuit.timeTrialOnly));
     if (c.airTemperature !== null)
       chips.append(chip('temp', S.circuit.air(Math.round(c.airTemperature - 273.15))));
     // Keep focus on the change button across a re-render.
@@ -399,6 +400,7 @@ export class HubScreen implements Screen {
       this.noticeCard.replaceChildren(
         h,
         el('p', 'notice__body', online ? S.notices.onlineBody : S.notices.racesBody),
+        ...(!online && !c.raceReady ? [el('p', 'notice__body', S.circuit.noRaceLine(c.name))] : []),
       );
     }
     this.presetLabel.textContent = S.setup.preset(S.menu.deviceNames[this.device]);

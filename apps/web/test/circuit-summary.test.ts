@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import monza from '@undercut/track/data/monza.json';
+import singapore from '@undercut/track/data/singapore.json';
+import spa from '@undercut/track/data/spa.json';
 import { CIRCUIT_DATA } from '@undercut/race';
 import { summarizeTrack, timesOfDayFor, type TrackFileLike } from '../src/ui/data/circuit-summary';
 
 describe('circuit summary', () => {
   const data = CIRCUIT_DATA.monza as { timingLine: number; raceLaps: number };
-  const s = summarizeTrack(monza as unknown as TrackFileLike, data.raceLaps, data.timingLine);
+  const s = summarizeTrack(monza as unknown as TrackFileLike, data.raceLaps, data.timingLine, true);
 
   it('reads the facts the circuit card shows from the track file', () => {
     expect(s).toMatchObject({
@@ -17,9 +19,33 @@ describe('circuit summary', () => {
       corners: 11,
       drsZones: 2,
       raceLaps: 53,
-      airTemperature: null,
+      airTemperature: 299.15,
       timesOfDay: ['monza-afternoon', 'overcast-day'],
+      raceReady: true,
     });
+  });
+
+  it('reads Spa and Singapore (track format 3): direction, corners, the day preset, no race line', () => {
+    const at = (t: unknown) => {
+      const f = t as TrackFileLike & { timingLine: { s: number } };
+      return summarizeTrack(f, 44, f.timingLine.s);
+    };
+    expect(at(spa)).toMatchObject({
+      id: 'spa',
+      direction: 'clockwise',
+      length: 7004,
+      timesOfDay: ['overcast-day'],
+      raceReady: false,
+    });
+    expect(at(singapore)).toMatchObject({
+      id: 'singapore',
+      direction: 'anticlockwise',
+      length: 4927,
+      timesOfDay: ['overcast-day'],
+      raceReady: false,
+    });
+    expect(at(spa).corners).toBeGreaterThan(10);
+    expect(at(singapore).plan.sectorPaths).toHaveLength(3);
   });
 
   it('fits the plan inside its box with three sectors and a start line', () => {
@@ -47,9 +73,10 @@ describe('circuit summary', () => {
     expect(end(plan.sectorPaths[0] as string)).toBe(start(plan.sectorPaths[1] as string));
   });
 
-  it('picks sky presets by circuit, else by lighting', () => {
-    expect(timesOfDayFor('singapore', 'floodlit')).toEqual(['night-floodlit']);
-    expect(timesOfDayFor('elsewhere', 'floodlit')).toEqual(['night-floodlit']);
+  it('picks sky presets by circuit, else the day preset', () => {
+    // The floodlit night preset is not built yet: the day preset stands in.
+    expect(timesOfDayFor('singapore', 'floodlit')).toEqual(['overcast-day']);
+    expect(timesOfDayFor('elsewhere', 'floodlit')).toEqual(['overcast-day']);
     expect(timesOfDayFor('elsewhere', 'daylight')).toEqual(['overcast-day']);
   });
 });
