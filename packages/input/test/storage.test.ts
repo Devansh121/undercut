@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultProfile, rebind } from '../src/bindings';
 import { MemoryStorage, ProfileStore, type StoragePort } from '../src/storage';
 import { ASSIST_PRESETS, assistPresetFor } from '../src/assists';
+import { WebStorageAdapter } from '../src/dom/storage';
 
 describe('ProfileStore', () => {
   it('returns defaults when nothing is saved and round-trips a saved profile', async () => {
@@ -35,5 +36,30 @@ describe('assist presets', () => {
     const mine = assistPresetFor('keyboard');
     mine.abs = 'off';
     expect(ASSIST_PRESETS.keyboard.abs).toBe('on');
+  });
+});
+
+describe('WebStorageAdapter', () => {
+  it('uses Web Storage when it works', async () => {
+    const data = new Map<string, string>();
+    const fake = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    } as unknown as Storage;
+    const adapter = new WebStorageAdapter(() => fake);
+    await adapter.save('a', '1');
+    expect(data.get('a')).toBe('1');
+    expect(await adapter.load('a')).toBe('1');
+    expect(adapter.blocked).toBe(false);
+  });
+
+  it('falls back to memory for the session when storage is blocked', async () => {
+    const adapter = new WebStorageAdapter(() => {
+      throw new Error('SecurityError');
+    });
+    expect(await adapter.load('a')).toBe(null);
+    expect(adapter.blocked).toBe(true);
+    await adapter.save('a', '2');
+    expect(await adapter.load('a')).toBe('2');
   });
 });
