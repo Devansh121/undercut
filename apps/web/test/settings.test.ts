@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRoomsUrl, roomSocketUrl } from '../src/settings';
+import { resolveRoomsUrl } from '../src/settings';
 
 describe('resolveRoomsUrl', () => {
   it('defaults to same-origin /rooms', () => {
@@ -24,15 +24,9 @@ describe('resolveRoomsUrl', () => {
   });
 });
 
-describe('roomSocketUrl', () => {
-  it('maps http to ws and https to wss', () => {
-    expect(roomSocketUrl('http://10.0.0.2:5173/rooms', 'abc')).toBe('ws://10.0.0.2:5173/rooms/abc');
-    expect(roomSocketUrl('https://example.test/rooms', 'abc')).toBe('wss://example.test/rooms/abc');
-  });
-
-  it('escapes the room id', () => {
-    expect(roomSocketUrl('https://example.test/rooms', 'a b')).toBe(
-      'wss://example.test/rooms/a%20b',
-    );
+describe('room sockets', () => {
+  it('are not built here: the protocol library owns the path (/rooms/<code>/ws)', async () => {
+    const settings: Record<string, unknown> = await import('../src/settings');
+    expect(settings.roomSocketUrl).toBeUndefined();
   });
 });

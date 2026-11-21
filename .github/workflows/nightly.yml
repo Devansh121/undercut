@@ -23,5 +23,15 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
-      # Full-race soaks and the screenshot-station run land here as they are written.
-      - run: npm run test:soak
+      # Reference-driver soak (long runs of the physics and AI).
+      - run: npm run test:soak:sim
+      # Rooms soak: eight clients through the network simulator for a full race. Runs
+      # even if the step above failed, so one failure never hides the other.
+      # The screenshot-station run lands here as it is written.
+      - run: npm run test:soak:rooms
+        if: always()
+        env:
+          SOAK_REPORT: soak-report.md
+      - name: Soak report
+        if: always()
+        run: if [ -f soak-report.md ]; then cat soak-report.md >> "$GITHUB_STEP_SUMMARY"; fi
