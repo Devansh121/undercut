@@ -32,9 +32,13 @@ export default async function setup(project: TestProject): Promise<() => Promise
   const port = await freePort();
   const logFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rooms-log-')), 'service.log');
   fs.writeFileSync(logFile, '');
+  // Its own state directory: the tools/serve runtime tests in this project start servers on
+  // the same config, and a shared directory let two runtimes lock each other's SQLite files.
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'rooms-state-'));
   const rooms = await startRooms({
     port,
     quiet: true,
+    persistTo: state,
     log: (text: string) => fs.appendFileSync(logFile, text),
     vars: {
       ROOM_TIMINGS: JSON.stringify(TEST_TIMINGS),
@@ -48,5 +52,6 @@ export default async function setup(project: TestProject): Promise<() => Promise
   return async () => {
     await rooms.stop();
     fs.rmSync(path.dirname(logFile), { recursive: true, force: true });
+    fs.rmSync(state, { recursive: true, force: true });
   };
 }
