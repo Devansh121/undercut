@@ -79,23 +79,25 @@ def build(textures, base_colour="#8C9096", livery=None):
     m, nt, b = principled("paint", srgb(base_colour), 0.30, coat=1.0, coat_rough=0.04)
     if livery is not None:
         _livery_nodes(nt, b, *livery)
-    if "body_ao" in T:
-        t = _tex(nt, T["body_ao"], "UVMap", non_color=True)
-        # glTF occlusion: the exporter picks it up from a glTF Material Output group
-        _occlusion(nt, t)
+    if "body_detail" in T:
+        # panel gaps, fasteners and louvres, drawn in the livery atlas (UV0)
+        t = _tex(nt, T["body_detail"], "UVMap", non_color=True)
+        _normal(nt, b, t, 1.0, uv="UVMap")
     mats["paint_edge"] = m
 
-    m, nt, b = principled("carbon", srgb("#0C0D0F"), 0.48, coat=0.6, coat_rough=0.22)
+    # carbon: rougher with a softer clear coat and a stronger weave relief, so broad highlights
+    # break up instead of reading as polished metal
+    m, nt, b = principled("carbon", srgb("#101114"), 0.55, coat=0.45, coat_rough=0.30)
     if "carbon_normal" in T:
         t = _tex(nt, T["carbon_normal"], "UVMetric", non_color=True, scale=CARBON_SCALE)
-        _normal(nt, b, t, 0.6)
+        _normal(nt, b, t, 0.9)
     if "carbon_base" in T:
         t = _tex(nt, T["carbon_base"], "UVMetric", scale=CARBON_SCALE)
         nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
     m, nt, b = principled("carbon_matte", srgb("#0B0C0D"), 0.66, coat=0.0)
     if "carbon_normal" in T:
         t = _tex(nt, T["carbon_normal"], "UVMetric", non_color=True, scale=CARBON_SCALE)
-        _normal(nt, b, t, 0.4)
+        _normal(nt, b, t, 0.6)
     principled("dark", srgb("#0B0C0D"), 0.75, double=True)
     principled("interior", srgb("#18191B"), 0.85, double=True)
     principled("headrest", srgb("#1E1F22"), 0.80)

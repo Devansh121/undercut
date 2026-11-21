@@ -47,22 +47,26 @@ coll = bpy.data.collections.new("Car")
 scene.collection.children.link(coll)
 
 car = assemble.build(args.lod)
-# the livery atlas layout is the same for every level of detail: pack the high patches, then
+# the livery atlas layout is the same for every level of detail: pack the High patches, then
 # give each lower LOD the same rectangles by key
 ref = car if args.lod == "high" else assemble.build("high")
 livery.pack(ref.patches, MASK_SIZE)
 rects = {p.key: p.rect for p in ref.patches}
 for p in car.patches:
     p.rect = rects[p.key]
+# one rasterisation of the High car's painted triangles serves every mask and the detail map
+gb = livery.rasterise(ref.patches, MASK_SIZE)
 
 prof = wheels.tyre_profile(D.TYRE_WIDTH_REAR, car.q)
 tex = textures.build_all(args.lod, wheels.tyre_shoulders(prof))
+detail = livery.detail_normal(gb)
+if args.lod != "high":
+    detail = detail.reshape(512, 2, 512, 2, 3).mean(axis=(1, 3))
+tex["body_detail"] = textures.to_image("body_detail", detail, non_color=True)
 
-mask_img = None
 team = next(t for t in TEAMS if t["id"] == args.team)
 if args.mode in ("review", "beauty", "ortho"):
-    m = livery.draw_mask(ref.patches, team["liveryPattern"], MASK_SIZE)
-    mask_img = textures.to_image("mask_review", m, non_color=True)
+    mask_img = textures.to_image("mask_review", livery.design(team["id"], gb), non_color=True)
     c = team["colours"]
     mats = materials.build(tex, livery=(mask_img, c["primary"], c["secondary"], c["accent"]))
 else:
@@ -89,14 +93,12 @@ elif args.mode == "beauty":
     stage.perspective(args.out, args.prefix, coll, args.stations.split(","), "CYCLES", args.samples, res, args.hdri)
 elif args.mode == "masks":
     os.makedirs(os.path.join(args.out, "livery"), exist_ok=True)
-    for pat in livery.PATTERNS:
-        m = livery.draw_mask(ref.patches, pat, MASK_SIZE)
-        png.write(os.path.join(args.out, "livery", pat + ".png"), m)
-    print("MASKS", len(livery.PATTERNS))
+    for t in TEAMS:
+        png.write(os.path.join(args.out, "livery", t["id"] + ".png"), livery.design(t["id"], gb))
+    print("MASKS", len(TEAMS))
 elif args.mode == "export":
     from carlib import export
 
     bpy.context.view_layer.update()
     ao.bake(ao.mesh_objects(objs["car"]), rays={"high": 24, "mobile": 14, "far": 8}[args.lod])
-
     export.write(objs, car, args.out, tris, args.stats_dir or args.out)

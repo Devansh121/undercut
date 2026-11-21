@@ -45,7 +45,7 @@ def srgb_to_lin(c):
 # ---------------------------------------------------------------------------------------------
 # Carbon twill: 2x2 twill, four tows per repeat in each direction; the texture holds 2 repeats
 # ---------------------------------------------------------------------------------------------
-CARBON_TILE_M = 0.040  # one texture tile covers 40 mm (tows 5 mm wide)
+CARBON_TILE_M = 0.048  # one texture tile covers 48 mm (tows 6 mm wide)
 
 
 def carbon(size=512):
@@ -126,45 +126,62 @@ def _text_segments(text, x, y, size, spacing=1.45, slant=0.18):
     return segs, cx
 
 
+TYRE_MARK_GROUPS = 4  # compound tick groups round each sidewall
+TYRE_MARK_SLOT = 0.012  # u spacing of the three tick slots in a group
+
+
 def tyre(profile_v, width_px=2048, height_px=512):
     """Texture in the tyre's UV space: u round the wheel, v across the profile from the inboard
     bead (0) over the tread to the outboard bead (1). profile_v gives the v of the shoulder on
-    each side ('in', 'out'); the sidewalls are v < in and v > out. Both sidewalls carry the
-    invented maker's mark, a size marking and the compound band (coloured at runtime by the
-    material colour)."""
+    each side ('in', 'out'); the sidewalls are v < in and v > out.
+
+    Markings (invented): the maker's mark once on each sidewall, and four groups of three short
+    radial ticks. The renderer shows one, two or all three ticks of each group in the compound's
+    colour (see design/compounds.json); the lettering stays neutral. There are no full rings and
+    no repeated lettering. The normal map adds raised lettering and ticks, fine concentric
+    moulding on the sidewalls and a restrained rubber grain everywhere."""
     w, h = width_px, height_px
     r_in = profile_v["in"] * (h - 1)
     r_out = profile_v["out"] * (h - 1)
     span = min(r_in, (h - 1) - r_out)
-    th = int(round(span * 0.34))  # text strip height in rows
-    segs = []
+    th = int(round(span * 0.30))
     size = th * 0.80
-    for k in range(2):
-        x0 = w * (0.05 + 0.5 * k)
-        s1, xe = _text_segments("VARRO", x0, th * 0.10, size, spacing=1.55)
-        s2, _ = _text_segments("SLICK 18", xe + size * 1.6, th * 0.22, size * 0.52, spacing=1.5, slant=0.0)
-        segs += s1 + s2
-    strip = _stroke_mask(w, th, segs, max(1.6, size * 0.16))
+    # lettering: one mark per sidewall, placed between the tick groups (u 0.16 .. 0.34)
+    s1, xe = _text_segments("VARRO", w * 0.165, th * 0.10, size, spacing=1.55)
+    s2, _ = _text_segments("18", xe + size * 1.2, th * 0.22, size * 0.52, spacing=1.5, slant=0.0)
+    strip = _stroke_mask(w, th, s1 + s2, max(1.6, size * 0.16))
+    # ticks: radial bars at the three slots of every group
+    tk = int(round(span * 0.26))
+    tsegs = []
+    for g in range(TYRE_MARK_GROUPS):
+        uc = (g + 0.5) / TYRE_MARK_GROUPS
+        for s in (-1, 0, 1):
+            x = (uc + s * TYRE_MARK_SLOT) * w
+            tsegs.append(((x, tk * 0.12), (x, tk * 0.88)))
+    ticks = _stroke_mask(w, tk, tsegs, max(2.0, w * 0.0035))
     marks = np.zeros((h, w))
-    band = np.zeros((h, w))
     rows = np.arange(h)[:, None]
-    # outboard sidewall: radius falls as v rises, so the strip is flipped vertically
+    # outboard sidewall: radius falls as v rises, so strips are flipped vertically
     t0 = int(round(r_out + span * 0.40))
     marks[t0:t0 + th] = np.maximum(marks[t0:t0 + th], strip[::-1, :])
-    band += np.clip(1.0 - np.abs(rows - (r_out + span * 0.18)) / (span * 0.035), 0, 1)
-    # inboard sidewall: seen from the other side, so the strip is flipped horizontally
+    k0 = int(round(r_out + span * 0.08))
+    marks[k0:k0 + tk] = np.maximum(marks[k0:k0 + tk], ticks[::-1, :])
+    # inboard sidewall: seen from the other side, so strips are flipped horizontally
     t1 = int(round(r_in - span * 0.40)) - th
     marks[t1:t1 + th] = np.maximum(marks[t1:t1 + th], strip[:, ::-1])
-    band += np.clip(1.0 - np.abs(rows - (r_in - span * 0.18)) / (span * 0.035), 0, 1)
-    band = np.clip(band, 0, 1) * np.ones((1, w))
-    paint = np.clip(marks + band, 0, 1)
-    lin = 0.016 + (0.78 - 0.016) * paint
+    k1 = int(round(r_in - span * 0.08)) - tk
+    marks[k1:k1 + tk] = np.maximum(marks[k1:k1 + tk], ticks[:, ::-1])
+    lin = 0.016 + (0.62 - 0.016) * np.clip(marks, 0, 1)
     rgb = np.repeat(lin[..., None], 3, axis=2)
     rgb = np.where(rgb <= 0.0031308, rgb * 12.92, 1.055 * np.power(rgb, 1 / 2.4) - 0.055)
-    # raised lettering and band, plus fine concentric moulding lines on the sidewalls
     side = ((rows < r_in) | (rows > r_out)).astype(np.float64)
-    mould = 0.15 * np.sin(rows * 2 * np.pi / 3.0) * side * np.ones((1, w))
-    hgt = marks * 1.2 + band * 0.5 + mould
+    mould = 0.12 * np.sin(rows * 2 * np.pi / 3.0) * side * np.ones((1, w))
+    # rubber grain: a fixed hash, two octaves, very low amplitude
+    ii, jj = np.meshgrid(np.arange(w, dtype=np.int64), np.arange(h, dtype=np.int64))
+    hsh = ((ii * 73856093) ^ (jj * 19349663)) % 1000003
+    grain = (hsh / 1000003.0 - 0.5) * 0.10
+    grain = grain + 0.5 * (np.roll(grain, 1, 0) + np.roll(grain, 1, 1)) * 0.5
+    hgt = marks * 1.2 + mould + grain
     normal = height_to_normal(hgt, strength=1.2)
     return rgb, normal
 

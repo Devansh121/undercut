@@ -46,15 +46,14 @@ def write(objs, car, out_dir, tris, stats_dir):
         ob = bpy.data.objects[n]
         if ob.type == "MESH":
             draw_calls += len({p.material_index for p in ob.data.polygons})
+    # triangle and draw-call numbers for the record are measured on the GLB by build.mjs; this
+    # file only carries the texture sizes, which the GLB does not state
     stats = {
         "lod": car.lod,
-        "triangles": tris,
-        "triangles_by_part": car.stats,
-        "draw_calls": draw_calls,
-        "glb_bytes": os.path.getsize(path),
-        "images": {img.name: list(img.size) for img in bpy.data.images if img.users and img.name.startswith(("carbon", "tyre", "disc"))},
+        "images": {img.name: list(img.size) for img in bpy.data.images
+                   if img.users and img.name.startswith(("carbon", "tyre", "disc", "body_detail"))},
     }
     os.makedirs(stats_dir, exist_ok=True)
     with open(os.path.join(stats_dir, "stats_%s.json" % car.lod), "w") as fh:
         json.dump(stats, fh, indent=2, sort_keys=True)
-    print("EXPORTED", path, stats["glb_bytes"], "bytes", tris, "triangles", draw_calls, "draw calls")
+    print("EXPORTED", path, os.path.getsize(path), "bytes", draw_calls, "draw calls")

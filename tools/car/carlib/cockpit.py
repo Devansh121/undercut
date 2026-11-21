@@ -272,3 +272,84 @@ def driveshaft(q, y_out):
     for p, r in ((a.lerp(b, 0.06), 0.040), (a.lerp(b, 0.94), 0.040)):
         tube(m, p - (b - a).normalized() * 0.03, p + (b - a).normalized() * 0.03, r, n, "boot", radius_b=0.026)
     return m
+
+
+# ---------------------------------------------------------------------------------------------
+# Driver (shoulders, arms, harness) and halo mounts
+# ---------------------------------------------------------------------------------------------
+def build_driver(mesh_paint, mesh_dark, q):
+    """Shoulders in the race suit (primary colour, no livery patch), forearms reaching for the
+    wheel, and the harness straps over the shoulders. The gloves are part of the steering wheel
+    node so they turn with it."""
+    m = Mesh()
+    n = q.n(18, 8)
+    # shoulders and upper chest: a squat rounded block under the helmet, sunk into the seat
+    rows = []
+    for k in range(q.n(8, 4) + 1):
+        t = k / q.n(8, 4)
+        x = lerp(0.235, -0.010, t)
+        s = math.sin(math.pi * min(1.0, 0.06 + 0.94 * t)) ** 0.45
+        hw = 0.205 * s
+        z0, z1 = 0.540, 0.540 + 0.150 * s
+        ring = superellipse_half(hw, z0, lerp(z0, z1, 0.45), z1, 3.0, 2.2, n)
+        rows.append([Vector((x, p.y, p.z)) for p in ring])
+    loft(m, rows, "paint_edge", flip=True)
+    mesh_paint.merge(m.with_mirror())
+    # forearms: from the shoulder line to the wrists beside the wheel grips
+    arms = Mesh()
+    for side in (1, -1):
+        a = Vector((0.20, side * 0.175, 0.625))
+        b = Vector((0.46, side * 0.150, 0.615))
+        tube(arms, a, b, 0.038, q.n(12, 6), "paint_edge", radius_b=0.030)
+    mesh_paint.merge(arms)
+    # harness: two straps over the shoulders, converging at the chest
+    hn = Mesh()
+    for side in (1, -1):
+        path = [Vector((0.02, side * 0.085, 0.700)), Vector((0.10, side * 0.080, 0.662)),
+                Vector((0.18, side * 0.060, 0.630)), Vector((0.235, side * 0.035, 0.590))]
+        grid = []
+        for p in path:
+            grid.append([p + Vector((0, dy, dz)) for (dy, dz) in ((0.024, 0.004), (-0.024, 0.004), (-0.024, -0.002),
+                                                                  (0.024, -0.002))])
+        loft(hn, grid, "dark", closed=True, cap0=True, cap1=True)
+    mesh_dark.merge(hn)
+
+
+def build_gloves(q, hand_y=0.150):
+    """Gloved hands round the steering-wheel grips, in the wheel's own frame (built facing +X)."""
+    m = Mesh()
+    n = q.n(12, 6)
+    for side in (1, -1):
+        rows = []
+        for k in range(6):
+            t = k / 5
+            z = lerp(-0.045, 0.040, t)
+            r = 0.036 * math.sin(math.pi * min(1.0, 0.12 + 0.88 * t)) ** 0.5 + 0.004
+            rows.append([Vector((-0.020 + r * 0.95 * math.cos(2 * math.pi * i / n), side * hand_y + r * 0.85 * math.sin(2 * math.pi * i / n), z))
+                         for i in range(n)])
+        loft(m, rows, "paint_edge", closed=True, cap0=True, cap1=True)
+    return m
+
+
+def build_halo_mounts(mesh_paint, q):
+    """Fairings over the halo's three mounting points."""
+    m = Mesh()
+    n = q.n(12, 6)
+    for (x, y, z, rx, ry, rz) in ((D.X_HALO_REAR + 0.01, D.HALO_HALF_WIDTH_REAR + 0.01, D.Z_HALO_REAR_MOUNT - 0.006, 0.055, 0.034, 0.026),):
+        rows = []
+        for k in range(7):
+            t = k / 6
+            s = math.sin(math.pi * t) ** 0.6
+            rows.append([Vector((x + rx * (1 - 2 * t), y + ry * s * math.cos(2 * math.pi * i / n), z + rz * s * max(-0.2, math.sin(2 * math.pi * i / n))))
+                         for i in range(n)])
+        loft(m, rows, "paint_edge", closed=True)
+    mesh_paint.merge(m.with_mirror())
+    fr = Mesh()
+    rows = []
+    for k in range(7):
+        t = k / 6
+        s = math.sin(math.pi * t) ** 0.6
+        rows.append([Vector((D.X_HALO_PYLON_BASE + 0.05 - 0.14 * t, 0.040 * s * math.cos(2 * math.pi * i / n),
+                             D.Z_HALO_PYLON_BASE - 0.01 + 0.022 * s * max(-0.2, math.sin(2 * math.pi * i / n)))) for i in range(n)])
+    loft(fr, rows, "paint_edge", closed=True)
+    mesh_paint.merge(fr)

@@ -19,6 +19,8 @@ STATIONS = {
     "wing": ((4.4, 1.35, 0.62), (2.55, 0.35, 0.18), 45),
     "cockpit": ((1.75, 1.05, 1.45), (0.30, 0.0, 0.70), 40),
     "low": ((4.6, -2.4, 0.18), (0.6, 0.0, 0.25), 35),
+    "rear": ((-9.0, 0.0, 0.80), (0.0, 0.0, 0.50), 50),
+    "chase": ((-6.0, 0.0, 2.00), (1.2, 0.0, 0.45), 28),
 }
 
 
@@ -182,12 +184,12 @@ def studio_floor(coll):
     import bmesh
 
     bm = bmesh.new()
-    prof = [(12.0 - 18.0 * i / 30, 0.0) for i in range(31)]
+    prof = [(14.0 - 25.0 * i / 30, 0.0) for i in range(31)]
     r = 3.0
     for i in range(1, 17):
         a = math.pi / 2 * i / 16
-        prof.append((-6.0 - r * math.sin(a), r - r * math.cos(a)))
-    prof.append((-9.0, 10.0))
+        prof.append((-11.0 - r * math.sin(a), r - r * math.cos(a)))
+    prof.append((-14.0, 10.0))
     left = [bm.verts.new((x, -14, z)) for (x, z) in prof]
     right = [bm.verts.new((x, 14, z)) for (x, z) in prof]
     for i in range(len(prof) - 1):

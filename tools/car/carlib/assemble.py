@@ -16,16 +16,28 @@ def gl(p):
 
 
 KINGPIN_Y = 0.672
+BUMP_REF = 0.030  # metres of wheel travel represented by a link morph target at influence 1
+STEER_REF = 0.35  # radians of road-wheel steer represented by a steer morph target at influence 1
 
-# Fewer materials (draw calls) for the lower levels of detail
+# Materials merged per level of detail, to keep draw calls down (High about 40, Mobile about 20)
+_MINOR = {"soot": "dark", "plank": "dark", "tcam": "dark", "headrest": "dark", "interior": "dark",
+          "boot": "dark", "paint_edge": "paint", "metal_satin": "metal_dark", "caliper": "metal_dark",
+          "grip": "carbon", "nut": "rim"}
 REMAP = {
-    "high": {},
-    "mobile": {"soot": "dark", "plank": "dark", "tcam": "dark", "headrest": "dark", "interior": "dark",
-               "nut": "rim", "boot": "dark", "paint_edge": "paint", "metal_satin": "metal_dark",
-               "exhaust": "metal_dark", "caliper": "metal_dark", "grip": "dark"},
+    "high": dict(_MINOR),
+    "mobile": dict(_MINOR, **{"carbon_matte": "carbon", "mirror_glass": "dark", "metal_dark": "dark",
+                              "exhaust": "dark", "visor": "dark"}),
 }
-REMAP["far"] = dict(REMAP["mobile"], **{"mirror_glass": "dark", "wheel_cover": "rim", "carbon_matte": "carbon",
-                                        "visor": "dark", "brake_disc": "metal_dark"})
+REMAP["far"] = dict(REMAP["mobile"], **{"brake_disc": "dark"})
+# per node, extra merges that only make sense there (a cover on a Mobile wheel is rim-coloured)
+NODE_REMAP = {
+    "mobile": {"wheel": {"paint": "rim"}, "upright": {"carbon": "brake_disc", "dark": "brake_disc"},
+               "suspension": {"metal_dark": "carbon", "dark": "carbon"},
+               "drs_flap": {"carbon": "paint"}, "steering_wheel": {"paint": "carbon"}},
+    "far": {"wheel": {"paint": "tyre", "rim": "tyre"}, "drs_flap": {"carbon": "paint"}},
+    "high": {"upright": {"metal_dark": "carbon", "dark": "carbon"}, "drs_flap": {"carbon": "paint"},
+             "suspension": {"metal_dark": "carbon", "dark": "carbon"}},
+}
 
 
 class Car:
@@ -44,6 +56,13 @@ class Car:
         self.stats[label] = self.stats.get(label, 0) + mesh.tri_count()
 
 
+def _rigid(mesh, lo, hi, pivot, rest_out, new_out):
+    """Positions of vertices lo..hi after rotating a link about its inboard pivot so that its
+    outboard joint moves from rest_out to new_out."""
+    q = (rest_out - pivot).rotation_difference(new_out - pivot)
+    return [pivot + q @ (mesh.v[i] - pivot) for i in range(lo, hi)]
+
+
 def build(lod):
     car = Car(lod)
     q = car.q
@@ -51,8 +70,8 @@ def build(lod):
     far = lod == "far"
 
     body.build_spine(paint, dark, car.patches, q)
+    body.build_intake(paint, dark, q)
     body.build_sidepods(paint, dark, car.patches, q)
-    body.build_airbox(paint, dark, car.patches, q)
     body.build_floor(carbon, dark, q)
     body.build_rear(carbon, dark, q)
     wings.build_front_wing(paint, carbon, car.patches, q)
@@ -61,20 +80,23 @@ def build(lod):
     wings.build_beam_wing(carbon, q)
     cockpit.build_halo(paint, car.patches, q)
     cockpit.build_headrest(dark, q)
-    cockpit.build_mirrors(paint, carbon, dark, car.patches, q)
     if not far:
+        # parts too small to read on a car in the distance
+        cockpit.build_halo_mounts(paint, q)
+        cockpit.build_mirrors(paint, carbon, dark, car.patches, q)
         cockpit.build_tcam(dark, q)
+        cockpit.build_driver(paint, dark, q)
     for label, m in (("paint", paint), ("carbon", carbon), ("dark", dark)):
         car.count("body_" + label, m)
         car.static.merge(m)
     car.node("body", "car", (0, 0, 0), car.static)
 
-    # rear crash structure tip: rain light
+    # rain light: the lamp sits just behind the bezel on the crash-structure tip
     rl = Mesh()
-    x = D.X_CRASH_TIP - 0.004
+    x = D.X_CRASH_TIP - 0.002
     zc = D.Z_CRASH_CENTRE
-    pts = [Vector((x, y, z)) for (y, z) in ((0.045, zc - 0.030), (-0.045, zc - 0.030), (-0.045, zc + 0.030),
-                                            (0.045, zc + 0.030))]
+    lw, lh = body.RAIN_LIGHT
+    pts = [Vector((x, y, zc + z)) for (y, z) in ((lw, -lh), (-lw, -lh), (-lw, lh), (lw, lh))]
     i0 = rl.add_verts(pts)
     rl.add_face((i0, i0 + 1, i0 + 2, i0 + 3), "rain_light", uv1=[(0, 0), (1, 0), (1, 1), (0, 1)])
     car.node("rain_light", "car", (x, 0, zc), rl)
@@ -85,13 +107,13 @@ def build(lod):
     car.node("drs_flap", "car", (hinge.x, 0, hinge.z), flap,
              {"axis": "z", "open_deg": D.DRS_OPEN_DEG, "rest": "closed"})
 
-    # cockpit: steering wheel and helmet
-    sw = cockpit.build_steering_wheel(q) if not far else Mesh()
-    pitch = math.radians(D.STEERING_COLUMN_PITCH_DEG)
-    # built facing +X; turn it to face the driver (-X) and tilt the face up towards the eyes
-    sw = sw.transformed(Matrix.Rotation(pitch, 4, "Y") @ Matrix.Rotation(math.pi, 4, "Z"))
-    car.count("steering_wheel", sw)
+    # cockpit: steering wheel with the driver's gloves, and the helmet
     if not far:
+        sw = cockpit.build_steering_wheel(q).merge(cockpit.build_gloves(q))
+        pitch = math.radians(D.STEERING_COLUMN_PITCH_DEG)
+        # built facing +X; turn it to face the driver (-X) and tilt the face up towards the eyes
+        sw = sw.transformed(Matrix.Rotation(pitch, 4, "Y") @ Matrix.Rotation(math.pi, 4, "Z"))
+        car.count("steering_wheel", sw)
         car.node("steering_wheel", "car", D.STEERING_WHEEL_CENTRE, sw.translate(D.STEERING_WHEEL_CENTRE),
                  {"axis": gl([-math.cos(pitch), 0.0, math.sin(pitch)])})
     hm = cockpit.build_helmet(q, car.patches)
@@ -102,7 +124,7 @@ def build(lod):
     car.node("helmet", "car", neck, hm, {"axis": "y"})
 
     # corners
-    segs = {"high": 64, "mobile": 32, "far": 14}[lod]
+    segs = {"high": 64, "mobile": 40, "far": 16}[lod]
     for corner in ("FL", "FR", "RL", "RR"):
         front = corner[0] == "F"
         left = corner[1] == "L"
@@ -118,9 +140,11 @@ def build(lod):
             return m.transformed(mirror).translate(ctr)
 
         tyre = wheels.build_tyre(width, q, segs)
+        if not left:
+            # mirrored wheels read their sidewall texture the right way round
+            tyre.uv1 = [[(1.0 - u, v) for (u, v) in uv] for uv in tyre.uv1]
         rim = wheels.build_rim(rim_w, q, segs, car.patches)
-        wheel = Mesh().merge(tyre).merge(rim)
-        wheel = place(wheel)
+        wheel = place(Mesh().merge(tyre).merge(rim))
         car.count("wheels", wheel)
         car.node("suspension_" + corner, "car", ctr, None, {"axis": "y", "travel": "translation"})
         parent = "suspension_" + corner
@@ -130,16 +154,15 @@ def build(lod):
             car.node("steer_" + corner, parent, kp, None, {"axis": "y"})
             parent = "steer_" + corner
         if not far:
-            up = place(wheels.build_upright(front, q))
+            # the disc is a solid of revolution with no markings, so it rides on the upright
+            # (which does not spin) and its glow material is per corner there
+            up = place(Mesh().merge(wheels.build_upright(front, q)).merge(wheels.build_disc(rim_w, q, segs // 2, front)))
             car.count("uprights", up)
             car.node("upright_" + corner, parent, ctr, up)
         car.node("wheel_" + corner, parent, ctr, wheel, {"axis": "z"})
-        if not far:
-            disc = place(wheels.build_disc(rim_w, q, segs // 2, front))
-            car.count("brake_discs", disc)
-            car.node("brake_disc_" + corner, "wheel_" + corner, ctr, disc)
 
-    # suspension links: one node per link, pivot at the inboard end
+    # suspension links and driveshafts: one mesh, rigid links in their rest pose, with morph
+    # targets for each corner's bump travel and each front corner's steer
     sign = {"L": 1, "R": -1}
 
     def mir(p, side):
@@ -155,14 +178,17 @@ def build(lod):
               ("toelink", [D.REAR_TOE_LINK_IN, D.REAR_TOE_LINK_OUT]),
               ("pullrod", [D.REAR_PULLROD_IN, D.REAR_PULLROD_OUT])],
     }
+
     def on_chassis(p):
         """Inboard pick-ups sit on the chassis or gearbox surface, never in the air beside it."""
         x, y, z = p
         sp = body.spine_params(x)
         z = min(max(z, sp[1] + 0.03), sp[3] - 0.035)
-        w = body.spine_half_width_at(x, z)
+        w = body.spine_y(x, z)
         return (x, min(y, max(0.04, w - 0.006)), z)
 
+    lm = Mesh()
+    segs_l = []  # (lo, hi, pivot, outboard, corner)
     for corner in ("FL", "FR", "RL", "RR"):
         axle, side = corner[0], corner[1]
         for kind, pts in links[axle]:
@@ -170,39 +196,83 @@ def build(lod):
             wp = [mir(p, side) for p in pts]
             wish = kind in ("lower", "upper")
             m = cockpit.link_mesh(wp, q, chord=0.075 if wish else 0.05, thick=0.022 if wish else 0.018)
-            inb = wp[0].lerp(wp[1], 0.5) if len(wp) == 3 else wp[0]
-            out = wp[-1]
-            car.count("suspension", m)
-            attach = "steer_" + corner if axle == "F" else "suspension_" + corner
-            if far:
-                car.static.merge(m)
-                continue
-            car.node("arm_%s_%s" % (corner, kind), "car", inb, m,
-                     {"outboard": gl(out), "follows": attach})
-        if axle == "R" and not far:
+            if len(wp) == 3:
+                # the two legs of a wishbone share the hinge line through both inboard joints
+                pivot = wp[0].lerp(wp[1], 0.5)
+            else:
+                pivot = wp[0]
+            lo = len(lm.v)
+            lm.merge(m)
+            segs_l.append((lo, len(lm.v), pivot, wp[-1], corner))
+        if axle == "R":
             ds = cockpit.driveshaft(q, D.TRACK_REAR / 2 - 0.2)
             if side == "R":
                 ds = ds.mirrored_y()
-            car.count("suspension", ds)
-            car.node("driveshaft_" + corner, "car", (D.X_REAR_AXLE, 0.14 * sign[side], D.WHEEL_Z - 0.03), ds,
-                     {"outboard": gl((D.X_REAR_AXLE, (D.TRACK_REAR / 2 - 0.2) * sign[side], D.WHEEL_Z)),
-                      "follows": "upright_" + corner})
+            lo = len(lm.v)
+            lm.merge(ds)
+            segs_l.append((lo, len(lm.v), Vector((D.X_REAR_AXLE, 0.14 * sign[side], D.WHEEL_Z - 0.03)),
+                           Vector((D.X_REAR_AXLE, (D.TRACK_REAR / 2 - 0.2) * sign[side], D.WHEEL_Z)), corner))
+    if far:
+        # links are thinner than a pixel on a car this far away
+        return car
+    car.count("suspension", lm)
+    targets = {}
+    for corner in ("FL", "FR", "RL", "RR"):
+        pos = [v.copy() for v in lm.v]
+        for lo, hi, piv, out, c in segs_l:
+            if c == corner:
+                pos[lo:hi] = _rigid(lm, lo, hi, piv, out, out + Vector((0, 0, BUMP_REF)))
+        targets["bump_" + corner] = pos
+    for corner in ("FL", "FR"):
+        kp = Vector((D.X_FRONT_AXLE, KINGPIN_Y * sign[corner[1]], D.WHEEL_Z))
+        rot = Matrix.Rotation(STEER_REF, 3, "Z")
+        pos = [v.copy() for v in lm.v]
+        for lo, hi, piv, out, c in segs_l:
+            if c == corner:
+                pos[lo:hi] = _rigid(lm, lo, hi, piv, out, kp + rot @ (out - kp))
+        targets["steer_" + corner] = pos
+    car.node("suspension_links", "car", (0, 0, 0), lm,
+             {"morph": {"bump_ref_m": BUMP_REF, "steer_ref_rad": STEER_REF}, "_targets": targets})
     return car
 
 
 def to_blender(car, materials, collection):
-    """Create the object hierarchy. Every node's origin is its pivot; rest rotations are identity."""
+    """Create the object hierarchy. Every node's origin is its pivot; rest rotations are identity.
+    Meshes are triangulated here and checked: an edge shared by more than two faces, or an open
+    edge on a part that is meant to be closed, fails the build."""
     objs = {}
+    problems = []
     root = bpy.data.objects.new("car", None)
     collection.objects.link(root)
     root["lod"] = car.lod
     objs["car"] = root
     for name, parent, pivot, mesh, extras in car.nodes:
         if mesh is not None:
-            local = Mesh().merge(mesh).translate(-pivot)
-            local.mat = [REMAP[car.lod].get(m, m) for m in local.mat]
-            ob = local.to_object(name, materials, collection, sharp_angle_deg=38.0, merge_dist=1e-5,
-                                 recalc=not name.startswith("wheel_"))
+            group = name.split("_")[0]
+            remap = dict(REMAP[car.lod], **NODE_REMAP[car.lod].get(group, NODE_REMAP[car.lod].get(name, {})))
+            local = Mesh().merge(mesh).translate(-pivot).triangulated()
+            if "_targets" not in extras:
+                local.drop_degenerate()
+            def resolve(m):
+                seen = set()
+                while m in remap and m not in seen:
+                    seen.add(m)
+                    m = remap[m]
+                return m
+
+            local.mat = [resolve(m) for m in local.mat]
+            problems += local.check_manifold("%s/%s" % (car.lod, name))
+            morph = "_targets" in extras
+            ob = local.to_object(name, materials, collection, sharp_angle_deg=38.0,
+                                 merge_dist=0.0 if morph else 1e-5, recalc=not name.startswith("wheel_") and not morph)
+            if morph:
+                ob.shape_key_add(name="Basis", from_mix=False)
+                for tname, pos in extras["_targets"].items():
+                    kb = ob.shape_key_add(name=tname, from_mix=False)
+                    flat = []
+                    for p in pos:
+                        flat.extend(p - pivot)
+                    kb.data.foreach_set("co", flat)
         else:
             ob = bpy.data.objects.new(name, None)
             collection.objects.link(ob)
@@ -211,6 +281,9 @@ def to_blender(car, materials, collection):
         ppiv = Vector((0, 0, 0)) if parent == "car" else next(n[2] for n in car.nodes if n[0] == parent)
         ob.location = pivot - ppiv
         for k, v in extras.items():
-            ob[k] = v
+            if not k.startswith("_"):
+                ob[k] = v
         objs[name] = ob
+    if problems:
+        raise SystemExit("Mesh topology check failed:\n  " + "\n  ".join(problems))
     return objs

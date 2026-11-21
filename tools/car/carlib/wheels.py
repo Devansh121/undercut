@@ -34,12 +34,19 @@ def tyre_profile(width, q):
     for k in range(1, n_sh + 1):
         a = math.pi / 2 * k / n_sh
         pts.append((c[0] + 0.040 * math.sin(a), c[1] - 0.040 * math.cos(a)))
-    # tread with a slight crown
+    # tread with a slight crown, traversed once from the inboard to the outboard shoulder
     for k in range(1, n_tr):
         w = lerp(-(hw - 0.040), hw - 0.040, k / n_tr)
         pts.append((R + 0.002 * (1 - (w / hw) ** 2), w))
-    mirror = [(r, -w) for (r, w) in reversed(pts)]
-    return pts + mirror
+    # outboard shoulder and sidewall: the inboard ones mirrored (tread excluded)
+    side_and_shoulder = pts[: n_side + 1 + n_sh]
+    prof = pts + [(r, -w) for (r, w) in reversed(side_and_shoulder)]
+    # one bead-to-bead pass: no point twice, the tread crossed exactly once
+    keys = [(round(r, 6), round(w, 6)) for (r, w) in prof]
+    assert len(set(keys)) == len(keys), "tyre profile repeats a point"
+    tread = [w for (r, w) in prof if r > R - 0.0005]
+    assert all(b > a for a, b in zip(tread, tread[1:])), "tyre tread is not crossed once"
+    return prof
 
 
 def tyre_uv_v(prof):
@@ -101,20 +108,26 @@ def build_rim(width, q, segs, patches=None):
         (rb - 0.014, -hw + 0.030),
         (rb - 0.014, hw - 0.020),
     ]
+    if q.lod == "far":
+        # far: the visible lip and a flat cover, nothing behind them
+        lathe(m, [(rb - 0.012, hw - 0.004), (rl, hw + 0.002), (rl, hw - 0.010)], segs, "rim")
+        lathe(m, [(rb - 0.012, hw - 0.004), (0.12, hw - 0.030), (0.0, hw - 0.022)], segs, "paint", flip=True,
+              patch_key="wheel_cover" if patches is not None else None, patches=patches)
+        return m
     lathe(m, prof, segs, "rim", sharp_rows=(1, 2, 5, 6, 7))
-    # wheel cover: dished disc from the lip inside to the hub
-    cov = []
-    n = 8 if q.f >= 1 else 4
-    for k in range(n + 1):
+    # wheel cover: a rolled rim tucked behind the wheel lip, a dished face with a shallow step
+    # ring, then a raised hub boss round the nut
+    hi = q.f >= 1
+    cov = [(rb - 0.004, hw - 0.010), (rb - 0.012, hw - 0.015)]
+    n = 6 if hi else 3
+    for k in range(1, n + 1):
         t = k / n
-        r = lerp(rb - 0.008, 0.055, t)
-        w = hw - 0.012 - 0.030 * math.sin(math.pi * 0.5 * t) ** 1.4
-        cov.append((r, w))
-    cov.append((0.050, hw - 0.030))
+        cov.append((lerp(rb - 0.012, 0.132, t), hw - 0.015 - 0.026 * math.sin(math.pi * 0.5 * t) ** 1.2))
+    cov += [(0.126, hw - 0.037), (0.090, hw - 0.036), (0.066, hw - 0.031), (0.056, hw - 0.024), (0.050, hw - 0.028)]
     lathe(m, cov, segs, "paint", flip=True, patch_key="wheel_cover" if patches is not None else None,
-          patches=patches)
+          patches=patches, sharp_rows=(1, n + 1, n + 2))
     # centre-lock nut
-    nut = [(0.050, hw - 0.031), (0.046, hw - 0.006), (0.036, hw + 0.002), (0.012, hw + 0.004), (0.001, hw + 0.004)]
+    nut = [(0.050, hw - 0.029), (0.046, hw - 0.006), (0.036, hw + 0.002), (0.012, hw + 0.004), (0.001, hw + 0.004)]
     lathe(m, nut, max(12, segs // 3), "nut", sharp_rows=(1, 2), flip=True)
     return m
 
@@ -216,4 +229,7 @@ def build_upright(front, q):
         rows.append(ring)
     loft(up, rows, "metal_dark", closed=True, cap0=True, cap1=True)
     m.merge(up)
+    # UV1 pinned to the cold end of the disc's glow ramp: where an LOD gives the upright the
+    # disc material, only the disc itself lights up
+    m.uv1 = [[(0.5, 0.0)] * len(uv) for uv in m.uv1]
     return m
