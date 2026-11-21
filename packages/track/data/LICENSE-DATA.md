@@ -34,6 +34,17 @@ This credit does not suggest that the Copernicus programme, the European Union, 
 endorse this project. Anyone who redistributes the heights in these files is bound by the same
 obligations of the Licence for the use of the Copernicus WorldDEM-30.
 
+## Files
+
+| File | Circuit | OpenStreetMap relation and pit-lane way | Copernicus GLO-30 tile |
+| --- | --- | --- | --- |
+| `monza.json` | Monza | 284565, way 38168747 | `Copernicus_DSM_COG_10_N45_00_E009_00_DEM` |
+| `spa.json` | Spa-Francorchamps | 284560, way 323851541 | `Copernicus_DSM_COG_10_N50_00_E005_00_DEM` |
+| `singapore.json` | Singapore Marina Bay | 421263, way 100484287 | `Copernicus_DSM_COG_10_N01_00_E103_00_DEM` |
+
+Timing-line positions (`timingLine`) were measured on the FIA's published 2025 circuit maps; no
+part of those maps is included.
+
 ## Provenance
 
 Each file records its sources in its `source` field: the OpenStreetMap relation and pit-lane way,

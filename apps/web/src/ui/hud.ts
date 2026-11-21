@@ -42,6 +42,8 @@ export interface HudState {
   ghostX: number | null;
   ghostZ: number | null;
   message: HudMessage | null;
+  /** Other cars on the map (online): world position, team colour and opacity. Optional. */
+  others?: readonly { x: number; z: number; colour: string; opacity: number }[];
 }
 
 const REV_COLOURS = ['g', 'g', 'g', 'g', 'g', 'r', 'r', 'r', 'r', 'r', 'b', 'b', 'b', 'b', 'b'];
@@ -70,11 +72,14 @@ export class Hud {
   private readonly invalidReason: Text;
   private readonly dot: SVGCircleElement;
   private readonly ghostDot: SVGCircleElement;
+  private readonly othersLayer: SVGGElement;
+  private readonly otherDots: SVGCircleElement[] = [];
   private readonly plan: MinimapPlan;
   private lastErs = '';
   private lastMark = '';
 
-  constructor(plan: MinimapPlan) {
+  /** `mode`: the session panel's title ("Time trial", "Online race"). */
+  constructor(plan: MinimapPlan, mode = 'Time trial') {
     this.plan = plan;
     const root = el('div', 'hud');
     root.dataset.testid = 'hud';
@@ -88,10 +93,7 @@ export class Hud {
     const session = el('section', 'hud-session panel');
     session.setAttribute('aria-label', 'Session');
     const sHead = el('header', 'panel-head');
-    sHead.append(
-      el('span', 'label', 'Time trial'),
-      txt('circuit', el('span', 'label label--strong')),
-    );
+    sHead.append(el('span', 'label', mode), txt('circuit', el('span', 'label label--strong')));
     const sBody = el('div', 'hud-session__body');
     const lapRow = el('div', 'hud-row');
     lapRow.append(el('span', 'label', 'Lap'), txt('lap', el('b', 'num')));
@@ -196,7 +198,8 @@ export class Hud {
       opacity: 0,
     });
     this.dot = svg('circle', { r: 5, fill: '#3d6fe0', stroke: '#f2f0eb', 'stroke-width': 2 });
-    s.append(this.ghostDot, this.dot);
+    this.othersLayer = svg('g', { 'data-testid': 'map-others' });
+    s.append(this.ghostDot, this.othersLayer, this.dot);
     map.append(mHead, s);
 
     // Driver cluster (bottom right).
@@ -321,5 +324,24 @@ export class Hud {
       this.ghostDot.setAttribute('cy', gy.toFixed(1));
       this.ghostDot.setAttribute('opacity', '1');
     } else this.ghostDot.setAttribute('opacity', '0');
+
+    const others = h.others ?? [];
+    while (this.otherDots.length < others.length) {
+      const dot = svg('circle', { r: 4, stroke: '#0b0c0e', 'stroke-width': 1.2 });
+      this.othersLayer.append(dot);
+      this.otherDots.push(dot);
+    }
+    this.otherDots.forEach((dot, i) => {
+      const o = others[i];
+      if (!o) {
+        dot.setAttribute('opacity', '0');
+        return;
+      }
+      const [ox, oy] = this.plan.project(o.x, o.z);
+      dot.setAttribute('cx', ox.toFixed(1));
+      dot.setAttribute('cy', oy.toFixed(1));
+      dot.setAttribute('fill', o.colour);
+      dot.setAttribute('opacity', o.opacity.toFixed(2));
+    });
   }
 }

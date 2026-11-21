@@ -4,19 +4,24 @@
  */
 export {
   BARRIER_TYPES,
+  OLDEST_TRACK_FORMAT_VERSION,
   RUNOFF_KINDS,
   TRACK_FORMAT,
   TRACK_FORMAT_VERSION,
   TrackDataError,
+  migrateTrackData,
   validateTrackData,
   type BarrierType,
   type CornerData,
   type DrsZoneData,
+  type EnvironmentData,
+  type FloodlightData,
   type KerbProfileData,
   type PitData,
   type RunoffKind,
   type Side,
   type SideData,
+  type TimingLineData,
   type TrackData,
   type TrackPoint,
 } from './data';
@@ -36,7 +41,13 @@ export {
   type SideIndex,
 } from './track';
 export { HIGH_KERB, SURFACE_PROPERTIES, TrackSurface, type SurfaceProperties } from './surface';
-export { CORNER_RULE, detectCorners, smoothClosed, type DetectedCorner } from './corners';
+export {
+  CORNER_RULE,
+  detectCorners,
+  smoothClosed,
+  type CornerRule,
+  type DetectedCorner,
+} from './corners';
 
 /**
  * A position in track coordinates: `s` metres along the centreline from the
