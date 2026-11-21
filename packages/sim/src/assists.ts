@@ -1,13 +1,19 @@
 import type { ControlInput } from './contracts';
 import { gearRatio, type CarState } from './state';
+import { engineFullLoadTorque } from './step';
 import type { TyreCurve } from './tyre';
 
 /**
  * Driver assists: a pure layer between the driver's `ControlInput` and the input the car
  * receives. They read the car the way an ECU's wheel-speed and yaw sensors would (slip, rpm,
- * speed) and only change pedals and gear requests. They never touch the physics.
+ * speed) and only change steering, pedals and gear requests. They never touch the physics.
  *
  * Each assist has levels; 0 is off. Higher levels intervene earlier.
+ *
+ * No assist ever adds a force the driver could not: traction control and the stability assist
+ * only take engine torque away down to the point where the engine neither drives nor brakes
+ * (they never leave engine braking on a wheel they are trying to save), the stability assist
+ * eases the brake pedal and adds steering toward a slide the way a driver catches one.
  */
 export interface AssistSettings {
   /** Traction control level 0–3. */
@@ -15,12 +21,19 @@ export interface AssistSettings {
   /** Anti-lock braking level 0–3. */
   abs: number;
   autoGears: boolean;
+  /**
+   * Stability assist, 0 (off) or 1 (on): when the car slides (rear tyre slip angle past
+   * `SLIDE_START`) it steers toward the slide, takes drive away from the rear down to neutral,
+   * cancels engine braking on the rear, eases the brake and holds automatic down-shifts.
+   */
+  stability?: number;
 }
 
 export const NO_ASSISTS: Readonly<AssistSettings> = Object.freeze({
   tractionControl: 0,
   abs: 0,
   autoGears: false,
+  stability: 0,
 });
 
 /**
@@ -40,6 +53,15 @@ const ABS_RECOVER = 5;
 const DIRECT_CUT = 3;
 /** Automatic gearbox: shift up at this rpm; shift down when the lower gear lands below it. */
 const UPSHIFT_RPM = 11800;
+/** Stability assist: rear slip angle where a slide starts, rad (just under the tyre's peak). */
+const SLIDE_START = 4.5 * (Math.PI / 180);
+/** Drive taken away: all of it (down to neutral) by this much sideslip past the start, rad. */
+const SLIDE_DRIVE_SPAN = 4 * (Math.PI / 180);
+/** Brake pedal eased per radian of sideslip past the start, and the least kept. */
+const SLIDE_BRAKE_RELEASE = 12;
+const SLIDE_BRAKE_FLOOR = 0.2;
+/** Below this speed sideslip means nothing (parking, a spin already over). */
+const SLIDE_MIN_SPEED = 8;
 const DOWNSHIFT_TARGET_RPM = 10800;
 
 /**
@@ -116,6 +138,10 @@ export function applyAssists(
     memory.tcScale = 1;
   }
   out.throttle = throttle * memory.tcScale * tcCut;
+  // Traction control only removes drive: never below the throttle that cancels engine drag
+  // (unless the driver asked for less), or it would brake the wheels it is saving.
+  if (out.throttle < throttle)
+    out.throttle = Math.max(out.throttle, Math.min(throttle, neutralThrottle(car)));
 
   // ABS: hold every braked wheel's combined slip under the level's limit (lower at the rear).
   const absLimit = ABS_LIMIT[clampLevel(settings.abs)];
@@ -136,8 +162,46 @@ export function applyAssists(
   }
   out.brake = brake * memory.absScale * absCut;
 
-  if (settings.autoGears) out.gearShift = automaticShift(memory, car, driver);
+  // Stability: the car is sliding.
+  const slide = (settings.stability ?? 0) > 0 ? slideExcess(car) : 0;
+  if (slide > 0) {
+    const beta = Math.atan2(car.vy, Math.abs(car.vx));
+    const maxSteer = car.model.params.geometry.maxSteerAngle;
+    const blend = clamp01(slide / ((3 * Math.PI) / 180));
+    const catchSteer = (beta - 0.3 * car.yawRate) / maxSteer;
+    const steer = out.steer * (1 - blend) + catchSteer * blend;
+    out.steer = steer > 1 ? 1 : steer < -1 ? -1 : steer;
+    const neutral = neutralThrottle(car);
+    const keep = clamp01(1 - slide / SLIDE_DRIVE_SPAN);
+    if (out.throttle > neutral) out.throttle = neutral + (out.throttle - neutral) * keep;
+    else out.throttle = neutral;
+    out.brake *= Math.max(SLIDE_BRAKE_FLOOR, 1 - SLIDE_BRAKE_RELEASE * slide);
+  }
+
+  if (settings.autoGears) {
+    out.gearShift = automaticShift(memory, car, driver);
+    if (slide > 0 && out.gearShift < 0) out.gearShift = 0;
+  }
   return out;
+}
+
+/** Rear tyre slip past the start of a slide, rad (0 when gripping or nearly stopped). */
+function slideExcess(car: CarState): number {
+  if (car.vx < SLIDE_MIN_SPEED) return 0;
+  const beta = Math.atan(Math.max(Math.abs(car.slipTan[2]!), Math.abs(car.slipTan[3]!)));
+  return beta > SLIDE_START ? beta - SLIDE_START : 0;
+}
+
+/**
+ * The throttle at which the engine neither drives nor brakes at its present speed: full-load
+ * torque and drag torque cancel. Below it the driven wheels are engine-braked.
+ */
+export function neutralThrottle(car: CarState): number {
+  const eng = car.model.params.engine;
+  const rpm = (car.engineSpeed * 60) / (2 * Math.PI);
+  const drag = eng.dragTorqueBase + eng.dragTorquePerRpm * rpm;
+  const wot = engineFullLoadTorque(eng, car.model.iceEfficiency, rpm);
+  return wot + drag > 0 ? drag / (wot + drag) : 0;
 }
 
 function automaticShift(memory: AssistState, car: CarState, driver: ControlInput): -1 | 0 | 1 {
