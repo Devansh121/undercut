@@ -35,8 +35,9 @@ export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = {
   touch: 'Touch',
 };
 
+/** Matches the automatic gearbox in `@undercut/sim` assists: 1 → N → R when stopped, and back. */
 export const REVERSE_NOTE =
-  'With automatic gears, gear down twice at a standstill selects reverse; gear up returns to first.';
+  'With automatic gears, gear down twice at a standstill selects reverse; gear up twice returns to first.';
 
 const NOT_BOUND = 'Not bound';
 
