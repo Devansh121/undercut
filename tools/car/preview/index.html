@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car preview</title>
+    <style>
+      @font-face {
+        font-family: 'Barlow Semi Condensed';
+        font-weight: 700;
+        src: url('/design/mock/fonts/BarlowSemiCondensed-Bold.woff2') format('woff2');
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0c0e;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/addons/": "/node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module" src="/tools/car/preview/viewer.js"></script>
+  </body>
+</html>

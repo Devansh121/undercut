@@ -35,6 +35,8 @@
     "track:build": "python3 tools/track-pipeline/build.py",
     "track:plot": "python3 tools/track-pipeline/plot.py",
     "track:bench": "vitest bench --run --project unit packages/track/bench",
+    "car:build": "node tools/car/build.mjs",
+    "car:preview": "node tools/car/preview/capture.mjs",
     "shots": "node tools/screenshots/shots.mjs"
   },
   "devDependencies": {

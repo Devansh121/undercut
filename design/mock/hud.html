@@ -150,13 +150,21 @@
   .row .chg { position: absolute; left: -2px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; opacity: 0.9; }
   .row .chg.up { border-bottom: 5px solid var(--c-time-personal); top: 9px; }
   .row .chg.dn { border-top: 5px solid var(--c-time-invalid); top: 10px; }
+  /* Compound mark (design/compounds.json): code letter in the compound colour over one, two or
+     three ticks, so the compound reads without colour too */
   .tyre {
-    width: 18px; height: 18px; border-radius: var(--r-pill);
+    position: relative; box-sizing: border-box;
+    width: 18px; height: 18px; border-radius: var(--r-1); padding-bottom: 4px;
     display: grid; place-items: center;
-    border: 2px solid var(--ring); background: #0d0e10;
-    font-family: var(--font-num); font-weight: 700; font-size: 10px; line-height: 1; color: var(--c-text-1);
+    background: #0d0e10; box-shadow: inset 0 0 0 1px var(--ring);
+    font-family: var(--font-num); font-weight: 700; font-size: 10px; line-height: 1; color: var(--ring);
   }
-  .tyre.s { --ring: var(--c-tyre-soft); } .tyre.m { --ring: var(--c-tyre-medium); } .tyre.h { --ring: var(--c-tyre-hard); }
+  .tyre::after {
+    content: ""; position: absolute; left: 50%; bottom: 3px; height: 2px;
+    width: calc(var(--marks) * 3px - 1px); transform: translateX(-50%);
+    background: repeating-linear-gradient(90deg, var(--ring) 0 2px, transparent 2px 3px);
+  }
+  .tyre.s { --ring: var(--c-tyre-soft); --marks: 3; } .tyre.m { --ring: var(--c-tyre-medium); --marks: 2; } .tyre.h { --ring: var(--c-tyre-hard); --marks: 1; }
   .tower-foot { display: flex; justify-content: space-between; padding: var(--sp-2) var(--sp-3); box-shadow: inset 0 1px 0 var(--c-line); }
 
   /* ---------- Lap timing (top right) ---------- */
@@ -258,7 +266,8 @@
     .row:not(.near) { display: none; }
     .row.gapline { display: grid; height: 8px; }
     .row.gapline > * { display: none; }
-    .tyre { width: 15px; height: 15px; font-size: 8px; border-width: 1.5px; }
+    .tyre { width: 15px; height: 15px; font-size: 8px; padding-bottom: 3px; }
+    .tyre::after { bottom: 2px; height: 1.5px; }
     .tower-foot { display: none; }
     .row .chg { display: none; }
 
