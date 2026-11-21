@@ -56,6 +56,7 @@ import { Hud, type HudMessage, type HudState } from './ui/hud';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
+import { debugEnabled } from './debug';
 import { saveQuality } from './game/quality-setting';
 
 /** The team whose colours the player's car wears in M1. */
@@ -241,6 +242,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           racingLine: line,
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
+          checkRegistration: import.meta.env.DEV || debugEnabled(),
           compound: compoundLook('medium'),
           timeOfDay: tod,
           localLights: tod.localLightSlots > 0 ? floodlightsAlong(track, 36) : [],

@@ -9,7 +9,6 @@ import {
   Matrix3,
   Matrix4,
   Mesh,
-  MeshStandardMaterial,
   Object3D,
   PMREMGenerator,
   Scene,
@@ -25,6 +24,7 @@ import {
 } from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
 import { LightPool, type LocalLight } from './lighting/light-pool';
+import { isLitMaterial } from './lighting/registration';
 import { groundBounce, skyRotation, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
 import type { Quality } from './quality';
 
@@ -349,7 +349,7 @@ export class Environment {
       if (!mesh.isMesh) return;
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const m of list) {
-        if (!(m instanceof MeshStandardMaterial) || this.registered.has(m)) continue;
+        if (!isLitMaterial(m) || this.registered.has(m)) continue;
         this.registered.add(m);
         const prev = m.onBeforeCompile;
         csm.setupMaterial(m);
@@ -360,6 +360,11 @@ export class Environment {
         };
       }
     });
+  }
+
+  /** Whether `m` is hooked into the cascades (always true without cascades). */
+  isRegistered(m: Material): boolean {
+    return this.csm === null || this.registered.has(m);
   }
 
   /** Local lights (floodlights) the pool assigns to its slots each frame. */

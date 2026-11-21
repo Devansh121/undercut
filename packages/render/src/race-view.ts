@@ -25,6 +25,7 @@ import { ContactShadows, contactShadowOpacity } from './car/contact-shadows';
 import { CarFleet } from './car/fleet';
 import { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
 import { Environment } from './environment';
+import { unregisteredLitMaterials } from './lighting/registration';
 import type { LocalLight } from './lighting/light-pool';
 import { nextLift } from './framing';
 import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
@@ -87,6 +88,11 @@ export interface RaceViewOptions {
   timeOfDay?: TimeOfDay;
   /** Tyre compound on every car (design/compounds.json); Medium when absent. */
   compound?: CompoundLook;
+  /**
+   * Development check: before rendering, now and then, report any lit material in the scene that
+   * is not registered with the cascaded shadows (it would be lit once per cascade).
+   */
+  checkRegistration?: boolean;
   /** Local lights (floodlights) for a night time of day. */
   localLights?: readonly LocalLight[];
   /** Racing-line lateral offset per lap sample (m), for the rubbered line. */
@@ -190,6 +196,9 @@ export class RaceView {
   private lift = 0;
   private readonly points: Vector3[] = [];
   private readonly heat = new Float64Array(4);
+  private readonly checkRegistration: boolean;
+  private framesToCheck = 0;
+  private readonly reported = new WeakSet<Material>();
   /** Per-frame inputs reused every frame (no garbage in the render loop). */
   private readonly extras: CarExtras & { glow: Float64Array } = {
     drs: 0,
@@ -318,7 +327,10 @@ export class RaceView {
     const contactOpacity = contactShadowOpacity(q, this.environment.csm !== null);
     this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity) : null;
     if (this.contact) this.scene.add(this.contact.mesh);
-    this.props = new PropRegistry(options.track.length);
+    this.props = new PropRegistry(options.track.length, 200, (root) =>
+      this.environment.register(root),
+    );
+    this.checkRegistration = options.checkRegistration ?? false;
     this.scene.add(this.props.group);
     this.environment.register(this.scene);
     this.pipeline = new RenderPipeline(
@@ -600,6 +612,18 @@ export class RaceView {
       c.end();
     }
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
+    if (this.checkRegistration && --this.framesToCheck <= 0) {
+      this.framesToCheck = 120;
+      for (const m of unregisteredLitMaterials(this.scene, (x) =>
+        this.environment.isRegistered(x),
+      )) {
+        if (this.reported.has(m)) continue;
+        this.reported.add(m);
+        console.error(
+          `Material "${m.name || m.type}" is lit but not registered with the cascaded shadows: add it through Environment.register (or the prop registry).`,
+        );
+      }
+    }
     // Count every pass of the frame (shadow cascades, AO, post), not only the last draw.
     this.renderer.info.autoReset = false;
     this.renderer.info.reset();

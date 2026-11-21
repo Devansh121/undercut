@@ -11,6 +11,7 @@ import {
   Vector3,
   type BufferGeometry,
   type Material,
+  type Object3D,
 } from 'three';
 
 /**
@@ -91,9 +92,14 @@ export class PropRegistry {
   private readonly chunks = new Map<string, Chunk[]>();
   private built = false;
 
+  /**
+   * `register` receives the registry's group when it builds: the view hooks every prop material
+   * into the cascaded shadows there, so a prop cannot be added unregistered.
+   */
   constructor(
     private readonly lapLength: number,
     private readonly chunkLength = 200,
+    private readonly register: (root: Object3D) => void = () => undefined,
   ) {
     this.group.name = 'props';
   }
@@ -152,6 +158,7 @@ export class PropRegistry {
       }
       this.chunks.set(id, chunks);
     }
+    this.register(this.group);
   }
 
   /** Per frame: pick each chunk's level by its distance from the camera. */
