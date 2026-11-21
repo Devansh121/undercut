@@ -22,6 +22,21 @@ function carAt(speed: number) {
 }
 
 describe('toAudioCarState', () => {
+  it('preserves lock-up sign, DRS and collision event identity', () => {
+    const { state, telemetry } = carAt(40);
+    telemetry.slipRatio.set([-0.8, -0.2, 0.1, 0.6]);
+    telemetry.drs = 1;
+    const a = toAudioCarState(
+      { state, telemetry, pitLimiter: false, kerbRoughness: 0, impactSerial: 2, impactSpeed: 8 },
+      defaultCarState(),
+    );
+    expect(a.slipRatioFront).toBe(-0.8);
+    expect(a.slipRatioRear).toBe(0.6);
+    expect(a.drs).toBe(1);
+    expect(a.impactSerial).toBe(2);
+    expect(a.impactSpeed).toBe(8);
+  });
+
   it('maps the sim to the audio engine in SI units', () => {
     const { state, telemetry } = carAt(60);
     state.engineSpeed = 1000;
@@ -133,6 +148,8 @@ describe('AudioSettingsStore', () => {
       master: 1,
       engine: 0,
       effects: AUDIO_DEFAULTS.effects,
+      ui: AUDIO_DEFAULTS.ui,
+      ambience: AUDIO_DEFAULTS.ambience,
     });
     await port.save('settings.audio', '{nope');
     expect(await new AudioSettingsStore(port).load()).toEqual(AUDIO_DEFAULTS);

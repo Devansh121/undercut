@@ -640,12 +640,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         state: car.state,
         telemetry: t,
+        surface: session.world.surface,
         pitLimiter: car.input.pitLimiter,
         kerbRoughness: session.kerbUnderWheels(),
       },
       audioState,
     );
-    sink(audioState, !playing || document.visibilityState === 'hidden');
+    const camera = view.cameraName;
+    sink(
+      audioState,
+      !playing || document.visibilityState === 'hidden',
+      camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
+    );
 
     handle = requestAnimationFrame(frame);
   };

@@ -5,6 +5,7 @@ import {
   integratedLoudness,
   magnitudeSpectrum,
   maxStep,
+  truePeak,
 } from '../src/analysis/index';
 import { Ducker, DUCKING } from '../src/dsp/ducking';
 import {
@@ -72,9 +73,9 @@ describe('gear shift: the upshift crack', () => {
     expect(lifted.meters.rms('crack')).toBe(0);
   });
 
-  it('lands within one 128-frame block of the sim event that ends the shift', () => {
+  it('starts the cut within one 128-frame block of the sim event', () => {
     // Render with and without the shift; the outputs agree exactly until the shift starts,
-    // and the crack's own layer starts exactly when the shift ends.
+    // so the cut cannot precede or lag the reported shift.
     const withShift = render(new AudioCore({ sampleRate: FS }), 0.7, upshift(1));
     const without = render(new AudioCore({ sampleRate: FS }), 0.7, (t) =>
       engineState(10_000, 1, { gear: t < T ? 4 : 5 }),
@@ -86,6 +87,33 @@ describe('gear shift: the upshift crack', () => {
     const update = Math.ceil(T * 120 - 1e-9) / 120;
     expect(first).toBeGreaterThanOrEqual(Math.round(update * FS) - 1);
     expect(first - Math.round(update * FS)).toBeLessThan(128);
+  });
+});
+
+describe('shift end timing', () => {
+  it('starts the crack within one block of ignition returning', () => {
+    const core = new AudioCore({ sampleRate: FS });
+    const channels = [new Float32Array(128), new Float32Array(128)];
+    const start = 19200;
+    const end = 20800; // a 120 Hz update after the 30 ms shift window
+    let first = -1;
+    for (let frame = 0; frame < end + 256;) {
+      if (frame % 400 === 0)
+        core.setCarState(
+          engineState(10000, 1, {
+            gear: frame < start ? 4 : 5,
+            shifting: frame >= start && frame < end,
+            shiftDirection: 1,
+          }),
+        );
+      const n = Math.min(128, 400 - (frame % 400));
+      core.meters.reset();
+      core.process(channels, n);
+      if (first < 0 && core.meters.rms('crack') > 0) first = frame;
+      frame += n;
+    }
+    expect(first).toBeGreaterThanOrEqual(end);
+    expect(first - end).toBeLessThan(128);
   });
 });
 
@@ -357,6 +385,8 @@ describe('impacts', () => {
     let peak = 0;
     for (const x of clip.left) peak = Math.max(peak, Math.abs(x));
     expect(peak).toBeLessThan(1);
+    expect(truePeak(clip.left)).toBeLessThan(1);
+    expect(truePeak(clip.right)).toBeLessThan(1);
   });
 });
 

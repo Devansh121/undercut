@@ -148,3 +148,56 @@ Render first with `npm run audio:render -- all`, then play, in this order:
 - Loudness targets and the 8 LU spread were set before tuning, from common game-mix practice (integrated levels in the −24 to −16 LUFS range), not from a standard that applies to this game.
 - `rev-sweep` and `load-steps` were added beyond the brief's list because they show the ladder and the load response most clearly.
 - Five spectrograms are committed (about 1 MB); the other four are reproducible with the command above.
+
+## M6 car and road pass (Slice 1)
+
+`npm run audio:render -- reference-lap --evidence docs/evidence/m6-audio` runs the
+reference driver on the committed racing line with the normal vehicle model, captures one timed
+lap at 240 Hz after the out-lap, and replays the exact `toAudioCarState` adapter used by the game.
+`all` (also the default) includes this capture. Full stereo WAVs, spectrograms, measurements and
+`reference-telemetry.json` go to `artifacts/audio/`. The evidence option saves measurements,
+spectrograms and 12-second Vorbis excerpts beginning at 4 s. No third-party recordings are used.
+The full lap is an offline check, deliberately outside CI. It gates pitch (median <0.25%, max <1%,
+more than 100 steady windows), DC (<1e-3), true peak (<0 dBTP), loudness (−28 to −14 LUFS), and
+bit-identical replay with 128- and 4096-frame host blocks (SHA-256 in each report).
+
+The added generators are individually metered before view and bus gains:
+
+- `crack`: a loaded upshift's ignition return excites a short filtered noise burst and three
+  strengthened firing events. A lifted shift produces no crack.
+- `burble`: irregular afterfire and uneven firing on a fresh lift, fading with time and load.
+- `gearWhine`: engaged gear tooth-mesh and final-drive tones, gliding between pairs over 12 ms;
+  stronger on the overrun, silent in neutral. Ratios, tooth counts and balance are design
+  estimates in `spec.ts`, not measured gearbox data.
+- `lockup` and `wheelspin`: signed per-axle longitudinal slip selects a 1.35 kHz howl or a lower
+  rasp. Combined slip builds scrub from 0.3 of the nominal 0.1 grip limit, then squeal past it.
+- `grass` and `gravel`: soft low rumble and swish versus impulsive stone noise and tub resonances;
+  replace asphalt noise according to wheel contact shares. Kerb repetition is speed / 0.25 m.
+- `drs`: one mechanical knock per flap transition; open DRS reduces wind about 3 dB.
+- `impact`: severity-driven body thump and debris burst, once per event serial. `AudioInputs`
+  exposes speed and serial for collision telemetry; neither barrier nor car contact telemetry
+  exists on this PR's base yet. No collision is inferred from ordinary braking.
+
+Existing limiter, spool-lag turbo, deploy/harvest whine, floor strikes and shift cut remain.
+All acoustic levels, resonances and view paths are sound-design estimates; mechanical power-unit
+inputs retain the sources in the original synthesis section and physics validation document.
+
+`VIEW_BALANCE` documents cockpit, T-cam, chase and trackside gains and exhaust cutoffs. Onboard
+views bring intake forward; the chase hears exhaust. Cockpit exhaust is dulled, but combustion
+noise can make the total cockpit spectrum brighter under load. The trackside file is the external
+balance throughout the lap; distance, panning and Doppler belong to Slice 2.
+
+Five saved levels are exposed as settings data: master 0.8, engine 1, effects 0.8, UI 0.8,
+ambience 0.6. Old saves acquire defaults for the new fields. The menus can consume these fields;
+this slice does not redesign their controls. UI cues duck engine/effects up to 3 dB and ambience
+8 dB; impacts duck ambience 6 dB; attack 10 ms, release 300 ms. Engine and road never duck each
+other. Ambience and UI synthesis remain for Slice 2. The same master true-peak limiter protects
+all buses, including gains of 2.
+
+Listen first to `docs/evidence/m6-audio/reference-cockpit-excerpt.ogg`, then the matching
+`reference-trackside-excerpt.ogg`: compare shift cuts, ignition cracks, intake and gear mesh.
+Then play the full WAVs in `artifacts/audio/`: check braking burble and harvest, kerbs versus
+scrub, wind/DRS, and whether the onboard high frequencies become tiring. Use `load-steps` for
+same-RPM tone, and the new layer tests for off-road surfaces and collisions (a clean reference
+lap does not exercise gravel or impacts). A human still needs to judge realism, balance and
+phone/headphone playback; objective gates cannot award the audio scorecard rating.
