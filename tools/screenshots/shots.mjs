@@ -10,6 +10,8 @@
 //   npm run shots -- monza --lifecycle                 also five High sessions on one page: no GL
 //                                                      object or program may leak (GPU twin of
 //                                                      tests/browser/lifecycle.spec.ts)
+//   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
+//                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
 //
 // Output: artifacts/screenshots/<git-sha>/<station>-<w>x<h>.png and report.json. The GPU is
@@ -673,6 +675,99 @@ async function lifecycle(browser, report) {
     report.errors.push(`High lifecycle check failed: ${JSON.stringify({ same, info, problems })}`);
 }
 
+/**
+ * Full-frame sky comparison on the High preset, on the GPU (GPU twin of tests/browser/sky.spec.ts):
+ * compares the central sky band (where High's lens vignette is zero) between the HDR pipeline and
+ * the direct fallback (half-float colour targets hidden) on a frozen grid start.
+ */
+async function skyCheck(browser, report) {
+  const hideFloatTargets = () => {
+    const hidden = new Set(['EXT_color_buffer_float', 'EXT_color_buffer_half_float']);
+    const proto = globalThis.WebGL2RenderingContext.prototype;
+    const getExtension = proto.getExtension;
+    proto.getExtension = function (name) {
+      return hidden.has(name) ? null : getExtension.call(this, name);
+    };
+    const supported = proto.getSupportedExtensions;
+    proto.getSupportedExtensions = function () {
+      return (supported.call(this) ?? []).filter((n) => !hidden.has(n));
+    };
+  };
+  const problems = [];
+  const measure = async (hideFloat) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    page.on('console', (m) => {
+      if (['error', 'warning'].includes(m.type())) problems.push(m.text());
+    });
+    page.on('pageerror', (e) => problems.push(e.message));
+    if (hideFloat) await page.addInitScript(hideFloatTargets);
+    await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high`);
+    await page.waitForFunction(() => Boolean(globalThis.__undercut));
+    await page.evaluate(() => globalThis.__undercut.start());
+    await page.waitForFunction(
+      () => globalThis.document.documentElement.dataset.ready !== undefined,
+    );
+    await page.evaluate(() => {
+      const u = globalThis.__undercut;
+      u.camera('chase-near');
+      u.restartLap();
+      u.setTimeScale(0);
+      u.resetFrameTimes();
+    });
+    await page.waitForFunction(() => (globalThis.__undercut.frameTimes().length ?? 0) >= 15);
+    const renderPath = await page.evaluate(() => globalThis.__undercut.renderStats().renderPath);
+    const png = await page
+      .locator('#view')
+      .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+    const luma = await page.evaluate(async (b64) => {
+      const img = new globalThis.Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const canvas = new globalThis.OffscreenCanvas(img.width, img.height);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const x0 = Math.floor(img.width * 0.25);
+      const w = Math.max(1, Math.floor(img.width * 0.5));
+      const h = Math.max(1, Math.floor(img.height * 0.15));
+      const { data } = ctx.getImageData(x0, 0, w, h);
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      }
+      return sum / (data.length / 4);
+    }, png.toString('base64'));
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await context.close();
+    return { renderPath, luma };
+  };
+  const hdr = await measure(false);
+  const direct = await measure(true);
+  const filteredProblems = problems.filter(
+    (p) => !p.includes('EXT_color_buffer_float extension not supported'),
+  );
+  const relDiff = hdr.luma > 0 ? Math.abs(direct.luma - hdr.luma) / hdr.luma : 1;
+  const ok =
+    hdr.renderPath === 'hdr' &&
+    direct.renderPath === 'direct' &&
+    hdr.luma > 40 &&
+    relDiff < 0.05 &&
+    filteredProblems.length === 0;
+  report.skyCheck = {
+    quality: 'high',
+    ok,
+    hdr: +hdr.luma.toFixed(2),
+    direct: +direct.luma.toFixed(2),
+    relDiffPct: +(relDiff * 100).toFixed(2),
+    paths: { hdr: hdr.renderPath, direct: direct.renderPath },
+    problems: filteredProblems,
+  };
+  console.log(
+    `  sky-check (high, GPU): ${ok ? 'ok' : 'FAILED'} hdr=${hdr.luma.toFixed(1)} direct=${direct.luma.toFixed(1)} diff=${(relDiff * 100).toFixed(2)}%`,
+  );
+  if (!ok) report.errors.push(`High sky check failed: ${JSON.stringify(report.skyCheck)}`);
+}
+
 async function lap(browser, report) {
   const vp = VIEWPORTS[0];
   const { context, page, errors } = await openGame(browser, vp);
@@ -715,6 +810,7 @@ try {
     if (flag('lap')) await lap(browser, report);
     if (flag('moving')) await moving(browser, report);
     if (flag('lifecycle')) await lifecycle(browser, report);
+    if (flag('sky-check')) await skyCheck(browser, report);
   } finally {
     await browser.close();
   }

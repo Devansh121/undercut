@@ -324,6 +324,22 @@ export class Environment {
   /** How many times the environment map was prefiltered (once, plus once per context restore). */
   bakes = 0;
 
+  /**
+   * A scene holding only the sky dome (sharing its geometry and material), for render checks
+   * that need the sky's output through each render path without the circuit or the cars.
+   */
+  skyOnlyScene(): Scene {
+    const scene = new Scene();
+    const dome = new Mesh(this.dome.geometry, this.dome.material);
+    dome.frustumCulled = false;
+    dome.onBeforeRender = (_r, _s, cam) => {
+      dome.position.copy(cam.position);
+      dome.updateMatrixWorld();
+    };
+    scene.add(dome);
+    return scene;
+  }
+
   /** Prefilter the sky (without the sun disc) into the scene's environment map. */
   bake(renderer: WebGLRenderer): void {
     if (this.quality.envSize <= 0) return;
