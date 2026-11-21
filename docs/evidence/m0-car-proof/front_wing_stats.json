@@ -1,0 +1,29 @@
+{
+  "hero": {
+    "main_plane": 16344,
+    "flap_1": 16344,
+    "flap_2": 16344,
+    "flap_3": 16344,
+    "gurney": 856,
+    "endplate": 6472,
+    "dive_vane": 1312,
+    "nose": 4220,
+    "total_triangles": 78236,
+    "glb_bytes": 198064
+  },
+  "game": {
+    "main_plane": 3240,
+    "flap_1": 3240,
+    "flap_2": 3240,
+    "flap_3": 3240,
+    "gurney": 408,
+    "endplate": 1288,
+    "dive_vane": 332,
+    "nose": 1052,
+    "total_triangles": 16040,
+    "glb_bytes": 70196
+  },
+  "blender": "5.2.4 LTS",
+  "render": "Cycles OptiX, 256 samples, AgX, 1600x1000",
+  "hdri": "Poly Haven studio_small_09 (CC0), lighting only, not committed"
+}

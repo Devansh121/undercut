@@ -1,0 +1,116 @@
+{
+  "$comment": "Invented grid for UNDERCUT. Names, codes and colours are fictional and were checked against the real grid of the 2014-2026 era so that no name, code or colour-plus-pattern pairing matches a real team, driver or sponsor. colours: primary is the dominant body colour, secondary the second livery colour, accent a thin line or detail colour. tower is the colour used for the team bar in the timing tower (chosen for contrast on the dark UI surface).",
+  "version": 1,
+  "teams": [
+    {
+      "id": "aldermoor",
+      "name": "Aldermoor Racing",
+      "code": "ALD",
+      "colours": { "primary": "#7A1F2B", "secondary": "#D9C7A3", "accent": "#1A1A1A", "tower": "#B23A4A" },
+      "liveryPattern": "split-diagonal",
+      "drivers": [
+        { "number": 7, "code": "ASH", "first": "Callum", "last": "Ashdown", "nationality": "GBR" },
+        { "number": 19, "code": "QUI", "first": "Rafael", "last": "Quintas", "nationality": "PRT" }
+      ]
+    },
+    {
+      "id": "kestrel",
+      "name": "Kestrel Grand Prix",
+      "code": "KST",
+      "colours": { "primary": "#1F4FBF", "secondary": "#C3C8D0", "accent": "#0E1116", "tower": "#3D6FE0" },
+      "liveryPattern": "chevron-nose",
+      "drivers": [
+        { "number": 8, "code": "VEL", "first": "Jonas", "last": "Velde", "nationality": "NOR" },
+        { "number": 26, "code": "KAL", "first": "Eero", "last": "Kallio", "nationality": "FIN" }
+      ]
+    },
+    {
+      "id": "norrland",
+      "name": "Norrland Motorsport",
+      "code": "NRL",
+      "colours": { "primary": "#F1F3F4", "secondary": "#6A4BC4", "accent": "#20232A", "tower": "#8C72E0" },
+      "liveryPattern": "side-band",
+      "drivers": [
+        { "number": 12, "code": "HOL", "first": "Sander", "last": "Holmqvist", "nationality": "SWE" },
+        { "number": 34, "code": "KER", "first": "Noa", "last": "Kerbrat", "nationality": "FRA" }
+      ]
+    },
+    {
+      "id": "sable",
+      "name": "Sable Dynamics",
+      "code": "SBL",
+      "colours": { "primary": "#17191C", "secondary": "#C27A3E", "accent": "#E9E4DC", "tower": "#C98549" },
+      "liveryPattern": "pinstripe",
+      "drivers": [
+        { "number": 21, "code": "CAS", "first": "Dario", "last": "Castellane", "nationality": "ITA" },
+        { "number": 38, "code": "MOR", "first": "Kenji", "last": "Morimoto", "nationality": "JPN" }
+      ]
+    },
+    {
+      "id": "orrin",
+      "name": "Orrin Racing",
+      "code": "ORN",
+      "colours": { "primary": "#74874A", "secondary": "#EDE6D3", "accent": "#2A2E22", "tower": "#94AA60" },
+      "liveryPattern": "two-tone-horizontal",
+      "drivers": [
+        { "number": 15, "code": "BEL", "first": "Luca", "last": "Bellandi", "nationality": "ITA" },
+        { "number": 47, "code": "PRO", "first": "Owen", "last": "Prothero", "nationality": "GBR" }
+      ]
+    },
+    {
+      "id": "terraluce",
+      "name": "Terraluce Corse",
+      "code": "TLC",
+      "colours": { "primary": "#C4532D", "secondary": "#2D2F33", "accent": "#F0E9DF", "tower": "#DE6A42" },
+      "liveryPattern": "fade-rear",
+      "drivers": [
+        { "number": 9, "code": "COR", "first": "Matteo", "last": "Corvani", "nationality": "ITA" },
+        { "number": 52, "code": "ALQ", "first": "Thiago", "last": "Albuquerque", "nationality": "BRA" }
+      ]
+    },
+    {
+      "id": "meridian",
+      "name": "Meridian Works",
+      "code": "MRW",
+      "colours": { "primary": "#E0A030", "secondary": "#3A3D42", "accent": "#FFFFFF", "tower": "#E8AE45" },
+      "liveryPattern": "block-sidepod",
+      "drivers": [
+        { "number": 28, "code": "MEN", "first": "Ravi", "last": "Menon", "nationality": "IND" },
+        { "number": 61, "code": "VOK", "first": "Anton", "last": "Volkhov", "nationality": "EST" }
+      ]
+    },
+    {
+      "id": "brevik",
+      "name": "Brevik Autosport",
+      "code": "BRK",
+      "colours": { "primary": "#5B2A5E", "secondary": "#C9CDD2", "accent": "#E8B64A", "tower": "#9A4FA0" },
+      "liveryPattern": "split-diagonal",
+      "drivers": [
+        { "number": 17, "code": "DAH", "first": "Henrik", "last": "Dahle", "nationality": "NOR" },
+        { "number": 42, "code": "NAV", "first": "Bruno", "last": "Navarro", "nationality": "ARG" }
+      ]
+    },
+    {
+      "id": "calder",
+      "name": "Calder Engineering",
+      "code": "CDR",
+      "colours": { "primary": "#00727C", "secondary": "#F4F1EA", "accent": "#D2463A", "tower": "#13A1AD" },
+      "liveryPattern": "side-band",
+      "drivers": [
+        { "number": 6, "code": "TAI", "first": "Jules", "last": "Taillefer", "nationality": "BEL" },
+        { "number": 39, "code": "KAP", "first": "Arjun", "last": "Kapadia", "nationality": "IND" }
+      ]
+    },
+    {
+      "id": "quillon",
+      "name": "Quillon Racing",
+      "code": "QLN",
+      "colours": { "primary": "#B4D334", "secondary": "#22346B", "accent": "#FFFFFF", "tower": "#B4D334" },
+      "liveryPattern": "chevron-nose",
+      "drivers": [
+        { "number": 24, "code": "OKA", "first": "Nathan", "last": "Okafor", "nationality": "NGA" },
+        { "number": 70, "code": "DEM", "first": "Yusuf", "last": "Demir", "nationality": "TUR" }
+      ]
+    }
+  ]
+}

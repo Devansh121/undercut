@@ -54,6 +54,17 @@ describe('checkAssets', () => {
     ]);
   });
 
+  it('scans the committed design-mock fonts by default', () => {
+    const root = repo({ 'design/mock/fonts/a.woff2': 'F' }, []);
+    expect(checkAssets(root, { allowed })).toEqual([
+      'design/mock/fonts/a.woff2: not in assets/MANIFEST.json',
+    ]);
+    const ok = repo({ 'design/mock/fonts/a.woff2': 'F' }, [
+      entry('design/mock/fonts/a.woff2', 'F'),
+    ]);
+    expect(checkAssets(ok, { allowed })).toEqual([]);
+  });
+
   it('flags a changed file, a disallowed licence, a missing field and a dangling entry', () => {
     const root = repo({ 'assets/a.png': 'changed' }, [
       { ...entry('assets/a.png', 'original'), licence: 'CC-BY-NC-4.0', author: '' },

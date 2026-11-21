@@ -1,0 +1,204 @@
+/*
+  UNDERCUT design tokens, v1.
+  The single source of truth for colour, type, spacing, radius, elevation and motion.
+  The game UI imports these names unchanged; docs/visual-direction.md explains the rules.
+*/
+
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/Archivo-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: block;
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("fonts/BarlowSemiCondensed-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: block;
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("fonts/BarlowSemiCondensed-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: block;
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("fonts/BarlowSemiCondensed-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  /* ---------- Colour: surfaces (warm graphite, never pure black) ---------- */
+  --c-ink-0: #0b0c0e;          /* deepest: scrims, track map ground */
+  --c-ink-1: #121417;          /* panel */
+  --c-ink-2: #191c20;          /* raised row, card */
+  --c-ink-3: #22262b;          /* hover, selected row base */
+  --c-ink-4: #2e3339;          /* dividers on raised surfaces */
+  --c-line: rgba(255, 255, 255, 0.08);   /* hairline */
+  --c-line-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---------- Colour: text ---------- */
+  --c-text-1: #f2f0eb;         /* primary, warm white */
+  --c-text-2: #b9b7b1;         /* secondary */
+  --c-text-3: #7d7c78;         /* tertiary, labels */
+  --c-text-inverse: #0b0c0e;
+
+  /* ---------- Colour: brand ---------- */
+  --c-brand: #ff5a1f;          /* signal vermilion: selection marker, logo, focus */
+  --c-brand-ink: #3a1406;
+
+  /* ---------- Colour: timing semantics (fixed meaning, never decorative) ---------- */
+  --c-time-overall: #b265ff;   /* fastest of session */
+  --c-time-personal: #38d07a;  /* personal best */
+  --c-time-slower: #f2c230;    /* slower than personal best */
+  --c-time-invalid: #e5484d;   /* deleted lap, penalty */
+
+  /* ---------- Colour: race state ---------- */
+  --c-flag-green: #2fbf62;
+  --c-flag-yellow: #f6c90e;
+  --c-flag-blue: #2f80ed;
+  --c-flag-red: #e5383b;
+  --c-flag-white: #f2f0eb;
+  --c-drs: #38d07a;            /* DRS open */
+  --c-drs-armed: #f2f0eb;      /* DRS available, not open */
+  --c-ers: #3fb8f0;            /* ERS store */
+  --c-ers-deploy: #f2c230;     /* overtake deploy */
+  --c-rev-low: #38d07a;
+  --c-rev-mid: #e5484d;
+  --c-rev-high: #4f7dff;
+
+  /* Tyre compounds: ring colour of the compound mark */
+  --c-tyre-soft: #e5484d;
+  --c-tyre-medium: #f2c230;
+  --c-tyre-hard: #f2f0eb;
+  --c-tyre-inter: #38d07a;
+  --c-tyre-wet: #3f8cf0;
+
+  /* Tyre temperature scale (cold to overheated) */
+  --c-temp-cold: #3f8cf0;
+  --c-temp-ok: #38d07a;
+  --c-temp-warm: #f2c230;
+  --c-temp-hot: #e5484d;
+
+  /* ---------- Typography ---------- */
+  --font-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-num: "Barlow Semi Condensed", "Archivo", Arial, sans-serif;
+  --num-features: "tnum" 1, "lnum" 1;
+
+  /* Type scale (px). Ratio ~1.2 below 16, ~1.333 above. */
+  --fs-10: 10px;   /* micro labels, phone only */
+  --fs-11: 11px;   /* labels, uppercase */
+  --fs-12: 12px;
+  --fs-14: 14px;   /* body small, tower rows */
+  --fs-16: 16px;   /* body */
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-32: 32px;
+  --fs-44: 44px;
+  --fs-64: 64px;   /* gear */
+  --fs-88: 88px;   /* launch title */
+
+  --lh-tight: 1;
+  --lh-snug: 1.15;
+  --lh-body: 1.45;
+
+  --tracking-label: 0.08em;    /* uppercase labels */
+  --tracking-title: 0.02em;
+
+  /* Archivo width axis, used through font-stretch */
+  --wdth-condensed: 75%;
+  --wdth-semi: 87.5%;
+  --wdth-normal: 100%;
+  --wdth-wide: 112.5%;
+
+  /* ---------- Spacing (4 px base) ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Safe frame: everything inside 3% of the short edge, broadcast title-safe */
+  --safe: max(16px, 3vmin);
+
+  /* ---------- Radius: small and consistent ---------- */
+  --r-0: 0;
+  --r-1: 2px;      /* panels, rows, buttons */
+  --r-2: 4px;      /* cards */
+  --r-pill: 999px; /* tyre marks, toggles only */
+
+  /* ---------- Elevation: opaque surfaces, hairline edge, tight shadow. No blur, no glow. ---------- */
+  --e-0: none;
+  --e-1: 0 1px 0 rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --e-2: 0 2px 0 rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --edge-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* HUD panels sit over the 3D frame: opaque enough to read on sky and on asphalt */
+  --hud-panel: rgba(14, 16, 19, 0.88);
+  --hud-panel-solid: #0e1013;
+
+  /* ---------- Motion ---------- */
+  --t-instant: 80ms;    /* value changes, toggles */
+  --t-quick: 160ms;     /* hover, focus, row reorder start */
+  --t-base: 240ms;      /* panels in and out */
+  --t-slow: 400ms;      /* screen transitions */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.6, 0, 0.3, 1);
+
+  /* ---------- Grid ---------- */
+  --grid-cols: 12;
+  --grid-gutter: 24px;
+  --grid-margin: var(--safe);
+  --touch-min: 44px;
+}
+
+/* Phone landscape: same tokens, tighter steps */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --grid-cols: 8;
+    --grid-gutter: 12px;
+    --safe: 12px;
+    --touch-min: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-quick: 0ms;
+    --t-base: 0ms;
+    --t-slow: 0ms;
+  }
+}
+
+/* ---------- Shared primitives ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--c-ink-0);
+  color: var(--c-text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.num { font-family: var(--font-num); font-feature-settings: var(--num-features); font-variant-numeric: tabular-nums lining-nums; }
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+  line-height: var(--lh-tight);
+}
+.icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; stroke-linejoin: miter; flex: none; }

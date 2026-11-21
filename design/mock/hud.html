@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UNDERCUT HUD mock</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { overflow: hidden; background: #000; }
+  .frame { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  /* ================= Placeholder scene: CSS-painted chase-camera stand-in ================= */
+  .scene { position: absolute; inset: 0; }
+  .scene .sky {
+    position: absolute; inset: 0 0 52% 0;
+    background:
+      radial-gradient(120% 90% at 78% 8%, rgba(255, 236, 205, 0.55), transparent 55%),
+      linear-gradient(#7f97ad 0%, #a7b6c2 45%, #d8d3c7 92%, #e2dccf 100%);
+  }
+  .scene .hills {
+    position: absolute; left: 0; right: 0; top: 34%; height: 14%;
+    background:
+      radial-gradient(60% 120% at 20% 100%, #6f7d76 0 60%, transparent 61%),
+      radial-gradient(50% 140% at 70% 100%, #77847b 0 58%, transparent 59%),
+      radial-gradient(40% 100% at 95% 100%, #6c7a72 0 60%, transparent 61%);
+    opacity: 0.7;
+  }
+  .scene .trees {
+    position: absolute; left: 0; right: 0; top: 39%; height: 11%;
+    background:
+      radial-gradient(18px 22px at 10px 100%, #2f3d26 98%, transparent) 0 0 / 26px 100% repeat-x,
+      radial-gradient(26px 34px at 14px 100%, #33432a 98%, transparent) 9px 2px / 38px 100% repeat-x,
+      radial-gradient(34px 46px at 20px 100%, #3a4b2f 98%, transparent) 0 6px / 57px 100% repeat-x,
+      linear-gradient(transparent 55%, #2b3822 56%);
+  }
+  .scene .stand {
+    position: absolute; left: 54%; right: 4%; top: 41%; height: 7.5%;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.25) 0 2px, transparent 2px 42px),
+      repeating-linear-gradient(180deg, #8c8f93 0 3px, #6e7277 3px 7px);
+    clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 100%);
+    box-shadow: inset 0 6px 0 #c9c6be;
+  }
+  .scene .stand::before { /* roof */
+    content: ""; position: absolute; left: -1%; right: -1%; top: -18%; height: 22%;
+    background: #d6d3cc; transform: skewY(-2deg);
+  }
+  .scene .ground {
+    position: absolute; left: 0; right: 0; top: 48%; bottom: 0;
+    background:
+      linear-gradient(180deg, #59703e 0%, #4c6436 30%, #3f552d 100%);
+  }
+  .scene .barrier {
+    position: absolute; left: 0; right: 0; top: 47.6%; height: 1.4%;
+    background: linear-gradient(#b9bcbf, #8b8f93 50%, #5f6367);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+  }
+  .scene .boards {
+    position: absolute; left: 8%; right: 52%; top: 46.2%; height: 1.5%;
+    background: repeating-linear-gradient(90deg, #1d2a3c 0 60px, #e8e3d6 60px 120px, #8a2e22 120px 180px, #e8e3d6 180px 240px);
+    opacity: 0.85;
+  }
+  .scene .runoff {
+    position: absolute; left: 0; right: 0; top: 48%; bottom: 0;
+    background: linear-gradient(#8a8f93, #6d7276);
+    clip-path: polygon(40% 0, 60% 0, 118% 100%, -18% 100%);
+    opacity: 0.55;
+  }
+  .scene .kerb-l, .scene .kerb-r {
+    position: absolute; top: 48%; bottom: 0; left: 0; right: 0;
+    background: repeating-linear-gradient(180deg, #c8382e 0 2.2%, #ece8df 2.2% 4.4%);
+  }
+  .scene .kerb-l { clip-path: polygon(45.6% 0, 46.4% 0, 6% 100%, -2% 100%); }
+  .scene .kerb-r { clip-path: polygon(53.6% 0, 54.4% 0, 102% 100%, 94% 100%); }
+  .scene .road {
+    position: absolute; left: 0; right: 0; top: 48%; bottom: 0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.10), transparent 30%),
+      radial-gradient(40% 60% at 50% 100%, rgba(0,0,0,0.25), transparent 70%),
+      linear-gradient(#6a6c6e, #4a4c4f 40%, #36383a);
+    clip-path: polygon(46.4% 0, 53.6% 0, 94% 100%, 6% 100%);
+  }
+  .scene .line-l, .scene .line-r {
+    position: absolute; left: 0; right: 0; top: 48%; bottom: 0; background: #e9e6df; opacity: 0.85;
+  }
+  .scene .line-l { clip-path: polygon(46.7% 0, 46.95% 0, 8.6% 100%, 7.1% 100%); }
+  .scene .line-r { clip-path: polygon(53.05% 0, 53.3% 0, 92.9% 100%, 91.4% 100%); }
+  .scene .rubber {
+    position: absolute; left: 0; right: 0; top: 48%; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(20,20,22,0.35) 40%, rgba(20,20,22,0.35) 60%, transparent);
+    clip-path: polygon(49% 0, 51% 0, 66% 100%, 34% 100%);
+  }
+  .scene .car {
+    position: absolute; left: 50%; bottom: 7%; width: 30vw; height: 15vw; transform: translateX(-50%);
+    background:
+      radial-gradient(50% 18% at 50% 92%, rgba(0,0,0,0.55), transparent 70%);
+  }
+  .scene .grain {
+    position: absolute; inset: 0; opacity: 0.22; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 1.2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .scene .grade {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0,0,0,0.45) 100%),
+      linear-gradient(rgba(255, 200, 150, 0.06), rgba(20, 30, 40, 0.10));
+  }
+
+  /* ================= HUD layer ================= */
+  .hud { position: absolute; inset: 0; padding: var(--safe); pointer-events: none; }
+  .panel {
+    background: var(--hud-panel);
+    border-radius: var(--r-1);
+    box-shadow: var(--e-1), var(--edge-top);
+  }
+
+  /* ---------- Timing tower ---------- */
+  .tower { position: absolute; left: var(--safe); top: var(--safe); width: 232px; }
+  .tower-head {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 32px; padding: 0 var(--sp-3);
+    background: var(--hud-panel-solid);
+    border-bottom: 2px solid var(--c-brand);
+    border-radius: var(--r-1) var(--r-1) 0 0;
+  }
+  .tower-head .lap { font-size: var(--fs-16); font-weight: 600; color: var(--c-text-1); letter-spacing: 0.01em; }
+  .tower-head .lap b { color: var(--c-text-1); font-weight: 700; }
+  .tower-head .lap span { color: var(--c-text-3); }
+  .tower-rows { list-style: none; margin: 0; padding: var(--sp-1) 0; }
+  .row {
+    position: relative; display: grid; align-items: center;
+    grid-template-columns: 26px 4px 1fr 64px 22px;
+    column-gap: var(--sp-2);
+    height: 24px; padding: 0 var(--sp-2) 0 var(--sp-1);
+  }
+  .row + .row { box-shadow: inset 0 1px 0 var(--c-line); }
+  .row.gapline { display: none; }
+  .row .pos { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-14); text-align: right; color: var(--c-text-2); }
+  .row .bar { width: 4px; height: 14px; border-radius: 1px; }
+  .row .code { font-weight: 650; font-stretch: var(--wdth-semi); font-size: var(--fs-14); letter-spacing: 0.04em; color: var(--c-text-1); }
+  .row .gap { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 500; font-size: var(--fs-14); text-align: right; color: var(--c-text-2); }
+  .row .gap.state { font-family: var(--font-ui); font-size: var(--fs-11); font-weight: 650; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+  .row .gap.pit { color: var(--c-text-1); }
+  .row .gap.pit::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: var(--c-flag-white); vertical-align: 1px; }
+  .row.out .code, .row.out .pos, .row.out .gap { color: var(--c-text-3); }
+  .row.out .bar { opacity: 0.35; }
+  .row.me { background: var(--c-text-1); box-shadow: none; border-radius: var(--r-1); }
+  .row.me .pos, .row.me .code, .row.me .gap { color: var(--c-text-inverse); }
+  .row.me + .row { box-shadow: none; }
+  .row .chg { position: absolute; left: -2px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; opacity: 0.9; }
+  .row .chg.up { border-bottom: 5px solid var(--c-time-personal); top: 9px; }
+  .row .chg.dn { border-top: 5px solid var(--c-time-invalid); top: 10px; }
+  .tyre {
+    width: 18px; height: 18px; border-radius: var(--r-pill);
+    display: grid; place-items: center;
+    border: 2px solid var(--ring); background: #0d0e10;
+    font-family: var(--font-num); font-weight: 700; font-size: 10px; line-height: 1; color: var(--c-text-1);
+  }
+  .tyre.s { --ring: var(--c-tyre-soft); } .tyre.m { --ring: var(--c-tyre-medium); } .tyre.h { --ring: var(--c-tyre-hard); }
+  .tower-foot { display: flex; justify-content: space-between; padding: var(--sp-2) var(--sp-3); box-shadow: inset 0 1px 0 var(--c-line); }
+
+  /* ---------- Lap timing (top right) ---------- */
+  .timing { position: absolute; right: var(--safe); top: var(--safe); width: 300px; }
+  .timing .top { display: flex; justify-content: space-between; align-items: center; height: 32px; padding: 0 var(--sp-3); background: var(--hud-panel-solid); border-radius: var(--r-1) var(--r-1) 0 0; }
+  .timing .pos-big { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 700; font-size: var(--fs-20); line-height: 1; }
+  .timing .pos-big span { color: var(--c-text-3); font-weight: 500; font-size: var(--fs-14); }
+  .timing .now { display: flex; align-items: baseline; justify-content: space-between; padding: var(--sp-3) var(--sp-3) var(--sp-2); }
+  .timing .now .t { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-32); line-height: 1; letter-spacing: 0.01em; }
+  .delta {
+    font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 700; font-size: var(--fs-16);
+    padding: 3px 6px; border-radius: var(--r-1); line-height: 1; color: var(--c-text-inverse);
+  }
+  .delta.good { background: var(--c-time-personal); }
+  .sectors { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); padding: 0 var(--sp-3) var(--sp-3); }
+  .sector { display: grid; gap: 4px; }
+  .sector i { display: block; height: 4px; border-radius: 1px; background: var(--c-ink-4); }
+  .sector.ov i { background: var(--c-time-overall); } .sector.pb i { background: var(--c-time-personal); } .sector.sl i { background: var(--c-time-slower); }
+  .sector .v { display: flex; justify-content: space-between; align-items: baseline; }
+  .sector .v b { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-14); }
+  .sector.ov b { color: var(--c-time-overall); } .sector.pb b { color: var(--c-time-personal); } .sector.sl b { color: var(--c-time-slower); } .sector.run b { color: var(--c-text-3); }
+  .timing .ref { display: grid; grid-template-columns: 1fr 1fr; box-shadow: inset 0 1px 0 var(--c-line); }
+  .timing .ref div { display: flex; justify-content: space-between; align-items: baseline; padding: var(--sp-2) var(--sp-3); }
+  .timing .ref div + div { box-shadow: inset 1px 0 0 var(--c-line); }
+  .timing .ref b { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-14); }
+  .timing .ref .pbv { color: var(--c-time-personal); }
+
+  /* ---------- Race control: flag + message slot (top centre) ---------- */
+  .control { position: absolute; left: 50%; top: var(--safe); transform: translateX(-50%); display: grid; justify-items: center; gap: var(--sp-2); }
+  .flag {
+    display: flex; align-items: stretch; height: 36px; background: var(--hud-panel-solid); border-radius: var(--r-1); box-shadow: var(--e-1); overflow: hidden;
+  }
+  .flag .sw { width: 36px; display: grid; place-items: center; background: var(--c-flag-yellow); color: #1a1500; }
+  .flag .sw .icon { width: 20px; height: 20px; stroke-width: 2; }
+  .flag .txt { display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-4) 0 var(--sp-3); }
+  .flag .txt strong { font-size: var(--fs-14); font-weight: 700; font-stretch: var(--wdth-semi); letter-spacing: 0.06em; text-transform: uppercase; }
+  .flag .txt span { color: var(--c-text-2); font-size: var(--fs-12); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .msg {
+    display: flex; align-items: center; gap: var(--sp-3);
+    height: 32px; padding: 0 var(--sp-4) 0 0;
+    background: var(--hud-panel-solid); border-radius: var(--r-1); box-shadow: var(--e-1);
+  }
+  .msg .tag { align-self: stretch; display: grid; place-items: center; padding: 0 var(--sp-3); background: var(--c-time-invalid); color: #fff; font-weight: 700; font-size: var(--fs-11); letter-spacing: var(--tracking-label); text-transform: uppercase; border-radius: var(--r-1) 0 0 var(--r-1); }
+  .msg .body { font-size: var(--fs-14); font-weight: 600; font-stretch: var(--wdth-semi); letter-spacing: 0.03em; text-transform: uppercase; }
+  .msg .body em { font-style: normal; color: var(--c-text-2); font-weight: 500; }
+
+  /* ---------- Minimap (bottom left) ---------- */
+  .map { position: absolute; left: var(--safe); bottom: var(--safe); width: 232px; padding: var(--sp-3); }
+  .map .head { display: flex; justify-content: space-between; margin-bottom: var(--sp-2); }
+  .map svg { display: block; width: 100%; height: auto; }
+
+  /* ---------- Driver cluster (bottom right) ---------- */
+  .cluster { position: absolute; right: var(--safe); bottom: var(--safe); display: flex; gap: var(--sp-2); align-items: flex-end; }
+  .tyres { position: absolute; right: calc(var(--safe) + 308px); bottom: var(--safe); width: 148px; padding: var(--sp-3); }
+  .tyres .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2); }
+  .tyres .head .cmp { display: flex; align-items: center; gap: 6px; }
+  .tyres .grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 40px; }
+  .tyres .car { position: absolute; left: 50%; top: 50%; width: 30px; height: 96px; transform: translate(-50%, -50%); color: var(--c-text-3); }
+  .tc { height: 50px; border-radius: var(--r-1); background: var(--c-ink-2); display: grid; grid-template-rows: 1fr auto; overflow: hidden; position: relative; }
+  .tc .temp { display: grid; place-items: center; font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 700; font-size: var(--fs-16); color: var(--c-text-inverse); background: var(--tc); }
+  .tc .wear { height: 16px; display: flex; align-items: center; justify-content: center; font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-11); color: var(--c-text-2); background: linear-gradient(90deg, var(--c-ink-4) var(--w), var(--c-ink-2) var(--w)); }
+  .tc.ok { --tc: var(--c-temp-ok); } .tc.warm { --tc: var(--c-temp-warm); } .tc.cold { --tc: var(--c-temp-cold); } .tc.hot { --tc: var(--c-temp-hot); }
+
+  .drive { width: 300px; padding: var(--sp-3) var(--sp-3) var(--sp-3); }
+  .revs { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin-bottom: var(--sp-3); }
+  .revs i { height: 8px; border-radius: 1px; background: var(--c-ink-3); }
+  .revs i.on.g { background: var(--c-rev-low); } .revs i.on.r { background: var(--c-rev-mid); } .revs i.on.b { background: var(--c-rev-high); }
+  .speedgear { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; }
+  .speedgear .gear { font-family: var(--font-num); font-weight: 700; font-size: var(--fs-64); line-height: 0.8; text-align: center; padding: 0 var(--sp-4); }
+  .speedgear .spd { text-align: right; }
+  .speedgear .spd b, .speedgear .rpm b { display: block; font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-32); line-height: 0.9; }
+  .speedgear .rpm b { font-size: var(--fs-20); color: var(--c-text-2); }
+  .speedgear .label { display: block; margin-top: 4px; }
+  .ers { margin-top: var(--sp-3); padding-top: var(--sp-3); box-shadow: inset 0 1px 0 var(--c-line); display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2) var(--sp-3); align-items: center; }
+  .ers .meter { position: relative; height: 10px; background: var(--c-ink-3); border-radius: 1px; overflow: hidden; }
+  .ers .meter i { position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--c-ers); }
+  .ers .meter u { position: absolute; top: 0; bottom: 0; left: var(--lap); width: 2px; background: var(--c-text-1); }
+  .ers .row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .ers .row1 b { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-14); }
+  .drs {
+    display: grid; place-items: center; width: 64px; height: 38px; border-radius: var(--r-1);
+    font-weight: 800; font-stretch: var(--wdth-semi); font-size: var(--fs-16); letter-spacing: 0.06em;
+    border: 2px solid var(--c-drs-armed); color: var(--c-text-1);
+  }
+  .drs.open { background: var(--c-drs); border-color: var(--c-drs); color: var(--c-text-inverse); }
+  .mode { font-size: var(--fs-12); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--c-ers); }
+
+  .touch { display: none; }
+
+  /* ================= Phone landscape ================= */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .tower { width: 172px; }
+    .tower-head { height: 24px; padding: 0 var(--sp-2); }
+    .tower-head .lap { font-size: var(--fs-12); }
+    .tower-head .label { font-size: var(--fs-10); }
+    .row { height: 20px; grid-template-columns: 20px 3px 1fr 48px 16px; column-gap: 6px; }
+    .row .pos, .row .code, .row .gap { font-size: var(--fs-12); }
+    .row .bar { width: 3px; height: 12px; }
+    .row:not(.near) { display: none; }
+    .row.gapline { display: grid; height: 8px; }
+    .row.gapline > * { display: none; }
+    .tyre { width: 15px; height: 15px; font-size: 8px; border-width: 1.5px; }
+    .tower-foot { display: none; }
+    .row .chg { display: none; }
+
+    .control { top: calc(var(--safe) + 100px); }
+    .flag { height: 26px; }
+    .flag .sw { width: 26px; } .flag .sw .icon { width: 15px; height: 15px; }
+    .flag .txt strong { font-size: var(--fs-11); }
+    .flag .txt span { display: none; }
+    .msg { height: 24px; padding-right: var(--sp-3); }
+    .msg .tag { font-size: var(--fs-10); padding: 0 var(--sp-2); }
+    .msg .body { font-size: var(--fs-11); }
+    .msg .body em { display: none; }
+
+    .timing { left: 50%; right: auto; transform: translateX(-50%); width: 236px; }
+    .timing .top { height: 22px; padding: 0 var(--sp-2); }
+    .timing .top .label { font-size: var(--fs-10); }
+    .timing .pos-big { font-size: var(--fs-14); }
+    .timing .pos-big span { font-size: var(--fs-11); }
+    .timing .now { padding: 6px var(--sp-2) 4px; }
+    .timing .now .t { font-size: var(--fs-20); }
+    .delta { font-size: var(--fs-12); padding: 2px 4px; }
+    .sectors { padding: 0 var(--sp-2) 6px; }
+    .sector .label { font-size: var(--fs-10); }
+    .sector .v b { font-size: var(--fs-12); }
+    .sector i { height: 3px; }
+    .timing .ref { display: none; }
+
+    .map { left: auto; right: var(--safe); top: var(--safe); bottom: auto; width: 128px; padding: 6px; }
+    .map .head { display: none; }
+
+    .cluster { right: auto; left: 50%; transform: translateX(-50%); bottom: var(--safe); gap: 6px; }
+    .tyres { top: var(--safe); bottom: auto; right: calc(var(--safe) + 192px); width: 92px; padding: 6px; }
+    .tyres .head { margin-bottom: 4px; }
+    .tyres .head .label { font-size: var(--fs-10); }
+    .tyres .head .cmp .label { display: none; }
+    .tyres .grid { gap: 4px 20px; }
+    .tyres .car { width: 16px; height: 56px; }
+    .tc { height: 32px; }
+    .tc .temp { font-size: var(--fs-12); }
+    .tc .wear { height: 11px; font-size: 9px; }
+    .drive { width: 232px; padding: 6px var(--sp-2) var(--sp-2); }
+    .revs { margin-bottom: 6px; gap: 2px; }
+    .revs i { height: 5px; }
+    .speedgear .gear { font-size: var(--fs-44); padding: 0 var(--sp-3); }
+    .speedgear .spd b { font-size: var(--fs-24); }
+    .speedgear .rpm b { font-size: var(--fs-14); }
+    .speedgear .label { font-size: var(--fs-10); margin-top: 2px; }
+    .ers { margin-top: 6px; padding-top: 6px; gap: 4px var(--sp-2); }
+    .ers .row1 { margin-bottom: 4px; }
+    .ers .row1 b { font-size: var(--fs-12); }
+    .ers .meter { height: 6px; }
+    .mode { font-size: var(--fs-10); }
+    .ers .label { font-size: var(--fs-10); }
+    .drs { width: 46px; height: 28px; font-size: var(--fs-12); }
+
+    /* Touch controls: steering left, pedals right, buttons */
+    .touch { display: block; position: absolute; inset: 0; pointer-events: none; }
+    .tz { position: absolute; border-radius: var(--r-2); }
+    .steer { left: var(--safe); bottom: var(--safe); width: 196px; height: 188px; }
+    .steer .zone { position: absolute; inset: 0; border: 1px dashed rgba(242, 240, 235, 0.22); border-radius: var(--r-2); }
+    .steer .base { position: absolute; left: 50%; bottom: 18px; width: 128px; height: 128px; transform: translateX(-50%); border-radius: 50%; border: 2px solid rgba(242,240,235,0.35); background: rgba(11,12,14,0.35); }
+    .steer .base::before { content: ""; position: absolute; left: 50%; top: 50%; width: 92px; height: 1px; transform: translate(-50%, -50%); background: rgba(242,240,235,0.18); }
+    .steer .knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; transform: translate(calc(-50% + 16px), -50%); border-radius: 50%; background: rgba(242,240,235,0.85); box-shadow: var(--e-1); }
+    .steer .tag { position: absolute; left: 10px; top: 8px; }
+    .btn {
+      position: absolute; display: grid; place-items: center; width: var(--touch-min); height: var(--touch-min);
+      border-radius: var(--r-2); background: rgba(14,16,19,0.78); border: 1px solid var(--c-line-strong); color: var(--c-text-1);
+      font-weight: 750; font-stretch: var(--wdth-semi); font-size: var(--fs-11); letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .btn .icon { width: 20px; height: 20px; }
+    .gear-up { left: calc(var(--safe) + 208px); bottom: calc(var(--safe) + 60px); }
+    .gear-dn { left: calc(var(--safe) + 208px); bottom: var(--safe); }
+    .pedal {
+      position: absolute; bottom: var(--safe); width: 76px; height: 150px; border-radius: var(--r-2);
+      background: rgba(14,16,19,0.72); border: 1px solid var(--c-line-strong);
+      display: grid; align-content: end; justify-items: center; padding-bottom: 10px;
+    }
+    .pedal::before { content: ""; position: absolute; left: 12px; right: 12px; top: 12px; bottom: 34px; border-radius: 2px; background: repeating-linear-gradient(180deg, rgba(242,240,235,0.16) 0 2px, transparent 2px 10px); }
+    .pedal.thr { right: var(--safe); height: 172px; }
+    .pedal.thr::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 34px; height: 62%; background: var(--c-time-personal); opacity: 0.85; border-radius: 2px; }
+    .pedal.brk { right: calc(var(--safe) + 86px); }
+    .drs-btn { right: calc(var(--safe) + 172px); bottom: calc(var(--safe) + 60px); width: 56px; border-color: var(--c-drs); color: var(--c-drs); }
+    .ovt-btn { right: calc(var(--safe) + 172px); bottom: var(--safe); width: 56px; border-color: var(--c-ers-deploy); color: var(--c-ers-deploy); }
+    .cam-btn { right: calc(var(--safe) + 136px); top: var(--safe); }
+    .pause-btn { right: calc(var(--safe) + 136px); top: calc(var(--safe) + 56px); }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- UNDERCUT icon set (subset): 24 px grid, 1.75 px square-cap strokes, no fills except state marks -->
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h13l-3 4.5 3 4.5H5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-car-top" viewBox="0 0 30 96"><path d="M15 2c-2 0-3 4-3 9v12l-4 6v10l-2 3v26l3 8v8l3 6h6l3-6v-8l3-8V42l-2-3V29l-4-6V11c0-5-1-9-3-9z"/><path d="M12 44h6M11 58c2 2 6 2 8 0"/></symbol>
+</svg>
+
+<div class="frame">
+  <div class="scene" aria-hidden="true">
+    <div class="sky"></div><div class="hills"></div><div class="trees"></div><div class="stand"></div>
+    <div class="ground"></div><div class="runoff"></div><div class="boards"></div><div class="barrier"></div>
+    <div class="kerb-l"></div><div class="kerb-r"></div><div class="road"></div><div class="rubber"></div>
+    <div class="line-l"></div><div class="line-r"></div><div class="car"></div>
+    <div class="grade"></div><div class="grain"></div>
+  </div>
+
+  <div class="hud">
+    <!-- Timing tower -->
+    <section class="tower panel" aria-label="Timing tower">
+      <header class="tower-head">
+        <span class="lap num"><b>LAP 14</b><span> / 53</span></span>
+        <span class="label">Interval</span>
+      </header>
+      <ol class="tower-rows" id="rows"></ol>
+      <footer class="tower-foot"><span class="label">Monza</span><span class="label">Race</span></footer>
+    </section>
+
+    <!-- Race control -->
+    <div class="control">
+      <div class="flag" role="status">
+        <div class="sw"><svg class="icon"><use href="#i-flag"/></svg></div>
+        <div class="txt"><strong>Yellow flag</strong><span>Sector 2 · No overtaking</span></div>
+      </div>
+      <div class="msg" role="status">
+        <span class="tag">Penalty</span>
+        <span class="body">5 s time penalty <em>· Track limits, turn 4</em></span>
+      </div>
+    </div>
+
+    <!-- Lap timing -->
+    <section class="timing panel" aria-label="Lap timing">
+      <div class="top">
+        <span class="label">Current lap</span>
+        <span class="pos-big">P6<span> / 20</span></span>
+      </div>
+      <div class="now">
+        <span class="t">1:21.448</span>
+        <span class="delta good">−0.214</span>
+      </div>
+      <div class="sectors">
+        <div class="sector ov"><i></i><div class="v"><span class="label">S1</span><b>−0.318</b></div></div>
+        <div class="sector pb"><i></i><div class="v"><span class="label">S2</span><b>−0.041</b></div></div>
+        <div class="sector run"><i></i><div class="v"><span class="label">S3</span><b>—</b></div></div>
+      </div>
+      <div class="ref">
+        <div><span class="label">Last</span><b>1:22.031</b></div>
+        <div><span class="label">Best</span><b class="pbv">1:21.907</b></div>
+      </div>
+    </section>
+
+    <!-- Minimap -->
+    <section class="map panel" aria-label="Track map">
+      <div class="head"><span class="label">Track</span><span class="label">5.793 km</span></div>
+      <svg viewBox="0 0 208 150" aria-hidden="true">
+        <!-- simplified outline of the Monza circuit, drawn for the mock -->
+        <path id="trk" d="M40 128 L150 128 C160 128 163 124 160 120 L156 116 C150 108 154 100 160 92 C170 78 178 64 178 48 C178 30 166 20 150 22 C136 24 128 34 122 44 L112 56 C108 62 100 62 96 56 L88 44 C82 34 72 28 62 30 L44 34 C32 37 24 46 24 58 L24 96 C24 104 20 108 18 112 C16 118 22 128 40 128 Z"
+          fill="none" stroke="#3a3f45" stroke-width="7" stroke-linejoin="round"/>
+        <path d="M40 128 L150 128 C160 128 163 124 160 120 L156 116 C150 108 154 100 160 92 C170 78 178 64 178 48 C178 30 166 20 150 22 C136 24 128 34 122 44 L112 56 C108 62 100 62 96 56 L88 44 C82 34 72 28 62 30 L44 34 C32 37 24 46 24 58 L24 96 C24 104 20 108 18 112 C16 118 22 128 40 128 Z"
+          fill="none" stroke="#c9c7c1" stroke-width="2.5" stroke-linejoin="round"/>
+        <!-- sector 2 under yellow -->
+        <path d="M160 92 C170 78 178 64 178 48 C178 30 166 20 150 22 C136 24 128 34 122 44 L112 56" fill="none" stroke="#f6c90e" stroke-width="3" stroke-linejoin="round"/>
+        <!-- start/finish -->
+        <path d="M96 123 V133" stroke="#f2f0eb" stroke-width="2"/>
+        <g id="dots"></g>
+      </svg>
+    </section>
+
+    <!-- Tyres -->
+    <section class="tyres panel" aria-label="Tyres">
+        <div class="head"><span class="label">Tyres</span><span class="cmp"><span class="tyre m">M</span><span class="label num">12 L</span></span></div>
+        <div class="grid">
+          <svg class="car icon" viewBox="0 0 30 96" style="stroke-width:1.25"><use href="#i-car-top"/></svg>
+          <div class="tc warm"><div class="temp">104°</div><div class="wear" style="--w:34%">34%</div></div>
+          <div class="tc ok"><div class="temp">97°</div><div class="wear" style="--w:31%">31%</div></div>
+          <div class="tc ok"><div class="temp">95°</div><div class="wear" style="--w:22%">22%</div></div>
+          <div class="tc cold"><div class="temp">82°</div><div class="wear" style="--w:20%">20%</div></div>
+        </div>
+      </section>
+
+    <!-- Driver cluster -->
+    <div class="cluster">
+      <section class="drive panel" aria-label="Car">
+        <div class="revs" aria-hidden="true">
+          <i class="on g"></i><i class="on g"></i><i class="on g"></i><i class="on g"></i><i class="on g"></i>
+          <i class="on r"></i><i class="on r"></i><i class="on r"></i><i class="on r"></i><i class="on r"></i>
+          <i class="on b"></i><i class="b"></i><i class="b"></i><i class="b"></i><i class="b"></i>
+        </div>
+        <div class="speedgear">
+          <div class="rpm"><b>11 640</b><span class="label">RPM</span></div>
+          <div class="gear num">7</div>
+          <div class="spd"><b>287</b><span class="label">km/h</span></div>
+        </div>
+        <div class="ers">
+          <div>
+            <div class="row1"><span class="label">ERS</span><span class="mode">Overtake</span><b>68%</b></div>
+            <div class="meter" style="--v:68%; --lap:41%"><i></i><u></u></div>
+          </div>
+          <div class="drs open">DRS</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Phone touch controls -->
+  <div class="touch" aria-hidden="true">
+    <div class="tz steer"><div class="zone"></div><span class="label tag">Steer</span><div class="base"><div class="knob"></div></div></div>
+    <div class="btn gear-up"><svg class="icon"><use href="#i-up"/></svg></div>
+    <div class="btn gear-dn"><svg class="icon"><use href="#i-down"/></svg></div>
+    <div class="btn drs-btn">DRS</div>
+    <div class="btn ovt-btn">OVT</div>
+    <div class="btn cam-btn"><svg class="icon"><use href="#i-camera"/></svg></div>
+    <div class="btn pause-btn"><svg class="icon"><use href="#i-pause"/></svg></div>
+    <div class="pedal brk"><span class="label">Brake</span></div>
+    <div class="pedal thr"><span class="label">Throttle</span></div>
+  </div>
+</div>
+
+<script>
+  // Mirrors design/teams.json (inlined so the mock opens from disk without a server).
+  const TEAM = {
+    KST: "#3D6FE0", SBL: "#C98549", NRL: "#8C72E0", TLC: "#DE6A42", ALD: "#B23A4A",
+    CDR: "#13A1AD", BRK: "#9A4FA0", MRW: "#E8AE45", QLN: "#B4D334", ORN: "#94AA60"
+  };
+  // [code, team, interval, tyre, change, extra]
+  const ORDER = [
+    ["VEL","KST","Leader","m",0], ["CAS","SBL","+1.204","m",0], ["HOL","NRL","+0.512","h",1],
+    ["COR","TLC","+2.880","m",-1], ["ASH","ALD","+0.391","m",0], ["TAI","CDR","+0.844","m",1,"me"],
+    ["DAH","BRK","+0.677","h",-1], ["MEN","MRW","+1.502","s",0], ["KAL","KST","+0.230","m",0],
+    ["OKA","QLN","+3.118","h",0], ["KER","NRL","+0.955","m",1], ["BEL","ORN","+1.740","m",0],
+    ["QUI","ALD","+0.408","h",-1], ["MOR","SBL","+2.215","m",0], ["KAP","CDR","Pit","h",0,"pit"],
+    ["ALQ","TLC","+0.733","s",0], ["NAV","BRK","+1.981","m",0], ["PRO","ORN","+4.406","h",0],
+    ["DEM","QLN","+1 Lap","m",0], ["VOK","MRW","Out","m",0,"out"]
+  ];
+  const near = new Set([0, 4, 5, 6]);
+  const rows = document.getElementById("rows");
+  ORDER.forEach(([code, team, gap, tyre, chg, extra], i) => {
+    const li = document.createElement("li");
+    li.className = "row" + (extra === "me" ? " me" : "") + (extra === "out" ? " out" : "") + (near.has(i) ? " near" : "");
+    const isState = /[A-Za-z]/.test(gap);
+    li.innerHTML =
+      (chg ? `<span class="chg ${chg > 0 ? "up" : "dn"}"></span>` : "") +
+      `<span class="pos">${i + 1}</span><span class="bar" style="background:${TEAM[team]}"></span>` +
+      `<span class="code">${code}</span>` +
+      `<span class="gap${isState ? " state" : ""}${extra === "pit" ? " pit" : ""}">${i === 0 ? "Leader" : gap}</span>` +
+      `<span class="tyre ${tyre}">${tyre.toUpperCase()}</span>`;
+    rows.appendChild(li);
+    if (i === 0) { const g = document.createElement("li"); g.className = "row gapline near"; g.innerHTML = "<span></span>"; rows.appendChild(g); }
+  });
+  // Car dots along the outline
+  const path = document.getElementById("trk"), len = path.getTotalLength(), dots = document.getElementById("dots");
+  const at = [0.06,0.09,0.12,0.16,0.20,0.215,0.235,0.27,0.29,0.34,0.37,0.41,0.44,0.48,0.995,0.55,0.60,0.66,0.78];
+  at.forEach((t, i) => {
+    const p = path.getPointAtLength(len * (1 - t));
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    const me = ORDER[i][5] === "me";
+    c.setAttribute("cx", p.x); c.setAttribute("cy", p.y); c.setAttribute("r", me ? 5 : 3.2);
+    c.setAttribute("fill", TEAM[ORDER[i][1]]);
+    c.setAttribute("stroke", me ? "#f2f0eb" : "#0b0c0e"); c.setAttribute("stroke-width", me ? 2 : 1);
+    if (!me) dots.appendChild(c); else dots.dataset.me = "1", dots._me = c;
+  });
+  if (dots._me) dots.appendChild(dots._me);
+</script>
+</body>
+</html>

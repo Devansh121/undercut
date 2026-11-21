@@ -1,1 +1,50 @@
-[]
+[
+  {
+    "file": "design/mock/fonts/Archivo-Variable.woff2",
+    "source_url": "https://raw.githubusercontent.com/Omnibus-Type/Archivo/master/fonts/variable/Archivo%5Bwdth,wght%5D.ttf",
+    "author": "The Archivo Project Authors (Omnibus-Type)",
+    "licence": "OFL-1.1",
+    "changes": "Archivo[wdth,wght].ttf repackaged as WOFF2 with fontTools 4.59.2 and renamed; no glyph, metric or name-table changes",
+    "sha256": "53103f355e93d34385857b8cb0bb635f6fc8a1960c867ef86db45658e739e624"
+  },
+  {
+    "file": "design/mock/fonts/Archivo-OFL.txt",
+    "source_url": "https://raw.githubusercontent.com/Omnibus-Type/Archivo/master/OFL.txt",
+    "author": "The Archivo Project Authors (Omnibus-Type)",
+    "licence": "OFL-1.1",
+    "changes": "Renamed from OFL.txt; content unchanged. Licence text shipped with the font as the OFL requires",
+    "sha256": "108b4e57c9c796d3d38d0428ca7ee39de47ad93187302718d9b2d8864b9b716b"
+  },
+  {
+    "file": "design/mock/fonts/BarlowSemiCondensed-Medium.woff2",
+    "source_url": "https://raw.githubusercontent.com/jpt/barlow/main/fonts/woff2/BarlowSemiCondensed-Medium.woff2",
+    "author": "The Barlow Project Authors (Jeremy Tribby)",
+    "licence": "OFL-1.1",
+    "changes": "none",
+    "sha256": "d09441548a8efae963180034f92259d0f051c7b6e895b1fcda2ac933f1a38895"
+  },
+  {
+    "file": "design/mock/fonts/BarlowSemiCondensed-SemiBold.woff2",
+    "source_url": "https://raw.githubusercontent.com/jpt/barlow/main/fonts/woff2/BarlowSemiCondensed-SemiBold.woff2",
+    "author": "The Barlow Project Authors (Jeremy Tribby)",
+    "licence": "OFL-1.1",
+    "changes": "none",
+    "sha256": "bae9a20f1461da5276b405097cfd4ad72a888632b65780ca3a0b996cb4aab3ad"
+  },
+  {
+    "file": "design/mock/fonts/BarlowSemiCondensed-Bold.woff2",
+    "source_url": "https://raw.githubusercontent.com/jpt/barlow/main/fonts/woff2/BarlowSemiCondensed-Bold.woff2",
+    "author": "The Barlow Project Authors (Jeremy Tribby)",
+    "licence": "OFL-1.1",
+    "changes": "none",
+    "sha256": "1a1e9ef592eec2e8c0886c0577cc8cfb8cc1f0c1eebf8a252e0341248b6bbbfa"
+  },
+  {
+    "file": "design/mock/fonts/Barlow-OFL.txt",
+    "source_url": "https://raw.githubusercontent.com/jpt/barlow/main/OFL.txt",
+    "author": "The Barlow Project Authors (Jeremy Tribby)",
+    "licence": "OFL-1.1",
+    "changes": "Renamed from OFL.txt; content unchanged. Licence text shipped with the font as the OFL requires",
+    "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+  }
+]

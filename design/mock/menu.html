@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UNDERCUT menu mock</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { overflow: hidden; }
+  .app {
+    position: relative; height: 100vh; display: grid;
+    grid-template-rows: 64px 1fr 72px;
+    background:
+      radial-gradient(90% 70% at 85% 10%, rgba(255, 90, 31, 0.07), transparent 60%),
+      linear-gradient(180deg, #14171b 0%, #0e1013 60%, #0b0c0e 100%);
+  }
+  .app::before { /* faint contour texture: drawn track-map lines, not a photo */
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640' viewBox='0 0 640 640'><g fill='none' stroke='%23ffffff' stroke-opacity='0.025' stroke-width='1'><path d='M-40 520 C120 430 220 560 360 470 S600 380 700 440'/><path d='M-40 560 C120 470 220 600 360 510 S600 420 700 480'/><path d='M-40 600 C120 510 220 640 360 550 S600 460 700 520'/><path d='M-40 120 C80 60 200 160 320 100 S560 20 700 80'/><path d='M-40 160 C80 100 200 200 320 140 S560 60 700 120'/></g></svg>");
+  }
+
+  /* ---------- Top bar ---------- */
+  .top {
+    position: relative; display: flex; align-items: center; gap: var(--sp-6);
+    padding: 0 var(--safe); box-shadow: inset 0 -1px 0 var(--c-line);
+  }
+  .wordmark {
+    display: flex; align-items: center; gap: var(--sp-3);
+    font-weight: 800; font-stretch: var(--wdth-wide); font-size: var(--fs-20); letter-spacing: 0.14em;
+  }
+  .wordmark .mark { width: 22px; height: 22px; }
+  .crumbs { display: flex; align-items: center; gap: var(--sp-2); color: var(--c-text-3); font-size: var(--fs-12); font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+  .crumbs b { color: var(--c-text-1); font-weight: 650; }
+  .crumbs .icon { width: 14px; height: 14px; }
+  .top .right { margin-left: auto; display: flex; align-items: center; gap: var(--sp-4); }
+  .profile { display: flex; align-items: center; gap: var(--sp-3); padding: 6px var(--sp-3) 6px 6px; border-radius: var(--r-1); background: var(--c-ink-2); box-shadow: var(--edge-top); }
+  .profile .av { width: 28px; height: 28px; border-radius: var(--r-1); display: grid; place-items: center; background: #00727c; font-weight: 750; font-size: var(--fs-12); font-stretch: var(--wdth-semi); }
+  .profile b { font-size: var(--fs-14); font-weight: 600; }
+  .iconbtn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-1); color: var(--c-text-2); background: transparent; border: 1px solid var(--c-line); }
+  .iconbtn .icon { width: 18px; height: 18px; }
+
+  /* ---------- Body grid ---------- */
+  .body {
+    position: relative; min-height: 0;
+    display: grid; grid-template-columns: 300px minmax(0, 1fr) 420px; gap: var(--grid-gutter);
+    padding: var(--sp-6) var(--safe);
+  }
+  .col { min-height: 0; display: grid; gap: var(--grid-gutter); align-content: start; }
+  .card { background: var(--c-ink-1); border-radius: var(--r-2); box-shadow: var(--e-1), var(--edge-top); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4) var(--sp-5) 0; }
+  .h { margin: 0; font-size: var(--fs-11); font-weight: 650; font-stretch: var(--wdth-semi); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--c-text-2); }
+
+  /* ---------- Modes ---------- */
+  .modes { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .mode {
+    position: relative; display: grid; grid-template-columns: 36px 1fr 16px; align-items: center; gap: var(--sp-3);
+    padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5);
+    background: var(--c-ink-1); border-radius: var(--r-1);
+  }
+  .mode:first-child { border-radius: var(--r-2) var(--r-2) var(--r-1) var(--r-1); }
+  .mode:last-child { border-radius: var(--r-1) var(--r-1) var(--r-2) var(--r-2); }
+  .mode .ic { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-1); background: var(--c-ink-2); color: var(--c-text-2); }
+  .mode .ic .icon { width: 20px; height: 20px; }
+  .mode .name { display: block; font-size: var(--fs-20); line-height: var(--lh-snug); font-weight: 700; font-stretch: var(--wdth-semi); letter-spacing: 0.01em; }
+  .mode .desc { display: block; margin-top: 2px; font-size: var(--fs-12); line-height: 1.35; color: var(--c-text-3); }
+  .mode .chev { width: 16px; height: 16px; color: var(--c-text-3); }
+  .mode.on { background: var(--c-ink-3); }
+  .mode.on::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; background: var(--c-brand); border-radius: 0 2px 2px 0; }
+  .mode.on .ic { background: var(--c-brand); color: var(--c-text-inverse); }
+  .mode.on .chev { color: var(--c-text-1); }
+  .mode .badge { margin-left: var(--sp-2); padding: 2px 6px; border-radius: var(--r-1); font-size: var(--fs-10); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line-strong); vertical-align: 3px; }
+  .records { padding: var(--sp-4) var(--sp-5); display: grid; gap: var(--sp-3); }
+  .records .r { display: flex; justify-content: space-between; align-items: baseline; }
+  .records .r b { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-16); }
+
+  /* ---------- Circuit card ---------- */
+  .circuit { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
+  .circuit .tabs { display: flex; gap: var(--sp-1); }
+  .tab { padding: 6px var(--sp-3); border-radius: var(--r-1); font-size: var(--fs-12); font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-3); }
+  .tab.on { background: var(--c-ink-3); color: var(--c-text-1); }
+  .circuit .hero { position: relative; display: grid; grid-template-columns: 1fr 260px; gap: var(--sp-6); padding: var(--sp-5); align-items: center; }
+  .circuit .art { position: relative; aspect-ratio: 208 / 150; }
+  .circuit .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .circuit .title { display: grid; gap: var(--sp-1); }
+  .circuit .place { font-size: var(--fs-44); line-height: 1; font-weight: 800; font-stretch: var(--wdth-condensed); letter-spacing: 0.005em; text-transform: uppercase; }
+  .circuit .country { font-size: var(--fs-14); color: var(--c-text-2); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4) var(--sp-5); margin-top: var(--sp-5); }
+  .stat b { display: block; margin-top: 6px; font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-24); line-height: 1; }
+  .stat b small { font-size: var(--fs-14); color: var(--c-text-3); font-weight: 500; margin-left: 2px; }
+  .conditions { display: flex; gap: var(--sp-2); margin-top: var(--sp-5); flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 var(--sp-3); border-radius: var(--r-1); background: var(--c-ink-2); box-shadow: inset 0 0 0 1px var(--c-line); font-size: var(--fs-12); font-weight: 600; color: var(--c-text-2); }
+  .chip .icon { width: 14px; height: 14px; }
+
+  /* ---------- Settings panel ---------- */
+  .settings .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-6); padding: var(--sp-2) var(--sp-5) var(--sp-4); }
+  .setting { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--sp-3); min-height: 48px; box-shadow: inset 0 -1px 0 var(--c-line); }
+  .setting .k { font-size: var(--fs-14); font-weight: 550; white-space: nowrap; }
+  .setting .k small { display: block; font-size: var(--fs-12); color: var(--c-text-3); font-weight: 400; }
+  .seg { display: inline-flex; padding: 2px; border-radius: var(--r-1); background: var(--c-ink-0); box-shadow: inset 0 0 0 1px var(--c-line); }
+  .seg span { padding: 5px 10px; border-radius: 1px; font-size: var(--fs-12); font-weight: 650; color: var(--c-text-3); letter-spacing: 0.02em; }
+  .seg span.on { background: var(--c-text-1); color: var(--c-text-inverse); }
+  .slider { display: grid; grid-template-columns: 88px auto; align-items: center; gap: var(--sp-3); }
+  .slider .track { position: relative; height: 4px; border-radius: 2px; background: var(--c-ink-4); }
+  .slider .track i { position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--c-text-1); border-radius: 2px; }
+  .slider .track u { position: absolute; top: 50%; left: var(--v); width: 14px; height: 14px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--c-text-1); box-shadow: 0 0 0 4px var(--c-ink-1); }
+  .slider b { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 600; font-size: var(--fs-14); min-width: 36px; text-align: right; }
+  .toggle { width: 36px; height: 20px; border-radius: var(--r-pill); background: var(--c-ink-4); position: relative; }
+  .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-text-2); }
+  .toggle.on { background: var(--c-brand); }
+  .toggle.on::after { left: 19px; background: #fff; }
+  .settings-summary { display: none; }
+
+  /* ---------- Team and driver pick ---------- */
+  .teams { padding: var(--sp-3) var(--sp-4) var(--sp-4); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+  .team {
+    position: relative; min-width: 0; display: grid; grid-template-columns: 1fr; gap: 2px;
+    padding: var(--sp-2) var(--sp-3) var(--sp-3); border-radius: var(--r-1); background: var(--c-ink-2);
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+  .team svg { width: 100%; height: auto; display: block; margin: 0 0 2px; }
+  .team .tn { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+  .team .tn b { min-width: 0; font-size: var(--fs-14); font-weight: 650; font-stretch: var(--wdth-semi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .tn span { font-size: var(--fs-11); font-weight: 650; color: var(--c-text-3); letter-spacing: 0.06em; }
+  .team.on { background: var(--c-ink-3); box-shadow: inset 0 0 0 2px var(--c-text-1); }
+  .drivers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-4); }
+  .driver { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--r-1); background: var(--c-ink-2); }
+  .driver .no { font-family: var(--font-num); font-feature-settings: var(--num-features); font-weight: 700; font-size: var(--fs-32); line-height: 1; color: var(--c-text-3); min-width: 40px; text-align: center; }
+  .driver .nm { display: block; font-size: var(--fs-12); color: var(--c-text-3); }
+  .driver .ln { display: block; font-size: var(--fs-16); font-weight: 700; font-stretch: var(--wdth-semi); text-transform: uppercase; letter-spacing: 0.02em; }
+  .driver.on { box-shadow: inset 0 0 0 2px var(--c-text-1); background: var(--c-ink-3); }
+  .driver.on .no { color: #13a1ad; }
+
+  /* ---------- Bottom action bar ---------- */
+  .actions { position: relative; display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--safe); box-shadow: inset 0 1px 0 var(--c-line); }
+  .actions .summary { display: flex; gap: var(--sp-6); color: var(--c-text-2); font-size: var(--fs-14); }
+  .actions .summary b { color: var(--c-text-1); font-weight: 600; }
+  .actions .btns { margin-left: auto; display: flex; gap: var(--sp-3); }
+  .button {
+    display: inline-flex; align-items: center; gap: var(--sp-3); height: 44px; padding: 0 var(--sp-5);
+    border-radius: var(--r-1); font-size: var(--fs-14); font-weight: 700; font-stretch: var(--wdth-semi); letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--c-ink-2); color: var(--c-text-1); box-shadow: inset 0 0 0 1px var(--c-line-strong);
+  }
+  .button.primary { background: var(--c-brand); color: var(--c-text-inverse); box-shadow: none; padding-right: var(--sp-3); }
+  .key { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 6px; border-radius: var(--r-1); font-size: var(--fs-11); font-weight: 700; letter-spacing: 0.04em; box-shadow: inset 0 0 0 1px currentColor; opacity: 0.75; }
+  .button.primary .key { background: rgba(11,12,14,0.14); box-shadow: none; opacity: 1; }
+
+  /* ---------- Launch screen (menu.html#launch) ---------- */
+  .launch { display: none; }
+  #launch:target { display: grid; position: fixed; inset: 0; z-index: 5; grid-template-rows: 1fr auto; background: #0b0c0e; }
+  #launch:target ~ .app { display: none; }
+  .launch .stage { position: relative; display: grid; align-content: end; padding: 0 var(--safe) 10vh; overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(11,12,14,0) 30%, #0b0c0e 92%),
+      linear-gradient(100deg, #23272d 0%, #15181c 55%, #0f1114 100%); }
+  .launch .stripe { position: absolute; right: -10vw; top: 12vh; width: 70vw; height: 52vh; transform: skewX(-18deg);
+    background: repeating-linear-gradient(90deg, rgba(255,90,31,0.9) 0 6px, transparent 6px 26px); opacity: 0.18; }
+  .launch h1, .launch p { position: relative; }
+  .launch h1 { margin: 0; font-size: clamp(56px, 11vw, 168px); line-height: 0.86; font-weight: 850; font-stretch: var(--wdth-wide); letter-spacing: 0.06em; }
+  .launch p { margin: var(--sp-4) 0 0; max-width: 520px; color: var(--c-text-2); font-size: var(--fs-16); }
+  .launch .bar { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-5) var(--safe); box-shadow: inset 0 1px 0 var(--c-line); }
+  .launch .press { display: flex; align-items: center; gap: var(--sp-3); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; font-size: var(--fs-14); }
+
+  /* ================= Phone landscape ================= */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .app { grid-template-rows: 44px 1fr 52px; }
+    .wordmark { font-size: var(--fs-14); gap: var(--sp-2); }
+    .wordmark .mark { width: 16px; height: 16px; }
+    .crumbs { font-size: var(--fs-10); }
+    .profile { padding: 3px var(--sp-2) 3px 3px; gap: var(--sp-2); }
+    .profile .av { width: 22px; height: 22px; font-size: var(--fs-10); }
+    .profile b { font-size: var(--fs-12); }
+    .iconbtn { width: 30px; height: 30px; }
+    .body { grid-template-columns: 196px minmax(0, 1fr) 236px; gap: var(--sp-2); padding: var(--sp-2) var(--safe); }
+    .col { gap: var(--sp-2); }
+    .mode { grid-template-columns: 24px 1fr; gap: var(--sp-2); padding: 7px var(--sp-2) 7px var(--sp-3); }
+    .mode .ic { width: 24px; height: 24px; }
+    .mode .ic .icon { width: 15px; height: 15px; }
+    .mode .name { font-size: var(--fs-14); }
+    .mode .desc, .mode .chev, .mode .badge { display: none; }
+    .records { display: none; }
+    .card-head { padding: var(--sp-2) var(--sp-3) 0; }
+    .h { font-size: var(--fs-10); }
+    .tab { padding: 3px 6px; font-size: var(--fs-10); }
+    .circuit .hero { grid-template-columns: 1fr 132px; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    .circuit .place { font-size: var(--fs-24); }
+    .circuit .country { font-size: var(--fs-11); }
+    .stats { grid-template-columns: 1fr 1fr; gap: 6px var(--sp-2); margin-top: var(--sp-3); }
+    .stat .label { font-size: var(--fs-10); }
+    .stat b { font-size: var(--fs-16); margin-top: 2px; }
+    .stat b small { font-size: var(--fs-11); }
+    .stat:nth-child(n+3) { display: none; }
+    .conditions { display: none; }
+    .settings { display: none; }
+    .settings-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    .settings-summary .vals { font-size: var(--fs-11); color: var(--c-text-2); }
+    .settings-summary .vals b { color: var(--c-text-1); font-weight: 600; }
+    .settings-summary .iconbtn { width: 32px; height: 32px; flex: none; }
+    .teams { gap: 4px; padding: 6px var(--sp-2) var(--sp-2); }
+    .card-head .label { display: none; }
+    .drivers { display: grid; gap: 4px; padding: 4px var(--sp-2) var(--sp-2) !important; }
+    .driver { padding: 4px 6px; gap: 6px; }
+    .driver .no { font-size: var(--fs-16); min-width: 20px; }
+    .driver .nm { display: none; }
+    .driver .ln { font-size: var(--fs-11); }
+    .team { padding: 3px 6px 5px; }
+    .team svg { display: none; }
+    .team .tn b { font-size: var(--fs-11); }
+    .team .tn span { display: none; }
+    .team .sw { display: block; height: 3px; border-radius: 1px; margin-bottom: 3px; }
+    .actions .summary { display: none; }
+    .button { height: 36px; font-size: var(--fs-12); padding: 0 var(--sp-3); }
+    .button.primary { padding-right: var(--sp-3); }
+    .key { display: none; }
+  }
+  .team .sw { display: none; }
+  @media (max-height: 500px) and (orientation: landscape) { .team .sw { display: block; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- UNDERCUT icon set (subset): 24 px grid, 1.75 px square-cap strokes -->
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M3 20L11 4h4l-8 16z" fill="#ff5a1f" stroke="none"/><path d="M11 20l8-16h2l-8 16z" fill="#f2f0eb" stroke="none"/></symbol>
+  <symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9M9.5 2.5h5M12 2.5V6M18.5 6.5l1.5-1.5"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h13l-3 4.5 3 4.5H5"/></symbol>
+  <symbol id="i-weekend" viewBox="0 0 24 24"><path d="M3.5 5.5h17v15h-17zM3.5 10h17M8 3v5M16 3v5"/><path d="M7 14h2M11 14h2M15 14h2M7 17h2"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20.5h8"/></symbol>
+  <symbol id="i-rooms" viewBox="0 0 24 24"><path d="M10 14l4-4"/><path d="M8.5 11.5L6 14a3 3 0 0 0 4 4l2.5-2.5M15.5 12.5L18 10a3 3 0 0 0-4-4l-2.5 2.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10.3 3h3.4l.5 2.4 1.6.7 2-1.4 2.4 2.4-1.4 2 .7 1.6 2.4.5v3.4l-2.4.5-.7 1.6 1.4 2-2.4 2.4-2-1.4-1.6.7-.5 2.4h-3.4l-.5-2.4-1.6-.7-2 1.4-2.4-2.4 1.4-2-.7-1.6L3 13.7v-3.4l2.4-.5.7-1.6-1.4-2 2.4-2.4 2 1.4 1.6-.7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></symbol>
+  <symbol id="i-temp" viewBox="0 0 24 24"><path d="M10 4a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 10v7"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></symbol>
+</svg>
+
+<!-- Launch screen, shown at menu.html#launch -->
+<section id="launch" class="launch" aria-label="Launch">
+  <div class="stage">
+    <div class="stripe" aria-hidden="true"></div>
+    <h1>UNDERCUT</h1>
+    <p>Ten teams, twenty drivers, three circuits. Race the full grid alone or in a private room.</p>
+  </div>
+  <div class="bar">
+    <span class="press"><span class="key">Enter</span> Press any key or tap to start</span>
+    <span class="label">Build 0.0.1 · Profile: J. Taillefer</span>
+  </div>
+</section>
+
+<div class="app">
+  <header class="top">
+    <div class="wordmark"><svg class="mark" viewBox="0 0 24 24"><use href="#i-mark"/></svg>UNDERCUT</div>
+    <nav class="crumbs" aria-label="Breadcrumb"><span>Main</span><svg class="icon"><use href="#i-chev"/></svg><b>Quick Race</b></nav>
+    <div class="right">
+      <div class="profile"><span class="av">JT</span><b>J. Taillefer</b></div>
+      <button class="iconbtn" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+
+  <main class="body">
+    <!-- Mode select -->
+    <div class="col">
+      <ul class="modes" aria-label="Modes">
+        <li class="mode"><span class="ic"><svg class="icon"><use href="#i-stopwatch"/></svg></span><span><span class="name">Time Trial</span><span class="desc">Hot laps against your ghost and the reference lap.</span></span><svg class="icon chev"><use href="#i-chev"/></svg></li>
+        <li class="mode on"><span class="ic"><svg class="icon"><use href="#i-flag"/></svg></span><span><span class="name">Quick Race</span><span class="desc">One race against the full grid, five laps to full distance.</span></span><svg class="icon chev"><use href="#i-chev"/></svg></li>
+        <li class="mode"><span class="ic"><svg class="icon"><use href="#i-weekend"/></svg></span><span><span class="name">Race Weekend</span><span class="desc">Practice, qualifying and the race on one circuit.</span></span><svg class="icon chev"><use href="#i-chev"/></svg></li>
+        <li class="mode"><span class="ic"><svg class="icon"><use href="#i-trophy"/></svg></span><span><span class="name">Championship</span><span class="desc">Round 2 of 3. Points and standings across all circuits.</span></span><svg class="icon chev"><use href="#i-chev"/></svg></li>
+        <li class="mode"><span class="ic"><svg class="icon"><use href="#i-rooms"/></svg></span><span><span class="name">Online Rooms</span><span class="desc">Private room by invite code or link, up to eight drivers.</span></span><svg class="icon chev"><use href="#i-chev"/></svg></li>
+      </ul>
+      <section class="card records" aria-label="Personal records">
+        <h2 class="h">Your best laps</h2>
+        <div class="r"><span class="label">Monza</span><b>1:21.907</b></div>
+        <div class="r"><span class="label">Spa</span><b>1:47.322</b></div>
+        <div class="r"><span class="label">Singapore</span><b>—</b></div>
+      </section>
+    </div>
+
+    <!-- Circuit + settings -->
+    <div class="col">
+      <section class="card circuit" aria-label="Circuit">
+        <div class="card-head">
+          <h2 class="h">Circuit</h2>
+          <div class="tabs"><span class="tab on">Monza</span><span class="tab">Spa</span><span class="tab">Singapore</span></div>
+        </div>
+        <div class="hero">
+          <div class="art">
+            <svg viewBox="0 0 208 150" aria-hidden="true">
+              <path d="M40 128 L150 128 C160 128 163 124 160 120 L156 116 C150 108 154 100 160 92 C170 78 178 64 178 48 C178 30 166 20 150 22 C136 24 128 34 122 44 L112 56 C108 62 100 62 96 56 L88 44 C82 34 72 28 62 30 L44 34 C32 37 24 46 24 58 L24 96 C24 104 20 108 18 112 C16 118 22 128 40 128 Z"
+                fill="none" stroke="#2a2e34" stroke-width="9" stroke-linejoin="round"/>
+              <path d="M40 128 L150 128 C160 128 163 124 160 120 L156 116 C150 108 154 100 160 92 C170 78 178 64 178 48 C178 30 166 20 150 22 C136 24 128 34 122 44 L112 56 C108 62 100 62 96 56 L88 44 C82 34 72 28 62 30 L44 34 C32 37 24 46 24 58 L24 96 C24 104 20 108 18 112 C16 118 22 128 40 128 Z"
+                fill="none" stroke="#f2f0eb" stroke-width="2.5" stroke-linejoin="round"/>
+              <path d="M60 128 L140 128" stroke="#38d07a" stroke-width="2.5"/>
+              <path d="M24 92 L24 62" stroke="#38d07a" stroke-width="2.5"/>
+              <path d="M96 122 V134" stroke="#ff5a1f" stroke-width="2.5"/>
+              <g font-family="Barlow Semi Condensed" font-weight="600" font-size="7" fill="#7d7c78">
+                <text x="164" y="134">1</text><text x="182" y="50">3</text><text x="126" y="40">4</text><text x="98" y="68">6</text><text x="50" y="26">7</text><text x="10" y="58">8</text><text x="8" y="118">11</text>
+              </g>
+            </svg>
+          </div>
+          <div class="title">
+            <span class="label">Round 1 · Italy</span>
+            <span class="place">Monza</span>
+            <span class="country">Parkland circuit, long straights and heavy braking.</span>
+            <div class="stats">
+              <div class="stat"><span class="label">Length</span><b>5.793<small>km</small></b></div>
+              <div class="stat"><span class="label">Laps</span><b>53</b></div>
+              <div class="stat"><span class="label">Turns</span><b>11</b></div>
+              <div class="stat"><span class="label">DRS zones</span><b>2</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="conditions" style="padding: 0 var(--sp-5) var(--sp-5); margin-top: 0;">
+          <span class="chip"><svg class="icon"><use href="#i-sun"/></svg>Afternoon · 15:00</span>
+          <span class="chip"><svg class="icon"><use href="#i-temp"/></svg>Air 24° · Track 38°</span>
+          <span class="chip"><svg class="icon"><use href="#i-drop"/></svg>Dry</span>
+        </div>
+      </section>
+
+      <section class="card settings" aria-label="Race settings">
+        <div class="card-head"><h2 class="h">Race settings</h2><span class="label">Preset: Keyboard</span></div>
+        <div class="grid">
+          <div class="setting"><span class="k">Race distance<small>13 of 53 laps</small></span><span class="slider" style="--v:25%"><span class="track"><i></i><u></u></span><b>25%</b></span></div>
+          <div class="setting"><span class="k">AI skill</span><span class="seg"><span>Club</span><span>Pro</span><span class="on">Elite</span><span>Alien</span></span></div>
+          <div class="setting"><span class="k">Grid</span><span class="seg"><span class="on">Tiers</span><span>Equal cars</span></span></div>
+          <div class="setting"><span class="k">Traction control</span><span class="seg"><span>Off</span><span class="on">Medium</span><span>Full</span></span></div>
+          <div class="setting"><span class="k">Anti-lock brakes</span><span class="toggle on"></span></div>
+          <div class="setting"><span class="k">Racing line</span><span class="seg"><span>Off</span><span class="on">Braking</span><span>Full</span></span></div>
+        </div>
+      </section>
+      <section class="card settings-summary" aria-label="Race settings">
+        <span class="vals"><b>25%</b> distance · <b>Elite</b> AI · <b>Touch</b> assists</span>
+        <button class="iconbtn" aria-label="Edit settings"><svg class="icon"><use href="#i-edit"/></svg></button>
+      </section>
+    </div>
+
+    <!-- Team + driver -->
+    <div class="col">
+      <section class="card" aria-label="Team and driver">
+        <div class="card-head"><h2 class="h">Team</h2><span class="label">Performance tiers on</span></div>
+        <div class="teams" id="teams"></div>
+        <div class="card-head" style="padding-top:0"><h2 class="h">Driver</h2></div>
+        <div class="drivers" style="padding-top: var(--sp-3)">
+          <div class="driver on"><span class="no">6</span><span><span class="nm">Jules</span><span class="ln">Taillefer</span></span></div>
+          <div class="driver"><span class="no">39</span><span><span class="nm">Arjun</span><span class="ln">Kapadia</span></span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="actions">
+    <div class="summary"><span>Monza · <b>13 laps</b></span><span>Calder Engineering · <b>#6 Taillefer</b></span><span>Start <b>P14</b> (random grid)</span></div>
+    <div class="btns">
+      <span class="button"><span class="key">Esc</span>Back</span>
+      <span class="button primary">Start race <span class="key">Enter</span></span>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // Mirrors design/teams.json (inlined so the mock opens from disk without a server).
+  const TEAMS = [
+    ["Aldermoor Racing","ALD","#7A1F2B","#D9C7A3","#1A1A1A","split-diagonal"],
+    ["Kestrel Grand Prix","KST","#1F4FBF","#C3C8D0","#0E1116","chevron-nose"],
+    ["Norrland Motorsport","NRL","#F1F3F4","#6A4BC4","#20232A","side-band"],
+    ["Sable Dynamics","SBL","#17191C","#C27A3E","#E9E4DC","pinstripe"],
+    ["Orrin Racing","ORN","#74874A","#EDE6D3","#2A2E22","two-tone-horizontal"],
+    ["Terraluce Corse","TLC","#C4532D","#2D2F33","#F0E9DF","fade-rear"],
+    ["Meridian Works","MRW","#E0A030","#3A3D42","#FFFFFF","block-sidepod"],
+    ["Brevik Autosport","BRK","#5B2A5E","#C9CDD2","#E8B64A","split-diagonal"],
+    ["Calder Engineering","CDR","#00727C","#F4F1EA","#D2463A","side-band"],
+    ["Quillon Racing","QLN","#B4D334","#22346B","#FFFFFF","chevron-nose"]
+  ];
+  // Side profile of a ground-effect single-seater, facing right, drawn for the mock.
+  const BODY = "M20 41 L21 33 L34 31 L52 26 L70 17 Q82 10 92 12 L97 20 L104 23 L124 23 Q150 27 176 34 L193 39 L194 42 L150 44 L60 45 Z";
+  const PATTERN = {
+    "split-diagonal": (c) => `<polygon points="96,0 124,0 92,56 64,56" fill="${c}"/>`,
+    "chevron-nose": (c) => `<polygon points="140,0 200,0 200,56 120,56 150,28" fill="${c}"/>`,
+    "side-band": (c) => `<rect x="0" y="31" width="200" height="5" fill="${c}"/>`,
+    "pinstripe": (c) => `<rect x="0" y="30" width="200" height="1.4" fill="${c}"/><rect x="0" y="34" width="200" height="1.4" fill="${c}"/>`,
+    "two-tone-horizontal": (c) => `<rect x="0" y="33" width="200" height="23" fill="${c}"/>`,
+    "fade-rear": (c, id) => `<defs><linearGradient id="f${id}" x1="0" x2="1"><stop offset="0" stop-color="${c}"/><stop offset="0.6" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><rect x="0" y="0" width="200" height="56" fill="url(#f${id})"/>`,
+    "block-sidepod": (c) => `<rect x="58" y="24" width="58" height="22" fill="${c}"/>`
+  };
+  function car(t, i) {
+    const [, , p, s, a, pat] = t;
+    return `<svg viewBox="0 0 200 56" aria-hidden="true">
+      <defs><clipPath id="b${i}"><path d="${BODY}"/></clipPath></defs>
+      <rect x="22" y="45" width="152" height="3" fill="#0b0c0e"/>
+      <path d="M6 7 L30 7 L30 11 L10 12.5 Z" fill="${p}"/><path d="M6 7 L11 7 L13 37 L7 37 Z" fill="#202328"/>
+      <path d="M8 15 L28 14 L28 17 L9 18 Z" fill="#2a2e34"/>
+      <path d="${BODY}" fill="${p}"/>
+      <g clip-path="url(#b${i})">${PATTERN[pat](s, i)}<rect x="0" y="41" width="200" height="4" fill="${a}" opacity="0.9"/></g>
+      <path d="M100 21 Q113 12 128 22" fill="none" stroke="#2a2e34" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="110" cy="19" r="4.2" fill="${s}"/>
+      <path d="M164 44 L198 41 L198 46 L162 48 Z" fill="${p}"/><path d="M192 36 L198 36 L198 47 L192 47 Z" fill="#202328"/>
+      <g><circle cx="40" cy="41" r="11" fill="#141517"/><circle cx="40" cy="41" r="6.6" fill="#2b2e33"/><circle cx="40" cy="41" r="2" fill="#7d7c78"/></g>
+      <g><circle cx="160" cy="41" r="10.5" fill="#141517"/><circle cx="160" cy="41" r="6.3" fill="#2b2e33"/><circle cx="160" cy="41" r="2" fill="#7d7c78"/></g>
+    </svg>`;
+  }
+  const host = document.getElementById("teams");
+  TEAMS.forEach((t, i) => {
+    const el = document.createElement("div");
+    el.className = "team" + (t[1] === "CDR" ? " on" : "");
+    el.innerHTML = car(t, i) + `<span class="sw" style="background:linear-gradient(90deg, ${t[2]} 60%, ${t[3]} 60%)"></span><span class="tn"><b>${t[0]}</b><span>${t[1]}</span></span>`;
+    host.appendChild(el);
+  });
+</script>
+</body>
+</html>
