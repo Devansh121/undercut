@@ -32,8 +32,6 @@ export function createPathPoint(): PathPoint {
   return { s: 0, d: 0, index: -1 };
 }
 
-/** Farther than this along the lap counts as another section of track for clearance. */
-const CLEARANCE_WINDOW = 100;
 const CLEARANCE_MAX = 400;
 const GRID_CELL = 20;
 /** Segments are indexed in every grid cell within this distance of them. */
@@ -64,8 +62,9 @@ export class TrackPath {
   /** Geometric length of each segment's chord. */
   readonly chord: Float64Array;
   /**
-   * Per sample and side, the lateral offset up to which this part of the path is certainly the
-   * nearest: beyond it another section (more than 100 m away along the path) may be closer.
+   * Per sample and side, the lateral offset up to which this sample is certainly the nearest:
+   * beyond it another sample may be closer, either across the inside of the bend (where the
+   * frame folds) or on another section of the path, near or far along it.
    */
   readonly clearanceLeft: Float64Array;
   readonly clearanceRight: Float64Array;
@@ -181,24 +180,28 @@ export class TrackPath {
 
     // A point at offset d from sample i can only be nearer to sample j (offset delta from i)
     // once d exceeds |delta|^2 / (2 delta.n). The smallest such d per side is the clearance.
+    // Every other sample counts: on a bend the neighbours give the local radius (where the
+    // frame folds), and the other leg of a chicane counts however close it is along the lap.
     this.clearanceLeft = new Float64Array(n).fill(CLEARANCE_MAX);
     this.clearanceRight = new Float64Array(n).fill(CLEARANCE_MAX);
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
-        const along = closed ? Math.min(j - i, n - (j - i)) * this.step : (j - i) * this.step;
-        if (along <= CLEARANCE_WINDOW) continue;
         const dx = this.x[j]! - this.x[i]!;
         const dz = this.z[j]! - this.z[i]!;
         const dd = dx * dx + dz * dz;
         if (dd >= 4 * CLEARANCE_MAX * CLEARANCE_MAX) continue;
         const di = dx * this.nx[i]! + dz * this.nz[i]!;
-        const ci = di >= 0 ? this.clearanceLeft : this.clearanceRight;
-        const ri = dd / (2 * Math.abs(di));
-        if (ri < ci[i]!) ci[i] = ri;
+        if (di !== 0) {
+          const ci = di > 0 ? this.clearanceLeft : this.clearanceRight;
+          const ri = dd / (2 * Math.abs(di));
+          if (ri < ci[i]!) ci[i] = ri;
+        }
         const dj = -dx * this.nx[j]! - dz * this.nz[j]!;
-        const cj = dj >= 0 ? this.clearanceLeft : this.clearanceRight;
-        const rj = dd / (2 * Math.abs(dj));
-        if (rj < cj[j]!) cj[j] = rj;
+        if (dj !== 0) {
+          const cj = dj > 0 ? this.clearanceLeft : this.clearanceRight;
+          const rj = dd / (2 * Math.abs(dj));
+          if (rj < cj[j]!) cj[j] = rj;
+        }
       }
     }
   }

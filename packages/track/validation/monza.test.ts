@@ -303,6 +303,51 @@ describe('Monza: barriers and surfaces', () => {
 });
 
 describe('Monza: (s, d) round trips', () => {
+  it('does not snap to the other leg of the Roggia chicane with a nearby hint', () => {
+    // Regression: a hint from s = 1893 used to return s = 1890.075, d = -23.945.
+    const p = createVec3();
+    const q = createPathPoint();
+    lap.pointAt(1803, 0, p);
+    lap.project(p.x, p.z, { index: lap.sampleIndex(1893) }, q);
+    expect(q.s).toBeCloseTo(1803, 6);
+    expect(Math.abs(q.d)).toBeLessThan(1e-6);
+  });
+
+  it('returns the true (s, d) on the track for any hint within 150 m, densely through the chicanes', () => {
+    const rng = createRng(5);
+    const p = createVec3();
+    const q = createPathPoint();
+    const hint = { index: -1 };
+    const dense = [
+      [corner(1) - 80, corner(2) + 80],
+      [corner(4) - 80, corner(5) + 80],
+      [corner(8) - 80, corner(10) + 80],
+    ];
+    const ss: number[] = [];
+    for (let s = 0; s < L; s += 10) ss.push(s);
+    for (const [a, b] of dense) for (let s = a!; s <= b!; s += 1) ss.push(s);
+    let worst = 0;
+    let where = '';
+    let cases = 0;
+    for (const s of ss) {
+      const side = rng.next() < 0.5 ? LEFT : RIGHT;
+      const d = (side === LEFT ? 1 : -1) * rng.next() * track.halfWidthAt(s, side);
+      lap.pointAt(s, d, p);
+      for (let off = -150; off <= 150; off += 10) {
+        hint.index = lap.sampleIndex(s + off);
+        lap.project(p.x, p.z, hint, q);
+        const err = Math.max(near(q.s, s), Math.abs(q.d - d));
+        cases++;
+        if (err > worst) {
+          worst = err;
+          where = `s ${s.toFixed(1)} d ${d.toFixed(2)} hint ${off}: got s ${q.s.toFixed(3)} d ${q.d.toFixed(3)}`;
+        }
+      }
+    }
+    expect(cases).toBeGreaterThan(30000);
+    expect(worst, where).toBeLessThan(1e-6);
+  });
+
   it('pointAt then project returns the same (s, d), with and without a hint', () => {
     const rng = createRng(2026);
     const p = createVec3();
