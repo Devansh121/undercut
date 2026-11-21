@@ -1,6 +1,6 @@
 # Circuit kit delivery — Slice 1
 
-31 original props, 93 Draco GLBs, 2,183,356 bytes (2.08 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
+31 original props, 93 Draco GLBs, 2,385,804 bytes (2.28 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
 
 ## Measurements
 
@@ -17,23 +17,23 @@
 | pit-garage | 1240 / 584 / 380 | 34032 / 18160 / 15804 |
 | pit-wall | 1556 / 720 / 404 | 34952 / 20440 / 13084 |
 | start-gantry | 3904 / 2000 / 1500 | 52220 / 31996 / 27132 |
-| crew-mechanic-standing | 1016 / 456 / 456 | 23672 / 13920 / 13912 |
-| crew-mechanic-crouched | 1016 / 456 / 456 | 23800 / 13496 / 13528 |
-| crew-engineer-standing | 896 / 468 / 468 | 23308 / 15356 / 15372 |
-| crew-engineer-seated | 896 / 468 / 468 | 23388 / 15372 / 15356 |
-| crowd-seated-0 | 732 / 368 / 368 | 19236 / 13012 / 13020 |
-| crowd-seated-1 | 732 / 368 / 368 | 19200 / 13104 / 13104 |
-| crowd-seated-2 | 732 / 368 / 368 | 19196 / 12804 / 12800 |
-| crowd-standing-0 | 732 / 368 / 368 | 19168 / 13112 / 13144 |
-| crowd-standing-1 | 732 / 368 / 368 | 19116 / 13068 / 13064 |
-| crowd-standing-2 | 732 / 368 / 368 | 19096 / 13024 / 12992 |
+| crew-mechanic-standing | 5882 / 456 / 456 | 71416 / 13904 / 13940 |
+| crew-mechanic-crouched | 5882 / 456 / 456 | 74384 / 13500 / 13532 |
+| crew-engineer-standing | 5634 / 468 / 468 | 74568 / 15336 / 15344 |
+| crew-engineer-seated | 5634 / 468 / 468 | 76768 / 15340 / 15340 |
+| crowd-seated-0 | 732 / 368 / 368 | 19204 / 12992 / 12992 |
+| crowd-seated-1 | 732 / 368 / 368 | 19160 / 13080 / 13080 |
+| crowd-seated-2 | 732 / 368 / 368 | 19160 / 12780 / 12780 |
+| crowd-standing-0 | 732 / 368 / 368 | 19164 / 13084 / 13112 |
+| crowd-standing-1 | 732 / 368 / 368 | 19096 / 13044 / 13036 |
+| crowd-standing-2 | 732 / 368 / 368 | 19072 / 12972 / 13012 |
 | braking-board | 232 / 72 / 72 | 9588 / 5884 / 5884 |
 | zone-board | 232 / 72 / 72 | 9132 / 5780 / 5780 |
 | corner-board | 232 / 72 / 72 | 9188 / 5828 / 5828 |
 | kilometre-board | 156 / 60 / 60 | 8108 / 5628 / 5628 |
 | marshal-post | 620 / 300 / 300 | 17028 / 12356 / 12356 |
 | hoarding | 288 / 128 / 128 | 10808 / 7480 / 7480 |
-| bridge-banner | 2808 / 1528 / 1048 | 27924 / 19672 / 14260 |
+| bridge-banner | 2808 / 1528 / 1048 | 27924 / 19668 / 14260 |
 | pedestrian-bridge | 2556 / 1324 / 924 | 36576 / 23584 / 18288 |
 | screen-tower | 2364 / 924 / 604 | 39444 / 20268 / 15276 |
 | camera-tower | 3024 / 1248 / 928 | 49496 / 24728 / 19504 |
@@ -51,10 +51,17 @@ Inspected all 62 individual images through contact sheets, with the pit garage a
 - Catalogue: 33 checks passed; shipped file sizes and triangle counts, Draco, AO vertex attributes, ids, bounds, LOD budgets and five lamp node names.
 - Full unit suite: 89 files, 1,230 tests passed, two workers.
 - Asset licence and hash check passed.
-- Production build passed: High first race 7.83 MiB. Complete-kit reserve plus first race 9.91 MiB against 25 MiB. The inventory excludes unloaded props so it remains equal to the browser's actual requests; the additional reserve check accounts conservatively for every prop LOD.
+- Production build passed: High first race 7.83 MiB. Complete-kit reserve plus first race 10.10 MiB against 25 MiB. The inventory excludes unloaded props so it remains equal to the browser's actual requests; the additional reserve check accounts conservatively for every prop LOD.
 - Lint and all workspace typechecks passed. Browser transfer inventory passed (one desktop test, one intentional phone skip), one worker.
 - A clean scripted rebuild retained all geometry counts and bounds; some smooth figure primitives have a few bytes of Draco encoding variation between exports. The manifest records the final shipped bytes; byte-identical figure exports are a known tooling gap.
 - CI results are recorded in the PR once final.
+
+## Review fixes (PR #27, first review)
+
+- Board artwork was mirrored: U ran right to left seen from +X. The shared board UV now runs left to right; `tools/props/boards.test.mjs` decodes the shipped Draco geometry of every LOD of all ten board-carrying props and checks asymmetric test art (red left, blue right) from the front. It fails on the previous GLBs and passes now. `<id>-artwork.jpg` shows each face carrying "LEFT > 27" test art from the front.
+- Close crew (High LOD) are rebuilt in `tools/props/crew.py`: lofted overalls with collar, zip, chest pockets, belt and bunched folds at knees and elbows, rounded deltoids, cuffs, gloves with fingers and thumb, shaped boots with soles, a helmet shell with chin bar, nape, wrapped visor, seals and pivots (mechanics, over a balaclava), and a sculpted head with hair, ears and headset (engineers). Mobile and Far keep the simple figure for distance. `review-before/` holds the previous sheets; `crew-before-after.jpg` puts them side by side, and `<crew id>-close.jpg` shows High at eye height, front and back.
+- Engineer and crowd trousers use `dark-fabric` (metalness 0, weave grain) instead of the brushed steel material; the catalogue test asserts it.
+- Seated figures (`crew-engineer-seated`, `crowd-seated-*`) carry a `seat` attachment measured at build time from the geometry under the pelvis: 0.387 m for the close engineer and 0.424 m for the crowd, against the 0.50 m hip joint. Put the attachment on the row's seat surface.
 
 ## Contract and decisions
 
