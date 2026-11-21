@@ -1,0 +1,5 @@
+{
+  "$comment": "Bundle and asset budgets for the production client build (apps/web/dist). Sizes in bytes. Raise a budget only with a reason in the PR.",
+  "jsGzipMaxBytes": 1572864,
+  "firstRaceTransferMaxBytes": 26214400
+}

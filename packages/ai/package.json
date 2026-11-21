@@ -1,0 +1,19 @@
+{
+  "name": "@undercut/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "AI drivers.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@undercut/core": "0.0.0",
+    "@undercut/sim": "0.0.0",
+    "@undercut/track": "0.0.0"
+  }
+}

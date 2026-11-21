@@ -1,0 +1,178 @@
+/*
+ * M0 styles. Interim tokens until the design system lands; keep every value here
+ * as a custom property so it can be swapped wholesale.
+ */
+:root {
+  --color-ink: #121416;
+  --color-ink-muted: #3a4046;
+  --color-paper: #f2f3f1;
+  --color-paper-muted: rgb(242 243 241 / 62%);
+  --color-surface: #0d0f12;
+  --color-accent: #e8b400;
+  --color-disabled-bg: rgb(13 15 18 / 72%);
+  --color-disabled-ink: #aeb4b9;
+
+  /* Condensed display face per platform: DIN Alternate (Apple), Bahnschrift (Windows),
+     Roboto Condensed (Android, many Linux desktops), then generic fallbacks. */
+  --font-display:
+    'DIN Alternate', 'Bahnschrift', 'Roboto Condensed', 'Arial Narrow', 'Liberation Sans Narrow',
+    sans-serif;
+  --font-ui:
+    system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --gutter: clamp(16px, 4vw, 48px);
+  --radius: 2px;
+
+  --text-wordmark: clamp(2.5rem, 4.5vw + 1rem, 5.5rem);
+  --text-body: 1rem;
+  --text-small: 0.8125rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-surface);
+  color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+#view {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+.launch {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'brand  .'
+    '.      .'
+    'actions build';
+  height: 100%;
+  padding: max(var(--gutter), env(safe-area-inset-top))
+    max(var(--gutter), env(safe-area-inset-right)) max(var(--gutter), env(safe-area-inset-bottom))
+    max(var(--gutter), env(safe-area-inset-left));
+}
+
+.launch__brand {
+  grid-area: brand;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-wordmark);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+}
+
+.launch__tagline {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-body);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.launch__actions {
+  grid-area: actions;
+  align-self: end;
+}
+
+.launch__build {
+  grid-area: build;
+  align-self: end;
+  font-size: var(--text-small);
+  color: var(--color-paper-muted);
+}
+
+.launch__build code {
+  font-family: var(--font-mono);
+}
+
+.button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 200px;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-6) var(--space-3) var(--space-4);
+  border: 0;
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.button--primary {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.button:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-ink);
+  border-left-color: var(--color-disabled-ink);
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.button__label {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.button__note {
+  font-size: var(--text-small);
+  letter-spacing: 0.02em;
+}
+
+@media (max-height: 480px) {
+  :root {
+    --gutter: 16px;
+    --text-wordmark: clamp(2.25rem, 6vw, 3.5rem);
+  }
+}

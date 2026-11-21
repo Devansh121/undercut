@@ -1,0 +1,4 @@
+{
+  "$comment": "Licences allowed for third-party assets (SPDX ids). Anything else needs a read of the licence and an ADR first.",
+  "allowed": ["CC0-1.0", "CC-BY-4.0", "CC-BY-3.0", "MIT", "OFL-1.1"]
+}
