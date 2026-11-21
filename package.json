@@ -25,6 +25,7 @@
     "build": "npm run build -w @undercut/web && node tools/budget/check.mjs",
     "check:assets": "node tools/assets/check-licences.mjs",
     "check:secrets": "bash tools/ci/gitleaks.sh",
+    "telemetry": "node tools/telemetry/cli.mjs",
     "track:build": "python3 tools/track-pipeline/build.py",
     "track:plot": "python3 tools/track-pipeline/plot.py",
     "track:bench": "vitest bench --run --project unit packages/track/bench"
