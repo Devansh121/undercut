@@ -144,6 +144,24 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
+    files: ['tests/browser/**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              importNames: ['test'],
+              message:
+                "Import test from './base' or './fixtures' so the software-WebGL preset guard runs.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['services/rooms/src/**/*.ts'],
     languageOptions: { globals: { ...globals.serviceworker } },
     rules: restrictImports(['core', 'protocol']),
