@@ -1,0 +1,17 @@
+{
+  "name": "@undercut/input",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Keyboard, gamepad and touch input.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@undercut/core": "0.0.0"
+  }
+}
