@@ -219,6 +219,83 @@ class Checker {
   }
 }
 
+/** The fewest samples a path needs for central-difference tangents. */
+export const MIN_PATH_SAMPLES = 3;
+/** Largest change of direction between consecutive chords. */
+const MAX_TURN_PER_SAMPLE = Math.PI / 3;
+
+/**
+ * Checks a sampled curve: evenly spaced (each chord between a quarter and four times the
+ * expected spacing, which also rules out repeated points), no reversals, and a chord sum within
+ * 1 % of `length`. Returns the chord sum, or 0 when the curve is unusable.
+ */
+function checkCurve(
+  c: Checker,
+  path: string,
+  xs: readonly number[],
+  zs: readonly number[],
+  closed: boolean,
+  length: number,
+): number {
+  const n = xs.length;
+  if (n < MIN_PATH_SAMPLES) return 0;
+  const segs = closed ? n : n - 1;
+  const expected = length / segs;
+  let total = 0;
+  let prevX = Number.NaN;
+  let prevZ = Number.NaN;
+  for (let k = 0; k <= segs; k++) {
+    const i = k % n;
+    const j = (k + 1) % n;
+    if (k === segs) {
+      if (!closed) break;
+    }
+    const ex = xs[j]! - xs[i]!;
+    const ez = zs[j]! - zs[i]!;
+    const len = Math.hypot(ex, ez);
+    if (k < segs) {
+      if (!(len > 0.25 * expected && len < 4 * expected)) {
+        c.fail(
+          `${path}.x[${j}]`,
+          `sample spacing ${len.toFixed(3)} m, expected about ${expected.toFixed(3)} m`,
+        );
+        return 0;
+      }
+      total += len;
+    }
+    if (k > 0 && (closed || k < segs)) {
+      const cos = (prevX * ex + prevZ * ez) / (Math.hypot(prevX, prevZ) * len);
+      if (!(cos > Math.cos(MAX_TURN_PER_SAMPLE))) {
+        c.fail(
+          `${path}.x[${i}]`,
+          'the path doubles back or kinks by more than 60 degrees between samples',
+        );
+        return 0;
+      }
+    }
+    prevX = ex;
+    prevZ = ez;
+  }
+  if (Math.abs(total - length) > 0.01 * length) {
+    c.fail(
+      path,
+      `the samples span ${total.toFixed(1)} m, more than 1 % from the stated ${length.toFixed(1)} m`,
+    );
+    return 0;
+  }
+  return total;
+}
+
+/** Shoelace area in (x, z); with +Z south, positive is clockwise seen from above. */
+function signedArea(xs: readonly number[], zs: readonly number[]): number {
+  let a = 0;
+  for (let i = 0; i < xs.length; i++) {
+    const j = (i + 1) % xs.length;
+    a += xs[i]! * zs[j]! - xs[j]! * zs[i]!;
+  }
+  return a / 2;
+}
+
 const isRunoff = (x: unknown): x is RunoffKind => RUNOFF_KINDS.includes(x as RunoffKind);
 const isBarrier = (x: unknown): x is BarrierType => BARRIER_TYPES.includes(x as BarrierType);
 
@@ -453,7 +530,8 @@ export function validateTrackData(raw: unknown): TrackData {
     const le = c.num(pit.limitEnd, 'track.pit.limitEnd', 0, pl);
     if (ls >= le) c.fail('track.pit.limitStart', 'the speed limit must start before it ends');
     const m = Array.isArray(pit.x) ? pit.x.length : 0;
-    if (m < 2) c.fail('track.pit.x', 'expected at least two samples');
+    if (m < MIN_PATH_SAMPLES)
+      c.fail('track.pit.x', `expected at least ${MIN_PATH_SAMPLES} samples, found ${m}`);
     for (const k of ['x', 'z'] as const) c.numbers(pit[k], `track.pit.${k}`, m, -20000, 20000);
     c.numbers(pit.y, 'track.pit.y', m, -2000, 2000);
     c.numbers(pit.halfWidthLeft, 'track.pit.halfWidthLeft', m, 1, 30);
@@ -471,10 +549,49 @@ export function validateTrackData(raw: unknown): TrackData {
       c.fail('track.pit.garageWall', 'expected [s0, s1]');
     } else {
       c.num(pit.garageWall[0], 'track.pit.garageWall[0]', 0, pl);
-      c.num(pit.garageWall[1], 'track.pit.garageWall[1]', 0, pl);
+      const w1 = c.num(pit.garageWall[1], 'track.pit.garageWall[1]', 0, pl);
+      if (!((pit.garageWall[0] as number) < w1))
+        c.fail('track.pit.garageWall', 'the wall must start before it ends');
     }
   }
 
   if (c.problems.length > 0) throw new TrackDataError(c.problems);
-  return raw as TrackData;
+
+  // Shape checks, once every number is known to be finite and every array the right length.
+  const data = raw as TrackData;
+  const scale = data.source.scale;
+  const lapLen = checkCurve(
+    c,
+    'track.centreline',
+    data.centreline.x,
+    data.centreline.z,
+    true,
+    data.length / scale,
+  );
+  if (lapLen > 0) {
+    const area = signedArea(data.centreline.x, data.centreline.z);
+    const clockwise = area > 0;
+    if (clockwise !== (data.direction === 'clockwise')) {
+      c.fail(
+        'track.centreline',
+        `the samples run ${clockwise ? 'clockwise' : 'anticlockwise'}, but direction says ${data.direction}`,
+      );
+    }
+  }
+  checkCurve(c, 'track.pit', data.pit.x, data.pit.z, false, data.pit.length);
+  for (const side of ['left', 'right'] as const) {
+    const hw = side === 'left' ? data.centreline.halfWidthLeft : data.centreline.halfWidthRight;
+    const sd = data.sides[side];
+    for (let i = 0; i < n; i++) {
+      if (sd.barrier[i]! < hw[i]! + 0.5) {
+        c.fail(
+          `track.sides.${side}.barrier[${i}]`,
+          `${sd.barrier[i]} m is inside the track edge at ${hw[i]} m`,
+        );
+        break;
+      }
+    }
+  }
+  if (c.problems.length > 0) throw new TrackDataError(c.problems);
+  return data;
 }
