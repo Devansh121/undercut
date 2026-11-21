@@ -31,7 +31,7 @@ telemetry (`wallImpact`, `wallContact`) for damage and audio later. No damage mo
 
 **Decision 3: the vehicle model survives bad ground.** Tyre vertical force saturates at the
 tyre's bottoming load (stiffness × 60 % of the sidewall height of the 18-inch wheel, 23.7 kN,
-about twice the 11.5 kN peak of the reference lap), and each floor skid at four times that.
+about twice the 11.5 kN peak of the reference lap), and so does each floor skid.
 Bump and droop stops act beyond 40 mm of spring travel either way (the reference lap uses 16 mm
 and never extends a spring). Two position-level rules follow, both counted in the state:
 

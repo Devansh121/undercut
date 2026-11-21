@@ -5,7 +5,7 @@
  *
  *   await __undercut.start()                 // launch screen -> Time Trial at Monza
  *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera,
- *                                            // safety-net resets
+ *                                            // safety-net resets, barrier hits
  *   __undercut.telemetry()                   // CarTelemetry (SI units)
  *   __undercut.teleport(s, d?, kmh?)         // place the car on the lap; timing restarts
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
@@ -103,6 +103,7 @@ export function installDebugApi(
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
       safetyResets: s.safetyResets,
+      wallHits: s.wallHits,
       camera: d.view.cameraName,
       device: s.device,
       assists: { ...s.assists },

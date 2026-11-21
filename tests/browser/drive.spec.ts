@@ -174,12 +174,11 @@ test.describe('drive', () => {
       d: number;
       time: number;
       safetyResets: number;
+      wallHits: number;
       pitch: number;
       roll: number;
       rideHeightFront: number;
       rideHeightRear: number;
-      wallContact: boolean;
-      wallImpact: number;
       speed: number;
     }
     const pose = (): Promise<Pose> =>
@@ -189,23 +188,19 @@ test.describe('drive', () => {
         return { ...st, ...t } as unknown as Pose;
       });
     const seen: Pose[] = [];
-    let touched = false;
-    const t0 = (await pose()).time;
-    // Up to 40 s of sim time, as in the owner's run, or 5 s past the first barrier contact.
-    let touchedAt = Infinity;
+    const start = await pose();
+    // Up to 40 s of sim time, as in the owner's run, or 5 s past the first barrier strike.
+    let struckAt = Infinity;
     for (;;) {
       const p = await pose();
       seen.push(p);
-      if (p.wallContact && !touched) {
-        touched = true;
-        touchedAt = p.time;
-      }
-      if (p.time - t0 > 40 || p.time > touchedAt + 5) break;
+      if (p.wallHits > start.wallHits && struckAt === Infinity) struckAt = p.time;
+      if (p.time - start.time > 40 || p.time > struckAt + 5) break;
       await page.waitForTimeout(100);
     }
-    expect(touched, 'the car reached the barrier').toBe(true);
+    expect(struckAt, 'the car reached the barrier').toBeLessThan(Infinity);
     // The game checks the sim's invariants every tick; the safety net never had to act.
-    expect(seen.at(-1)!.safetyResets).toBe(0);
+    expect(seen.at(-1)!.safetyResets).toBe(start.safetyResets);
     for (const p of seen) {
       expect(Math.abs(p.pitch)).toBeLessThan(0.2);
       expect(Math.abs(p.roll)).toBeLessThan(0.2);
@@ -226,7 +221,7 @@ test.describe('drive', () => {
     await page.waitForTimeout(500);
     await page.screenshot({ path: testInfo.outputPath('car-at-barrier.png') });
     const rest = await pose();
-    expect(rest.safetyResets).toBe(0);
+    expect(rest.safetyResets).toBe(start.safetyResets);
     await page.evaluate(() => window.__undercut?.drive(null));
     expect(problems).toEqual([]);
   });

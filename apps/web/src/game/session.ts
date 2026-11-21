@@ -129,6 +129,7 @@ export class DriveSession {
   private readonly today: string;
   private readonly poseLimits: InvariantLimits;
   private safetyResetsValue = 0;
+  private wallHitsValue = 0;
 
   constructor(options: DriveSessionOptions) {
     this.track = options.track;
@@ -162,6 +163,11 @@ export class DriveSession {
    */
   get safetyResets(): number {
     return this.safetyResetsValue;
+  }
+
+  /** Steps on which the car struck a barrier (moving into it) since the session began. */
+  get wallHits(): number {
+    return this.wallHitsValue;
   }
 
   get phase(): SessionPhase {
@@ -313,6 +319,7 @@ export class DriveSession {
     const prevT = this.world.time;
     stepWorld(this.world);
     if (checkCarInvariants(car.state, this.poseLimits) !== null) return this.safetyReset(prevS);
+    if (car.state.wallImpactSpeed > 0) this.wallHitsValue++;
     this.locate();
 
     // Track limits are resolved before the timing lines, so a lap is never committed (or made a
