@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './base';
 import { GAME_NAME } from '@undercut/core';
 import { PROTOCOL_VERSION } from '@undercut/protocol';
 

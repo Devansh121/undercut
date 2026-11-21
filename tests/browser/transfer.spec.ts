@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './base';
 
 /**
  * The budget check's first-race inventory (apps/web/dist/first-race.json, written by
