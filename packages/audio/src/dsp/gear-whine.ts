@@ -1,4 +1,5 @@
 import { onePoleCoefficient } from './biquad';
+import { SINE_MASK, SINE_STEPS, SINE_TABLE } from './sine';
 import type { GearboxSoundSpec } from './spec';
 
 const TWO_PI = 2 * Math.PI;
@@ -15,7 +16,7 @@ const TWO_PI = 2 * Math.PI;
  *
  * Phases accumulate continuously, so a gear change glides the tone to the new pair's pitch
  * over the shift instead of stepping. Allocation-free; per-sample work is a few multiplies and
- * two `Math.sin` calls.
+ * three reads of the sine table.
  */
 export class GearWhine {
   private readonly dt: number;
@@ -76,6 +77,7 @@ export class GearWhine {
     const overall = this.overall;
     const fadeTop = this.fadeTop;
     const fadeScale = this.fadeScale;
+    const sine = SINE_TABLE;
     let e = 0;
     for (let i = 0; i < n; i++) {
       const w = speed[i] as number;
@@ -113,9 +115,24 @@ export class GearWhine {
       g2 = g2 < 0 ? 0 : g2 > 1 ? 1 : g2;
       let gf = (fadeTop - fFinal) * fadeScale;
       gf = gf < 0 ? 0 : gf > 1 ? 1 : gf;
-      const p = TWO_PI * this.meshPhase;
-      const mesh = g1 > 0 ? g1 * Math.sin(p) + 0.25 * g2 * Math.sin(2 * p) : 0;
-      const fin = gf > 0 ? 0.5 * gf * Math.sin(TWO_PI * this.finalPhase) : 0;
+      // Mesh fundamental and second harmonic, and the final drive, from the table.
+      const x1 = this.meshPhase * SINE_STEPS;
+      let k = x1 | 0;
+      let fr = x1 - k;
+      k &= SINE_MASK;
+      const sin1 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const x2 = 2 * x1;
+      k = x2 | 0;
+      fr = x2 - k;
+      k &= SINE_MASK;
+      const sin2 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const xf = this.finalPhase * SINE_STEPS;
+      k = xf | 0;
+      fr = xf - k;
+      k &= SINE_MASK;
+      const sinF = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const mesh = g1 > 0 ? g1 * sin1 + 0.25 * g2 * sin2 : 0;
+      const fin = gf > 0 ? 0.5 * gf * sinF : 0;
       const v = (mesh + fin) * this.level * this.peak;
       out[i] = v;
       e += v * v;
