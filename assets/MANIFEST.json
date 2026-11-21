@@ -46,5 +46,13 @@
     "licence": "OFL-1.1",
     "changes": "Renamed from OFL.txt; content unchanged. Licence text shipped with the font as the OFL requires",
     "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+  },
+  {
+    "file": "packages/track/data/monza.json",
+    "source_url": "https://www.openstreetmap.org/relation/284565 (via https://overpass-api.de/api/interpreter); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E009_00_DEM/Copernicus_DSM_COG_10_N45_00_E009_00_DEM.tif",
+    "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+    "licence": "ODbL-1.0",
+    "changes": "Derived database built by tools/track-pipeline/build.py monza: OSM circuit relation 284565 and pit way 38168747 chained, projected, smoothed and resampled every 2 m; s scaled to 5793 m; heights from the Copernicus GLO-30 tile with a 300 m opening, 90 m average and 20 m Gaussian; gravel and barriers from OSM ways near the track; authored widths, banking, kerbs, run-off kinds, barrier types and offsets, pit widths, limit lines, boxes and grid. Notices in packages/track/data/LICENSE-DATA.md",
+    "sha256": "52ec6a86e33a4c98aba47084f739318610d2064fbf51514c4cd0f213c581e21b"
   }
 ]
