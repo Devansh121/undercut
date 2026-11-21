@@ -30,14 +30,23 @@ import {
   type CameraName,
   type CarLivery,
   type CompoundLook,
+  type DrivingLineMode,
   type QualityName,
   type ToneMap,
 } from '@undercut/render';
+import {
+  DRIVING_LINE_SCALE,
+  DrivingLine,
+  buildPlan,
+  decodeEnvelope,
+  type EnvelopeArtefact,
+} from '@undercut/ai';
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
-// The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
+// The AI's racing line and measured vehicle envelope, for the rubbered line and driving-line assist.
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
+import monzaEnvelope from '../../../packages/ai/data/monza-low.envelope.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { toAudioCarState } from './game/audio-map';
@@ -205,7 +214,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = Track.fromJSON(monza);
   const records = o.records;
   const record = await records.load(track.id);
-  const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
+  const session = new DriveSession({
+    track,
+    seed: o.seed,
+    record,
+    today: o.today,
+    device: o.touch ? 'touch' : 'keyboard',
+  });
   const params = session.params;
   const mass = computeMass(session.car.state.model, TIME_TRIAL_FUEL, {
     total: 0,
@@ -229,6 +244,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     tyreRadius: params.tyre.rollingRadius,
   };
   const line = racingLineOffsets(track.lap.count);
+  const drivingLine = line
+    ? new DrivingLine(
+        buildPlan(track, line, decodeEnvelope(monzaEnvelope as EnvelopeArtefact), {
+          scale: DRIVING_LINE_SCALE,
+        }),
+      )
+    : null;
   const loadView = async (quality: QualityName, screen: LoadingScreen): Promise<RaceView> => {
     for (;;) {
       try {
@@ -240,6 +262,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          drivingLine,
+          drivingLineMode: session.assists.racingLine ?? 'off',
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
@@ -378,6 +402,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         choices: levels,
         get: () => session.assists.steering,
         set: (v) => session.setAssist('steering', Number(v)),
+      },
+      {
+        id: 'line',
+        label: 'Driving line',
+        description: 'Shows the racing line and where to lift or brake.',
+        choices: [
+          { value: 'off', label: 'Off' },
+          { value: 'braking', label: 'Braking' },
+          { value: 'full', label: 'Full' },
+        ],
+        get: () => session.assists.racingLine ?? 'off',
+        set: (v) => session.setAssist('racingLine', v as DrivingLineMode),
       },
     ],
     () =>
@@ -594,6 +630,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             0,
             Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
           );
+    view.setDrivingLine(session.assists.racingLine ?? 'off');
     view.render({
       pose,
       ghost: ghostOn ? ghostPose : null,
@@ -856,6 +893,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (session.phase === 'paused') resume();
       setSource('human');
       loop.timeScale = 1;
+      session.resetAssists();
+      view.setDrivingLine(session.assists.racingLine ?? 'off');
       view.setCamera('chase-near');
       actions.restartLap();
       results.hide();

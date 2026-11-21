@@ -8,6 +8,14 @@ interface UndercutDebugApi {
   drive(control: Record<string, number | boolean> | null): void;
   autopilot(on: boolean): void;
   camera(name?: string): string;
+  drivingLine(mode?: 'off' | 'braking' | 'full'): {
+    mode: 'off' | 'braking' | 'full';
+    visible: boolean;
+    throttleCount: number;
+    liftCount: number;
+    brakeCount: number;
+    firstBrakeDistance: number | null;
+  };
   pause(): void;
   resume(): void;
   restartLap(): void;
