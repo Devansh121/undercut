@@ -67,6 +67,7 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
     root: screen,
     setLoading(loading) {
       start.disabled = loading;
+      trial.disabled = loading;
       startLabel.textContent = loading ? 'Loading' : 'Start';
       screen.setAttribute('aria-busy', String(loading));
     },

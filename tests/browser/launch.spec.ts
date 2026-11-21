@@ -14,13 +14,14 @@ function watchErrors(page: Page): string[] {
 }
 
 test.describe('launch screen', () => {
-  test('renders the name, the Time Trial start and the build', async ({ page }) => {
+  test('renders the name, Quick Race, Time Trial and the build', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto('/');
 
     await expect(page).toHaveTitle(GAME_NAME);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(GAME_NAME);
-    await expect(page.getByText('Time Trial, Monza')).toBeVisible();
+    await expect(page.getByText('Quick Race, Monza')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Time Trial', exact: true })).toBeVisible();
     const start = page.getByRole('button', { name: /Start/ });
     await expect(start).toBeEnabled();
     await expect(page.locator('.launch__build code')).toHaveText(

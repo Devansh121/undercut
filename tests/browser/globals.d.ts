@@ -1,6 +1,7 @@
 /** The debug API the drive tests use (apps/web/src/debug.ts), typed loosely for tests. */
 interface UndercutDebugApi {
   start(): Promise<void>;
+  startQuickRace(laps?: number): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
   teleport(s: number, d?: number, kmh?: number): void;

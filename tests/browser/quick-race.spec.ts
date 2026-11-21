@@ -11,12 +11,14 @@ test('Quick Race: grid, lights, moving field and player result', async ({ page }
     window.__undercut!.autopilot(true);
     window.__undercut!.setTimeScale(8);
   });
-  await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', {
+  await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', null, {
     timeout: 60_000,
   });
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
-  await page.waitForFunction(() => !!window.__undercut!.state().raceResult, { timeout: 120_000 });
+  await page.waitForFunction(() => !!window.__undercut!.state().raceResult, null, {
+    timeout: 120_000,
+  });
   await expect(page.getByTestId('race-status')).toContainText('Race result');
   await page.evaluate(() => window.__undercut!.quit());
 });
