@@ -1,0 +1,38 @@
+{
+  "$comment": "Invented dry-compound identification for the game. Each compound has a colour and a mark count, so it reads without colour too. On the tyre the maker's mark appears once per sidewall and the compound is shown by four groups of short radial ticks: in each group the slots listed are lit in the compound's colour (slot -1, 0, +1 left to right). The HUD uses the same colour and the same number of ticks beside the code letter. Not the real supplier's scheme: no full coloured rings, no repeated lettering, and none of red, yellow or white.",
+  "version": 1,
+  "tyreMarking": {
+    "groupsPerSidewall": 4,
+    "slotSpacingU": 0.012,
+    "description": "Radial ticks about 30 mm long near the shoulder, four groups round each sidewall; the maker's mark sits once between two groups"
+  },
+  "compounds": [
+    {
+      "id": "soft",
+      "name": "Soft",
+      "code": "S",
+      "colour": "#D946A8",
+      "marks": 3,
+      "slots": [-1, 0, 1],
+      "mark": "Three ticks per group, magenta"
+    },
+    {
+      "id": "medium",
+      "name": "Medium",
+      "code": "M",
+      "colour": "#F2902F",
+      "marks": 2,
+      "slots": [-1, 1],
+      "mark": "Two ticks per group (the outer pair), orange"
+    },
+    {
+      "id": "hard",
+      "name": "Hard",
+      "code": "H",
+      "colour": "#8FA3B8",
+      "marks": 1,
+      "slots": [0],
+      "mark": "One tick per group (the centre), steel blue"
+    }
+  ]
+}

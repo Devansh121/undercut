@@ -70,10 +70,11 @@
   --c-rev-mid: #e5484d;
   --c-rev-high: #4f7dff;
 
-  /* Tyre compounds: ring colour of the compound mark */
-  --c-tyre-soft: #e5484d;
-  --c-tyre-medium: #f2c230;
-  --c-tyre-hard: #f2f0eb;
+  /* Tyre compounds (design/compounds.json): colour of the compound mark; the mark also carries
+     one, two or three ticks so it reads without colour */
+  --c-tyre-soft: #d946a8;
+  --c-tyre-medium: #f2902f;
+  --c-tyre-hard: #8fa3b8;
   --c-tyre-inter: #38d07a;
   --c-tyre-wet: #3f8cf0;
 
