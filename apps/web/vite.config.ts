@@ -67,11 +67,34 @@ function dracoDecoder(): Plugin {
   };
 }
 
+/**
+ * `network-info`: the addresses another device on the same network can open, for the online
+ * lobby's invite. The local server (tools/serve/static.mjs) answers it with this machine's Wi-Fi
+ * origins; everywhere else (a static host, the deployed Worker, the dev server) this empty answer
+ * stands in, so the lobby shows the page's own address and the request never 404s.
+ */
+function networkInfoFallback(): Plugin {
+  const body = JSON.stringify({ origins: [] });
+  return {
+    name: 'network-info-fallback',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== '/network-info') return next();
+        res.setHeader('Content-Type', 'application/json');
+        res.end(body);
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'network-info', source: body });
+    },
+  };
+}
+
 const roomsPort = Number(process.env.ROOMS_PORT ?? 8787);
 
 export default defineConfig({
   base: './',
-  plugins: [gameName(), dracoDecoder()],
+  plugins: [gameName(), dracoDecoder(), networkInfoFallback()],
   define: {
     __BUILD_HASH__: JSON.stringify(buildHash()),
   },
