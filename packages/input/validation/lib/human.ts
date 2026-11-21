@@ -251,7 +251,10 @@ export class Human {
     const g = t.steer;
     const kAhead = sample(line.curvature, track, s + v * g.preview, n);
     const w = Math.max(g.omegaMin, Math.min(g.omegaMax, g.omegaSpeed / v));
-    let corr = -(w * w * e) / (v * v) - (2 * g.damping * w * Math.sin(ePsi)) / v;
+    // Desired rejoin angle sine from lateral error, capped at ~44° so a wide runoff rejoin
+    // drives back onto the track instead of overturning past 90°.
+    const intercept = Math.max(-0.7, Math.min(0.7, -(w * e) / (2 * g.damping * v)));
+    let corr = ((2 * g.damping * w) / v) * (intercept - Math.sin(ePsi));
     corr = Math.max(-0.05, Math.min(0.05, corr));
     const kCmd = kAhead + corr;
     const p = car.model.params;

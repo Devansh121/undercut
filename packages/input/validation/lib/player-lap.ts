@@ -48,8 +48,11 @@ export const NEWCOMER_SCALE: Readonly<EnvelopeScale> = DRIVING_LINE_SCALE;
 
 /** A spin: body sideslip past `SPIN_SIDESLIP`, or the car pointing more than 90° off the road. */
 export const SPIN_SIDESLIP = (30 * Math.PI) / 180;
-/** Ticks of history kept for a spin report: half a second. */
-const HISTORY = 120;
+/** Ticks of history kept for a spin report (2 s), and the window summarised (0.5 s). */
+const HISTORY = 480;
+const WINDOW = 120;
+/** A slide begins when sideslip passes this; a spin report describes the window before it. */
+const SLIDE_ONSET = (4 * Math.PI) / 180;
 
 export interface PlayerRunOptions {
   setup: CircuitSetup;
@@ -94,8 +97,12 @@ export const TRACE_COLUMNS = [
   'sa_fr',
 ] as const;
 
-/** What the car was doing in the half second before a spin. */
+/** What the car was doing in the half second before the slide that became a spin began. */
 export interface SpinContext {
+  /** Seconds from the slide's onset (sideslip past 4°) to the spin. */
+  slideTime: number;
+  /** Speed at the onset, km/h. */
+  onsetKmh: number;
   /** Largest rear combined slip, as a multiple of the peak (1 = top of the curve). */
   rearSlip: number;
   /** Largest rear slip ratio in drive (wheelspin) and lowest slip ratio of any wheel (lock). */
@@ -371,8 +378,8 @@ class WheelSurfaces {
 
 /** The last half second of what the car did, for spin reports. */
 class History {
-  private readonly cols = 10;
-  private readonly buf = new Float64Array(HISTORY * 10);
+  private readonly cols = 12;
+  private readonly buf = new Float64Array(HISTORY * 12);
   private count = 0;
   private head = 0;
 
@@ -406,6 +413,8 @@ class History {
     b[o + 7] = downshift ? 1 : 0;
     b[o + 8] = kerb ? 1 : 0;
     b[o + 9] = st.steerAngle / st.model.params.geometry.maxSteerAngle;
+    b[o + 10] = Math.abs(Math.atan2(st.vy, Math.max(Math.abs(st.vx), 1)));
+    b[o + 11] = st.vx * 3.6;
     void tcScale;
     this.head = (this.head + 1) % HISTORY;
     this.count = Math.min(this.count + 1, HISTORY);
@@ -418,6 +427,8 @@ class History {
 
   summary(): SpinContext {
     const c: SpinContext = {
+      slideTime: 0,
+      onsetKmh: 0,
       rearSlip: 0,
       wheelspin: 0,
       lock: 0,
@@ -429,11 +440,18 @@ class History {
       kerb: false,
       steerSwing: 0,
     };
+    const b = this.buf;
+    const at = (k: number): number => ((this.head - 1 - k + HISTORY) % HISTORY) * this.cols;
+    // Walk back to the slide's onset: the last tick with sideslip under the onset angle.
+    let onset = 0;
+    while (onset < this.count - 1 && b[at(onset) + 10]! >= SLIDE_ONSET) onset++;
+    c.slideTime = onset * STEP;
+    c.onsetKmh = b[at(onset) + 11]!;
     let steerMin = Infinity;
     let steerMax = -Infinity;
-    for (let k = 0; k < this.count; k++) {
-      const o = ((this.head - 1 - k + HISTORY) % HISTORY) * this.cols;
-      const b = this.buf;
+    const end = Math.min(this.count, onset + WINDOW);
+    for (let k = onset; k < end; k++) {
+      const o = at(k);
       c.rearSlip = Math.max(c.rearSlip, b[o]!);
       c.wheelspin = Math.max(c.wheelspin, b[o + 1]!);
       c.lock = Math.min(c.lock, b[o + 2]!);
@@ -446,7 +464,7 @@ class History {
       steerMin = Math.min(steerMin, b[o + 9]!);
       steerMax = Math.max(steerMax, b[o + 9]!);
     }
-    c.steerSwing = this.count > 0 ? steerMax - steerMin : 0;
+    c.steerSwing = end > onset ? steerMax - steerMin : 0;
     return c;
   }
 }
