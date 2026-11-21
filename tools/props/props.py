@@ -793,8 +793,6 @@ for ident, module in specs:
                 box('lens-hood', (.88, 0, head_z + .34), (.16, .28, .26), dark_steel, bevel=.012)
                 rod('lens-glass', (.80, 0, head_z + .34), (.84, 0, head_z + .34), .095, glass)
 
-        if 'seated' in ident:
-            attachments.append({'name': 'seat', 'position': [0, .50, 0], 'front': '+X'})
         # Authored coordinates above are X front, Y lateral, Z up; glTF exports (X,Z,-Y).
         # Flip author lateral so delivery Z is positive right, then rotate Blender Z-up frame.
         for ob in objects:
@@ -829,6 +827,11 @@ for ident, module in specs:
             'min': [min(p.x for p in points), min(p.z for p in points), min(-p.y for p in points)],
             'max': [max(p.x for p in points), max(p.z for p in points), max(-p.y for p in points)],
         }
+        if 'seated' in ident:
+            # Seat contact: the lowest point under the pelvis (thigh and seat undersides), measured
+            # from this LOD's geometry. Feet, shins and hands lie forward of |x| < 0.12.
+            under = [p.z for p in points if abs(p.x) < .12 and abs(p.y) < .16 and p.z > .3]
+            attachments.append({'name': 'seat', 'position': [0, round(min(under), 3), 0], 'front': '+X'})
         if lod == 0:
             entry['bounds'] = bounds
             entry['attachments'] = attachments

@@ -16,11 +16,12 @@ describe('shipped prop catalogue', () => {
     it(`${prop.id} has measured compressed LODs and sane attachment data`, () => {
       expect(prop.pivot).toEqual([0, 0, 0]);
       if (prop.id.includes('seated')) {
-        expect(prop.attachments.find((a) => a.name === 'seat')).toEqual({
-          name: 'seat',
-          position: [0, 0.5, 0],
-          front: '+X',
-        });
+        // Seat contact (thigh undersides) measured at build time: chair height, below the 0.50 m hip joint.
+        const seat = prop.attachments.find((a) => a.name === 'seat');
+        expect(seat).toMatchObject({ name: 'seat', front: '+X' });
+        expect([seat.position[0], seat.position[2]]).toEqual([0, 0]);
+        expect(seat.position[1]).toBeGreaterThan(0.36);
+        expect(seat.position[1]).toBeLessThan(0.47);
       }
       expect(prop.bounds.min[1]).toBeGreaterThanOrEqual(-0.005);
       for (let i = 0; i < 3; i++) {
