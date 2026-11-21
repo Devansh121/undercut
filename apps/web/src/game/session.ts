@@ -340,7 +340,7 @@ export class DriveSession {
   /** Back to the rolling start; timing for the lap in progress is dropped. */
   restartLap(): SessionEvent[] {
     const p = this.race.lapPose(this.race.circuit.timingLine - ROLLING_START_RUN_UP, 0);
-    this.place(p.x, p.z, p.yaw, ROLLING_START_SPEED);
+    this.place(p.x, p.z, p.yaw, ROLLING_START_SPEED, []);
     this.race.control.restartTiming(0);
     this.recorder.cancel();
     if (this.phaseValue === 'paused') this.phaseValue = 'running';
@@ -351,7 +351,7 @@ export class DriveSession {
   resetToTrack(): SessionEvent[] {
     const events: SessionEvent[] = [];
     const pose = this.race.lapPose(this.s, 0);
-    this.place(pose.x, pose.z, pose.yaw, 0);
+    this.place(pose.x, pose.z, pose.yaw, 0, events);
     for (const e of this.race.control.invalidateLap(0, 'reset')) this.onRaceEvent(e, events);
     if (this.phaseValue === 'paused') this.phaseValue = 'running';
     events.push({ type: 'reset', reason: 'track' });
@@ -361,7 +361,7 @@ export class DriveSession {
   /** Debug and tools: put the car at (s, d) at `speed`, timing back to before the line. */
   teleport(s: number, d = 0, speed = 0): SessionEvent[] {
     const pose = this.race.lapPose(this.track.wrap(s), d);
-    this.place(pose.x, pose.z, pose.yaw, speed);
+    this.place(pose.x, pose.z, pose.yaw, speed, []);
     this.race.control.restartTiming(0);
     this.recorder.cancel();
     return [{ type: 'reset', reason: 'teleport' }];
@@ -398,8 +398,9 @@ export class DriveSession {
     this.onLine(at);
   }
 
-  private place(x: number, z: number, yaw: number, speed: number): void {
-    this.race.placeCar(0, x, z, yaw, speed);
+  /** Move the car without crossing any line; a retired car is back in the session. */
+  private place(x: number, z: number, yaw: number, speed: number, events: SessionEvent[]): void {
+    for (const e of this.race.placeCar(0, x, z, yaw, speed, true)) this.onRaceEvent(e, events);
     this.assistMemory = createAssistState();
   }
 }

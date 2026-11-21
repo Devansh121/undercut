@@ -259,4 +259,45 @@ describe('GameLoop and DriveSession', () => {
       autoGears: false,
     });
   });
+
+  it('never retires a player who stops in time trial, and restart puts the car back in play', () => {
+    const { loop, driver, session } = setup();
+    driver.control.brake = 1;
+    run(loop, 70);
+    const control = session.race.control;
+    expect(control.cars[0]!.status).toBe('running');
+    expect(control.anomalies().some((a) => a.kind === 'stationary')).toBe(true);
+    // Even a retired car (the rules allow it to come back in time trial) drives again after a restart.
+    control.retireCar(0, 'stuck');
+    expect(control.cars[0]!.status).toBe('dnf');
+    loop.restartLap();
+    expect(control.cars[0]!.status).toBe('running');
+    driver.control.brake = 0;
+    driver.control.throttle = 1;
+    run(loop, 1);
+    expect(session.car.input.throttle).toBeGreaterThan(0);
+    expect(session.car.input.brake).toBe(0);
+    expect(session.readTelemetry().speed).toBeGreaterThan(40);
+  });
+
+  it('a car moved across the timing line does not complete a lap', () => {
+    const { loop, driver, session } = setup();
+    driver.control.throttle = 1;
+    session.teleport(TIMING_LINE - 20, 0, 60);
+    const started = run(loop, 1);
+    expect(started.some((e) => e.type === 'lapStart')).toBe(true);
+    // Carry the car round the lap in moves of under half a lap, to 2 m before the line, then over it.
+    const race = session.race;
+    const moveTo = (s: number) => {
+      const p = race.lapPose(s, 0);
+      return race.placeCar(0, p.x, p.z, p.yaw, 60);
+    };
+    moveTo(TIMING_LINE + 2000);
+    moveTo(TIMING_LINE + 4000);
+    moveTo(TIMING_LINE - 2);
+    moveTo(TIMING_LINE + 3);
+    const after = run(loop, 0.5);
+    expect(after.filter((e) => e.type === 'lap' || e.type === 'lapStart')).toEqual([]);
+    expect(session.timer.valid).toBe(false);
+  });
 });

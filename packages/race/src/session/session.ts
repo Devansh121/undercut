@@ -121,6 +121,7 @@ export class RaceSession {
       session: o.session,
       entrants: o.cars.map((c) => ({
         team: c.entrant.team,
+        human: c.controller.kind === 'human',
         ...(c.entrant.compound ? { compound: c.entrant.compound } : {}),
       })),
       seed: o.seed,
@@ -287,10 +288,20 @@ export class RaceSession {
   }
 
   /**
-   * Put a car at a world pose at `speed`, settled on the ground (restart, reset, teleport).
-   * Timing is the caller's business (`control.restartTiming`, `control.invalidateLap`).
+   * Put a car at a world pose at `speed`, settled on the ground (restart, reset, teleport). The
+   * rules see a reposition, not a drive: no line is crossed (`RaceControl.reposition`). With
+   * `revive`, a retired car is back in the session where the rules allow it (time trial,
+   * practice). Timing beyond that is the caller's business (`control.restartTiming`,
+   * `control.invalidateLap`). Returns the rules' events.
    */
-  placeCar(car: number, x: number, z: number, yaw: number, speed: number): void {
+  placeCar(
+    car: number,
+    x: number,
+    z: number,
+    yaw: number,
+    speed: number,
+    revive = false,
+  ): RaceEvent[] {
     const wc = this.world.cars[car]!;
     const fresh = createCarState(wc.state.params, {
       x,
@@ -311,6 +322,7 @@ export class RaceSession {
     this.limits[car]!.reset();
     this.cars[car]!.controller.reset();
     this.locate(car);
+    return this.control.reposition(car, this.facts[car]!, revive);
   }
 
   snapshot(): RaceSessionSnapshot {
