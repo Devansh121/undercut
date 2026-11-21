@@ -8,6 +8,7 @@ import {
   type RoomClientOptions,
   type ServerMessage,
 } from '@undercut/protocol';
+import type { HeadlessDriver } from '../../../tools/netsim/driver';
 import { realTimers, wsTransport } from '../../../tools/netsim/node';
 import './context';
 
@@ -80,12 +81,49 @@ export async function until(
   predicate: () => boolean,
   ms = 10_000,
   stepMs = 10,
+  explain?: () => string,
 ): Promise<void> {
   const deadline = Date.now() + ms;
   while (!predicate()) {
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    if (Date.now() > deadline) {
+      throw new Error(`timed out waiting for ${what}${explain ? `: ${explain()}` : ''}`);
+    }
     await new Promise((r) => setTimeout(r, stepMs));
   }
+}
+
+/** What a stuck race looks like from the clients: for timeout messages. */
+export function raceState(rs: Recorder[], drivers: HeadlessDriver[]): string {
+  const room = rs[0]?.client.room;
+  return JSON.stringify({
+    phase: room?.phase,
+    chequeredAt: room?.chequeredAt,
+    lightsOutAt: room?.start?.lightsOutAt,
+    grid: room?.grid?.map((g) => `${g.seat}:${g.kind}:${g.state}`),
+    reported: drivers.map((d) => Object.fromEntries(d.reported)),
+    rejected: drivers.flatMap((d) =>
+      d.rejections.map((t) => `${t.seat}/${t.lap}/${t.raceMs}:${t.reason}`),
+    ),
+    timing: rs.map((r) => r.of('timing').length),
+    status: rs.map((r) => r.client.status),
+    clock: rs.map((r) => {
+      const c = r.client.clock;
+      return { offset: c.offset, error: c.error, rtt: c.rtt };
+    }),
+    host: room?.host,
+    members: room?.members.map((m) => `${m.id}:${m.status}:${m.connected}`),
+  });
+}
+
+/** Wait for every recorder to have the results, explaining the race if they never come. */
+export async function untilResults(rs: Recorder[], drivers: HeadlessDriver[], ms = 40_000) {
+  await until(
+    'results',
+    () => rs.every((r) => r.of('results').length > 0 && r.client.room?.phase === 'results'),
+    ms,
+    20,
+    () => raceState(rs, drivers),
+  );
 }
 
 /** Connect in the order given (join order decides seats and the host). */

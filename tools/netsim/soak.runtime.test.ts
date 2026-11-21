@@ -19,6 +19,7 @@ import {
   Recorder,
   createRoom,
   joined,
+  raceState,
   serviceErrors,
   until,
 } from '../../services/rooms/test/headless';
@@ -142,6 +143,7 @@ describe(`soak: ${profile.name}`, () => {
         () => rs.every((r) => r.of('results').length > 0 && r.client.room?.phase === 'results'),
         raceBudgetMs,
         50,
+        () => raceState(rs, drivers),
       );
       clearInterval(sampler);
       sampler = null;

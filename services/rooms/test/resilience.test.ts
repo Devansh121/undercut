@@ -3,7 +3,7 @@ import { CLOSE } from '@undercut/protocol';
 import { HeadlessDriver } from '../../../tools/netsim/driver';
 import { realTimers } from '../../../tools/netsim/node';
 import { loopTrack } from '../../../tools/netsim/track';
-import { Recorder, createRoom, joined, serviceErrors, until } from './headless';
+import { Recorder, createRoom, joined, serviceErrors, until, untilResults } from './headless';
 
 const timings = inject('roomTimings');
 const track = loopTrack(450);
@@ -73,7 +73,7 @@ describe('leaving, reconnecting and host migration', () => {
     expect(b.client.ownedSeats()).toEqual([1, 3, 4]);
     expect(c.client.room?.host).toBe(b.client.me);
 
-    await until('results', () => b.of('results').length > 0 && c.of('results').length > 0, 40_000);
+    await untilResults([b, c], drivers);
     const rb = b.last('results')!;
     expect(JSON.stringify(c.last('results'))).toBe(JSON.stringify(rb));
     const byseat = new Map(rb.results.rows.map((r) => [r.seat, r]));
@@ -84,7 +84,7 @@ describe('leaving, reconnecting and host migration', () => {
   });
 
   it('resumes the same seat after a drop mid-race and finishes', async () => {
-    const { rs } = await raceWith(['Ana', 'Ben'], 2);
+    const { rs, drivers } = await raceWith(['Ana', 'Ben'], 2);
     const [a, b] = rs as [Recorder, Recorder];
     await new Promise((r) => setTimeout(r, 1500));
     const token = b.client.resumeToken;
@@ -96,7 +96,7 @@ describe('leaving, reconnecting and host migration', () => {
     expect(b.client.resumeToken).toBe(token);
     const welcome = b.last('welcome')!;
     expect(welcome.progress).not.toBeNull();
-    await until('results', () => a.of('results').length > 0, 40_000);
+    await untilResults([a, b], drivers);
     const row = a.last('results')!.results.rows.find((r) => r.seat === 1)!;
     expect(row).toMatchObject({ status: 'finished', laps: 2 });
   });

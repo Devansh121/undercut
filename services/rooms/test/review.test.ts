@@ -5,7 +5,7 @@ import { LIMITS } from '@undercut/protocol';
 import { HeadlessDriver } from '../../../tools/netsim/driver';
 import { realTimers } from '../../../tools/netsim/node';
 import { carAt, loopTrack } from '../../../tools/netsim/track';
-import { Recorder, base, createRoom, joined, serviceErrors, until } from './headless';
+import { Recorder, base, createRoom, joined, serviceErrors, until, untilResults } from './headless';
 
 const track = loopTrack(450);
 const cleanup: (() => void)[] = [];
@@ -88,7 +88,7 @@ describe('review findings on the local Workers runtime', () => {
     await until('new host', () => b.of('host').some((h) => h.member === b.client.me), 10_000);
     expect(a.client.status).toBe('joined');
     expect(b.client.ownedSeats()).toEqual([1, 2, 3]);
-    await until('results', () => b.of('results').length > 0, 40_000);
+    await untilResults([b], drivers);
     const rows = b.last('results')!.results.rows;
     for (const seat of [1, 2, 3])
       expect(rows.find((r) => r.seat === seat)).toMatchObject({ status: 'finished', laps: 3 });

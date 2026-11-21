@@ -2,7 +2,15 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { HeadlessDriver } from '../../../tools/netsim/driver';
 import { realTimers } from '../../../tools/netsim/node';
 import { loopTrack } from '../../../tools/netsim/track';
-import { Recorder, createRoom, joined, roomsUrl, serviceErrors, until } from './headless';
+import {
+  Recorder,
+  createRoom,
+  joined,
+  roomsUrl,
+  serviceErrors,
+  until,
+  untilResults,
+} from './headless';
 
 const track = loopTrack(450);
 const cleanup: (() => void)[] = [];
@@ -67,7 +75,7 @@ describe('a race on the local Workers runtime', () => {
     const info = (await (await fetch(`${roomsUrl}/${code}`)).json()) as { joinable: boolean };
     expect(info.joinable).toBe(false);
 
-    await until('results', () => a.of('results').length > 0 && b.of('results').length > 0, 40_000);
+    await untilResults([a, b], drivers);
     const ra = a.last('results')!;
     const rb = b.last('results')!;
     expect(JSON.stringify(rb)).toBe(JSON.stringify(ra));
