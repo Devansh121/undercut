@@ -145,6 +145,11 @@ export class DriveSession {
     return this.drsAvailableValue;
   }
 
+  /** A ghost of the current lap is being recorded (false once the lap is invalid or too long). */
+  get ghostRecording(): boolean {
+    return this.recorder.recording;
+  }
+
   /** The record lap's ghost, if there is one. */
   get ghost(): Ghost | null {
     return this.ghostValue;

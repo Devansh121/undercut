@@ -86,3 +86,33 @@ describe('track limits at the finish line', () => {
     expect(session.timer.valid).toBe(true);
   });
 });
+
+describe('ghost recording on an invalid lap', () => {
+  it('stops recording when the lap is invalidated, while lap timing carries on', () => {
+    let session: DriveSession | null = null;
+    const tick = (): number => session?.world.tick ?? 0;
+    // Four off for one tick about 10 s into the session (well after the line).
+    session = new DriveSession({
+      track,
+      seed: 1,
+      limits: new ScriptedLimits(tick, new Map([[2400, 4]])),
+    });
+    const s = session;
+    const source = new AutopilotControlSource(
+      new InputSystem(),
+      new KeyboardAutopilot(track, s.params),
+      () => s.car.state,
+    );
+    s.start();
+    let recordingBefore = false;
+    for (let i = 0; i < 2600; i++) {
+      const f = source.sample(s.world.step, s.car.state.vx);
+      s.tick(f.control, f.device);
+      if (s.world.tick === 2399) recordingBefore = s.ghostRecording;
+    }
+    expect(recordingBefore).toBe(true);
+    expect(s.timer.running).toBe(true);
+    expect(s.timer.valid).toBe(false);
+    expect(s.ghostRecording).toBe(false);
+  });
+});
