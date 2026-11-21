@@ -68,7 +68,7 @@ function checkAll(meshes: TrackMeshes): void {
   for (const [name, m] of Object.entries(meshes)) checkMesh(name, m);
 }
 
-/** Terrain height under (x, z), bilinear on the regular grid. */
+/** Terrain height under (x, z) on the grid's own triangles (split from the cell's north-east corner). */
 function terrainAt(t: MeshData, x: number, z: number): number {
   const x0 = t.positions[0]!;
   const z0 = t.positions[2]!;
@@ -82,10 +82,34 @@ function terrainAt(t: MeshData, x: number, z: number): number {
   const at = (rr: number, cc: number): number => t.positions[3 * (rr * cols + cc) + 1]!;
   const u = fc - c;
   const v = fr - r;
-  return (
-    (at(r, c) * (1 - u) + at(r, c + 1) * u) * (1 - v) +
-    (at(r + 1, c) * (1 - u) + at(r + 1, c + 1) * u) * v
-  );
+  if (u + v <= 1) return at(r, c) + u * (at(r, c + 1) - at(r, c)) + v * (at(r + 1, c) - at(r, c));
+  const h11 = at(r + 1, c + 1);
+  return h11 + (1 - u) * (at(r + 1, c) - h11) + (1 - v) * (at(r, c + 1) - h11);
+}
+
+/** Smallest height of a mesh above the terrain over its vertices, edge midpoints and centroids. */
+function clearance(m: MeshData, t: MeshData): { gap: number; where: string } {
+  const p = m.positions;
+  let gap = Infinity;
+  let where = '';
+  const probe = (x: number, y: number, z: number): void => {
+    const g = y - terrainAt(t, x, z);
+    if (g < gap) {
+      gap = g;
+      where = `x ${x.toFixed(2)} z ${z.toFixed(2)}`;
+    }
+  };
+  for (let k = 0; k < m.indices.length; k += 3) {
+    const v = [m.indices[k]!, m.indices[k + 1]!, m.indices[k + 2]!].map((i) => [
+      p[3 * i]!,
+      p[3 * i + 1]!,
+      p[3 * i + 2]!,
+    ]);
+    const pts = [...v, ...[0, 1, 2].map((e) => v[e]!.map((c, j) => (c + v[(e + 1) % 3]![j]!) / 2))];
+    pts.push([0, 1, 2].map((j) => (v[0]![j]! + v[1]![j]! + v[2]![j]!) / 3));
+    for (const q of pts) probe(q[0]!, q[1]!, q[2]!);
+  }
+  return { gap, where };
 }
 
 describe('track meshes on a synthetic stadium', () => {
@@ -141,13 +165,16 @@ describe('track meshes on Monza', () => {
     );
   });
 
-  it('keeps the terrain below the road everywhere and reaches well beyond the barriers', () => {
-    const r = high.road.positions;
-    let worst = Infinity;
-    for (let k = 0; k < r.length; k += 3) {
-      worst = Math.min(worst, r[k + 1]! - terrainAt(high.terrain, r[k]!, r[k + 2]!));
+  it('keeps the terrain below every drivable surface and reaches well beyond the barriers', () => {
+    for (const [lod, m] of [
+      ['high', high],
+      ['mobile', mobile],
+    ] as const) {
+      for (const name of ['road', 'lines', 'kerbs', 'runoff', 'pit', 'markings'] as const) {
+        const { gap, where } = clearance(m[name], m.terrain);
+        expect(gap, `${lod} ${name} at ${where}`).toBeGreaterThan(0.2);
+      }
     }
-    expect(worst).toBeGreaterThan(0.2);
     const t = high.terrain.positions;
     let minX = Infinity;
     let maxX = -Infinity;

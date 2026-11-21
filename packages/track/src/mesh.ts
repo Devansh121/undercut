@@ -573,7 +573,19 @@ function buildMarkings(track: Track, marks: MeshBuilder): MeshData {
   return marks.build();
 }
 
-function buildTerrain(track: Track, cell: number, margin: number): MeshData {
+/**
+ * The ground around the track: a regular grid whose heights follow the centreline elevation
+ * (inverse-distance weighted), then lowered under every drivable mesh. Those meshes are built
+ * from the same ground function the surface sampler uses, so clamping each grid corner under a
+ * drivable triangle to TERRAIN_DROP below that triangle's lowest vertex keeps the whole terrain
+ * surface (which interpolates its corners) below the whole drivable surface.
+ */
+function buildTerrain(
+  track: Track,
+  cell: number,
+  margin: number,
+  drivable: readonly MeshData[],
+): MeshData {
   const lap = track.lap;
   let minX = Infinity;
   let minZ = Infinity;
@@ -617,6 +629,32 @@ function buildTerrain(track: Track, cell: number, margin: number): MeshData {
       h[r * cols + c] = ysum / wsum - TERRAIN_DROP;
     }
   }
+  for (const m of drivable) {
+    const p = m.positions;
+    for (let k = 0; k < m.indices.length; k += 3) {
+      let x0t = Infinity;
+      let x1t = -Infinity;
+      let z0t = Infinity;
+      let z1t = -Infinity;
+      let ymin = Infinity;
+      for (let e = 0; e < 3; e++) {
+        const v = 3 * m.indices[k + e]!;
+        x0t = Math.min(x0t, p[v]!);
+        x1t = Math.max(x1t, p[v]!);
+        ymin = Math.min(ymin, p[v + 1]!);
+        z0t = Math.min(z0t, p[v + 2]!);
+        z1t = Math.max(z1t, p[v + 2]!);
+      }
+      const cap = ymin - TERRAIN_DROP;
+      const c0 = Math.max(0, Math.floor((x0t - x0) / cell));
+      const c1 = Math.min(cols - 1, Math.floor((x1t - x0) / cell) + 1);
+      const r0 = Math.max(0, Math.floor((z0t - z0) / cell));
+      const r1 = Math.min(rowsN - 1, Math.floor((z1t - z0) / cell) + 1);
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) if (h[r * cols + c]! > cap) h[r * cols + c] = cap;
+      }
+    }
+  }
   const b = new MeshBuilder();
   for (let r = 0; r < rowsN; r++) {
     for (let c = 0; c < cols; c++) {
@@ -651,14 +689,16 @@ export function buildTrackMeshes(
   const rowList = rows(track, options.stride);
   const { road, lines } = buildRoad(track, rowList);
   const { pit, marks } = buildPit(track, options.stride);
-  return {
+  const kerbs = buildKerbs(track, rowList);
+  const runoff = buildRunoff(track, rowList);
+  const markings = buildMarkings(track, marks);
+  const terrain = buildTerrain(track, options.terrainCell, options.terrainMargin, [
     road,
     lines,
-    kerbs: buildKerbs(track, rowList),
-    runoff: buildRunoff(track, rowList),
-    terrain: buildTerrain(track, options.terrainCell, options.terrainMargin),
-    barriers: buildBarriers(track),
+    kerbs,
+    runoff,
     pit,
-    markings: buildMarkings(track, marks),
-  };
+    markings,
+  ]);
+  return { road, lines, kerbs, runoff, terrain, barriers: buildBarriers(track), pit, markings };
 }
