@@ -233,7 +233,11 @@ export function trussTowerGeometry(): BufferGeometry {
 }
 
 /** Brand atlas instanced material: selects one of the 20 invented brand slots per instance position. */
-export function brandHoardingMaterial(atlas: Texture): MeshStandardMaterial {
+/**
+ * `gltfUv`: the face's uv follows glTF (v = 0 at the top of the artwork), as on catalogue models;
+ * the brand atlas is a canvas texture with v up, so v is turned over.
+ */
+export function brandHoardingMaterial(atlas: Texture, gltfUv = false): MeshStandardMaterial {
   const m = new MeshStandardMaterial({
     map: atlas,
     roughness: 0.52,
@@ -254,12 +258,12 @@ export function brandHoardingMaterial(atlas: Texture): MeshStandardMaterial {
         float row = floor(slot / ${BRAND_ATLAS_COLS.toFixed(1)});
         // CanvasTexture has flipY=true: row 0 is at the top (v near 1).
         float vRow = ${(BRAND_ATLAS_ROWS - 1).toFixed(1)} - row;
-        vMapUv = vec2((col + uv.x) / ${BRAND_ATLAS_COLS.toFixed(1)}, (vRow + uv.y) / ${BRAND_ATLAS_ROWS.toFixed(1)});
+        vMapUv = vec2((col + uv.x) / ${BRAND_ATLAS_COLS.toFixed(1)}, (vRow + ${gltfUv ? '1.0 - uv.y' : 'uv.y'}) / ${BRAND_ATLAS_ROWS.toFixed(1)});
       }
       #endif`,
     );
   };
-  m.customProgramCacheKey = () => 'brand-hoarding-v1';
+  m.customProgramCacheKey = () => `brand-hoarding-v1-${gltfUv ? 'gltf' : 'up'}`;
   return m;
 }
 
@@ -997,8 +1001,10 @@ export function placeTracksideFurniture(options: {
   const farDist = mobile ? 450 : 950;
   const distScale = mobile ? 0.55 : 1;
 
+  const kitHoardMat = brandHoardingMaterial(brandAtlasTex, true);
+  materials.push(kitHoardMat);
   const kitHoarding = propKit?.lodsFor('hoarding', {
-    materialOverrides: { 'board-face': hoardMat },
+    materialOverrides: { 'board-face': kitHoardMat },
     maxDistanceScale: distScale,
   });
   const hasKitHoarding = Boolean(kitHoarding);
@@ -1185,8 +1191,9 @@ export function placeTracksideFurniture(options: {
       const col = slot % 4;
       const row = Math.floor(slot / 4);
       const slotTex = signageAtlasTex.clone();
-      slotTex.repeat.set(0.25, 0.5);
-      slotTex.offset.set(col * 0.25, (1 - row) * 0.5);
+      // Catalogue faces use glTF uv (v = 0 at the top); the atlas is a canvas texture (v up).
+      slotTex.repeat.set(0.25, -0.5);
+      slotTex.offset.set(col * 0.25, 1 - row * 0.5);
       slotTex.needsUpdate = true;
       textures?.push(slotTex);
       const slotMat = new MeshStandardMaterial({
@@ -1374,7 +1381,11 @@ export function placeTracksideFurniture(options: {
     });
   }
   const usedHoard = new Set<string>();
-  const hoardStep = mobile ? 14 : 6.2;
+  // Board pitch: the catalogue module (plus a hand's gap) when the kit's hoarding is in use.
+  const hoardPitch = hasKitHoarding
+    ? (propKit?.entries.get('hoarding')?.moduleLength ?? 4) + 0.1
+    : 6.2;
+  const hoardStep = mobile ? 14 : hoardPitch;
   for (const run of hoardingRuns) {
     const span = run.s1 >= run.s0 ? run.s1 - run.s0 : L - run.s0 + run.s1;
     for (let ds = 0; ds < span; ds += run.step ?? hoardStep) {
@@ -1410,7 +1421,7 @@ export function placeTracksideFurniture(options: {
   // Grandstand front-wall brand banners (mounted cleanly along the concrete front wall of each stand).
   for (const st of stands) {
     const yawFront = Math.atan2(st.bz, -st.bx);
-    for (let u = 3.5; u < st.length - 3.5; u += 6.2) {
+    for (let u = 3.5; u < st.length - 3.5; u += hoardPitch) {
       const x = st.ox + st.ax * u - st.bx * 0.16;
       const z = st.oz + st.az * u - st.bz * 0.16;
       placeHoarding(x, st.base + 0.3, z, yawFront, st.s);
@@ -1502,7 +1513,8 @@ export function placeTracksideFurniture(options: {
   let boards = 0;
   const placeSign = (id: string, x: number, y: number, z: number, yaw: number, s: number): void => {
     props.place(`${id}-face`, { x, y, z, yaw, s });
-    props.place(`${id}-post`, { x, y, z, yaw, s });
+    // A catalogue board is one model (face and posts); the stand-in is two kinds.
+    if (!kitSigns.has(id)) props.place(`${id}-post`, { x, y, z, yaw, s });
     boards++;
   };
   // Identify primary braking zones (first corner of each chicane or distinct corner separated > 200 m).

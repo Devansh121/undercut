@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { AssetLoader } from '../assets/loader';
 import type { Quality } from '../quality';
 import type { PropLod } from './registry';
+import worldProps from '../../data/world-props.json';
 
 /** One LOD entry inside `packages/render/data/props.catalog.json`. */
 export interface PropCatalogLod {
@@ -58,25 +59,10 @@ export interface PropCatalog {
 }
 
 /**
- * Prop IDs from `props.catalog.json` that `CircuitWorld` consumes when present.
- * Keeping the list explicit ensures only props placed by the world are fetched on load.
+ * Prop ids from `props.catalog.json` that `CircuitWorld` places (packages/render/data/
+ * world-props.json, also read by the budget check): only these are fetched on load.
  */
-export const WORLD_CATALOG_PROP_IDS: readonly string[] = Object.freeze([
-  'pit-wall',
-  'crew-engineer-seated',
-  'crew-mechanic-standing',
-  'crowd-seated-0',
-  'crowd-seated-1',
-  'crowd-seated-2',
-  'hoarding',
-  'catch-fence',
-  'braking-board',
-  'zone-board',
-  'marshal-post',
-  'absorber-block',
-  'screen-tower',
-  'camera-tower',
-]);
+export const WORLD_CATALOG_PROP_IDS: readonly string[] = Object.freeze([...worldProps.ids]);
 
 /** Material names that should receive per-instance colour tinting (team colours / crowd clothes). */
 const TINTABLE_SLOTS = new Set(['clothing', 'paint-band', 'seat', 'team-tint']);
@@ -252,12 +238,17 @@ function preparePropMaterial(mat: Material, anisotropy: number, ignoreInstanceTi
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = function (shader, renderer) {
       prev.call(this, shader, renderer);
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <color_fragment>',
-        `#if defined( USE_COLOR_ALPHA )
-          diffuseColor *= vColor;
+      // three.js's colour chunk multiplies in the instance colour; leave it out here (vColor is
+      // a vec4 in this three.js).
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <color_vertex>',
+        `#if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA ) || defined( USE_INSTANCING_COLOR )
+          vColor = vec4( 1.0 );
+        #endif
+        #ifdef USE_COLOR_ALPHA
+          vColor *= color;
         #elif defined( USE_COLOR )
-          diffuseColor.rgb *= vColor;
+          vColor.rgb *= color;
         #endif`,
       );
     };
