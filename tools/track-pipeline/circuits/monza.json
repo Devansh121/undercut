@@ -82,7 +82,7 @@
     }
   ],
   "timing": {
-    "note": "Offsets from the 2025 circuit map (docs/track-data.md section 4). A corner's position is its curvature apex.",
+    "note": "Offsets from the 2025 circuit map (docs/track-data.md section 4). A corner's position is its curvature apex. The map's 'finish line' is the timing (control) line, 320.5 m before the start line at s = 0, so DRS activation 2 is 12 m after the timing line; the zone runs through s = 0 to turn 1.",
     "sectors": [
       {
         "corner": 4,
@@ -114,10 +114,32 @@
           "offset": 20
         },
         "activation": {
-          "s": 12
+          "line": "timing",
+          "offset": 12
         }
       }
     ]
+  },
+  "timingLine": {
+    "note": "The control line, from which lap and sector times run. It is not the start line (s = 0, the OpenStreetMap start node).",
+    "at": {
+      "s": 5472.5
+    },
+    "uncertainty": 13.0,
+    "source": "FIA 2025 Monza circuit map: the map's drawn track fitted to this centreline (median miss 3.4 m) and the control-line tick projected onto it; 320.5 m before the start line. The map's S1, S2 and speed-trap ticks land 8.0, 6.6 and 12.6 m from their stored positions under the same fit, hence +/- 13 m (docs/physics-validation.md section 7.6)."
+  },
+  "environment": {
+    "note": "Air temperature is an estimate of a typical race afternoon (early September, Lombardy). Pressure is the ISA value at the lap's mean altitude. Session times are the 2025 event's local start times.",
+    "timeZone": "Europe/Rome",
+    "utcOffset": 7200,
+    "raceDate": "2025-09-07",
+    "sessions": {
+      "qualifying": 57600,
+      "race": 54000
+    },
+    "airTemperature": 299.15,
+    "lighting": "daylight",
+    "floodlights": null
   },
   "grid": {
     "note": "Estimates: pole 5 m behind the line on the right (inside of turn 1), 8 m between slots, 2.8 m either side of the centreline.",

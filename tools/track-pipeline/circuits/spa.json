@@ -1,0 +1,990 @@
+{
+  "id": "spa",
+  "name": "Spa-Francorchamps",
+  "country": "Belgium",
+  "direction": "clockwise",
+  "officialLength": 7004.0,
+  "referenceWidth": 10.0,
+  "osm": {
+    "relation": 284560,
+    "pitWay": 323851541,
+    "bbox": [50.425, 5.955, 50.448, 5.99]
+  },
+  "geometry": {
+    "denseStep": 0.5,
+    "smoothSigma": 6.0,
+    "sampleStep": 2.0,
+    "maxLengthChangePct": 0.2,
+    "startHeadingDeg": [320, 340]
+  },
+  "cornerRule": {
+    "note": "Spa's official numbering counts the Eau Rouge left (about 17 degrees of turn) and splits Pouhon (turns 10 and 11) and Campus and Stavelot (turns 14 and 15), which the default rule merges or drops. A higher entry threshold, a 30 m merge gap and a 15 degree minimum find exactly the 19 official corners in order.",
+    "enter": 0.003333333,
+    "exit": 0.001666667,
+    "mergeGap": 30,
+    "minTurn": 15
+  },
+  "elevation": {
+    "note": "90 m average and 20 m Gaussian, no opening (docs/track-data.md section 2.2), so Raidillon is not softened further. One targeted correction: along Kemmel (s 1325 to 2150 m) the surface model has a narrow bump of about 6 m at s 1400 to 1450 m followed by a flat (probably a structure or canopy over the track) and a smaller wiggle near s 2000 m; they put crests of -1.5 g and -0.6 g at 300 km/h on the straight. Over that span the profile is replaced by a cubic matching height and grade at both ends. A second on the descent to Pouhon (s 3400 to 3640 m): a 100 m ledge at about -4 % followed by -9.6 % (-0.7 g at 300 km/h) where the operator's labels give a steady -7.3 %. A third after Blanchimont (s 5900 to 6600 m): the surface model squeezes the climb to the Bus Stop into a 10 % step of 15 m over 150 m with a dip after it (+1.3 g and -1.2 g at 300 km/h), where the operator's altitude labels show a steady 2 to 3 %.",
+    "openWindow": 0,
+    "average": 90,
+    "gradeSigma": 20,
+    "publishedRange": 102.2,
+    "rangeTolerance": 3.0,
+    "corrections": [
+      {
+        "from": {
+          "corner": 4,
+          "offset": 157
+        },
+        "to": {
+          "corner": 4,
+          "offset": 982
+        },
+        "note": "Surface-model bump on early Kemmel (s 1400 to 1450 m, about 6 m) and wiggle near s 2000 m replaced by a cubic matching height and grade at both ends (estimate of the real smooth climb)."
+      },
+      {
+        "from": {
+          "corner": 9,
+          "offset": 222
+        },
+        "to": {
+          "corner": 10,
+          "offset": -126
+        },
+        "note": "Surface-model ledge on the descent to Pouhon (about -4 % over s 3450 to 3550 m, then -9.6 %) replaced by a cubic matching height and grade at both ends. The operator's altitude labels give a steady -7.3 % from 438 m at 3110 m to 402 m at 3600 m."
+      },
+      {
+        "from": {
+          "corner": 16,
+          "offset": 90
+        },
+        "to": {
+          "corner": 18,
+          "offset": -34
+        },
+        "note": "Surface-model step after Blanchimont (15 m over s 6050 to 6200 m, 10 %, then a dip; the stretch is lined with forest) replaced by a cubic matching height and grade at both ends. The circuit operator's altitude labels give a steady 2 to 3 % climb here: 388 m at 5700 m, 398 m at 6000 m, 408 m at 6540 m, 418 m at the line."
+      }
+    ]
+  },
+  "corners": [
+    {
+      "number": 1,
+      "name": "La Source",
+      "direction": "right"
+    },
+    {
+      "number": 2,
+      "name": "Eau Rouge",
+      "direction": "left"
+    },
+    {
+      "number": 3,
+      "name": "Raidillon",
+      "direction": "right"
+    },
+    {
+      "number": 4,
+      "name": "Raidillon",
+      "direction": "left"
+    },
+    {
+      "number": 5,
+      "name": "Les Combes",
+      "direction": "right"
+    },
+    {
+      "number": 6,
+      "name": "Les Combes",
+      "direction": "left"
+    },
+    {
+      "number": 7,
+      "name": "Malmedy",
+      "direction": "right"
+    },
+    {
+      "number": 8,
+      "name": "Bruxelles",
+      "direction": "right"
+    },
+    {
+      "number": 9,
+      "name": "Speaker's Corner",
+      "direction": "left"
+    },
+    {
+      "number": 10,
+      "name": "Pouhon",
+      "direction": "left"
+    },
+    {
+      "number": 11,
+      "name": "Pouhon",
+      "direction": "left"
+    },
+    {
+      "number": 12,
+      "name": "Les Fagnes",
+      "direction": "right"
+    },
+    {
+      "number": 13,
+      "name": "Les Fagnes",
+      "direction": "left"
+    },
+    {
+      "number": 14,
+      "name": "Campus",
+      "direction": "right"
+    },
+    {
+      "number": 15,
+      "name": "Stavelot",
+      "direction": "right"
+    },
+    {
+      "number": 16,
+      "name": "Blanchimont",
+      "direction": "left"
+    },
+    {
+      "number": 17,
+      "name": "Blanchimont",
+      "direction": "left"
+    },
+    {
+      "number": 18,
+      "name": "Bus Stop",
+      "direction": "right"
+    },
+    {
+      "number": 19,
+      "name": "Bus Stop",
+      "direction": "left"
+    }
+  ],
+  "timing": {
+    "note": "Offsets from the 2025 circuit map (docs/track-data.md section 4). A corner's position is its curvature apex, except for sector 2: Stavelot (turn 15) is a long corner, and the map's sector 2 tick lands 5 m from 48 m before the corner's start but 67 m from 48 m before its apex, so the line is placed from the start.",
+    "sectors": [
+      {
+        "corner": 5,
+        "offset": -145
+      },
+      {
+        "corner": 15,
+        "offset": -48,
+        "at": "start"
+      }
+    ],
+    "speedTrap": {
+      "corner": 4,
+      "offset": 30
+    },
+    "drs": [
+      {
+        "detection": {
+          "corner": 2,
+          "offset": -240
+        },
+        "activation": {
+          "corner": 4,
+          "offset": 305
+        }
+      },
+      {
+        "detection": {
+          "corner": 18,
+          "offset": -160
+        },
+        "activation": {
+          "corner": 19,
+          "offset": 30
+        }
+      }
+    ]
+  },
+  "timingLine": {
+    "note": "The control line, from which lap and sector times run. It is not the start line (s = 0, the OpenStreetMap start node).",
+    "at": {
+      "s": 6875.4
+    },
+    "uncertainty": 15.0,
+    "source": "FIA 2025 Belgian circuit map: the map's drawn track fitted to this centreline with tools/research/map_fit.py (similarity transform, median miss 4.7 m) and the control-line tick projected onto it; 128.6 m before the start line. Under the same fit the speed-trap tick lands 2 m and the sector 2 tick 5 m from their stored positions, and the sector 1 tick 15 m (its centroid is pulled off the track by the label), hence +/- 15 m."
+  },
+  "environment": {
+    "note": "Air temperature is an estimate of a typical race afternoon (late July, Ardennes, about 450 m up). Pressure is the ISA value at the lap's mean altitude. Session times are the 2025 event's local start times.",
+    "timeZone": "Europe/Brussels",
+    "utcOffset": 7200,
+    "raceDate": "2025-07-27",
+    "sessions": {
+      "qualifying": 57600,
+      "race": 54000
+    },
+    "airTemperature": 293.15,
+    "lighting": "daylight",
+    "floodlights": null
+  },
+  "grid": {
+    "note": "Estimates: pole 5 m behind the line on the right (the 2025 pit-lane drawing marks pole on the right-hand side, the inside of La Source), 8 m between slots, 2.8 m either side of the centreline.",
+    "slots": 20,
+    "poleS": -5.0,
+    "spacing": 8.0,
+    "lateral": 2.8,
+    "poleSide": "right"
+  },
+  "widths": {
+    "note": "Half-widths left and right in metres, linear between keys. Estimates: FIA reference width 10 m as the floor; the wide start straight, La Source, the Kemmel straight and the approach to the Bus Stop follow the shape of the TUMFTM width profile used as a local reference only (about 10 % above it, as at Monza).",
+    "keys": [
+      [
+        {
+          "s": 0
+        },
+        7.5,
+        7.5
+      ],
+      [
+        {
+          "corner": 1,
+          "offset": 80
+        },
+        7.5,
+        7.5
+      ],
+      [
+        {
+          "corner": 1,
+          "offset": 160
+        },
+        9.0,
+        8.5
+      ],
+      [
+        {
+          "corner": 2,
+          "offset": -380
+        },
+        6.5,
+        6.5
+      ],
+      [
+        {
+          "corner": 2,
+          "offset": -250
+        },
+        5.5,
+        5.5
+      ],
+      [
+        {
+          "corner": 2
+        },
+        5.3,
+        5.3
+      ],
+      [
+        {
+          "corner": 4,
+          "offset": 100
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 5,
+          "offset": -500
+        },
+        5.3,
+        5.3
+      ],
+      [
+        {
+          "corner": 5,
+          "offset": -60
+        },
+        5.3,
+        5.3
+      ],
+      [
+        {
+          "corner": 5,
+          "offset": 100
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 9,
+          "offset": 120
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 9,
+          "offset": 240
+        },
+        6.0,
+        6.0
+      ],
+      [
+        {
+          "corner": 10,
+          "offset": -300
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 16,
+          "offset": -200
+        },
+        5.0,
+        5.0
+      ],
+      [
+        {
+          "corner": 17,
+          "offset": -50
+        },
+        5.2,
+        5.2
+      ],
+      [
+        {
+          "corner": 18,
+          "offset": -160
+        },
+        5.8,
+        5.8
+      ],
+      [
+        {
+          "corner": 19,
+          "offset": 60
+        },
+        6.0,
+        6.0
+      ],
+      [
+        {
+          "corner": 19,
+          "offset": 200
+        },
+        7.5,
+        7.5
+      ]
+    ]
+  },
+  "banking": {
+    "note": "Crossfall per corner in degrees, positive raises the left edge. Estimates: no open dataset has camber; Raidillon, Pouhon and Stavelot are known to be cambered into the turn.",
+    "ramp": 30,
+    "corners": [
+      {
+        "corner": 1,
+        "deg": 1.0
+      },
+      {
+        "corner": 2,
+        "deg": -2.0
+      },
+      {
+        "corner": 3,
+        "deg": 2.5
+      },
+      {
+        "corner": 4,
+        "deg": -1.5
+      },
+      {
+        "corner": 8,
+        "deg": 1.0
+      },
+      {
+        "corner": 10,
+        "deg": -2.0
+      },
+      {
+        "corner": 11,
+        "deg": -2.0
+      },
+      {
+        "corner": 15,
+        "deg": 2.0
+      },
+      {
+        "corner": 17,
+        "deg": -1.5
+      }
+    ]
+  },
+  "kerbProfiles": [
+    {
+      "name": "flat",
+      "note": "Low painted kerb with a ramped inner edge. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.35, 0.05],
+        [1.5, 0]
+      ],
+      "high": null,
+      "taper": 3.0
+    },
+    {
+      "name": "exit",
+      "note": "Wide, very low exit kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.1, 0.02],
+        [2.3, 0.03],
+        [2.5, 0]
+      ],
+      "high": null,
+      "taper": 3.0
+    },
+    {
+      "name": "chicane",
+      "note": "Flat kerb followed by a raised sausage kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.4, 0.05],
+        [1.6, 0.05],
+        [1.75, 0.13],
+        [2.05, 0.13],
+        [2.2, 0]
+      ],
+      "high": [1.6, 2.2],
+      "taper": 4.0
+    }
+  ],
+  "kerbs": {
+    "note": "Estimates from the corner list: inside apex kerbs, outside exit kerbs, sausage kerbs at the Bus Stop. Offsets in metres from the apex; side is inside or outside of the corner.",
+    "items": [
+      {
+        "corner": 1,
+        "side": "inside",
+        "from": -20,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 1,
+        "side": "outside",
+        "from": 15,
+        "to": 70,
+        "profile": "exit"
+      },
+      {
+        "corner": 2,
+        "side": "inside",
+        "from": -25,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 3,
+        "side": "inside",
+        "from": -30,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 3,
+        "side": "outside",
+        "from": 40,
+        "to": 90,
+        "profile": "exit"
+      },
+      {
+        "corner": 4,
+        "side": "inside",
+        "from": -25,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 4,
+        "side": "outside",
+        "from": 15,
+        "to": 80,
+        "profile": "exit"
+      },
+      {
+        "corner": 5,
+        "side": "inside",
+        "from": -20,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 5,
+        "side": "outside",
+        "from": -50,
+        "to": -15,
+        "profile": "flat"
+      },
+      {
+        "corner": 6,
+        "side": "inside",
+        "from": -20,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 6,
+        "side": "outside",
+        "from": 15,
+        "to": 60,
+        "profile": "exit"
+      },
+      {
+        "corner": 7,
+        "side": "inside",
+        "from": -25,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 7,
+        "side": "outside",
+        "from": 25,
+        "to": 80,
+        "profile": "exit"
+      },
+      {
+        "corner": 8,
+        "side": "inside",
+        "from": -40,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 8,
+        "side": "outside",
+        "from": 50,
+        "to": 110,
+        "profile": "exit"
+      },
+      {
+        "corner": 9,
+        "side": "inside",
+        "from": -25,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 9,
+        "side": "outside",
+        "from": 25,
+        "to": 80,
+        "profile": "exit"
+      },
+      {
+        "corner": 10,
+        "side": "inside",
+        "from": -40,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 11,
+        "side": "inside",
+        "from": -40,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 11,
+        "side": "outside",
+        "from": 40,
+        "to": 110,
+        "profile": "exit"
+      },
+      {
+        "corner": 12,
+        "side": "inside",
+        "from": -25,
+        "to": 15,
+        "profile": "flat"
+      },
+      {
+        "corner": 13,
+        "side": "inside",
+        "from": -20,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 13,
+        "side": "outside",
+        "from": 25,
+        "to": 80,
+        "profile": "exit"
+      },
+      {
+        "corner": 14,
+        "side": "inside",
+        "from": -25,
+        "to": 20,
+        "profile": "flat"
+      },
+      {
+        "corner": 15,
+        "side": "inside",
+        "from": -40,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 15,
+        "side": "outside",
+        "from": 40,
+        "to": 110,
+        "profile": "exit"
+      },
+      {
+        "corner": 16,
+        "side": "inside",
+        "from": -30,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 17,
+        "side": "inside",
+        "from": -30,
+        "to": 30,
+        "profile": "flat"
+      },
+      {
+        "corner": 18,
+        "side": "inside",
+        "from": -14,
+        "to": 10,
+        "profile": "chicane"
+      },
+      {
+        "corner": 18,
+        "side": "outside",
+        "from": -40,
+        "to": -8,
+        "profile": "flat"
+      },
+      {
+        "corner": 19,
+        "side": "inside",
+        "from": -10,
+        "to": 14,
+        "profile": "chicane"
+      },
+      {
+        "corner": 19,
+        "side": "outside",
+        "from": 12,
+        "to": 70,
+        "profile": "exit"
+      }
+    ]
+  },
+  "runoff": {
+    "note": "Gravel comes from OpenStreetMap gravel and sand polygons within maxScan of the edge. The kind nearest the track is authored (estimates): asphalt at the heavy-braking corners and the fast sweeps, grass elsewhere.",
+    "lineWidth": 0.2,
+    "maxScan": 45,
+    "minGravelLength": 20,
+    "default": "grass",
+    "items": [
+      {
+        "from": {
+          "corner": 1,
+          "offset": -120
+        },
+        "to": {
+          "corner": 1,
+          "offset": 60
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 1,
+          "offset": -40
+        },
+        "to": {
+          "corner": 1,
+          "offset": 40
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 2,
+          "offset": -60
+        },
+        "to": {
+          "corner": 4,
+          "offset": 120
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 3,
+          "offset": 40
+        },
+        "to": {
+          "corner": 4,
+          "offset": 150
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 5,
+          "offset": -150
+        },
+        "to": {
+          "corner": 7,
+          "offset": 80
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 6,
+          "offset": -30
+        },
+        "to": {
+          "corner": 6,
+          "offset": 60
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -120
+        },
+        "to": {
+          "corner": 8,
+          "offset": 120
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 10,
+          "offset": -80
+        },
+        "to": {
+          "corner": 11,
+          "offset": 120
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 15,
+          "offset": -60
+        },
+        "to": {
+          "corner": 15,
+          "offset": 120
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 16,
+          "offset": -60
+        },
+        "to": {
+          "corner": 17,
+          "offset": 120
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 18,
+          "offset": -150
+        },
+        "to": {
+          "corner": 19,
+          "offset": 60
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 18,
+          "offset": -60
+        },
+        "to": {
+          "corner": 19,
+          "offset": 40
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "pit": "entry",
+          "offset": 40
+        },
+        "to": {
+          "pit": "exit",
+          "offset": -40
+        },
+        "side": "right",
+        "kind": "asphalt"
+      }
+    ]
+  },
+  "barriers": {
+    "note": "Offsets from the centreline in metres. Where OpenStreetMap maps a wall, fence or guard rail within maxScan of the edge it is used; elsewhere the default rule applies: minimum run-off beyond the edge, and at least `behindGravel` metres behind mapped gravel. OpenStreetMap fences along the track are the debris fences on top of the guard rails, so they are read as Armco, and type changes shorter than 20 m are merged into the run before them. Types and authored offsets are estimates: tyre walls on the outside of the braking zones and fast corners, Armco elsewhere. On the pit side the pit wall stands halfway between the track edge and the pit lane.",
+    "maxScan": 45,
+    "minRunoff": 9,
+    "behindGravel": 3,
+    "default": "armco",
+    "mappedTypes": {
+      "fence": "armco"
+    },
+    "clampToFrame": true,
+    "minTypeRun": 20,
+    "items": [
+      {
+        "from": {
+          "corner": 1,
+          "offset": -60
+        },
+        "to": {
+          "corner": 1,
+          "offset": 80
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 3,
+          "offset": -20
+        },
+        "to": {
+          "corner": 4,
+          "offset": 80
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 5,
+          "offset": -80
+        },
+        "to": {
+          "corner": 5,
+          "offset": 40
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -60
+        },
+        "to": {
+          "corner": 8,
+          "offset": 80
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 10,
+          "offset": -40
+        },
+        "to": {
+          "corner": 11,
+          "offset": 80
+        },
+        "side": "right",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 15,
+          "offset": -40
+        },
+        "to": {
+          "corner": 15,
+          "offset": 80
+        },
+        "side": "left",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 17,
+          "offset": -60
+        },
+        "to": {
+          "corner": 17,
+          "offset": 100
+        },
+        "side": "right",
+        "type": "tyres"
+      },
+      {
+        "from": {
+          "corner": 18,
+          "offset": -60
+        },
+        "to": {
+          "corner": 18,
+          "offset": 20
+        },
+        "side": "left",
+        "type": "tyres"
+      }
+    ]
+  },
+  "pit": {
+    "note": "Path from the OpenStreetMap pit-lane way. Widths, limit lines and boxes are estimates.",
+    "side": "right",
+    "speedLimitKmh": 80,
+    "limitStart": 110,
+    "limitEndFromExit": 120,
+    "widths": [
+      [0, 2.5, 2.5],
+      [60, 3.5, 3.5],
+      [160, 3.5, 9.0],
+      [-160, 3.5, 9.0],
+      [-60, 3.5, 3.5],
+      [-1, 2.5, 2.5]
+    ],
+    "boxes": {
+      "count": 10,
+      "spacing": 20.0,
+      "lateral": -5.5
+    }
+  }
+}
