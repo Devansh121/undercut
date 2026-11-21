@@ -76,12 +76,12 @@ await new Promise((resolve) => server.close(resolve));
 function sent(rel) {
   return sentCache.has(rel) ? sentCache.get(rel) : null;
 }
-// Build outputs the game loads: everything outside assets/{tex,env,car,draco} and the asset index,
-// except source maps, the input lab and the bundler's unused Draco decoder copies.
+// Build outputs the game loads: everything outside assets/{tex,env,car,draco,props} and the asset
+// index, except source maps, the input lab and the bundler's unused Draco decoder copies.
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
-    !/^assets\/(tex|env|car|draco)\//.test(f) &&
+    !/^assets\/(tex|env|car|draco|props)\//.test(f) &&
     f !== 'assets/index.json' &&
     !/input-?lab/i.test(f) &&
     !/^assets\/draco_(decoder|wasm_wrapper)-/.test(f),
@@ -162,8 +162,19 @@ fs.writeFileSync(
     2,
   )}\n`,
 );
+const propCatalogue = JSON.parse(
+  fs.readFileSync(path.join(root, 'packages/render/data/props.catalog.json'), 'utf8'),
+);
+// Reserve every prop LOD until the dressing consumer defines the fetched subset. Keep the
+// first-race inventory exact: these files are delivered but not loaded by the game yet.
+const propReserve = propCatalogue.totalBytes;
 const checks = [
   ['JS, as sent', jsSent, budget.jsGzipMaxBytes],
+  [
+    'First race plus complete prop kit reserve',
+    worst.total + propReserve,
+    budget.firstRaceTransferMaxBytes,
+  ],
   [
     `First-race transfer (${worst.name}, the largest preset)`,
     worst.total,

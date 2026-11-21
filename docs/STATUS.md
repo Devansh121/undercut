@@ -155,3 +155,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 ## Optional, needs you
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
+
+### Decided for you — modular prop kit
+
+- Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
+- Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
+- Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
+- Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.
