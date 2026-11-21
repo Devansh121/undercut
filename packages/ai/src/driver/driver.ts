@@ -1,5 +1,6 @@
 import type { CarTelemetry, ControlInput, ErsMode } from '@undercut/sim';
 import type { EnvelopeScale } from '../envelope/envelope';
+import type { TrafficView } from './traffic';
 
 /**
  * An AI driver: reads what a driver can read (the car's telemetry and where it is on the
@@ -27,6 +28,13 @@ export interface Driver {
   snapshot(): DriverMemory;
   /** Overwrite the carried state from `snapshot` of a driver built the same way. */
   restore(memory: DriverMemory): void;
+  /**
+   * Racing drivers read the cars around them: called before each `drive` with this tick's view.
+   * A lap driver (the reference) has no use for it and leaves it out.
+   */
+  sense?(traffic: TrafficView): void;
+  /** True while the traffic held the pedals back on the last tick (a launch must not override it). */
+  readonly following?: boolean;
 }
 
 /** A driver's carried state: plain JSON numbers, booleans and number lists. */

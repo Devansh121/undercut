@@ -140,6 +140,15 @@ export class ReferenceDriver implements Driver {
   private brakeOut = 0;
   private wander = 0;
 
+  /**
+   * Seams for a race driver built on this one (`RaceDriver`), set before each `drive`: a lateral
+   * offset from the racing line to hold, m (positive left), and a ceiling on the acceleration
+   * the pedals are asked for, m/s² (following a slower car, a corner taken off line). The
+   * defaults leave the reference driver exactly as it is.
+   */
+  offset = 0;
+  accelLimit = Number.POSITIVE_INFINITY;
+
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
   readonly last = {
     s: 0,
@@ -274,7 +283,7 @@ export class ReferenceDriver implements Driver {
       this.wander += this.rng.range(-1, 1) * this.skill.lineWander * Math.sqrt(dt);
       this.wander = Math.max(-this.skill.lineWander, Math.min(this.skill.lineWander, this.wander));
     }
-    const e = q.d - lineD - this.wander;
+    const e = q.d - lineD - this.wander - this.offset;
     const ePsi = wrapAngle(course - heading);
     const kAhead = this.sampleAhead(line.curvature, s, v * g.steerPreview);
     const w = Math.max(g.lateralOmegaMin, Math.min(g.lateralOmegaMax, g.lateralOmegaSpeed / v));
@@ -326,7 +335,7 @@ export class ReferenceDriver implements Driver {
     // under the target here at every braking onset.)
     const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview);
     const aFf = v < vAhead - 1 ? Math.max(aHere, aAhead) : aAhead;
-    const aDemand = aFf + g.speedGain * (vTarget - v);
+    const aDemand = Math.min(aFf + g.speedGain * (vTarget - v), this.accelLimit);
     const drsHere = plan.drsZone[i] === 1 && prof.phase[i] !== Phase.Brake;
     const deployHere = prof.deploying[i] === 1 && (this.crossedLine || this.deployBeforeLine);
     const model = plan.model;

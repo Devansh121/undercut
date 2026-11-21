@@ -166,6 +166,7 @@ export class RaceSession {
       control: this.control,
       track: this.track,
       circuit: this.circuit,
+      field: this.facts,
     }));
     for (let i = 0; i < o.cars.length; i++) this.locate(i);
   }

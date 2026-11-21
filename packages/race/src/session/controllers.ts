@@ -1,4 +1,11 @@
-import { PathFollower, type Driver, type DriverMemory, type FollowerState } from '@undercut/ai';
+import {
+  PathFollower,
+  createTrafficView,
+  type Driver,
+  type DriverMemory,
+  type FollowerState,
+  type TrafficView,
+} from '@undercut/ai';
 import { NEUTRAL_INPUT, type CarParams, type CarTelemetry, type ControlInput } from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import type { CircuitInfo } from '../circuit';
@@ -27,6 +34,11 @@ export interface ControlContext {
   readonly control: RaceControl;
   readonly track: Track;
   readonly circuit: CircuitInfo;
+  /**
+   * Every car's facts, this one's included (index = car number): where the others are, as a
+   * driver sees them from the cockpit and the mirrors. Racing drivers read it; humans ignore it.
+   */
+  readonly field: readonly CarFacts[];
 }
 
 export interface CarController {
@@ -46,6 +58,8 @@ export interface ControllerState {
   driver?: DriverMemory;
   launching?: boolean;
   launchCap?: number;
+  /** Sim time the fifth light came on (a jump start counts from it), or null. */
+  fifthAt?: number | null;
   pit?: PitLaneState | null;
 }
 
@@ -153,6 +167,11 @@ export interface AiControllerOptions {
   launchSpeed?: number;
   /** Throttle kept under a blue flag (lifting to let the faster car by). */
   blueThrottle?: number;
+  /**
+   * A jump start: the driver goes this long after the fifth light comes on, whether or not the
+   * lights are out yet (null: never; the field draws it with a small seeded chance).
+   */
+  jumpAfter?: number | null;
 }
 
 /**
@@ -172,8 +191,11 @@ export class AiController implements CarController {
   private readonly launchSpeed: number;
   private readonly blueThrottle: number;
   private readonly race: ControlInput = { ...NEUTRAL_INPUT };
+  readonly jumpAfter: number | null;
+  private readonly traffic: TrafficView = createTrafficView(0);
   private launching = true;
   private launchCap = 0.6;
+  private fifthAt: number | null = null;
 
   constructor(o: AiControllerOptions) {
     this.driver = o.driver;
@@ -181,6 +203,7 @@ export class AiController implements CarController {
     this.pit = new PitLaneDriving(o.params);
     this.launchSpeed = o.launchSpeed ?? 25;
     this.blueThrottle = o.blueThrottle ?? 0.85;
+    this.jumpAfter = o.jumpAfter ?? null;
   }
 
   reset(): void {
@@ -193,6 +216,7 @@ export class AiController implements CarController {
       driver: this.driver.snapshot(),
       launching: this.launching,
       launchCap: this.launchCap,
+      fifthAt: this.fifthAt,
       pit: this.pit.getState(),
     };
   }
@@ -202,13 +226,42 @@ export class AiController implements CarController {
     this.driver.restore(s.driver);
     this.launching = s.launching === true;
     this.launchCap = s.launchCap ?? this.launchCap;
+    this.fifthAt = s.fifthAt ?? null;
     this.pit.setState(s.pit);
+  }
+
+  /** The cars around this one, from the field's facts, for a racing driver. */
+  private sense(ctx: ControlContext): void {
+    const driver = this.driver;
+    if (!driver.sense) return;
+    const view = this.traffic;
+    const field = ctx.field;
+    while (view.cars.length < field.length) view.cars.push({ id: -1, s: 0, d: 0, speed: 0 });
+    const me = ctx.facts;
+    view.self.id = ctx.car;
+    view.self.s = me.s;
+    view.self.d = me.d;
+    view.self.speed = me.speed;
+    let n = 0;
+    for (let j = 0; j < field.length; j++) {
+      const f = field[j]!;
+      if (j === ctx.car || f.inPitLane) continue;
+      const c = view.cars[n++]!;
+      c.id = j;
+      c.s = f.s;
+      c.d = f.d;
+      c.speed = f.speed;
+    }
+    view.count = n;
+    view.blueFlag = ctx.control.blueFlag(ctx.car) >= 0;
+    driver.sense(view);
   }
 
   control(ctx: ControlContext, out: ControlInput): void {
     const c = ctx.control;
     const i = ctx.car;
     const tel = ctx.telemetry;
+    this.sense(ctx);
     this.driver.drive(tel, ctx.dt, this.race);
     const phase = c.phase;
     const status = c.cars[i]!.status;
@@ -216,12 +269,21 @@ export class AiController implements CarController {
       hold(out);
       return;
     }
-    if (phase === 'grid' || phase === 'lights') {
-      hold(out);
-      return;
-    }
     const out0 = c.lightsOutAt;
-    if (out0 !== null && ctx.time < out0 + this.reaction) {
+    let jumping = false;
+    if (phase === 'grid' || phase === 'lights') {
+      if (phase === 'lights' && c.lightsCount >= 5 && this.fifthAt === null) {
+        this.fifthAt = ctx.time;
+      }
+      jumping =
+        this.jumpAfter !== null &&
+        this.fifthAt !== null &&
+        ctx.time >= this.fifthAt + this.jumpAfter;
+      if (!jumping) {
+        hold(out);
+        return;
+      }
+    } else if (out0 !== null && ctx.time < out0 + this.reaction) {
       hold(out);
       return;
     }
@@ -230,14 +292,18 @@ export class AiController implements CarController {
       return;
     }
     Object.assign(out, this.race);
-    if (this.launching && out0 !== null) {
+    if (this.launching && (out0 !== null || jumping)) {
       // Launch from rest: the racing driver's steering and gears, throttle held under the
-      // grip of the driven wheels until it asks for full throttle itself at speed.
+      // grip of the driven wheels until it asks for full throttle itself at speed. A car ahead
+      // still has the last word on the pedals.
       const slip = Math.max(tel.slipRatio[2] ?? 0, tel.slipRatio[3] ?? 0);
       if (slip > 0.12) this.launchCap = Math.max(0.1, this.launchCap - 4 * ctx.dt);
       else this.launchCap = Math.min(1, this.launchCap + 1.5 * ctx.dt);
       if (tel.speed > this.launchSpeed && (this.race.throttle > 0.9 || this.race.brake > 0)) {
         this.launching = false;
+      } else if (this.driver.following) {
+        out.throttle = Math.min(this.race.throttle, this.launchCap);
+        if (tel.gear < 1) out.gearShift = 1;
       } else {
         out.throttle = this.launchCap;
         out.brake = 0;
