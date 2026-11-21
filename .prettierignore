@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.cache/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+# Prose is not reformatted by tooling.
+*.md
+# Static design mocks, not shipped code.
+design/

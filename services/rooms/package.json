@@ -1,0 +1,20 @@
+{
+  "name": "@undercut/rooms",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Room service: a Cloudflare Worker with one Durable Object per room, run locally with wrangler dev.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@undercut/core": "0.0.0",
+    "@undercut/protocol": "0.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260426.1",
+    "wrangler": "4.86.0"
+  }
+}

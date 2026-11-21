@@ -1,0 +1,17 @@
+{
+  "name": "@undercut/render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Rendering of sim state.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@undercut/core": "0.0.0"
+  }
+}
