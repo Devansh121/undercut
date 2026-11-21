@@ -5,9 +5,9 @@ point contact (before),exit,200,3,314,2336,6311,2995,3861,0.000,0,0.95
 point contact (before),exit,250,5,0,2142,9280,5914,6909,0.046,0,1.00
 point contact (before),chicane,80,2,0,0,7831,5889,6509,0.333,0,1.11
 point contact (before),chicane,120,4,0,0,14956,12370,13317,0.292,7457,0.62
-contact patch (after),flat,100,2,0,763,3857,935,873,0.192,0,0.32
-contact patch (after),flat,200,5,0,1691,6090,3031,1746,0.100,0,1.93
-contact patch (after),exit,200,3,1206,3072,4156,730,714,0.000,0,0.44
-contact patch (after),exit,250,5,284,3887,5679,1942,1605,0.000,0,0.74
-contact patch (after),chicane,80,2,0,0,4857,3791,3295,0.258,0,1.85
-contact patch (after),chicane,120,4,0,0,7069,6022,6959,0.167,0,0.85
+contact patch (after),flat,100,2,0,795,3858,935,652,0.196,0,0.32
+contact patch (after),flat,200,5,0,1646,6112,2648,1336,0.100,0,1.95
+contact patch (after),exit,200,3,1406,3147,4156,630,496,0.000,0,0.44
+contact patch (after),exit,250,5,717,3998,5717,1367,721,0.000,0,0.74
+contact patch (after),chicane,80,2,0,0,4903,3656,3813,0.254,0,1.84
+contact patch (after),chicane,120,4,0,0,7129,5398,5315,0.163,0,0.83

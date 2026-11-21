@@ -47,8 +47,19 @@ the probes cannot see (a new input to the line that the probe does not exercise)
 speed-scheduled lateral and course feedback over a yaw-rate loop, held within the front tyres'
 peak slip angle), pedals (profile acceleration plus speed feedback, eased on wheelspin, lock-up
 and slides), gears (engine-derived shift points, downshifts by road speed), DRS and the overtake
-button. `DriverSkill` sets how much of the envelope it plans with, its lag and its errors. One
-tick costs about 1.3 µs.
+button. `DriverSkill` sets how much of the envelope it plans with, the lag of its hands and feet
+and its errors. One tick costs about 1.3 µs.
+
+The reference driver is an **ideal, telemetry-driven reference controller**, a measuring
+instrument and not a model of a human. With the car's built-in TC and ABS off, it reads exact
+per-wheel slip ratio, slip angle and load and the car's exact sideslip every tick, with no lag
+or noise, and from them regulates the pedals (lock and wheelspin thresholds) and recovers from
+slides (countersteer, brake release) instantly. That is a driver aid no human has.
+
+**Requirement for race AI.** Race-AI skill parameters must add sensing lag and noise to what the
+driver reads (slips, loads, sideslip, position on the line), not only lag and noise to what it
+writes (`reaction`, `steerNoise`, `pedalNoise`). An AI that reads the car exactly, as this
+controller does, regulates slip better than any player can.
 
 ## Validation
 
