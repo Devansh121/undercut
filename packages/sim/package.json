@@ -1,0 +1,17 @@
+{
+  "name": "@undercut/sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Vehicle and world simulation. Pure: no DOM, no renderer, no wall clock.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@undercut/core": "0.0.0"
+  }
+}

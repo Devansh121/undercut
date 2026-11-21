@@ -1,0 +1,13 @@
+{
+  // Local only for now: `wrangler dev` runs this on the Workers runtime with no
+  // Cloudflare account. Deploying it is a later, owner-side job (docs/STATUS.md).
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "rooms",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "send_metrics": false,
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+}
