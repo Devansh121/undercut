@@ -55,12 +55,13 @@ try {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(`http://127.0.0.1:4473/?debug=1&quality=${quality}`);
     await page.waitForFunction(() => !!globalThis.__undercut);
+    // Standing grid from P20 so all twenty cars sit in view for the grid shot and frame-time check.
     await page.evaluate(() => globalThis.__undercut.startQuickRace(5, { gridPosition: 20 }));
     await page.evaluate(() => {
       globalThis.__undercut.setTimeScale(0);
       globalThis.__undercut.camera('chase-far');
     });
-    await page.screenshot({ path: `${out}/${name}-grid-chase.png` });
+    await page.screenshot({ path: `${out}/${name}-grid-chase.jpg`, type: 'jpeg', quality: 90 });
     await page.evaluate(() => {
       globalThis.__undercut.resetFrameTimes();
       globalThis.__undercut.setTimeScale(1);
@@ -83,13 +84,15 @@ try {
         { name, quality },
       ),
     );
+    // Restart in the midfield (P10) for turn-one and mid-race pack captures.
+    await page.evaluate(() => globalThis.__undercut.startQuickRace(5, { gridPosition: 10 }));
     await page.evaluate(() => {
       globalThis.__undercut.autopilot(true);
       globalThis.__undercut.setTimeScale(4);
     });
     for (const [stage, distance] of [
-      ['turn-one', 520],
-      ['pack', 1500],
+      ['turn-one', 560],
+      ['pack', 1450],
     ]) {
       await page.waitForFunction(
         (s) =>
@@ -103,16 +106,24 @@ try {
         globalThis.__undercut.camera('chase-far');
       });
       await page.waitForTimeout(300);
-      await page.screenshot({ path: `${out}/${name}-${stage}-chase.png` });
+      await page.screenshot({
+        path: `${out}/${name}-${stage}-chase.jpg`,
+        type: 'jpeg',
+        quality: 90,
+      });
       await page.evaluate(() => {
         const u = globalThis.__undercut,
           s = Number(u.state().s);
-        const eye = u.trackPoint(s + 35, 22, 6),
-          aim = u.trackPoint(s - 25, 0, 0.5);
-        u.tvCamera(eye.x, eye.y, eye.z, 45, aim);
+        const eye = u.trackPoint(s + 40, 18, 5),
+          aim = u.trackPoint(s - 10, 0, 0.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 42, aim);
       });
       await page.waitForTimeout(300);
-      await page.screenshot({ path: `${out}/${name}-${stage}-trackside.png` });
+      await page.screenshot({
+        path: `${out}/${name}-${stage}-trackside.jpg`,
+        type: 'jpeg',
+        quality: 90,
+      });
       await page.evaluate(() => {
         globalThis.__undercut.camera('chase-far');
         globalThis.__undercut.setTimeScale(4);

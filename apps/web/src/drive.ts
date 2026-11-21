@@ -301,7 +301,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
-  const hud = new Hud(plan);
+  const hud = new Hud(plan, session.quickRace ? 'Quick Race' : 'Time trial');
   const results = new ResultsStrip();
   let quitting = false;
   const actions = {
@@ -515,8 +515,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   raceStatus.className = 'panel';
   raceStatus.dataset.testid = 'race-status';
   raceStatus.style.cssText =
-    'position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:12px 20px;white-space:pre-line;text-align:center;max-height:70vh;overflow:auto';
-  if (session.quickRace) o.host.append(raceStatus);
+    'padding:8px 16px;white-space:pre-line;text-align:center;max-height:60vh;overflow:auto;pointer-events:auto';
+  if (session.quickRace) {
+    (hud.root.querySelector('.hud-control') ?? o.host).append(raceStatus);
+  }
 
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
