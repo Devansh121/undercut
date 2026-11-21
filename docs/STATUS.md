@@ -101,6 +101,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - M2: Khronos PBR Neutral tone map rather than AgX (the visual direction's choice) or ACES. Compared on the same frames with the real car and HDRI: AgX desaturated liveries and grass, ACES shifted blue toward purple; Neutral keeps authored colours (`docs/render.md`).
 - M2: WebP textures with GPU mipmaps, not KTX2/Basis: the transcoder could not be verified on a phone-class GPU here. The first race is 7.8 MiB on High, 2.9 MiB on Mobile as the server sends it (Brotli for text), well inside 25 MB.
 - M2: Monza's sun elevation is the HDRI's own (48°), not the 35° in the visual direction, so shadows match the sky; the bearing (235°, south-west) is the visual direction's.
+- M2 dressing: trees, ground cover, brand boards and the tree atlas are generated at load by script (canvas), not downloaded: no third-party tree assets, and the first race on High grows by only the dressing file (7.98 MiB in all).
+- M2 dressing: the old oval's mapped concrete is built only more than 32 m from the circuit or where it crosses it, because its ways share Monza's main straight.
+- M2 dressing: invented brand "MARETTI" renamed "VASSERO": one letter from a famous real brand.
 - M2: the Poly Haven asphalt scan (fresh black tarmac, albedo 0.015) is lifted to about 0.08, the grey of a used circuit surface.
 - M2: grass is ambientCG Grass001 (a mowed lawn) instead of the survey's Poly Haven sparse_grass, which is dry grass over dirt.
 - M2: three cascades of shadow from three.js CSM with the cascade-blend fade, PCF; a blob contact shadow under every car on Mobile and Lite, and on any preset when no key light casts shadows (night).
