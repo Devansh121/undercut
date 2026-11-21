@@ -123,13 +123,13 @@ export class PitSystem implements RaceSystem<PitState> {
   tick(core: RaceCore): void {
     const { rules, circuit } = core;
     const pit = circuit.pit;
+    const t = core.clock.now;
     for (let k = 0; k < this.cars.length; k++) {
       const i = core.order[k]!;
       const c = this.cars[i]!;
       const f = core.facts[i]!;
       const car = core.cars[i]!;
       const inLane = f.inPitLane;
-      const t = core.time;
       if (inLane && !c.wasIn && c.phase === 'none') {
         c.phase = 'lane';
         c.speeding = false;

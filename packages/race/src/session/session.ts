@@ -239,7 +239,7 @@ export class RaceSession {
     }
     stepWorld(world);
     for (let i = 0; i < this.cars.length; i++) this.locate(i);
-    const events = control.tick(world.time, this.facts);
+    const events = control.tick(world, this.facts);
     for (const e of events) {
       if (e.type === 'lapStart' || e.type === 'lap') this.onLine(e.car);
     }

@@ -5,7 +5,7 @@ import type { CarFacts } from './facts';
 import type { SessionStrategy } from './kinds';
 import type { RaceRules } from './rules';
 import type { GapTower } from './timing/tower';
-import type { LapTimer } from './timing/lap-timer';
+import type { LapTimer, TickClock } from './timing/lap-timer';
 
 export type CarStatus = 'running' | 'finished' | 'dnf' | 'dsq';
 
@@ -65,6 +65,11 @@ export interface RaceCore {
   /** Sim time at the end of this tick and of the last one. */
   readonly time: number;
   readonly prevTime: number;
+  /**
+   * The same two times as plain fields, for per-car loops: reading a field never boxes a
+   * number, a getter that is not inlined does.
+   */
+  readonly clock: TickClock;
   readonly phase: Phase;
   readonly lightsOutAt: number | null;
   /** Car indices in classification order. */

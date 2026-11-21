@@ -88,7 +88,8 @@ export class FlagSystem implements RaceSystem<FlagsState> {
     const live = core.phase === 'green' || core.phase === 'chequered';
     if (!live) return;
     this.greenAt ??= core.lightsOutAt ?? core.prevTime;
-    const graceOver = core.time > this.greenAt + START_GRACE;
+    const now = core.clock.now;
+    const graceOver = now > this.greenAt + START_GRACE;
     const n = core.cars.length;
     // ---- Yellow ----
     for (let q = 0; q < n; q++) {
@@ -114,7 +115,7 @@ export class FlagSystem implements RaceSystem<FlagsState> {
       }
     }
     for (let k = 0; k < this.sectorCount; k++) {
-      const want = this.until[k] !== null && core.time <= this.until[k]!;
+      const want = this.until[k] !== null && now <= this.until[k]!;
       if (!want) this.until[k] = null;
       if (want !== this.on[k]) {
         this.on[k] = want;

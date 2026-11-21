@@ -34,11 +34,8 @@ const WRONG_WAY = 3;
 const SAMPLE = 0.25;
 
 interface WatchCar {
-  /** Onset times; NaN when not running (numbers only, so ticks do not allocate). */
-  slowSince: number;
-  offSince: number;
-  wrongSince: number;
-  lowSince: number;
+  /** Onset of each condition (KINDS order; NaN when it is not running). */
+  onset: Float64Array;
   watchStart: number;
   /** Open finding start per kind (KINDS order), NaN when none. */
   active: Float64Array;
@@ -51,10 +48,7 @@ interface WatchCar {
 
 export interface WatchdogState {
   cars: {
-    slowSince: number | null;
-    offSince: number | null;
-    wrongSince: number | null;
-    lowSince: number | null;
+    onset: (number | null)[];
     watchStart: number | null;
     active: (number | null)[];
     ringT: number[];
@@ -82,10 +76,7 @@ export class Watchdog implements RaceSystem<WatchdogState> {
 
   private fresh(): WatchCar {
     return {
-      slowSince: Number.NaN,
-      offSince: Number.NaN,
-      wrongSince: Number.NaN,
-      lowSince: Number.NaN,
+      onset: new Float64Array(4).fill(Number.NaN),
       watchStart: Number.NaN,
       active: new Float64Array(4).fill(Number.NaN),
       ringT: new Float64Array(this.size),
@@ -108,10 +99,7 @@ export class Watchdog implements RaceSystem<WatchdogState> {
   }
 
   private forget(w: WatchCar): void {
-    w.slowSince = Number.NaN;
-    w.offSince = Number.NaN;
-    w.wrongSince = Number.NaN;
-    w.lowSince = Number.NaN;
+    w.onset.fill(Number.NaN);
     w.watchStart = Number.NaN;
     w.count = 0;
     w.head = 0;
@@ -119,8 +107,8 @@ export class Watchdog implements RaceSystem<WatchdogState> {
 
   tick(core: RaceCore): void {
     const r = core.rules;
-    const t = core.time;
-    const dt = core.time - core.prevTime;
+    const t = core.clock.now;
+    const dt = t - core.clock.prev;
     const kind = core.strategy.kind;
     for (let k = 0; k < this.cars.length; k++) {
       const i = core.order[k]!;
@@ -133,53 +121,60 @@ export class Watchdog implements RaceSystem<WatchdogState> {
         continue;
       }
       if (Number.isNaN(w.watchStart)) w.watchStart = t;
+      // Onsets live in a typed array and `set` reads them from there: no loose doubles are
+      // passed to calls that may not be inlined (they would be boxed every tick).
+      const on = w.onset;
       // Stationary.
       if (f.speed < r.stuckSpeed) {
-        if (Number.isNaN(w.slowSince)) w.slowSince = t;
-      } else w.slowSince = Number.NaN;
+        if (Number.isNaN(on[STATIONARY]!)) on[STATIONARY] = t;
+      } else on[STATIONARY] = Number.NaN;
       this.set(
         core,
         i,
         w,
         STATIONARY,
-        !Number.isNaN(w.slowSince) && t - w.slowSince >= r.stuckTime,
-        w.slowSince,
+        !Number.isNaN(on[STATIONARY]!) && t - on[STATIONARY]! >= r.stuckTime,
       );
       // Progress over a rolling window.
-      this.sample(w, t, car.dist);
+      this.sample(w, core, car);
       let low = false;
       if (t - w.watchStart >= r.progressTime) {
-        const then = this.distanceAt(w, t - r.progressTime);
+        // Race distance of the newest sample at or before the window's start.
+        const from = t - r.progressTime;
+        let then = w.ringD[w.head]!;
+        for (let j = 0; j < w.count; j++) {
+          const q = (w.head + j) % this.size;
+          if (w.ringT[q]! > from) break;
+          then = w.ringD[q]!;
+        }
         low = car.dist - then < r.progressDistance;
       }
       if (low) {
-        if (Number.isNaN(w.lowSince)) w.lowSince = t - r.progressTime;
-      } else w.lowSince = Number.NaN;
-      this.set(core, i, w, NO_PROGRESS, low, w.lowSince);
+        if (Number.isNaN(on[NO_PROGRESS]!)) on[NO_PROGRESS] = t - r.progressTime;
+      } else on[NO_PROGRESS] = Number.NaN;
+      this.set(core, i, w, NO_PROGRESS, low);
       // Off track.
       if (f.wheelsOff >= 4 && !f.inPitLane) {
-        if (Number.isNaN(w.offSince)) w.offSince = t;
-      } else w.offSince = Number.NaN;
+        if (Number.isNaN(on[OFF_TRACK]!)) on[OFF_TRACK] = t;
+      } else on[OFF_TRACK] = Number.NaN;
       this.set(
         core,
         i,
         w,
         OFF_TRACK,
-        !Number.isNaN(w.offSince) && t - w.offSince >= r.offTrackTime,
-        w.offSince,
+        !Number.isNaN(on[OFF_TRACK]!) && t - on[OFF_TRACK]! >= r.offTrackTime,
       );
       // Wrong way.
       const rate = dt > 0 ? (car.dist - car.prevDist) / dt : 0;
       if (rate < -r.wrongWaySpeed) {
-        if (Number.isNaN(w.wrongSince)) w.wrongSince = t;
-      } else w.wrongSince = Number.NaN;
+        if (Number.isNaN(on[WRONG_WAY]!)) on[WRONG_WAY] = t;
+      } else on[WRONG_WAY] = Number.NaN;
       this.set(
         core,
         i,
         w,
         WRONG_WAY,
-        !Number.isNaN(w.wrongSince) && t - w.wrongSince >= r.wrongWayTime,
-        w.wrongSince,
+        !Number.isNaN(on[WRONG_WAY]!) && t - on[WRONG_WAY]! >= r.wrongWayTime,
       );
       // Retire a car stuck for too long (never a person in time trial or practice).
       const mayRetire = !(core.human(i) && (kind === 'timeTrial' || kind === 'practice'));
@@ -196,7 +191,9 @@ export class Watchdog implements RaceSystem<WatchdogState> {
     }
   }
 
-  private sample(w: WatchCar, t: number, dist: number): void {
+  private sample(w: WatchCar, core: RaceCore, car: { readonly dist: number }): void {
+    const t = core.clock.now;
+    const dist = car.dist;
     if (w.count > 0) {
       const last = (w.head + w.count - 1) % this.size;
       if (t - w.ringT[last]! < SAMPLE) return;
@@ -211,25 +208,8 @@ export class Watchdog implements RaceSystem<WatchdogState> {
     w.count += 1;
   }
 
-  /** Race distance of the newest sample at or before `time` (the oldest kept if none is). */
-  private distanceAt(w: WatchCar, time: number): number {
-    let d = w.ringD[w.head]!;
-    for (let j = 0; j < w.count; j++) {
-      const k = (w.head + j) % this.size;
-      if (w.ringT[k]! > time) break;
-      d = w.ringD[k]!;
-    }
-    return d;
-  }
-
-  private set(
-    core: RaceCore,
-    car: number,
-    w: WatchCar,
-    kind: number,
-    on: boolean,
-    since: number,
-  ): void {
+  private set(core: RaceCore, car: number, w: WatchCar, kind: number, on: boolean): void {
+    const since = w.onset[kind]!;
     const active = w.active[kind]!;
     if (on && Number.isNaN(active)) {
       const start = Number.isNaN(since) ? core.time : since;
@@ -276,10 +256,7 @@ export class Watchdog implements RaceSystem<WatchdogState> {
   getState(): WatchdogState {
     return {
       cars: this.cars.map((w) => ({
-        slowSince: toJson(w.slowSince),
-        offSince: toJson(w.offSince),
-        wrongSince: toJson(w.wrongSince),
-        lowSince: toJson(w.lowSince),
+        onset: Array.from(w.onset, toJson),
         watchStart: toJson(w.watchStart),
         active: Array.from(w.active, toJson),
         ringT: Array.from(w.ringT),
@@ -293,10 +270,7 @@ export class Watchdog implements RaceSystem<WatchdogState> {
 
   setState(s: WatchdogState): void {
     this.cars = s.cars.map((c) => ({
-      slowSince: fromJson(c.slowSince),
-      offSince: fromJson(c.offSince),
-      wrongSince: fromJson(c.wrongSince),
-      lowSince: fromJson(c.lowSince),
+      onset: Float64Array.from(c.onset.map(fromJson)),
       watchStart: fromJson(c.watchStart),
       active: Float64Array.from(c.active.map(fromJson)),
       ringT: Float64Array.from(c.ringT),

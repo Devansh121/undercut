@@ -17,7 +17,7 @@ import {
   type TimingBests,
 } from './timing/lap-timer';
 import { GapTower, type TowerState } from './timing/tower';
-import type { TimingEvent } from './timing/lap-timer';
+import type { TickClock, TimingEvent } from './timing/lap-timer';
 
 /** Returned by a tick with nothing to report: shared and frozen, so a quiet tick allocates nothing. */
 const NO_EVENTS = Object.freeze([]) as unknown as RaceEvent[];
@@ -124,8 +124,8 @@ export class RaceControl implements RaceCore {
   readonly pit: PitSystem;
   readonly watchdog: Watchdog;
   private readonly overall: TimingBests;
-  private timeValue: number;
-  private prevTimeValue: number;
+  /** [last tick's time, this tick's time]: a typed array, so storing them never boxes. */
+  private readonly tm = new Float64Array(2);
   private seen = false;
   private phaseValue: Phase;
   private lightsOn = 0;
@@ -151,6 +151,7 @@ export class RaceControl implements RaceCore {
   private cxA: Int32Array = new Int32Array(64);
   private cxIdx: Int32Array = new Int32Array(64);
   private cxCount = 0;
+  readonly clock: TickClock = { prev: 0, now: 0 };
 
   constructor(o: RaceControlOptions) {
     this.circuit = o.circuit;
@@ -214,8 +215,8 @@ export class RaceControl implements RaceCore {
     this.humans = o.entrants.map((e) => e.human === true);
     this.rank = new Int32Array(n);
     const t0 = o.startTime ?? 0;
-    this.timeValue = t0;
-    this.prevTimeValue = t0;
+    this.tm[1] = t0;
+    this.tm[0] = t0;
     const r = this.rules;
     this.lightsStart = t0 + r.gridTime;
     this.lightsOutTime =
@@ -237,11 +238,11 @@ export class RaceControl implements RaceCore {
   // ---- RaceCore ----
 
   get time(): number {
-    return this.timeValue;
+    return this.tm[1]!;
   }
 
   get prevTime(): number {
-    return this.prevTimeValue;
+    return this.tm[0]!;
   }
 
   get phase(): Phase {
@@ -263,11 +264,11 @@ export class RaceControl implements RaceCore {
   penalise(car: number, reason: PenaltyReason, seconds: number): void {
     const c = this.cars[car]!;
     if (this.strategy.penalties) {
-      c.penalties.push({ reason, seconds, served: false, at: this.timeValue });
-      this.emit({ type: 'penalty', t: this.timeValue, car, reason, seconds });
+      c.penalties.push({ reason, seconds, served: false, at: this.tm[1]! });
+      this.emit({ type: 'penalty', t: this.tm[1]!, car, reason, seconds });
     } else {
       c.warnings += 1;
-      this.emit({ type: 'warning', t: this.timeValue, car, reason });
+      this.emit({ type: 'warning', t: this.tm[1]!, car, reason });
     }
   }
 
@@ -275,7 +276,7 @@ export class RaceControl implements RaceCore {
     const timer = this.timers[car]!;
     if (!timer.running || !timer.valid) return;
     timer.invalidate();
-    this.emit({ type: 'invalidated', t: this.timeValue, car, lap: timer.lap, reason });
+    this.emit({ type: 'invalidated', t: this.tm[1]!, car, lap: timer.lap, reason });
   }
 
   retire(car: number, reason: string): void {
@@ -283,7 +284,7 @@ export class RaceControl implements RaceCore {
     if (c.status !== 'running') return;
     c.status = 'dnf';
     c.reason = reason;
-    this.emit({ type: 'retired', t: this.timeValue, car, reason });
+    this.emit({ type: 'retired', t: this.tm[1]!, car, reason });
   }
 
   racing(car: number): boolean {
@@ -402,8 +403,8 @@ export class RaceControl implements RaceCore {
     copyFacts(facts, this.prevFacts[car]!);
     const timer = this.timers[car]!;
     const wasValid = timer.running && timer.valid;
-    if (timer.reposition(facts.s, this.timeValue) && wasValid) {
-      this.emit({ type: 'invalidated', t: this.timeValue, car, lap: timer.lap, reason: 'reset' });
+    if (timer.reposition(facts.s, this.tm[1]!) && wasValid) {
+      this.emit({ type: 'invalidated', t: this.tm[1]!, car, lap: timer.lap, reason: 'reset' });
     }
     const c = this.cars[car]!;
     if (timer.running) {
@@ -415,7 +416,7 @@ export class RaceControl implements RaceCore {
     if (revive && c.status === 'dnf' && (kind === 'timeTrial' || kind === 'practice')) {
       c.status = 'running';
       c.reason = null;
-      this.emit({ type: 'rejoined', t: this.timeValue, car });
+      this.emit({ type: 'rejoined', t: this.tm[1]!, car });
     }
     return this.flush();
   }
@@ -438,12 +439,23 @@ export class RaceControl implements RaceCore {
 
   // ---- The tick ----
 
-  /** One fixed step: `time` is the sim time at its end; `facts` one per car, in car order. */
-  tick(time: number, facts: readonly CarFacts[]): RaceEvent[] {
-    this.events.length = 0;
+  /**
+   * One fixed step: `at` is the sim time at its end (a number, or an object with `time`, such as
+   * the sim's `World`); `facts` one per car, in car order. A tick with nothing to report returns
+   * a shared frozen empty array and allocates nothing.
+   */
+  tick(at: number | { readonly time: number }, facts: readonly CarFacts[]): RaceEvent[] {
+    // The time may come by reference (the sim's World): a loose number passed into this call
+    // is boxed by the caller every tick. Each branch stores into the field on its own: merging
+    // the two into one local would box the number read from the object.
     if (facts.length !== this.cars.length) throw new RangeError('one CarFacts per car');
-    this.prevTimeValue = this.timeValue;
-    this.timeValue = time;
+    this.events.length = 0;
+    this.tm[0] = this.tm[1]!;
+    if (typeof at === 'number') this.tm[1] = at;
+    else this.tm[1] = at.time;
+    const time = this.tm[1]!;
+    this.clock.prev = this.tm[0]!;
+    this.clock.now = time;
     for (let i = 0; i < facts.length; i++) {
       copyFacts(this.facts[i]!, this.prevFacts[i]!);
       copyFacts(facts[i]!, this.facts[i]!);
@@ -479,13 +491,13 @@ export class RaceControl implements RaceCore {
   private setPhase(phase: Phase): void {
     if (this.phaseValue === phase) return;
     this.phaseValue = phase;
-    this.emit({ type: 'phase', t: this.timeValue, phase });
+    this.emit({ type: 'phase', t: this.tm[1]!, phase });
   }
 
   /** Grid, five lights, the random hold, lights out; jump starts. True on the lights-out tick. */
   private stepStart(): boolean {
     if (this.phaseValue !== 'grid' && this.phaseValue !== 'lights') return false;
-    const t = this.timeValue;
+    const t = this.tm[1]!;
     const L = this.circuit.length;
     const r = this.rules;
     for (let k = 0; k < this.cars.length; k++) {
@@ -534,8 +546,8 @@ export class RaceControl implements RaceCore {
     const n = this.cars.length;
     const L = this.circuit.length;
     const zones = this.circuit.drsZones;
-    const t0 = this.prevTimeValue;
-    const dt = this.timeValue - t0;
+    const t0 = this.tm[0]!;
+    const dt = this.tm[1]! - t0;
     this.cxCount = 0;
     for (let k = 0; k < n; k++) this.rank[this.orderValue[k]!] = k;
     for (let k = 0; k < n; k++) {
@@ -546,7 +558,7 @@ export class RaceControl implements RaceCore {
       if (c.status !== 'running' || c.finishTime !== null) continue;
       const p = this.prevFacts[i]!;
       const f = this.facts[i]!;
-      const m = timer.scan(p.s, f.s, t0, this.timeValue);
+      const m = timer.scanTick(p, f, this.clock);
       for (let j = 0; j < m; j++) this.addCrossing(timer.pendingTime(j), i, CX_LINE, j, 0);
       c.dist = timer.distance;
       const trap = crossingFraction(L, p.s, f.s, this.circuit.speedTrap);
@@ -579,7 +591,7 @@ export class RaceControl implements RaceCore {
       for (let k = 0; k < n; k++) {
         const i = this.orderValue[k]!;
         const c = this.cars[i]!;
-        if (this.timers[i]!.running) this.tower.update(i, c.prevDist, c.dist, t0, this.timeValue);
+        if (this.timers[i]!.running) this.tower.advance(i, c, this.clock);
       }
     }
   }
@@ -640,7 +652,7 @@ export class RaceControl implements RaceCore {
     const c = this.cars[car]!;
     for (let k = 0; k < buf.length; k++) {
       const e = buf[k]!;
-      this.emit({ ...e, t: this.timeValue, car });
+      this.emit({ ...e, t: this.tm[1]!, car });
       if (e.type === 'lapStart') {
         this.limits.onLine(this, car);
         if (this.phaseValue === 'chequered') this.finish(car, e.time, timer.appliedDistance);
@@ -653,7 +665,7 @@ export class RaceControl implements RaceCore {
         }
         if (r.valid && (this.fastestValue === null || r.time < this.fastestValue.time)) {
           this.fastestValue = { car, lap: r.lap, time: r.time };
-          this.emit({ type: 'fastestLap', t: this.timeValue, car, lap: r.lap, time: r.time });
+          this.emit({ type: 'fastestLap', t: this.tm[1]!, car, lap: r.lap, time: r.time });
         }
         if (
           this.strategy.drs === 'race' &&
@@ -673,7 +685,7 @@ export class RaceControl implements RaceCore {
     const best = this.speedTrapBestValue === null || speed > this.speedTrapBestValue;
     if (best) this.speedTrapBestValue = speed;
     if (c.speedTrapBest === null || speed > c.speedTrapBest) c.speedTrapBest = speed;
-    this.emit({ type: 'speedTrap', t: this.timeValue, car, speed, best });
+    this.emit({ type: 'speedTrap', t: this.tm[1]!, car, speed, best });
   }
 
   /** A car completed lap `lap` at sim time `at`: the chequered flag, and finishing under it. */
@@ -693,8 +705,8 @@ export class RaceControl implements RaceCore {
 
   private showChequered(): void {
     if (this.phaseValue === 'chequered' || this.phaseValue === 'finished') return;
-    this.chequeredAt = this.timeValue;
-    this.emit({ type: 'flag', t: this.timeValue, flag: 'chequered', on: true });
+    this.chequeredAt = this.tm[1]!;
+    this.emit({ type: 'flag', t: this.tm[1]!, flag: 'chequered', on: true });
     this.setPhase('chequered');
   }
 
@@ -710,7 +722,7 @@ export class RaceControl implements RaceCore {
     c.status = 'finished';
     this.emit({
       type: 'finish',
-      t: this.timeValue,
+      t: this.tm[1]!,
       car,
       position: c.finishOrder,
       laps: c.finishLaps,
@@ -721,11 +733,11 @@ export class RaceControl implements RaceCore {
   private stepSessionClock(): void {
     const s = this.strategy;
     if (s.duration === null || this.phaseValue !== 'green' || this.greenAt === null) return;
-    if (this.timeValue < this.greenAt + s.duration) return;
+    if (this.tm[1]! < this.greenAt + s.duration) return;
     this.showChequered();
     for (let k = 0; k < this.cars.length; k++) {
       const i = this.orderValue[k]!;
-      if (this.facts[i]!.inPitLane) this.finish(i, this.timeValue, this.cars[i]!.dist);
+      if (this.facts[i]!.inPitLane) this.finish(i, this.tm[1]!, this.cars[i]!.dist);
     }
   }
 
@@ -752,14 +764,14 @@ export class RaceControl implements RaceCore {
       const c = this.cars[car]!;
       const pos = k + 1;
       if (c.position !== pos) {
-        if (live)
-          this.emit({ type: 'position', t: this.timeValue, car, from: c.position, to: pos });
+        if (live) this.emit({ type: 'position', t: this.tm[1]!, car, from: c.position, to: pos });
         c.position = pos;
       }
     }
   }
 
-  /** Negative when car a is ahead of car b, positive when behind, 0 for a complete tie. */
+  /** -1 when car a is ahead of car b, 1 when behind, 0 for a complete tie (small integers: no
+   * boxed doubles on the per-tick path). */
   private compare(a: number, b: number): number {
     const ca = this.cars[a]!;
     const cb = this.cars[b]!;
@@ -767,27 +779,37 @@ export class RaceControl implements RaceCore {
       const oa = ca.status === 'dnf' || ca.status === 'dsq' ? 1 : 0;
       const ob = cb.status === 'dnf' || cb.status === 'dsq' ? 1 : 0;
       if (oa !== ob) return oa - ob;
-      const da = ca.finishDist ?? ca.dist;
-      const db = cb.finishDist ?? cb.dist;
-      if (da !== db) return db - da;
+      // Not `finishDist ?? dist`: merging the nullable field with the number would box the
+      // number on every comparison. Running cars compare their distances directly.
+      const xa = ca.finishDist;
+      const xb = cb.finishDist;
+      if (xa === null && xb === null) {
+        if (ca.dist !== cb.dist) return ca.dist > cb.dist ? -1 : 1;
+        return 0;
+      }
+      const da = xa === null ? ca.dist : xa;
+      const db = xb === null ? cb.dist : xb;
+      if (da !== db) return da > db ? -1 : 1;
       const fa = ca.finishTime;
       const fb = cb.finishTime;
-      if (fa !== null && fb !== null) return fa - fb;
+      if (fa !== null && fb !== null) return fa < fb ? -1 : fa > fb ? 1 : 0;
       if (fa !== null) return -1;
       if (fb !== null) return 1;
       return 0;
     }
     const ba = this.timers[a]!.bestLap;
     const bb = this.timers[b]!.bestLap;
-    if (ba !== null && bb !== null && ba !== bb) return ba - bb;
+    if (ba !== null && bb !== null && ba !== bb) return ba < bb ? -1 : 1;
     if (ba !== null && bb === null) return -1;
     if (bb !== null && ba === null) return 1;
     if (ba !== null && bb !== null) {
       const ta = ca.bestAt ?? 0;
       const tb = cb.bestAt ?? 0;
-      if (ta !== tb) return ta - tb;
+      if (ta !== tb) return ta < tb ? -1 : 1;
     }
-    return this.timers[b]!.lapsCompleted - this.timers[a]!.lapsCompleted;
+    const la = this.timers[a]!.lapsCompleted;
+    const lb = this.timers[b]!.lapsCompleted;
+    return la > lb ? -1 : la < lb ? 1 : 0;
   }
 
   /**
@@ -807,10 +829,10 @@ export class RaceControl implements RaceCore {
     const timedOut =
       this.phaseValue === 'chequered' &&
       this.chequeredAt !== null &&
-      this.timeValue >= this.chequeredAt + this.rules.finishTimeout;
+      this.tm[1]! >= this.chequeredAt + this.rules.finishTimeout;
     if (!running || timedOut) {
       this.setPhase('finished');
-      this.emit({ type: 'sessionEnd', t: this.timeValue });
+      this.emit({ type: 'sessionEnd', t: this.tm[1]! });
     }
   }
 
@@ -881,8 +903,8 @@ export class RaceControl implements RaceCore {
     return JSON.parse(
       JSON.stringify({
         version: 1,
-        time: this.timeValue,
-        prevTime: this.prevTimeValue,
+        time: this.tm[1]!,
+        prevTime: this.tm[0]!,
         seen: this.seen,
         phase: this.phaseValue,
         lightsOn: this.lightsOn,
@@ -917,8 +939,8 @@ export class RaceControl implements RaceCore {
       throw new Error(`unknown race snapshot version ${String(snap.version)}`);
     if (snap.cars.length !== this.cars.length) throw new Error('snapshot has a different field');
     const s = JSON.parse(JSON.stringify(snap)) as RaceControlSnapshot;
-    this.timeValue = s.time;
-    this.prevTimeValue = s.prevTime;
+    this.tm[1] = s.time;
+    this.tm[0] = s.prevTime;
     this.seen = s.seen;
     this.phaseValue = s.phase;
     this.lightsOn = s.lightsOn;

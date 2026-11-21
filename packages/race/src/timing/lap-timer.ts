@@ -17,6 +17,12 @@
  * - `invalid` (red): on a lap that was invalidated.
  */
 
+/** The start and end of the current tick, sim time in seconds (shared, updated in place). */
+export interface TickClock {
+  prev: number;
+  now: number;
+}
+
 export type DeltaClass = 'overall' | 'personal' | 'slower' | 'invalid';
 
 /** Where the lines are: lap length and the s of each sector's start line (the first is the timing line). */
@@ -153,6 +159,9 @@ export class LapTimer {
   private pendCount = 0;
   private pendNext = 0;
   private appliedDist = 0;
+  private readonly scratchPrev = { s: 0 };
+  private readonly scratchCur = { s: 0 };
+  private readonly scratchClock: TickClock = { prev: 0, now: 0 };
 
   /**
    * `record`: stored all-time bests to compare against (copied). `shared`: an overall-bests
@@ -301,6 +310,22 @@ export class LapTimer {
    * applied before the next scan. Allocation-free.
    */
   scan(prevS: number, curS: number, prevT: number, curT: number): number {
+    this.scratchPrev.s = prevS;
+    this.scratchCur.s = curS;
+    this.scratchClock.prev = prevT;
+    this.scratchClock.now = curT;
+    return this.scanTick(this.scratchPrev, this.scratchCur, this.scratchClock);
+  }
+
+  /**
+   * `scan` taking the positions and times by reference: the engine's hot path, which then
+   * passes no loose numbers into a call that may not be inlined (they would be boxed).
+   */
+  scanTick(prev: { readonly s: number }, cur: { readonly s: number }, clock: TickClock): number {
+    const prevS = prev.s;
+    const curS = cur.s;
+    const prevT = clock.prev;
+    const curT = clock.now;
     const { length } = this.lines;
     const t0 = this.lines.sectors[0] as number;
     this.pendCount = 0;

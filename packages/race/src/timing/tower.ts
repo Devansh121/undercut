@@ -19,6 +19,8 @@ export class GapTower {
   readonly step: number;
   private readonly size: number;
   private last: (number | null)[];
+  private readonly scratch = { prevDist: 0, dist: 0 };
+  private readonly clock = { prev: 0, now: 0 };
   private ring: number[][];
 
   constructor(cars: number, length: number, spacing = 150) {
@@ -31,6 +33,23 @@ export class GapTower {
 
   /** The car's race distance went from `prev` (at `prevT`) to `cur` (at `curT`). */
   update(car: number, prev: number, cur: number, prevT: number, curT: number): void {
+    this.scratch.prevDist = prev;
+    this.scratch.dist = cur;
+    this.clock.prev = prevT;
+    this.clock.now = curT;
+    this.advance(car, this.scratch, this.clock);
+  }
+
+  /** `update` taking the distances and times by reference (no boxed numbers on the hot path). */
+  advance(
+    car: number,
+    d: { readonly prevDist: number; readonly dist: number },
+    clock: { readonly prev: number; readonly now: number },
+  ): void {
+    const prev = d.prevDist;
+    const cur = d.dist;
+    const prevT = clock.prev;
+    const curT = clock.now;
     if (!(cur > prev)) return;
     const first = Math.floor(prev / this.step) + 1;
     const lastK = Math.floor(cur / this.step);
