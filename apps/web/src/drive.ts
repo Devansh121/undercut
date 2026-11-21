@@ -51,7 +51,12 @@ import {
 import { GameLoop } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
-import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
+import {
+  DriveSession,
+  TIME_TRIAL_FUEL,
+  type QuickRaceOptions,
+  type SessionEvent,
+} from './game/session';
 import { Hud, type HudMessage, type HudState } from './ui/hud';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
@@ -101,7 +106,7 @@ export interface DriveOptions {
   touch: boolean;
   seed: number;
   today: string;
-  quickRace?: { laps?: number };
+  quickRace?: QuickRaceOptions;
   onQuit(): void;
   /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
@@ -608,14 +613,34 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       view.setRaceCars(fleetPoses, fleetDrs);
       const c = session.race.control;
       const row = c.standings().find((r) => r.car === 0);
+      const totalLaps = o.quickRace?.laps ?? 5;
+      const lap = Math.max(1, Math.min(session.timer.lap, totalLaps));
+      const gapText =
+        row && row.position > 1
+          ? row.lapsDown > 0
+            ? ` · +${row.lapsDown}L`
+            : row.gap !== null
+              ? ` · +${row.gap.toFixed(1)}s`
+              : ''
+          : '';
       raceStatus.textContent = session.result
         ? 'Race result\n' +
-          session.result.entries.map((e) => `${e.position}  ${e.code}  ${e.status}`).join('\n')
+          session.result.entries
+            .map((e) => {
+              const g =
+                e.gap === null
+                  ? ''
+                  : 'laps' in e.gap
+                    ? `  +${e.gap.laps}L`
+                    : `  +${e.gap.time.toFixed(3)}s`;
+              return `${e.position}  ${e.code}  ${e.status}${g}`;
+            })
+            .join('\n')
         : c.phase === 'grid'
-          ? 'Quick Race · 20 cars · 5 laps'
+          ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
           : c.phase === 'lights'
             ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
-            : `P${row?.position ?? 20} / 20 · Lap ${Math.min(session.timer.lap, o.quickRace?.laps ?? 5)} / ${o.quickRace?.laps ?? 5}`;
+            : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
     }
     view.render({
       pose,

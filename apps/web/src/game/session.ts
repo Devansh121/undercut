@@ -59,9 +59,17 @@ export type SessionEvent =
   | { type: 'record'; circuit: string; update: RecordUpdate }
   | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' };
 
+export interface QuickRaceOptions {
+  laps?: number;
+  /** Player starting grid position, 1 (pole) to 20 (back). Defaults to 10 (midfield). */
+  gridPosition?: number;
+  /** Skill spread across the AI field, 0 to 1. */
+  skillSpread?: number;
+}
+
 export interface DriveSessionOptions {
   track: Track;
-  quickRace?: { laps?: number };
+  quickRace?: QuickRaceOptions;
   seed: number;
   params?: CarParams;
   /** All-time best for this circuit, from storage. */
@@ -143,10 +151,25 @@ export class DriveSession {
           envelope: decodeEnvelope(raceEnvelope),
           count: 20,
           seed: options.seed,
+          ...(options.quickRace?.skillSpread !== undefined
+            ? { spread: options.quickRace.skillSpread }
+            : {}),
         })
       : [];
-
-    this.playerPilot = field[0] ?? null;
+    const gridSlot = this.quickRace
+      ? Math.max(0, Math.min(19, Math.round(options.quickRace?.gridPosition ?? 10) - 1))
+      : 0;
+    this.playerPilot = field[gridSlot] ?? null;
+    const aiField = this.quickRace
+      ? [...field.slice(0, gridSlot), ...field.slice(gridSlot + 1)]
+      : [];
+    const grid = this.quickRace
+      ? [
+          ...Array.from({ length: gridSlot }, (_, i) => i + 1),
+          0,
+          ...Array.from({ length: 19 - gridSlot }, (_, i) => gridSlot + 1 + i),
+        ]
+      : undefined;
     this.race = new RaceSession({
       track: this.track,
       session: this.quickRace
@@ -157,6 +180,7 @@ export class DriveSession {
       fuel: this.quickRace ? 10 : TIME_TRIAL_FUEL,
       step: SIM_STEP,
       rollingStart: { before: ROLLING_START_RUN_UP, speed: ROLLING_START_SPEED },
+      ...(grid ? { grid } : {}),
       cars: [
         {
           entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0 },
@@ -165,7 +189,7 @@ export class DriveSession {
             else this.drive(out);
           }),
         },
-        ...field.slice(1).map((controller, i) => ({
+        ...aiField.map((controller, i) => ({
           entrant: {
             id: `driver${i + 1}`,
             name: `Driver ${i + 1}`,

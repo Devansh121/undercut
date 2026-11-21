@@ -20,12 +20,13 @@
  */
 import type { CameraName } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
+import type { QuickRaceOptions } from './game/session';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
 
 export interface DebugApi {
   start(): Promise<void>;
-  startQuickRace(laps?: number): Promise<void>;
+  startQuickRace(laps?: number, options?: Omit<QuickRaceOptions, 'laps'>): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
   teleport(s: number, d?: number, kmh?: number): void;
@@ -101,7 +102,7 @@ export function debugEnabled(): boolean {
 
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
-  start: (quickRace?: { laps?: number }) => Promise<DriveHandle>,
+  start: (quickRace?: QuickRaceOptions) => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   audioStatus: () => string,
   audioCapability: () => { supported: boolean; fallback: string | null },
@@ -162,9 +163,9 @@ export function installDebugApi(
     start: async () => {
       if (!getDrive()) await start();
     },
-    startQuickRace: async (laps = 5) => {
+    startQuickRace: async (laps = 5, options?: Omit<QuickRaceOptions, 'laps'>) => {
       needQuit();
-      await start({ laps });
+      await start({ laps, ...options });
     },
     state,
     telemetry,

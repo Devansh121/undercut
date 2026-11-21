@@ -15,6 +15,7 @@ import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
 
 type DriveModule = typeof DriveModuleNs;
+import type { QuickRaceOptions } from './game/session';
 import { RecordStore, durableStorage, memoryStorage } from './game/records';
 import { mountLaunchScreen, type LaunchScreen } from './launch';
 import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
@@ -95,7 +96,7 @@ function showLaunch(): void {
   menuHandle = requestAnimationFrame(poll);
 }
 
-async function start(quickRace?: { laps?: number }): Promise<DriveHandle> {
+async function start(quickRace?: QuickRaceOptions): Promise<DriveHandle> {
   if (drive) return drive;
   if (starting) return starting;
   launch?.setLoading(true);
