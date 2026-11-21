@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from './ports.mjs';
@@ -51,6 +53,12 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
+ * Each service keeps its Durable Object storage in its own temporary directory, removed on
+ * stop. With wrangler's default (.wrangler/state beside the config) every runtime on the
+ * machine shares the same SQLite files, and two at once (a test run's service beside the
+ * servers the tools/serve runtime tests start) fail with "database is locked" (SQLITE_BUSY).
+ * Rooms are short-lived; nothing needs to outlive the process.
+ *
  * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
  */
 export function createRoomsService({
@@ -68,6 +76,8 @@ export function createRoomsService({
   /** @type {Promise<{ code: number | null, signal: string | null }>} */
   const exited = new Promise((resolve) => (resolveExited = resolve));
   let stopPromise = null;
+  /** This service's own Durable Object storage (see above); null until started. */
+  let persistDir = null;
 
   // Last resort if this process exits without stop() finishing: kill the group too.
   const killOnExit = () => child && signalGroup(child.pid, 'SIGKILL');
@@ -77,6 +87,7 @@ export function createRoomsService({
     const inspectorPort = await freePort();
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
+    persistDir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
     child = spawn(
       process.execPath,
       [
@@ -90,6 +101,8 @@ export function createRoomsService({
         String(port),
         '--inspector-port',
         String(inspectorPort),
+        '--persist-to',
+        persistDir,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
@@ -162,6 +175,7 @@ export function createRoomsService({
       await new Promise((r) => setTimeout(r, 25));
     }
     process.off('exit', killOnExit);
+    if (persistDir) fs.rmSync(persistDir, { recursive: true, force: true });
   }
 
   return {
