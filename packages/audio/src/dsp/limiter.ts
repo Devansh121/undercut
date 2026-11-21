@@ -68,6 +68,8 @@ export class SoftLimiter {
   private n = 0;
   private sum = 0;
   private env = 1;
+  /** Consecutive samples written to `avgRing` at exactly 1 (counted up to `size`). */
+  private onesRun = 0;
   private readonly kRelease: number;
   /** Lowest gain applied since the last read, for metering. */
   minGain = 1;
@@ -87,6 +89,7 @@ export class SoftLimiter {
     this.minIndex = new Int32Array(this.size + 1);
     this.minValue = new Float64Array(this.size + 1);
     this.sum = this.size;
+    this.onesRun = this.size;
     this.kRelease = 1 - Math.exp(-1 / (opts.release * sampleRate));
   }
 
@@ -124,6 +127,19 @@ export class SoftLimiter {
       if (b > bound || b !== b) bound = b;
     }
     const quiet = bound * INTERPOLATOR_MAX_GAIN <= threshold;
+    // At rest (gain exactly 1, the average window all ones, the minimum queue holding one 1)
+    // a quiet block leaves the gain at exactly 1 on every sample: only the delay runs.
+    if (
+      quiet &&
+      this.env === 1 &&
+      this.sum === size &&
+      this.onesRun >= size &&
+      this.tail === (this.head + 1) % cap &&
+      this.minValue[this.head] === 1
+    ) {
+      this.processAtRest(left, right, frames);
+      return;
+    }
     for (let i = 0; i < frames; i++) {
       const l = left[i] as number;
       const r = right[i] as number;
@@ -177,6 +193,8 @@ export class SoftLimiter {
       // Moving average over the same window.
       this.sum += this.env - (this.avgRing[this.pos] as number);
       this.avgRing[this.pos] = this.env;
+      if (this.env !== 1) this.onesRun = 0;
+      else if (this.onesRun < size) this.onesRun++;
       const gain = Math.min(1, this.sum / size);
       if (gain < this.minGain) this.minGain = gain;
 
@@ -213,6 +231,62 @@ export class SoftLimiter {
       left[i] = yl;
       right[i] = yr;
     }
+  }
+
+  /**
+   * `process` for a quiet block at rest: the same state changes and output as the full loop
+   * when every sample needs a gain of 1 (the queue's one entry moves to the newest sample,
+   * the envelope, average and sum stay at exactly 1 and `size`), without the arithmetic.
+   */
+  private processAtRest(left: Float64Array, right: Float64Array, frames: number): void {
+    const { knee, ceiling } = this.opts;
+    const room = ceiling - knee;
+    const taps = this.taps;
+    const size = this.size;
+    const hl = this.histL;
+    const hr = this.histR;
+    const delay = this.delay;
+    const dlL = this.delayL;
+    const dlR = this.delayR;
+    let hpos = this.hpos;
+    let dpos = this.dpos;
+    for (let i = 0; i < frames; i++) {
+      const l = left[i] as number;
+      const r = right[i] as number;
+      hl[hpos] = l;
+      hl[hpos + taps] = l;
+      hr[hpos] = r;
+      hr[hpos + taps] = r;
+      hpos = hpos + 1 === taps ? 0 : hpos + 1;
+      let yl = l;
+      let yr = r;
+      if (delay > 0) {
+        yl = dlL[dpos] as number;
+        yr = dlR[dpos] as number;
+        dlL[dpos] = l;
+        dlR[dpos] = r;
+        dpos = dpos + 1 === delay ? 0 : dpos + 1;
+      }
+      // The delayed samples can predate this quiet block, so the clipper still applies.
+      const al = yl < 0 ? -yl : yl;
+      if (al > knee) {
+        const c = knee + room * Math.tanh((al - knee) / room);
+        yl = yl < 0 ? -c : c;
+      }
+      const ar = yr < 0 ? -yr : yr;
+      if (ar > knee) {
+        const c = knee + room * Math.tanh((ar - knee) / room);
+        yr = yr < 0 ? -c : c;
+      }
+      left[i] = yl;
+      right[i] = yr;
+    }
+    this.hpos = hpos;
+    this.dpos = dpos;
+    this.n += frames;
+    this.pos = (this.pos + frames) % size;
+    // The queue's single entry now stands for the newest sample.
+    this.minIndex[this.head] = this.n - 1;
   }
 }
 

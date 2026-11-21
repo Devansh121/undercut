@@ -227,9 +227,34 @@ export class AudioCore {
     const dFx = duck.effects;
     const dAmb = duck.ambience;
 
+    // Gains and the pause fade, smoothed per sample. Once a smoother has settled (its next
+    // value equals its current one) it stays there, so a chunk where all have settled skips
+    // the updates; the arithmetic is the same either way.
     const g = this.gainValue;
     const t = this.gainTarget;
     const k = this.kGain;
+    const kp = this.kPause;
+    const pauseTarget = this.pauseTarget;
+    let gm = g[0] as number;
+    let ge0 = g[1] as number;
+    let gf0 = g[2] as number;
+    let gu = g[3] as number;
+    let ga0 = g[4] as number;
+    const tm = t[0] as number;
+    const te = t[1] as number;
+    const tf = t[2] as number;
+    const tu = t[3] as number;
+    const ta = t[4] as number;
+    let pauseEnv = this.pauseEnv;
+    let next = pauseEnv + (pauseTarget - pauseEnv) * kp;
+    if (pauseTarget === 0 && next < 1e-4) next = 0;
+    const moving =
+      gm + (tm - gm) * k !== gm ||
+      ge0 + (te - ge0) * k !== ge0 ||
+      gf0 + (tf - gf0) * k !== gf0 ||
+      gu + (tu - gu) * k !== gu ||
+      ga0 + (ta - ga0) * k !== ga0 ||
+      next !== pauseEnv;
     const engL = this.busLeft[0] as Float64Array;
     const engR = this.busRight[0] as Float64Array;
     const fxL = this.busLeft[1] as Float64Array;
@@ -241,16 +266,20 @@ export class AudioCore {
     const mixL = this.mixLeft;
     const mixR = this.mixRight;
     for (let i = 0; i < n; i++) {
-      for (let j = 0; j < 5; j++)
-        g[j] = (g[j] as number) + ((t[j] as number) - (g[j] as number)) * k;
-      let pause = this.pauseEnv + (this.pauseTarget - this.pauseEnv) * this.kPause;
-      if (this.pauseTarget === 0 && pause < 1e-4) pause = 0;
-      this.pauseEnv = pause;
-      const master = (g[0] as number) * pause;
-      const ge = (g[1] as number) * (dEng[i] as number);
-      const gf = (g[2] as number) * (dFx[i] as number);
-      const gu = g[3] as number;
-      const ga = (g[4] as number) * (dAmb[i] as number);
+      if (moving) {
+        gm = gm + (tm - gm) * k;
+        ge0 = ge0 + (te - ge0) * k;
+        gf0 = gf0 + (tf - gf0) * k;
+        gu = gu + (tu - gu) * k;
+        ga0 = ga0 + (ta - ga0) * k;
+        let pause = pauseEnv + (pauseTarget - pauseEnv) * kp;
+        if (pauseTarget === 0 && pause < 1e-4) pause = 0;
+        pauseEnv = pause;
+      }
+      const master = gm * pauseEnv;
+      const ge = ge0 * (dEng[i] as number);
+      const gf = gf0 * (dFx[i] as number);
+      const ga = ga0 * (dAmb[i] as number);
       const l =
         ((engL[i] as number) * ge +
           (fxL[i] as number) * gf +
@@ -267,6 +296,12 @@ export class AudioCore {
       mixL[i] = l - l === 0 ? l : 0;
       mixR[i] = r - r === 0 ? r : 0;
     }
+    g[0] = gm;
+    g[1] = ge0;
+    g[2] = gf0;
+    g[3] = gu;
+    g[4] = ga0;
+    this.pauseEnv = pauseEnv;
     this.dcLeft.processBlock(mixL, mixL, n);
     this.dcRight.processBlock(mixR, mixR, n);
     this.limiter.process(this.mixLeft, this.mixRight, n);
