@@ -4,7 +4,7 @@ import { TrackDataError, validateTrackData } from '../src/data';
 import { createVec3 } from '../src/path';
 import { HIGH_KERB, SURFACE_PROPERTIES, TrackSurface } from '../src/surface';
 import { LEFT, Track, VERGE_FALL, createGround } from '../src/track';
-import { syntheticTrackData } from './fixtures';
+import { steepestKerbSlope, syntheticTrackData } from './fixtures';
 
 describe('validateTrackData', () => {
   it('accepts a complete file', () => {
@@ -12,8 +12,8 @@ describe('validateTrackData', () => {
   });
 
   it('lists every problem it finds', () => {
-    const bad = structuredClone(syntheticTrackData()) as unknown as Record<string, unknown>;
-    (bad.centreline as Record<string, number[]>).x.pop();
+    const bad = JSON.parse(JSON.stringify(syntheticTrackData())) as Record<string, unknown>;
+    (bad.centreline as Record<string, number[]>).x!.pop();
     (bad as { version: number }).version = 2;
     (bad as { extra?: number }).extra = 1;
     ((bad.sides as Record<string, Record<string, unknown>>).left!.inner as unknown[]) = [
@@ -35,7 +35,9 @@ describe('validateTrackData', () => {
   });
 
   it('rejects kerb profiles that would leave a step in the ground', () => {
-    const bad = structuredClone(syntheticTrackData());
+    const bad = JSON.parse(JSON.stringify(syntheticTrackData())) as ReturnType<
+      typeof syntheticTrackData
+    >;
     (bad.kerbProfiles[0]!.points as [number, number][])[3] = [1.5, 0.05];
     expect(() => validateTrackData(bad)).toThrow(/end at height 0/);
   });
@@ -208,12 +210,14 @@ describe('TrackSurface', () => {
     const hint = createSurfaceHint();
     for (const s of [100, 460, 500, 900]) {
       let last = Number.NaN;
-      // Steepest legitimate slope is a kerb ramp (0.4 m/m): 2 mm per 5 mm step. A step change
-      // between zones would be several centimetres.
-      for (let d = -40; d <= 40; d += 0.005) {
+      // Steepest legitimate ground: a kerb edge plus the verge fall; a step between zones
+      // would be centimetres.
+      const step = 0.005;
+      const bound = (steepestKerbSlope(track) + VERGE_FALL + 0.05) * step + 1e-4;
+      for (let d = -40; d <= 40; d += step) {
         track.lap.pointAt(s, d, p);
         surface.sample(p.x, p.z, hint, out);
-        if (!Number.isNaN(last)) expect(Math.abs(out.height - last)).toBeLessThan(0.004);
+        if (!Number.isNaN(last)) expect(Math.abs(out.height - last)).toBeLessThan(bound);
         last = out.height;
       }
     }

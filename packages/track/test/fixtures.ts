@@ -1,4 +1,16 @@
 import { TRACK_FORMAT, TRACK_FORMAT_VERSION, type Run, type TrackData } from '../src/data';
+import type { Track } from '../src/track';
+
+/** Largest |dh/du| over all kerb profiles of a track. */
+export function steepestKerbSlope(track: Track): number {
+  let max = 0;
+  for (const p of track.kerbProfiles) {
+    for (let k = 1; k < p.u.length; k++) {
+      max = Math.max(max, Math.abs((p.h[k]! - p.h[k - 1]!) / (p.u[k]! - p.u[k - 1]!)));
+    }
+  }
+  return max;
+}
 
 /**
  * A clockwise stadium: a straight heading east along z = -radius, a right-hand semicircle, a
