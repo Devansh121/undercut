@@ -1122,7 +1122,6 @@ export function placeTracksideFurniture(options: {
     materialOverrides: { 'screen-face': screenMat },
     maxDistanceScale: distScale,
   });
-  const hasKitScreen = Boolean(kitScreen);
   if (kitScreen) {
     kitPropsUsed++;
     props.define({
@@ -1130,6 +1129,35 @@ export function placeTracksideFurniture(options: {
       castShadow: castShadows,
       receiveShadow: true,
       lods: kitScreen,
+    });
+    // The model's screen is a blank panel; the live timing face goes on its catalogued
+    // `screen-face` attachment.
+    const face = propKit?.entries
+      .get('screen-tower')
+      ?.attachments?.find((a) => a.name === 'screen-face');
+    const [fx, fy, fz] = face?.position ?? [0.29, 10.7, 0];
+    const [fw, fh] = face?.size ?? [6.7, 3.7];
+    const led = new PropBuilder();
+    led.quad(
+      [fx + 0.02, fy - fh / 2, fz + fw / 2],
+      [fx + 0.02, fy - fh / 2, fz - fw / 2],
+      [fx + 0.02, fy + fh / 2, fz - fw / 2],
+      [fx + 0.02, fy + fh / 2, fz + fw / 2],
+      [1, 1, 1],
+      [
+        [0.75, 0.0],
+        [1.0, 0.0],
+        [1.0, 0.5],
+        [0.75, 0.5],
+      ],
+    );
+    const ledGeo = led.build(false);
+    geometries.push(ledGeo);
+    props.define({
+      id: 'big-screen-led',
+      castShadow: false,
+      receiveShadow: false,
+      lods: [{ geometry: ledGeo, material: screenMat, maxDistance: farDist * 1.4 }],
     });
   } else {
     const screenParts = bigScreenTowerGeometry();
@@ -1614,14 +1642,13 @@ export function placeTracksideFurniture(options: {
       yaw: b.yawInward,
       s: b.s,
     });
-    if (!hasKitScreen)
-      props.place('big-screen-led', {
-        x: b.x,
-        y: heightAt(b.x, b.z),
-        z: b.z,
-        yaw: b.yawInward,
-        s: b.s,
-      });
+    props.place('big-screen-led', {
+      x: b.x,
+      y: heightAt(b.x, b.z),
+      z: b.z,
+      yaw: b.yawInward,
+      s: b.s,
+    });
     screens++;
   }
 
