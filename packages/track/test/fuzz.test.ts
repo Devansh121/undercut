@@ -185,7 +185,9 @@ describe('track data fuzzing', () => {
     );
   });
 
-  it('rejects or survives 300 random numeric mutations', () => {
+  // 300 full track builds: about 2 s on the laptop, near 6 s on a shared CI runner, so the
+  // default 5 s limit made it fail by load alone. The limit bounds run time, not behaviour.
+  it('rejects or survives 300 random numeric mutations', { timeout: 30_000 }, () => {
     const rng = createRng(77);
     const paths = [
       'centreline.x',

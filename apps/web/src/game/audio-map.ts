@@ -1,0 +1,62 @@
+import type { AudioCarState } from '@undercut/audio';
+import type { CarState, CarTelemetry } from '@undercut/sim';
+
+/**
+ * Spacing of the ridges a tyre feels crossing a kerb, m, so the rumble rate is speed / spacing.
+ * An estimate: painted kerbs have shallow ribs about a quarter of a metre apart.
+ */
+export const KERB_RIDGE_SPACING = 0.25;
+/** Below this floor height at an axle (m) the plank starts to touch; full scrape 6 mm lower. */
+const BOTTOMING_START = 0.002;
+const BOTTOMING_RANGE = 0.006;
+/** The turbo has little to give below this engine speed and is at full demand above the next. */
+const BOOST_LOW_RPM = 6000;
+const BOOST_HIGH_RPM = 10500;
+const RAD_TO_RPM = 60 / (2 * Math.PI);
+
+export interface AudioInputs {
+  state: CarState;
+  telemetry: CarTelemetry;
+  pitLimiter: boolean;
+  /** Kerb roughness under the wheels, 0–1 (`DriveSession.kerbUnderWheels`). */
+  kerbRoughness: number;
+}
+
+/**
+ * The player's car as the audio engine wants it, in SI units: engine speed in rad/s, load from
+ * the throttle the car actually applies (after traction control and fuel cut), shift flag and
+ * direction, limiters, a boost demand from load and engine speed, MGU-K power, per-axle combined
+ * slip, kerb rumble and plank contact. Fills and returns `out`.
+ */
+export function toAudioCarState(i: AudioInputs, out: AudioCarState): AudioCarState {
+  const s = i.state;
+  const t = i.telemetry;
+  const rpm = s.engineSpeed * RAD_TO_RPM;
+  out.engineOn = true;
+  out.engineSpeed = s.engineSpeed;
+  out.throttle = t.throttle;
+  out.load = t.throttle;
+  out.gear = s.gear;
+  out.shifting = s.shiftTimer > 0;
+  out.shiftDirection = out.shifting ? Math.sign(s.shiftTarget - s.gear) : 0;
+  out.revLimiter = rpm >= s.model.params.engine.revLimit - 25 && t.throttle > 0.5;
+  out.pitLimiter = i.pitLimiter;
+  out.boost = t.throttle * clamp01((rpm - BOOST_LOW_RPM) / (BOOST_HIGH_RPM - BOOST_LOW_RPM));
+  out.ersPower = t.mgukPower;
+  out.speed = Math.abs(t.speed);
+  out.slipFront = Math.max(slip(t, 0), slip(t, 1));
+  out.slipRear = Math.max(slip(t, 2), slip(t, 3));
+  out.kerb = clamp01(i.kerbRoughness);
+  out.kerbFrequency = out.kerb > 0 ? out.speed / KERB_RIDGE_SPACING : 0;
+  const floor = Math.min(s.rideHeightFront, s.rideHeightRear);
+  out.bottoming = clamp01((BOTTOMING_START - floor) / BOTTOMING_RANGE);
+  return out;
+}
+
+function slip(t: CarTelemetry, i: number): number {
+  return Math.hypot(t.slipRatio[i] as number, t.slipAngle[i] as number);
+}
+
+function clamp01(v: number): number {
+  return v > 0 ? (v < 1 ? v : 1) : 0;
+}
