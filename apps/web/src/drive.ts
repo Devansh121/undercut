@@ -120,7 +120,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const input = o.input;
   const human = new InputControlSource(input);
   const scripted = new ScriptedControlSource();
-  const pilot = new AutopilotControlSource(input, new KeyboardAutopilot(track, params), () => session.car.state);
+  const pilot = new AutopilotControlSource(
+    input,
+    new KeyboardAutopilot(track, params),
+    () => session.car.state,
+  );
   const loop = new GameLoop(session, human);
 
   // UI.
@@ -152,7 +156,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'camera',
         label: 'Camera',
-        choices: CAMERA_ORDER.map((c) => ({ value: c, label: CAMERA_LABELS[c].replace(' chase', '') })),
+        choices: CAMERA_ORDER.map((c) => ({
+          value: c,
+          label: CAMERA_LABELS[c].replace(' chase', ''),
+        })),
         get: () => view.cameraName,
         set: (v) => view.setCamera(v as CameraName),
       },
@@ -210,7 +217,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
-  if (!records.persistent) say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
+  if (!records.persistent)
+    say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
@@ -225,11 +233,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           break;
         case 'record':
           void records.save(e.circuit, e.record).then(() => {
-            if (!records.persistent) say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
+            if (!records.persistent)
+              say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
           });
           break;
         case 'invalidated':
-          say({ tag: 'Lap invalid', text: e.reason === 'reset' ? 'Reset to track' : 'Track limits', tone: 'invalid' }, 3);
+          say(
+            {
+              tag: 'Lap invalid',
+              text: e.reason === 'reset' ? 'Reset to track' : 'Track limits',
+              tone: 'invalid',
+            },
+            3,
+          );
           break;
         case 'reset':
           view.snapCamera();
@@ -379,7 +395,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     h.revLights =
       t.engineRpm >= REV_FLASH
         ? 16
-        : Math.max(0, Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)));
+        : Math.max(
+            0,
+            Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
+          );
     h.lap = timer.lap;
     h.running = timer.running;
     h.valid = timer.valid;

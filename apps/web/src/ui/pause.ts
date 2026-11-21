@@ -28,7 +28,10 @@ export interface PauseActions {
 export class PauseMenu {
   readonly root: HTMLElement;
   private readonly focusables: HTMLElement[] = [];
-  private readonly rows = new Map<string, { setting: PauseSetting; buttons: HTMLButtonElement[] }>();
+  private readonly rows = new Map<
+    string,
+    { setting: PauseSetting; buttons: HTMLButtonElement[] }
+  >();
   private focusIndex = 0;
 
   constructor(actions: PauseActions, settings: PauseSetting[], note: () => string) {
@@ -51,7 +54,13 @@ export class PauseMenu {
     };
 
     const list = el('div', 'pause__actions');
-    const action = (label: string, glyph: IconKey, fn: () => void, id: string, primary = false): void => {
+    const action = (
+      label: string,
+      glyph: IconKey,
+      fn: () => void,
+      id: string,
+      primary = false,
+    ): void => {
       const b = el('button', `pause__action${primary ? ' is-primary' : ''}`);
       b.type = 'button';
       b.dataset.action = id;
@@ -143,14 +152,18 @@ export class PauseMenu {
   navigate(action: string): boolean {
     if (!this.open) return false;
     const active = document.activeElement;
-    const rowOf = (node: Element | null): { setting: PauseSetting; buttons: HTMLButtonElement[] } | undefined => {
+    const rowOf = (
+      node: Element | null,
+    ): { setting: PauseSetting; buttons: HTMLButtonElement[] } | undefined => {
       const id = (node?.closest('[data-setting]') as HTMLElement | null)?.dataset.setting;
       return id ? this.rows.get(id) : undefined;
     };
     switch (action) {
       case 'menuDown':
       case 'menuUp': {
-        const index = this.focusables.findIndex((f) => f === active || rowOf(active) === rowOf(f) && rowOf(f) !== undefined);
+        const index = this.focusables.findIndex(
+          (f) => f === active || (rowOf(active) === rowOf(f) && rowOf(f) !== undefined),
+        );
         const step = action === 'menuDown' ? 1 : -1;
         const n = this.focusables.length;
         this.focusIndex = ((index < 0 ? 0 : index) + step + n) % n;
@@ -163,7 +176,8 @@ export class PauseMenu {
         if (!row) return false;
         const values = row.setting.choices.map((c) => c.value);
         const i = values.findIndex((v) => String(v) === String(row.setting.get()));
-        const next = values[Math.min(values.length - 1, Math.max(0, i + (action === 'menuRight' ? 1 : -1)))];
+        const next =
+          values[Math.min(values.length - 1, Math.max(0, i + (action === 'menuRight' ? 1 : -1)))];
         if (next !== undefined) row.setting.set(next);
         this.sync();
         const on = row.buttons.find((b) => b.classList.contains('is-on'));

@@ -1,6 +1,6 @@
 import {
-  AgXToneMapping,
-  PCFSoftShadowMap,
+  ACESFilmicToneMapping,
+  PCFShadowMap,
   PerspectiveCamera,
   SRGBColorSpace,
   Scene,
@@ -82,11 +82,11 @@ export class RaceView {
       stencil: false,
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.toneMapping = AgXToneMapping;
+    this.renderer.toneMapping = ACESFilmicToneMapping;
     const lighting = options.lighting ?? MONZA_AFTERNOON;
     this.renderer.toneMappingExposure = lighting.exposure;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
 
     this.environment = new Environment(this.scene, lighting, q);
     this.environment.bakeEnvironment(this.renderer, this.scene);

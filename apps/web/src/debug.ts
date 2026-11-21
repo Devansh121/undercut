@@ -36,6 +36,8 @@ export interface DebugApi {
   frameTimes(): number[];
   resetFrameTimes(): void;
   renderStats(): Record<string, unknown>;
+  /** The RaceView itself, for render experiments from tools. */
+  view(): unknown;
   quit(): void;
 }
 
@@ -50,7 +52,10 @@ export function debugEnabled(): boolean {
   return new URLSearchParams(window.location.search).get('debug') === '1';
 }
 
-export function installDebugApi(getDrive: () => DriveHandle | null, start: () => Promise<DriveHandle>): void {
+export function installDebugApi(
+  getDrive: () => DriveHandle | null,
+  start: () => Promise<DriveHandle>,
+): void {
   const need = (): DriveHandle => {
     const d = getDrive();
     if (!d) throw new Error('No session: call start() first');
@@ -123,6 +128,7 @@ export function installDebugApi(getDrive: () => DriveHandle | null, start: () =>
     }),
     frameTimes: () => need().frameTimes(),
     resetFrameTimes: () => need().resetFrameTimes(),
+    view: () => need().view,
     renderStats: () => ({ ...need().view.stats(), quality: need().view.quality.name }),
     quit: () => need().quit(),
   };

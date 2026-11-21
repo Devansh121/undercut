@@ -27,7 +27,7 @@ import {
 import { TrackSurface, createPathPoint, createVec3, type Pose, type Track } from '@undercut/track';
 import type { DeviceKind } from '@undercut/input';
 import { assistSteer, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
-import type { Ghost} from './ghost';
+import type { Ghost } from './ghost';
 import { GhostRecorder, decodeGhost, encodeGhost } from './ghost';
 import { TrackLimits } from './limits';
 import type { CircuitRecord } from './records';

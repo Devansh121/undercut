@@ -27,7 +27,10 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   stage.append(el('div', 'launch__stripe'));
   const title = el('h1', 'launch__title', GAME_NAME);
   title.id = 'launch-title';
-  stage.append(title, el('p', 'launch__tagline', 'Open-wheel racing. One car, one circuit, the clock.'));
+  stage.append(
+    title,
+    el('p', 'launch__tagline', 'Open-wheel racing. One car, one circuit, the clock.'),
+  );
 
   const bar = el('div', 'launch__bar');
   const mode = el('div', 'launch__mode');
@@ -55,7 +58,8 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   root.replaceChildren(screen);
 
   const setRecord = (r: number | null): void => {
-    record.textContent = r === null ? 'No lap set on this device yet' : `Record ${formatLapTime(r)}`;
+    record.textContent =
+      r === null ? 'No lap set on this device yet' : `Record ${formatLapTime(r)}`;
   };
   setRecord(options.record);
   start.focus({ preventScroll: true });

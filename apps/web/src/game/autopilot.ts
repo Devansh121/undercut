@@ -12,16 +12,27 @@ export interface DrivingKeys {
 }
 
 export interface AutopilotOptions {
+  /** Pure-pursuit look-ahead: metres per m/s and the longest, m. */
+  lookGain: number;
+  lookMax: number;
+  /** Steering correction per rad/s of yaw-rate error, rad. */
+  yawDamping: number;
   /** Share of the estimated grip the speed profile uses; lower is safer. */
   gripUse: number;
   /** Braking deceleration as a multiple of the cornering limit. */
   brakeUse: number;
 }
 
-const DEFAULTS: AutopilotOptions = { gripUse: 0.78, brakeUse: 0.8 };
+const DEFAULTS: AutopilotOptions = {
+  lookGain: 0.5,
+  lookMax: 50,
+  yawDamping: 0.05,
+  gripUse: 0.75,
+  brakeUse: 0.7,
+};
 const G = 9.80665;
 const AIR = 1.184;
-/** Peak tyre friction the profile assumes before `gripUse`. */
+/** Peak tyre friction the profile assumes before `gripUse` (the sim's tyres peak near 1.8). */
 const MU = 1.6;
 /** Highest target speed, m/s; the car's own drag sets the real top speed. */
 const V_MAX = 100;
@@ -37,6 +48,9 @@ export class KeyboardAutopilot {
   private readonly track: Track;
   private readonly wheelbase: number;
   private readonly maxSteer: number;
+  private readonly lookGain: number;
+  private readonly lookMax: number;
+  private readonly yawDamping: number;
   /** Target speed per lap sample, m/s. */
   readonly profile: Float64Array;
   private readonly hint = { index: -1 };
@@ -48,6 +62,9 @@ export class KeyboardAutopilot {
     this.track = track;
     this.wheelbase = params.geometry.wheelbase;
     this.maxSteer = params.geometry.maxSteerAngle;
+    this.lookGain = o.lookGain;
+    this.lookMax = o.lookMax;
+    this.yawDamping = o.yawDamping;
     this.profile = speedProfile(track, params, o);
   }
 
@@ -73,7 +90,7 @@ export class KeyboardAutopilot {
     const v = Math.max(0, car.vx);
     const q = track.project(car.x, car.z, this.hint, this.q);
     // Pure pursuit on the centreline, a little inside of it on the way back from an edge.
-    const look = Math.min(36, Math.max(7, 6 + 0.3 * v));
+    const look = Math.min(this.lookMax, Math.max(7, 6 + this.lookGain * v));
     track.pointAt(track.wrap(q.s + look), 0, this.p);
     const dx = this.p.x - car.x;
     const dz = this.p.z - car.z;
@@ -83,7 +100,11 @@ export class KeyboardAutopilot {
     const left = -dx * sn - dz * c;
     const dist2 = Math.max(1, fwd * fwd + left * left);
     const curvature = (2 * left) / dist2;
-    const demand = Math.atan(curvature * this.wheelbase) / this.maxSteer;
+    // Yaw damping: steer against the yaw rate the path does not ask for, so the car settles
+    // instead of weaving under the keys' on-off steering.
+    const yawError = car.yawRate - curvature * v;
+    const demand =
+      (Math.atan(curvature * this.wheelbase) - this.yawDamping * yawError) / this.maxSteer;
     const band = 0.01;
     out.left = demand > steer + band;
     out.right = demand < steer - band;
@@ -184,7 +205,15 @@ export class ScriptedControlSource implements ControlSource {
 
   constructor(device: DriverFrame['device'] = 'keyboard') {
     this.frame = {
-      control: { steer: 0, throttle: 0, brake: 0, gearShift: 0, drs: false, overtake: false, pitLimiter: false },
+      control: {
+        steer: 0,
+        throttle: 0,
+        brake: 0,
+        gearShift: 0,
+        drs: false,
+        overtake: false,
+        pitLimiter: false,
+      },
       device,
       lookBack: false,
       events: [],

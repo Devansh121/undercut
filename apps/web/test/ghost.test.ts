@@ -1,6 +1,6 @@
 import { createCarPose } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
-import type { Ghost} from '../src/game/ghost';
+import type { Ghost } from '../src/game/ghost';
 import { GHOST_RATE, GhostRecorder, decodeGhost, encodeGhost } from '../src/game/ghost';
 
 /** A pose moving east at 50 m/s with a gentle yaw drift, at lap time t. */

@@ -95,7 +95,8 @@ describe('GameLoop and DriveSession', () => {
     driver.control.throttle = 0;
     driver.control.brake = 1;
     run(loop, 1);
-    expect(session.readTelemetry().speed).toBeLessThan(v1 - 25);
+    // About 2.4 g from 225 km/h with the low-drag trim and tyre-limited brakes.
+    expect(session.readTelemetry().speed).toBeLessThan(v1 - 18);
   });
 
   it('pause truly freezes the sim, the clock and the interpolation factor', () => {

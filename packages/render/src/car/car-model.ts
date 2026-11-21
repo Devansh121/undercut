@@ -156,10 +156,10 @@ export class CarModel {
     const carbon = new MeshPhysicalMaterial({
       color: '#ffffff',
       map: carbonMap,
-      roughness: 0.42,
-      metalness: 0.1,
-      clearcoat: q.clearcoat ? 0.6 : 0,
-      clearcoatRoughness: 0.15,
+      roughness: 0.5,
+      metalness: 0.05,
+      clearcoat: q.clearcoat ? 0.3 : 0,
+      clearcoatRoughness: 0.2,
     });
     const tyre = new MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 });
     const rim = new MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0.75 });
@@ -493,15 +493,25 @@ export class CarModel {
       width: number,
     ): { tyre: BufferGeometry; cover: BufferGeometry; inner: BufferGeometry } => {
       const hw = width / 2;
+      // Extra rings bound the compound band so its colour does not bleed across the sidewall.
+      const side = (sign: number): number[][] => [
+        [R - 0.09, sign * (hw + 0.004)],
+        [R - 0.077, sign * (hw + 0.005)],
+        [R - 0.074, sign * (hw + 0.005)],
+        [R - 0.051, sign * (hw + 0.002)],
+        [R - 0.048, sign * (hw + 0.001)],
+        [R - 0.033, sign * (hw - 0.002)],
+        [R - 0.03, sign * (hw - 0.003)],
+      ];
       const profile = [
         [RIM_RADIUS - 0.005, -hw + 0.012],
-        [R - 0.07, -hw - 0.006],
-        [R - 0.025, -hw + 0.008],
+        ...side(-1),
+        [R - 0.012, -hw + 0.014],
         [R, -hw + 0.04],
         [R + 0.002, 0],
         [R, hw - 0.04],
-        [R - 0.025, hw - 0.008],
-        [R - 0.07, hw + 0.006],
+        [R - 0.012, hw - 0.014],
+        ...side(1).reverse(),
         [RIM_RADIUS - 0.005, hw - 0.012],
       ].map(([r, y]) => new Vector2(r as number, y as number));
       const tyre = new LatheGeometry(profile, 64);
@@ -665,8 +675,9 @@ function colourTyre(g: BufferGeometry, R: number, hw: number): void {
     const ang = Math.atan2(z, x);
     const sidewall = Math.abs(y) > hw - 0.03;
     c.copy(rubber);
-    if (sidewall && r > R - 0.075 && r < R - 0.05) c.copy(mark);
-    if (sidewall && r > R - 0.048 && r < R - 0.03 && Math.abs(Math.sin(ang)) < 0.18) c.copy(print);
+    if (sidewall && r > R - 0.0755 && r < R - 0.0495) c.copy(mark);
+    if (sidewall && r > R - 0.0465 && r < R - 0.0315 && Math.abs(Math.sin(ang)) < 0.18)
+      c.copy(print);
     colours.set([c.r, c.g, c.b], i * 3);
   }
   g.setAttribute('color', new BufferAttribute(colours, 3));

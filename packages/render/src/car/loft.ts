@@ -112,7 +112,7 @@ export function loft(sections: readonly Section[], options: LoftOptions = {}): B
       const a2 = a + count;
       const b2 = b + count;
       // Rings run nose to tail (−X); this order faces outward.
-      indices.push(a, a2, b, b, a2, b2);
+      indices.push(a, b, a2, b, b2, a2);
     }
   }
   if (options.caps !== false && !half) {

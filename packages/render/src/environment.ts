@@ -31,6 +31,10 @@ export interface LightingPreset {
   fogDensity: number;
   fogColour: string;
   exposure: number;
+  /** Scale of the sky's image-based light; the analytic sky is bright and very blue. */
+  envIntensity: number;
+  /** Hemisphere fill intensity. */
+  fill: number;
 }
 
 /** Monza, afternoon, partly cloudy, sun ~35° in the south-west (docs/visual-direction.md). */
@@ -46,7 +50,9 @@ export const MONZA_AFTERNOON: Readonly<LightingPreset> = Object.freeze({
   cloudCoverage: 0.35,
   fogDensity: 0.00042,
   fogColour: '#c2cbd1',
-  exposure: 0.95,
+  exposure: 0.8,
+  envIntensity: 0.38,
+  fill: 0.2,
 });
 
 /**
@@ -62,9 +68,11 @@ export class Environment {
   private readonly target = new Object3D();
   private envTexture: Texture | null = null;
   private readonly quality: Quality;
+  private readonly envIntensity: number;
 
   constructor(scene: Scene, preset: LightingPreset, quality: Quality) {
     this.quality = quality;
+    this.envIntensity = preset.envIntensity;
     const phi = MathUtils.degToRad(90 - preset.sunElevation);
     const theta = MathUtils.degToRad(preset.sunAzimuth);
     // Azimuth from north (−Z) toward east (+X).
@@ -106,7 +114,7 @@ export class Environment {
     scene.add(this.sun, this.target);
 
     // Bounce from the parkland below, sky above; the environment map does most of the work.
-    this.fill = new HemisphereLight('#c9d6e0', '#4f5a3a', 0.35);
+    this.fill = new HemisphereLight('#d9e0e4', '#5a5f3e', preset.fill);
     scene.add(this.fill);
 
     scene.fog = new FogExp2(new Color(preset.fogColour), preset.fogDensity);
@@ -128,7 +136,7 @@ export class Environment {
     this.envTexture?.dispose();
     this.envTexture = target.texture;
     scene.environment = target.texture;
-    scene.environmentIntensity = 1;
+    scene.environmentIntensity = this.envIntensity;
     pmrem.dispose();
   }
 

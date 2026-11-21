@@ -87,7 +87,10 @@ export class Hud {
     const session = el('section', 'hud-session panel');
     session.setAttribute('aria-label', 'Session');
     const sHead = el('header', 'panel-head');
-    sHead.append(el('span', 'label', 'Time trial'), txt('circuit', el('span', 'label label--strong')));
+    sHead.append(
+      el('span', 'label', 'Time trial'),
+      txt('circuit', el('span', 'label label--strong')),
+    );
     const sBody = el('div', 'hud-session__body');
     const lapRow = el('div', 'hud-row');
     lapRow.append(el('span', 'label', 'Lap'), txt('lap', el('b', 'num')));
@@ -158,8 +161,20 @@ export class Hud {
     mHead.append(txt('mapName', el('span', 'label')), txt('mapLen', el('span', 'label')));
     const s = svg('svg', { viewBox: `0 0 ${plan.width} ${plan.height}`, 'aria-hidden': 'true' });
     s.append(
-      svg('path', { d: plan.path, fill: 'none', stroke: '#3a3f45', 'stroke-width': 7, 'stroke-linejoin': 'round' }),
-      svg('path', { d: plan.path, fill: 'none', stroke: '#c9c7c1', 'stroke-width': 2.2, 'stroke-linejoin': 'round' }),
+      svg('path', {
+        d: plan.path,
+        fill: 'none',
+        stroke: '#3a3f45',
+        'stroke-width': 7,
+        'stroke-linejoin': 'round',
+      }),
+      svg('path', {
+        d: plan.path,
+        fill: 'none',
+        stroke: '#c9c7c1',
+        'stroke-width': 2.2,
+        'stroke-linejoin': 'round',
+      }),
       svg('line', {
         x1: plan.startLine[0],
         y1: plan.startLine[1],
@@ -169,7 +184,13 @@ export class Hud {
         'stroke-width': 2,
       }),
     );
-    this.ghostDot = svg('circle', { r: 3.4, fill: '#bcd3ff', stroke: '#0b0c0e', 'stroke-width': 1, opacity: 0 });
+    this.ghostDot = svg('circle', {
+      r: 3.4,
+      fill: '#bcd3ff',
+      stroke: '#0b0c0e',
+      'stroke-width': 1,
+      opacity: 0,
+    });
     this.dot = svg('circle', { r: 5, fill: '#3d6fe0', stroke: '#f2f0eb', 'stroke-width': 2 });
     s.append(this.ghostDot, this.dot);
     map.append(mHead, s);
@@ -198,7 +219,11 @@ export class Hud {
     const ers = el('div', 'hud-ers');
     const ersLeft = el('div');
     const row1 = el('div', 'hud-ers__row');
-    row1.append(el('span', 'label', 'ERS'), txt('ersMode', el('span', 'hud-ers__mode')), txt('ersPct', el('b', 'num')));
+    row1.append(
+      el('span', 'label', 'ERS'),
+      txt('ersMode', el('span', 'hud-ers__mode')),
+      txt('ersPct', el('b', 'num')),
+    );
     const meter = el('div', 'hud-ers__meter');
     this.ersFill = el('i');
     this.ersMark = el('u');
@@ -240,7 +265,12 @@ export class Hud {
       const s = h.sectors[i];
       const node = this.sectorEls[i] as HTMLElement;
       setData(node, 'state', s?.state ?? 'none');
-      const text = !s || s.time === null ? '—' : s.delta !== null ? formatDelta(s.delta) : formatLapTime(s.time, true);
+      const text =
+        !s || s.time === null
+          ? '—'
+          : s.delta !== null
+            ? formatDelta(s.delta)
+            : formatLapTime(s.time, true);
       this.sectorText[i]?.set(text);
     }
 

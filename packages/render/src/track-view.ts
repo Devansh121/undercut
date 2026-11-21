@@ -371,8 +371,8 @@ function addTrackDetail(
           float dist = abs(vTrackUv.x - lineD);
           float wobble = texture2D(uMacro, vTrackUv * vec2(0.08, 0.004)).r;
           trackRubber = uRubber * (1.0 - smoothstep(0.5, 1.7 + wobble, dist)) * (0.55 + 0.45 * wobble);
-          float patch = texture2D(uMacro, vTrackUv * 0.012).r;
-          diffuseColor.rgb *= mix(0.86, 1.08, patch);
+          float patches = texture2D(uMacro, vTrackUv * 0.012).r;
+          diffuseColor.rgb *= mix(0.86, 1.08, patches);
           diffuseColor.rgb *= 1.0 - 0.38 * trackRubber;
         }`,
       )
