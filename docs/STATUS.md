@@ -47,6 +47,14 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Circuit dressing (PR #31 review, next slice), in priority order:
+  - Performance headroom: 1080p High is 9 to 14 ms of GPU with 450 to 767 draw calls and 2.9 to 4.5 M triangles (3 to 4 ms before the world). Buildings, stands, the pit building, terrain, bridges, the old banking and decals are single merged meshes outside the prop registry (no chunk culling, no levels of detail, every shadow cascade): chunk and cull them, give them levels of detail, and stop distant structures casting shadows. The world build is now 0.3 s on Lite, 0.5 s on Mobile and 1.1 s on High, all on the main thread; build it in slices or a worker.
+  - Look: flat card trees with a speckled leaf texture from trackside; the blocky crowd mosaics close up (the kit's crowd figures need an impostor before they can fill the seats); bare grey stand sides and backs and flat grey car parks; grey haze instead of a warm afternoon; plain white mapped buildings; plain absorber blocks at the chicane exits; no distant treeline or skyline.
+  - The kit's grandstands, pit building, pit wall, start gantry, crew, bridges and barriers are not placed yet; the world's own builders stand in for them.
+  - The race engine's `lights` events do not reach the app (Time Trial has no lights phase); the start gantry follows the online start only. A local race mode should call `startLightMask` from its `lights` events the same way.
+  - Tests still to add: the 24 m minimum catch-fence run; `PropRegistry.update` makes a closure per chunk each frame (`props/registry.ts`).
+- Browser CI: Lite builds the world as ground and a few trees (no structures); the full Mobile world is tested once in `tests/browser/world-dressing.spec.ts`, and the High lifecycle with the full world runs on the GPU (`npm run shots -- monza --lifecycle`).
+
 - Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
 
 - Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
