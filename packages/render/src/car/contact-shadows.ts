@@ -87,3 +87,16 @@ export class ContactShadows {
     this.mesh.removeFromParent();
   }
 }
+
+/**
+ * How dark the contact shadow under each car is (0: none). Presets that ask for it (Mobile, Lite)
+ * always have one; any preset gets a full one when the scene has no shadow-casting key light
+ * (night under floodlights, a sun turned off), so cars never float.
+ */
+export function contactShadowOpacity(
+  quality: { contactShadow: boolean },
+  hasShadowKey: boolean,
+): number {
+  if (!hasShadowKey) return 0.65;
+  return quality.contactShadow ? 0.35 : 0;
+}

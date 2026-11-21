@@ -343,6 +343,11 @@ export class CarFleet {
     return this.cars.length;
   }
 
+  /** Pose of car `i` (for contact shadows), or undefined. */
+  poseAt(i: number): CarPose | undefined {
+    return this.cars[i]?.pose;
+  }
+
   private drawMarkings(i: number, l: CarLivery): void {
     const ctx = this.atlasCtx;
     if (!ctx) return;

@@ -21,7 +21,7 @@ import { AssetLoader, type AssetIndex, type Progress } from './assets/loader';
 import { CameraRig, type CameraName } from './cameras';
 import { CarAssets, type CarLivery } from './car/car-assets';
 import { CarModel, type CarGeometry } from './car/car-model';
-import { ContactShadows } from './car/contact-shadows';
+import { ContactShadows, contactShadowOpacity } from './car/contact-shadows';
 import { CarFleet } from './car/fleet';
 import { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
 import { Environment } from './environment';
@@ -57,6 +57,11 @@ export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.type = PCFShadowMap;
   return renderer;
+}
+
+/** Ground height under a car: mean of a front and a rear wheel centre less the tyre radius. */
+function groundUnder(p: CarPose): number {
+  return ((p.wheelY[0] as number) + (p.wheelY[3] as number)) / 2 - 0.355;
 }
 
 /** What the page's renderer can do (see `effectiveQuality`). */
@@ -295,9 +300,10 @@ export class RaceView {
     this.ghostCar.root.renderOrder = 2;
     this.fleet = new CarFleet(assets.car, q, options.car, compound);
     this.scene.add(this.car.root, this.ghostCar.root, this.fleet.group);
-    this.contact = q.contactShadow
-      ? new ContactShadows(32, q.shadow.cascades > 0 ? 0.35 : 0.6)
-      : null;
+    // A footprint under every car where the shadow map does not cover it: always on Mobile and
+    // Lite, and on any preset when no key light casts shadows (night under floodlights).
+    const contactOpacity = contactShadowOpacity(q, this.environment.csm !== null);
+    this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity) : null;
     if (this.contact) this.scene.add(this.contact.mesh);
     this.props = new PropRegistry(options.track.length);
     this.scene.add(this.props.group);
@@ -568,11 +574,14 @@ export class RaceView {
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
     if (this.contact) {
-      this.contact.begin();
-      const ground = (p: CarPose): number =>
-        ((p.wheelY[0] as number) + (p.wheelY[3] as number)) / 2 - 0.355;
-      this.contact.add(frame.pose.x, ground(frame.pose), frame.pose.z, frame.pose.yaw);
-      this.contact.end();
+      const c = this.contact;
+      c.begin();
+      c.add(frame.pose.x, groundUnder(frame.pose), frame.pose.z, frame.pose.yaw);
+      for (let i = 0; i < this.fleet.size; i++) {
+        const p = this.fleet.poseAt(i);
+        if (p) c.add(p.x, groundUnder(p), p.z, p.yaw);
+      }
+      c.end();
     }
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
     // Count every pass of the frame (shadow cascades, AO, post), not only the last draw.
