@@ -8,6 +8,7 @@ export interface LaunchScreenOptions {
   /** Best lap at the circuit from storage, if any. */
   record: number | null;
   onStart(): void;
+  onOnline?(): void;
   /** Where the controls list reads bindings and the device in use. */
   controls?: ControlsSource;
 }
@@ -59,6 +60,9 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const build = el('footer', 'launch__build');
   build.append('Build ', el('code', '', options.buildHash));
 
+  const online = el('button', 'button', 'Online rooms');
+  online.type = 'button';
+  online.onclick = () => options.onOnline?.();
   const panel = options.controls ? new ControlsPanel(options.controls) : null;
   const help = el('button', 'button');
   help.type = 'button';
@@ -72,7 +76,7 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
     }
   });
 
-  bar.append(mode, start, build);
+  bar.append(mode, start, online, build);
   if (panel) bar.insertBefore(help, start);
   screen.append(stage, bar);
   if (panel) screen.append(panel.root);

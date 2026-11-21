@@ -1417,3 +1417,65 @@ button {
     font-size: var(--fs-12);
   }
 }
+
+.online-screen {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: clamp(16px, 4vw, 56px);
+  background: var(--bg, #101215);
+  color: var(--text, #edf0f2);
+}
+.online-screen h1 {
+  font-size: 32px;
+  margin: 0 0 12px;
+}
+.online-screen__content {
+  max-width: 960px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.online-screen__content > p,
+.online-members,
+.online-results {
+  flex-basis: 100%;
+}
+.online-screen a {
+  color: #b7d3e8;
+  overflow-wrap: anywhere;
+}
+.online-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.online-field input {
+  background: #20252a;
+  color: inherit;
+  border: 1px solid #626c74;
+  padding: 10px;
+  font: inherit;
+  width: 180px;
+}
+.online-assist {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.online-members {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+}
+.online-members li {
+  padding: 10px;
+  background: #20252a;
+}
+.online-notice {
+  min-height: 24px;
+}
