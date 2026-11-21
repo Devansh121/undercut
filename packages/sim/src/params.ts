@@ -57,18 +57,22 @@ export interface TyreParams {
   verticalDamping: number;
   /**
    * Peak lateral friction at the reference load. Fitted to the low-trim slow-corner lateral
-   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.14, inside [44]'s
-   * 1.85 front – 2.15 rear at 3 kN (range 1.8–2.2, doc 1.2).
+   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.145. Range 1.7–2.2
+   * (doc 1.2): [56] gives 1.71 at 3 kN, [44] 1.85 front and 2.15 rear.
    */
   muY: number;
   /**
-   * Peak longitudinal friction at the reference load, and its load slope, fitted together to
-   * the low-load launch (0–100 km/h, doc 2.3) and the high-load braking peaks of two trims
-   * (Monza T1 2025, Singapore T7 2025, doc 2.4): 1.85 and −1.3e-4 per N. At 3 kN μx/μy is 0.86
-   * ([44]: 0.89–0.91); the slope is steeper than [44]'s −5e-5 (doc 1.2 and 7.4).
+   * Peak longitudinal friction at the reference load. Fitted to the low-load launch
+   * (0–100 km/h, doc 2.3) and the low-trim braking peak (Monza T1 2025, doc 2.4), which agree
+   * on it: 1.765. Range 1.6–2.0 (doc 1.2). μx/μy at 3 kN is 0.82, below [44]'s 0.89–0.91 and
+   * [56]'s 0.97 (doc 7.4).
    */
   muX: number;
-  /** d(mu)/d(Fz), 1/N. Lateral: [44]'s −5e-5. Longitudinal: fitted with `muX`. */
+  /**
+   * d(mu)/d(Fz) in each direction, 1/N. Set from [56] (Perantoni and Limebeer's single-seater
+   * tyre: μx 1.75 → 1.40 and μy 1.80 → 1.45 from 2 to 6 kN): −8.75e-5 in both directions.
+   * Range −5e-5 ([44], both directions) to −8.75e-5 ([56]).
+   */
   loadSensitivityY: number;
   loadSensitivityX: number;
   /** Reference load for `muY` and `muX`, N. Doc 1.2: 3 kN. */
@@ -390,10 +394,10 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     freeRadius: 0.36,
     verticalStiffness: 300e3,
     verticalDamping: 7000,
-    muY: 2.14,
-    muX: 1.85,
-    loadSensitivityY: -5e-5,
-    loadSensitivityX: -1.3e-4,
+    muY: 2.145,
+    muX: 1.765,
+    loadSensitivityY: -8.75e-5,
+    loadSensitivityX: -8.75e-5,
     referenceLoad: 3000,
     muMin: 0.9,
     peakSlipRatio: 0.1,

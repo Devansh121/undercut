@@ -12,7 +12,8 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 74.852,
     high: 82.732,
     stated: '1:18.792 ± 5 %',
-    source: 'doc 2.1 [24]',
+    source: 'doc 2.1 [24]; used in selection: the floor share (doc 7.1)',
+    role: 'selection',
   },
   'monza-trap': {
     id: 'monza-trap',
@@ -22,6 +23,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     high: 354,
     stated: '348 ± 6',
     source: 'doc 2.2 [11]',
+    role: 'validation',
   },
 });
 
@@ -51,12 +53,12 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 84.69,
+    measured: 85.539,
     reason:
-      'After the tyre and floor calibration the lap is 1.96 s outside the M1 band: the reference ' +
-      "driver's planning margin and driving cost about 1.8 s, the line's margin and unused kerbs " +
-      '0.8 s, and on this line the medium-speed corners are 13–25 % tighter than the published ' +
-      'apex speeds allow a car of this class. docs/physics-validation.md section 7.6.',
+      'After the tyre and floor calibration the lap is 2.81 s outside the M1 band. The ' +
+      "reference driver's planning margin and driving cost about 1.6 s; the line keeps the " +
+      'whole car 0.3 m inside the white lines, where the rules allow the car centre well past ' +
+      'them, and keeps off the kerbs. docs/physics-validation.md section 7.6.',
   },
 });
 

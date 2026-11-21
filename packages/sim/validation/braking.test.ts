@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BRAKING_EVENTS,
   FIT_TARGETS,
+  SELECTION_TARGETS,
   KMH,
   TARGETS,
   TRAIL_OFF,
@@ -27,14 +28,24 @@ describe('validation: published braking events (doc 2.4)', () => {
   }
 });
 
-describe('fit and check sets', () => {
-  it('marks exactly the declared fit targets; everything else is a check', () => {
-    const fits = Object.values(TARGETS)
-      .filter((t) => t.fit)
+describe('fit, selection and validation sets', () => {
+  const ids = (role: string) =>
+    Object.values(TARGETS)
+      .filter((t) => t.role === role)
       .map((t) => t.id)
       .sort();
-    expect(fits).toEqual(Object.keys(FIT_TARGETS).sort());
-    expect(fits).toHaveLength(5);
+  it('marks exactly the declared direct fits', () => {
+    expect(ids('fit')).toEqual(Object.keys(FIT_TARGETS).sort());
+    expect(ids('fit')).toHaveLength(4);
+  });
+  it('marks exactly the declared selection checks, disjoint from the fits', () => {
+    expect(ids('selection')).toEqual(Object.keys(SELECTION_TARGETS).sort());
+    for (const id of Object.keys(SELECTION_TARGETS)) expect(FIT_TARGETS[id]).toBeUndefined();
+  });
+  it('withholds every other target as validation', () => {
+    expect(ids('validation')).toHaveLength(
+      Object.keys(TARGETS).length - ids('fit').length - ids('selection').length,
+    );
   });
 });
 

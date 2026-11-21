@@ -143,6 +143,7 @@ function measureTargets(sim) {
       high: t.high,
       pass: t.low <= value && value <= t.high,
       miss: miss(t, value),
+      role: t.role,
       recordedGap: sim.KNOWN_GAPS[t.id]?.measured ?? null,
     };
   });
@@ -196,11 +197,11 @@ function fmt(v, d = 3) {
 }
 
 function printTargets(rows) {
-  console.log('| Target | Result | Band | Verdict | Miss | Recorded gap |');
-  console.log('| --- | --- | --- | --- | --- | --- |');
+  console.log('| Target | Role | Result | Band | Verdict | Miss | Recorded gap |');
+  console.log('| --- | --- | --- | --- | --- | --- | --- |');
   for (const r of rows) {
     console.log(
-      `| ${r.label} | ${fmt(r.value)} ${r.unit} | ${fmt(r.low, 2)}–${fmt(r.high, 2)} | ` +
+      `| ${r.label} | ${r.role} | ${fmt(r.value)} ${r.unit} | ${fmt(r.low, 2)}–${fmt(r.high, 2)} | ` +
         `${r.pass ? 'pass' : 'out'} | ${fmt(r.miss, 2)} | ${r.recordedGap ?? ''} |`,
     );
   }
