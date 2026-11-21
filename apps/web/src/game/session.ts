@@ -18,6 +18,7 @@ import {
   type AssistState,
   type CarParams,
   type CarPose,
+  type CarState,
   type CarTelemetry,
   type ControlInput,
   type SurfaceKind,
@@ -48,6 +49,13 @@ export type SessionEvent =
   | { type: 'record'; circuit: string; record: CircuitRecord }
   | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' };
 
+/** Counts wheels wholly past the track-limit lines. `TrackLimits` in play; scripts in tests. */
+export interface WheelsOffCounter {
+  wheelsOff(car: CarState): number;
+  /** Forget cached search positions (after a teleport). */
+  reset(): void;
+}
+
 export interface DriveSessionOptions {
   track: Track;
   seed: number;
@@ -56,6 +64,8 @@ export interface DriveSessionOptions {
   record?: CircuitRecord | null;
   /** Date stamp for new records (YYYY-MM-DD); the session never reads a clock. */
   today?: string;
+  /** Track-limit counter; defaults to `TrackLimits` on this track. */
+  limits?: WheelsOffCounter;
 }
 
 /**
@@ -70,7 +80,7 @@ export class DriveSession {
   readonly timer: LapTimer;
   readonly params: CarParams;
   private phaseValue: SessionPhase = 'ready';
-  private readonly limits: TrackLimits;
+  private readonly limits: WheelsOffCounter;
   private readonly recorder = new GhostRecorder();
   private ghostValue: Ghost | null = null;
   private assistMemory: AssistState = createAssistState();
@@ -108,7 +118,7 @@ export class DriveSession {
       record ? { lap: record.lap, sectors: record.sectors } : undefined,
     );
     this.ghostValue = record?.ghost ? decodeGhost(record.ghost) : null;
-    this.limits = new TrackLimits(this.track);
+    this.limits = options.limits ?? new TrackLimits(this.track);
     this.locate();
   }
 
@@ -231,24 +241,33 @@ export class DriveSession {
     stepWorld(this.world);
     this.locate();
 
+    // Track limits are resolved before the timing lines, so a lap is never committed (or made a
+    // record) and only then invalidated. The reading is the car at the end of this tick; when a
+    // timing line also falls inside the tick, which happened first is unknown. Policy: a
+    // four-off reading counts against every lap that ran during the tick, so it invalidates the
+    // outgoing lap before it completes and the lap that starts at the line as well.
     const events: SessionEvent[] = [];
+    this.wheelsOffValue = this.limits.wheelsOff(car.state);
+    const off = this.wheelsOffValue === 4;
+    if (off) this.invalidate('limits', events);
     for (const e of this.timer.update(prevS, this.sValue, prevT, this.world.time)) {
       events.push(e);
       if (e.type === 'lapStart') this.onLine(e.time);
       else if (e.type === 'lap') this.onLapComplete(e, events);
+      if (off && (e.type === 'lapStart' || e.type === 'lap')) this.invalidate('limits', events);
     }
-    if (this.timer.running) {
-      const lapTime = this.timer.currentLapTime(this.world.time);
-      this.recorder.sample(lapTime, this.sValue, car.pose);
-      this.wheelsOffValue = this.limits.wheelsOff(car.state);
-      if (this.wheelsOffValue === 4 && this.timer.valid) {
-        this.timer.invalidate();
-        events.push({ type: 'invalidated', reason: 'limits' });
-      }
-    } else {
-      this.wheelsOffValue = this.limits.wheelsOff(car.state);
+    if (this.timer.running && this.recorder.recording) {
+      this.recorder.sample(this.timer.currentLapTime(this.world.time), this.sValue, car.pose);
     }
     return events;
+  }
+
+  /** Invalidate the running lap once; its ghost recording is dropped (it can never be kept). */
+  private invalidate(reason: 'limits' | 'reset', events: SessionEvent[]): void {
+    if (!this.timer.running || !this.timer.valid) return;
+    this.timer.invalidate();
+    this.recorder.cancel();
+    events.push({ type: 'invalidated', reason });
   }
 
   /** Back to the rolling start; timing for the lap in progress is dropped. */
@@ -266,10 +285,7 @@ export class DriveSession {
     const events: SessionEvent[] = [];
     const pose = this.lapPose(this.sValue, 0);
     this.place(pose.x, pose.z, pose.yaw, 0);
-    if (this.timer.running && this.timer.valid) {
-      this.timer.invalidate();
-      events.push({ type: 'invalidated', reason: 'reset' });
-    }
+    this.invalidate('reset', events);
     if (this.phaseValue === 'paused') this.phaseValue = 'running';
     events.push({ type: 'reset', reason: 'track' });
     return events;
