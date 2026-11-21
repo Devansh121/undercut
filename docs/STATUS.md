@@ -139,3 +139,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 - A Cloudflare account to deploy the rooms Worker, and a static host for the client. Neither blocks a milestone; everything runs locally.
   Deploying the rooms service would take: a Cloudflare account on the Workers plan that includes Durable Objects with SQLite storage; `npx wrangler login`, then `npx wrangler deploy --config services/rooms/wrangler.jsonc` (the migrations `v1` and `v2` create the `Room` and `CreateLimiter` classes); optionally a route so the Worker answers `/rooms/*` on the game's own domain. If the client is served from a different origin, set the rooms URL setting (`settings.roomsUrl`, or `VITE_ROOMS_URL` at build time) to `https://<worker host>/rooms`. Nothing has been deployed.
+
+### Decided for you — modular prop kit
+
+- Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
+- Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
+- Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
