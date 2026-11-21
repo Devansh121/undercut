@@ -1,7 +1,8 @@
 // Racing-line build: `npm run ai:build [-- --check]`.
 // Measures the car's performance envelope by driving the vehicle model, computes the racing
-// line and speed profile from it, and writes both artefacts to packages/ai/data/ with the hash
-// of their inputs. With --check it only compares the stored hashes with the current inputs.
+// line and speed profile from it, and writes both artefacts to packages/ai/data/ with a
+// fingerprint of what produced them. With --check it recomputes the fingerprints (about 3 s) and
+// compares them with the stored ones; see packages/ai/README.md.
 // The work lives in packages/ai/validation/lib; this file loads that TypeScript through Vite's
 // module runner and does the I/O and timing (the AI package never reads a clock).
 import path from 'node:path';
@@ -25,7 +26,10 @@ for (const setup of setups) {
       console.log(
         `${setup.id}-${setup.trim} ${name}: ${v.stale ? 'STALE' : 'current'} (${v.stored.slice(0, 12)})`,
       );
-      if (v.stale) stale++;
+      if (v.stale) {
+        stale++;
+        console.log(`  ${lib.staleMessage(setup, name)}`);
+      }
     }
     continue;
   }
@@ -39,6 +43,6 @@ for (const setup of setups) {
   for (const f of r.files) console.log(`  wrote ${f}`);
 }
 if (stale > 0) {
-  console.log(`${stale} artefact(s) stale: run npm run ai:build`);
+  console.log(`${stale} artefact(s) stale: run \`npm run ai:build\` and commit packages/ai/data/.`);
   process.exit(1);
 }

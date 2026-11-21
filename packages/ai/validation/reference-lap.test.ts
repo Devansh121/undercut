@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { lateralLimit, topSpeed } from '../../sim/validation/lib/index';
 import { racingLineSpeeds } from '../src/export/racing-line';
-import { MONZA, checkArtefacts, loadEnvelope, loadLine, referenceLap } from './lib/index';
+import {
+  MONZA,
+  checkArtefacts,
+  loadEnvelope,
+  loadLine,
+  referenceLap,
+  staleMessage,
+} from './lib/index';
 import { expectLap, lapTargetName } from './expect-lap';
 
 // Doc 2.1: a flying lap by the reference driver at Monza in low-drag trim, qualifying fuel
-// (10 kg), 25 °C at 180 m, DRS in the zones, full ERS. One lap here; ten in the nightly soak.
+// (10 kg), 25 °C at 180 m, DRS in the zones, full ERS, timed from the control line after an
+// out-lap. One lap here; ten in the nightly soak.
 describe('validation: reference lap, Monza (doc 2.1)', () => {
   const staleness = checkArtefacts(MONZA);
 
   it('uses racing-line and envelope artefacts made from the current car, track and code', () => {
-    const msg = (name: string) =>
-      `${name} artefact is stale: the car, the track or the code that made it changed. ` +
-      'Run `npm run ai:build` and commit packages/ai/data/.';
-    expect(staleness.envelope.stale, msg('envelope')).toBe(false);
-    expect(staleness.line.stale, msg('racing-line')).toBe(false);
+    expect(staleness.envelope.stale, staleMessage(MONZA, 'envelope')).toBe(false);
+    expect(staleness.line.stale, staleMessage(MONZA, 'line')).toBe(false);
   });
 
   const { result, plan } = referenceLap(MONZA);

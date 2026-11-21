@@ -3,11 +3,24 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeEnvelope, type EnvelopeArtefact } from '../../src/envelope/envelope';
+import type { CarParams } from '@undercut/sim';
+import type { Track } from '@undercut/track';
+import type { DriverSkill } from '../../src/driver/driver';
+import {
+  EnvelopeModel,
+  decodeEnvelope,
+  type Envelope,
+  type EnvelopeArtefact,
+} from '../../src/envelope/envelope';
 import { measureEnvelope, type MeasureReport } from '../../src/envelope/measure';
 import { REFERENCE_SKILL } from '../../src/driver/reference';
-import { buildRacingLine, type LineBuildResult } from '../../src/line/build';
-import { buildPlan } from '../../src/profile/plan';
+import { buildRacingLine, type LineBuildResult, type LineConfig } from '../../src/line/build';
+import { buildCorridor } from '../../src/line/corridor';
+import { computeLineGeometry } from '../../src/line/geometry';
+import { minimumCurvatureLine } from '../../src/line/min-curvature';
+import { refineLine } from '../../src/line/refine';
+import { buildPlan, drsZoneFlags } from '../../src/profile/plan';
+import { SpeedProfiler } from '../../src/profile/speed-profile';
 import {
   decodeRacingLine,
   encodeRacingLine,
@@ -17,86 +30,131 @@ import { referenceLineConfig } from '../../src/reference-setup';
 import { carFor, envelopeFile, lineFile, type CircuitSetup } from './circuits';
 
 /**
- * The two committed artefacts per circuit and trim, and the hashes that tell CI when they are
- * stale without recomputing them:
+ * The two committed artefacts per circuit and trim, and how CI tells they are stale.
  *
- * - envelope: the car's measured performance envelope. Its inputs are the car's parameters,
- *   the event air and fuel, and the source of the vehicle model and of the measurement code.
- * - racing line: the line and speed profile. Its inputs are the track file, the envelope's
- *   hash, the line configuration and skill, and the source of the line and profile code.
+ * The staleness hashes are behavioural fingerprints, not hashes of source text: they hash what
+ * the code computes, rounded to six significant digits, so a comment, a rename or reformatting
+ * changes nothing, while any change in behaviour that reaches an artefact changes the hash,
+ * wherever the code lives (sim, track, AI).
  *
- * Change any input and the stored hash no longer matches; `npm run ai:build` remakes both.
+ * - envelope: the envelope is remeasured (about 1 s of driving the sim) and the measurement
+ *   itself, with the car's parameters, the air and the fuel, is the fingerprint. Any change in
+ *   the vehicle model, the car or the measurement code that moves a number moves it.
+ * - racing line: a probe run of the line pipeline on the real track with the envelope: the
+ *   corridor (track widths, kerbs, frame limits), the minimum-curvature line, the line's
+ *   geometry (positions, elevation from `Track.ground`, grade, vertical curvature, banking,
+ *   surface grip under the wheels), its speed profile with the DRS zones, and a short
+ *   refinement pass, plus the line configuration, the skill and the envelope's fingerprint.
+ *   About 2 s.
+ *
+ * Stale: run `npm run ai:build` and commit packages/ai/data/.
  */
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-/** Bumped when the meaning of the artefacts changes without the hashed source changing. */
-const PROCEDURE = 1;
+/** Bumped when the meaning of the artefacts changes in a way the probes cannot see. */
+const PROCEDURE = 2;
 
-const ENVELOPE_SOURCES = [
-  'packages/sim/src',
-  'packages/ai/src/envelope',
-  'packages/ai/src/driver/feel.ts',
-];
-const LINE_SOURCES = [
-  'packages/ai/src/line',
-  'packages/ai/src/profile',
-  'packages/ai/src/envelope/envelope.ts',
-  'packages/ai/src/export',
-  'packages/ai/src/reference-setup.ts',
-];
+/** Canonical JSON with every number to six significant digits; typed arrays as arrays. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_k, v: unknown) => {
+    if (typeof v === 'number') return Number.isFinite(v) ? Number(v.toPrecision(6)) : String(v);
+    if (ArrayBuffer.isView(v) && !(v instanceof DataView)) {
+      return Array.from(v as unknown as ArrayLike<number>, (x) => Number(x.toPrecision(6)));
+    }
+    return v;
+  });
+}
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
 
-function listFiles(rel: string): string[] {
-  const abs = path.join(ROOT, rel);
-  const st = fs.statSync(abs);
-  if (st.isFile()) return [rel];
-  const out: string[] = [];
-  for (const name of fs.readdirSync(abs).sort()) {
-    const child = `${rel}/${name}`;
-    const cs = fs.statSync(path.join(ROOT, child));
-    if (cs.isDirectory()) out.push(...listFiles(child));
-    else if (name.endsWith('.ts') || name.endsWith('.json')) out.push(child);
-  }
-  return out;
+/** The envelope without its stored hash, as measured. */
+function envelopeData(e: Envelope): Omit<Envelope, never> {
+  const { inputsHash: _h, ...rest } = e as EnvelopeArtefact;
+  return rest;
 }
 
-/** Digest of source files: path and content of each, line endings normalised. */
-export function sourcesDigest(roots: readonly string[]): string {
-  const h = createHash('sha256');
-  for (const root of roots) {
-    for (const file of listFiles(root)) {
-      h.update(file + '\0');
-      h.update(fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n'));
-      h.update('\0');
-    }
-  }
-  return h.digest('hex');
+export interface EnvelopeFingerprint {
+  hash: string;
+  /** The envelope as measured now, rounded as the file stores it. */
+  envelope: Envelope;
+  report: MeasureReport;
 }
 
-export function envelopeInputsHash(setup: CircuitSetup): string {
-  return sha256(
-    JSON.stringify({
+/** Remeasure the envelope and fingerprint it (the car's behaviour is the fingerprint). */
+export function envelopeFingerprint(
+  setup: CircuitSetup,
+  params: CarParams = carFor(setup),
+): EnvelopeFingerprint {
+  const report = measureEnvelope({ params, airDensity: setup.airDensity, fuel: setup.fuel });
+  // Round-trip through the file format so the fingerprint is of what the file holds.
+  const envelope = JSON.parse(JSON.stringify(report.envelope)) as Envelope;
+  const hash = sha256(
+    canonical({
       procedure: PROCEDURE,
-      params: carFor(setup),
+      params,
       airDensity: setup.airDensity,
       fuel: setup.fuel,
-      sources: sourcesDigest(ENVELOPE_SOURCES),
+      envelope: envelopeData(envelope),
     }),
   );
+  return { hash, envelope, report };
 }
 
-export function lineInputsHash(setup: CircuitSetup, envelopeHash: string): string {
+/**
+ * Probe the line pipeline on `track` with `envelope` and fingerprint the results. Everything
+ * the racing-line artefact depends on is exercised: track geometry and surface, corridor,
+ * minimum-curvature solver, line geometry, speed profile, refinement.
+ */
+export function lineFingerprint(
+  track: Track,
+  envelope: Envelope,
+  config: LineConfig,
+  skill: DriverSkill,
+  envelopeHash = '',
+): string {
+  const model = new EnvelopeModel(envelope);
+  const corridor = buildCorridor(track, config.corridor);
+  const mc = minimumCurvatureLine(track, corridor).d;
+  const halfTrack = config.corridor.halfTrack;
+  const geo = computeLineGeometry(track, mc, { halfTrack });
+  const drs = drsZoneFlags(track);
+  const lapTimeOf = (d: Float64Array): number =>
+    new SpeedProfiler(computeLineGeometry(track, d, { halfTrack }), model).compute({
+      scale: config.scale,
+      drs,
+    }).lapTime;
+  const profile = new SpeedProfiler(geo, model).compute({ scale: config.scale, drs });
+  const step = track.lap.step;
+  const probe = refineLine(corridor, mc, {
+    evaluate: lapTimeOf,
+    focus: new Uint8Array(track.lap.count).fill(1),
+    widths: [20 / step],
+    amplitudes: [0.6],
+    spacing: Math.round(300 / step),
+  });
   return sha256(
-    JSON.stringify({
+    canonical({
       procedure: PROCEDURE,
-      track: sha256(fs.readFileSync(path.join(ROOT, setup.trackFile), 'utf8')),
-      envelope: envelopeHash,
-      config: referenceLineConfig(carFor(setup)),
-      skill: REFERENCE_SKILL,
-      sources: sourcesDigest(LINE_SOURCES),
+      config,
+      skill,
+      envelope: envelopeHash || canonical(envelopeData(envelope)),
+      track: { length: track.length, count: track.lap.count, drsZones: track.drsZones },
+      corridor,
+      mc,
+      geometry: {
+        x: geo.x,
+        y: geo.y,
+        z: geo.z,
+        curvature: geo.curvature,
+        grade: geo.grade,
+        verticalCurvature: geo.verticalCurvature,
+        tanBank: geo.tanBank,
+        grip: geo.grip,
+      },
+      profile: { v: profile.v, lapTime: profile.lapTime, deploy: profile.deployEnergy },
+      refine: { d: probe.d, lapTime: probe.lapTime, accepted: probe.accepted },
     }),
   );
 }
@@ -116,16 +174,35 @@ export interface Staleness {
   line: { stored: string; current: string; stale: boolean };
 }
 
-/** Compare the committed artefacts' hashes with the current inputs. Cheap (hashing only). */
+/**
+ * Compare the committed artefacts with what the current code, car and track produce, by
+ * fingerprint (about 3 s: one envelope measurement and one line probe).
+ */
 export function checkArtefacts(setup: CircuitSetup): Staleness {
   const env = loadEnvelope(setup);
   const line = loadLine(setup);
-  const envNow = envelopeInputsHash(setup);
-  const lineNow = lineInputsHash(setup, envNow);
+  const fresh = envelopeFingerprint(setup);
+  const lineNow = lineFingerprint(
+    setup.track(),
+    fresh.envelope,
+    referenceLineConfig(carFor(setup)),
+    REFERENCE_SKILL,
+    fresh.hash,
+  );
   return {
-    envelope: { stored: env.inputsHash, current: envNow, stale: env.inputsHash !== envNow },
+    envelope: { stored: env.inputsHash, current: fresh.hash, stale: env.inputsHash !== fresh.hash },
     line: { stored: line.inputsHash, current: lineNow, stale: line.inputsHash !== lineNow },
   };
+}
+
+/** What to tell a developer whose change made an artefact stale. */
+export function staleMessage(setup: CircuitSetup, which: 'envelope' | 'line'): string {
+  const file = which === 'envelope' ? envelopeFile(setup) : lineFile(setup);
+  return (
+    `${file} is stale: the car, the track or the code that makes it now computes something ` +
+    `different. Run \`npm run ai:build\`, then commit ${envelopeFile(setup)} and ` +
+    `${lineFile(setup)}.`
+  );
 }
 
 export interface BuildReport {
@@ -141,12 +218,9 @@ export interface BuildReport {
 export function buildArtefacts(setup: CircuitSetup, clock: () => number): BuildReport {
   const params = carFor(setup);
   const t0 = clock();
-  const measured = measureEnvelope({ params, airDensity: setup.airDensity, fuel: setup.fuel });
-  const envelopeHash = envelopeInputsHash(setup);
-  const envArtefact: EnvelopeArtefact = { ...measured.envelope, inputsHash: envelopeHash };
-  // Build the line from the envelope exactly as it will be read back (rounded in the file).
-  const envText = JSON.stringify(envArtefact);
-  const envRead = decodeEnvelope(JSON.parse(envText));
+  const fresh = envelopeFingerprint(setup, params);
+  const envArtefact: EnvelopeArtefact = { ...fresh.envelope, inputsHash: fresh.hash };
+  const envRead = decodeEnvelope(JSON.parse(JSON.stringify(envArtefact)));
   const t1 = clock();
   const track = setup.track();
   const config = referenceLineConfig(params);
@@ -156,13 +230,13 @@ export function buildArtefacts(setup: CircuitSetup, clock: () => number): BuildR
   const data = encodeRacingLine(plan, {
     circuit: setup.id,
     trim: setup.trim,
-    inputsHash: lineInputsHash(setup, envelopeHash),
-    envelopeHash,
+    inputsHash: lineFingerprint(track, envRead, config, REFERENCE_SKILL, fresh.hash),
+    envelopeHash: fresh.hash,
   });
   const files = [envelopeFile(setup), lineFile(setup)];
   fs.writeFileSync(path.join(ROOT, files[0]!), formatEnvelope(envArtefact));
   fs.writeFileSync(path.join(ROOT, files[1]!), formatLine(data));
-  return { envelope: measured, line, envelopeMs: t1 - t0, lineMs: t2 - t1, files };
+  return { envelope: fresh.report, line, envelopeMs: t1 - t0, lineMs: t2 - t1, files };
 }
 
 /** One table row per line keeps the files small and their diffs readable. */
