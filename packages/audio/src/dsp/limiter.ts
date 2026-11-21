@@ -1,4 +1,10 @@
-import { INTERPOLATOR_DELAY, OVERSAMPLE, POLYPHASE, TAPS_PER_PHASE } from './oversampling';
+import {
+  INTERPOLATOR_DELAY,
+  INTERPOLATOR_MAX_GAIN,
+  OVERSAMPLE,
+  POLYPHASE,
+  TAPS_PER_PHASE,
+} from './oversampling';
 
 /**
  * Master-bus protection: a look-ahead true-peak limiter followed by a soft-knee clipper.
@@ -10,6 +16,11 @@ import { INTERPOLATOR_DELAY, OVERSAMPLE, POLYPHASE, TAPS_PER_PHASE } from './ove
  * in that window needs. Every value in that average is at most the gain the peak needs, so
  * the delayed peak lands at or under `threshold` with no overshoot, and the gain itself moves
  * smoothly.
+ * The interpolator costs 128 multiply-adds per stereo sample, so it only runs when it could
+ * matter: when the largest input magnitude in a block (and in the history the interpolator
+ * still reads) times the interpolator's largest gain cannot exceed `threshold`, every true peak
+ * in that block is under it, the gain needed is exactly 1, and the detector is skipped. The
+ * output is identical either way; in normal driving the master bus sits well under the bound.
  * The clipper after it is the identity below `knee` and approaches `ceiling` asymptotically,
  * so no sample can reach `ceiling` whatever the input.
  */
@@ -95,38 +106,57 @@ export class SoftLimiter {
     const lag = this.lag;
     const size = this.size;
     const cap = size + 1;
+    const hl = this.histL;
+    const hr = this.histR;
+    // Largest magnitude any detection in this block reads: the history and the new samples.
+    // A NaN sticks (no comparison with it is true) and sends the block to the full detector.
+    let bound = 0;
+    for (let t = 0; t < taps; t++) {
+      const a = Math.abs(hl[t] as number);
+      const b = Math.abs(hr[t] as number);
+      if (a > bound || a !== a) bound = a;
+      if (b > bound || b !== b) bound = b;
+    }
+    for (let i = 0; i < frames; i++) {
+      const a = Math.abs(left[i] as number);
+      const b = Math.abs(right[i] as number);
+      if (a > bound || a !== a) bound = a;
+      if (b > bound || b !== b) bound = b;
+    }
+    const quiet = bound * INTERPOLATOR_MAX_GAIN <= threshold;
     for (let i = 0; i < frames; i++) {
       const l = left[i] as number;
       const r = right[i] as number;
       // True-peak detection for the sample INTERPOLATOR_DELAY behind the newest.
-      const hl = this.histL;
-      const hr = this.histR;
       const hp = this.hpos;
       hl[hp] = l;
       hl[hp + taps] = l;
       hr[hp] = r;
       hr[hp + taps] = r;
-      // Newest sample at hp + taps; x[n - t] at hp + taps - t.
-      const newest = hp + taps;
-      let peak = Math.abs(hl[newest - lag] as number);
-      const pr = Math.abs(hr[newest - lag] as number);
-      if (pr > peak) peak = pr;
-      for (let ph = 0; ph < phases; ph++) {
-        const base = ph * taps;
-        let al = 0;
-        let ar = 0;
-        for (let t = 0; t < taps; t++) {
-          const c = poly[base + t] as number;
-          al += c * (hl[newest - t] as number);
-          ar += c * (hr[newest - t] as number);
-        }
-        if (al < 0) al = -al;
-        if (ar < 0) ar = -ar;
-        if (al > peak) peak = al;
-        if (ar > peak) peak = ar;
-      }
       this.hpos = hp + 1 === taps ? 0 : hp + 1;
-      const need = peak > threshold ? threshold / peak : 1;
+      let need = 1;
+      if (!quiet) {
+        // Newest sample at hp + taps; x[n - t] at hp + taps - t.
+        const newest = hp + taps;
+        let peak = Math.abs(hl[newest - lag] as number);
+        const pr = Math.abs(hr[newest - lag] as number);
+        if (pr > peak) peak = pr;
+        for (let ph = 0; ph < phases; ph++) {
+          const base = ph * taps;
+          let al = 0;
+          let ar = 0;
+          for (let t = 0; t < taps; t++) {
+            const c = poly[base + t] as number;
+            al += c * (hl[newest - t] as number);
+            ar += c * (hr[newest - t] as number);
+          }
+          if (al < 0) al = -al;
+          if (ar < 0) ar = -ar;
+          if (al > peak) peak = al;
+          if (ar > peak) peak = ar;
+        }
+        need = peak > threshold ? threshold / peak : 1;
+      }
 
       // Sliding minimum over the last `size` samples (monotonic deque in a ring).
       while (this.head !== this.tail) {
