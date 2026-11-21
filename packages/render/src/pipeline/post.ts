@@ -17,6 +17,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import type { Quality } from '../quality';
+import { bloomThreshold } from './bloom';
 
 /** Tone maps the pipeline can end in. Khronos PBR Neutral is the default (docs/render.md). */
 export type ToneMap = 'agx' | 'aces' | 'neutral';
@@ -129,7 +130,6 @@ export class RenderPipeline {
   private quad: FullScreenQuad | null = null;
   private width = 1;
   private height = 1;
-  private readonly bloomThreshold: number;
 
   constructor(
     renderer: WebGLRenderer,
@@ -141,7 +141,6 @@ export class RenderPipeline {
     this.renderer = renderer;
     this.quality = quality;
     this.toneMap = toneMap;
-    this.bloomThreshold = quality.bloom.threshold;
     if (!quality.post) return;
     const depthTexture = new DepthTexture(1, 1, UnsignedIntType);
     this.hdr = new WebGLRenderTarget(1, 1, {
@@ -176,7 +175,7 @@ export class RenderPipeline {
         new Vector2(1, 1),
         quality.bloom.strength,
         0.55,
-        this.bloomThreshold,
+        quality.bloom.threshold,
       );
     }
     this.final = new ShaderMaterial({
@@ -241,8 +240,8 @@ export class RenderPipeline {
     r.render(scene, camera);
     if (this.gtao) this.gtao.render(r, this.hdr, this.hdr, 0, false);
     if (this.bloom) {
-      // Threshold in scene-linear units, so the same things bloom at any exposure.
-      this.bloom.threshold = this.bloomThreshold / Math.max(1e-3, grade.exposure);
+      // Scene-linear threshold: bloom runs before exposure.
+      this.bloom.threshold = bloomThreshold(this.quality, grade.exposure);
       this.bloom.render(r, this.hdr, this.hdr, 0, false);
     }
     const u = this.final.uniforms;
@@ -264,7 +263,12 @@ export class RenderPipeline {
     this.hdr?.depthTexture?.dispose();
     this.hdr?.dispose();
     this.ldr?.dispose();
-    this.gtao?.dispose();
+    if (this.gtao) {
+      this.gtao.dispose();
+      // three.js's GTAOPass.dispose() leaves these two materials (and their programs) behind.
+      this.gtao.gtaoMaterial.dispose();
+      this.gtao.blendMaterial.dispose();
+    }
     this.bloom?.dispose();
     this.smaa?.dispose();
     this.final?.dispose();

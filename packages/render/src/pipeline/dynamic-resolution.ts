@@ -2,8 +2,9 @@
  * Dynamic resolution: scales the canvas's drawing buffer (never the DOM HUD) to hold a frame-time
  * target. Pure logic, fed one frame time per frame.
  *
- * - A smoothed frame time (exponential, ~0.5 s) is compared with the target. Single stalls longer
- *   than four targets (a tab switch, a shader compile) are ignored.
+ * - A smoothed frame time (exponential, ~0.5 s) is compared with the target. An isolated frame
+ *   longer than four targets (a tab switch, a shader compile) is ignored; three or more in a row
+ *   are overload, and count (capped at eight targets each) like any slow frame.
  * - Over the target for 0.5 s: step the scale down in proportion to the excess (cost is assumed to
  *   follow pixel count, so scale goes as the square root of the time ratio), at most 15 % a step.
  * - Under 75 % of the target for 1.5 s: step up by the headroom to 80 % of the target, at most
@@ -25,6 +26,8 @@ export class DynamicResolution {
   private smoothed = 0;
   private over = 0;
   private under = 0;
+  /** Consecutive frames over four targets. */
+  private stalls = 0;
 
   constructor(private readonly options: DynamicResolutionOptions) {}
 
@@ -32,7 +35,13 @@ export class DynamicResolution {
   update(frameMs: number): boolean {
     const target = this.options.targetMs;
     if (target <= 0 || frameMs <= 0) return false;
-    if (frameMs > target * 4) return false;
+    if (frameMs > target * 4) {
+      this.stalls++;
+      if (this.stalls < 3) return false;
+      frameMs = Math.min(frameMs, target * 8);
+    } else {
+      this.stalls = 0;
+    }
     const k = 1 - Math.exp(-frameMs / 500);
     this.smoothed = this.smoothed === 0 ? frameMs : this.smoothed + (frameMs - this.smoothed) * k;
     const before = this.scale;
@@ -73,5 +82,6 @@ export class DynamicResolution {
     this.smoothed = 0;
     this.over = 0;
     this.under = 0;
+    this.stalls = 0;
   }
 }

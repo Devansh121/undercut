@@ -54,6 +54,21 @@ describe('DynamicResolution', () => {
     expect(dr.scale).toBe(1);
   });
 
+  it('treats sustained severe overload as load, not as stalls: 300 frames of 100 ms reach the floor', () => {
+    const dr = new DynamicResolution({ targetMs: 16.67, min: 0.6 });
+    for (let i = 0; i < 300; i++) dr.update(100);
+    expect(dr.scale).toBeCloseTo(0.6, 5);
+  });
+
+  it('still ignores a few separate stalls among normal frames', () => {
+    const dr = new DynamicResolution({ targetMs: 16.67, min: 0.6 });
+    for (let k = 0; k < 5; k++) {
+      dr.update(250);
+      for (let i = 0; i < 60; i++) dr.update(12);
+    }
+    expect(dr.scale).toBe(1);
+  });
+
   it('is off when the target is 0', () => {
     const dr = new DynamicResolution({ targetMs: 0, min: 1 });
     run(dr, () => 80, 3);
