@@ -1,0 +1,35 @@
+{
+  // Production Cloudflare Workers deployment: serves the built client as static assets
+  // and the rooms API on the same origin under /rooms. No account_id or zone is set
+  // here; wrangler reads the account from `npx wrangler login` or CLOUDFLARE_ACCOUNT_ID.
+  // Local `./start.sh` and `npm run test:rooms` still use services/rooms/wrangler.jsonc.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "undercut",
+  "main": "services/rooms/src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "send_metrics": false,
+  "workers_dev": true,
+  "assets": {
+    "directory": "dist/cloudflare",
+    "not_found_handling": "none",
+    "run_worker_first": ["/rooms", "/rooms/*"],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "LIMITER", "class_name": "CreateLimiter" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["CreateLimiter"] },
+  ],
+  "vars": {
+    // 10 rooms / 10 min per CF-Connecting-IP; 60 rooms / hour across the whole deployment.
+    "CREATE_LIMIT": "10/600000",
+    "GLOBAL_CREATE_LIMIT": "60/3600000",
+    "SAME_ORIGIN_ONLY": "true",
+    // Cap any single room at 4 hours so no object stays alive indefinitely.
+    "ROOM_TIMINGS": "{\"maxRoomAgeMs\":14400000}",
+  },
+}
