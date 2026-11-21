@@ -59,6 +59,9 @@ export interface ViewFrame {
   /** Running time for camera shake, s. */
   time: number;
   lookBack: boolean;
+  /** For the steering-wheel display: gear and rev lights lit (0–15, 16 at the limiter). */
+  gear: number;
+  revLights: number;
 }
 
 export interface ScreenRect {
@@ -165,6 +168,11 @@ export class RaceView {
     this.avoid = rect;
   }
 
+  /** What the steering-wheel display last showed (tests). */
+  get dashboard(): { gear: string; speed: string; revs: number } | null {
+    return this.car.dashboard;
+  }
+
   /** The player's car's projected bounding box in CSS pixels, with the current framing. */
   carScreenRect(): ScreenRect {
     this.camera.updateMatrixWorld();
@@ -235,6 +243,8 @@ export class RaceView {
       frame.lookBack,
     );
     this.car.setHelmetVisible(mode.helmet);
+    if (mode.name === 'cockpit')
+      this.car.setDashboard(frame.gear, frame.speed * 3.6, frame.revLights);
     this.frame(mode.name === 'chase-near' || mode.name === 'chase-far', frame.dt);
     if (frame.ghost) {
       const dx = frame.ghost.x - this.camera.position.x;

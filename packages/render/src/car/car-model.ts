@@ -1,6 +1,10 @@
 import type { Matrix4 } from 'three';
 import {
   Box3,
+  CanvasTexture,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  SRGBColorSpace,
   BufferAttribute,
   CatmullRomCurve3,
   Color,
@@ -20,7 +24,7 @@ import {
 } from 'three';
 import type { CarPose } from '@undercut/sim';
 import type { Quality } from '../quality';
-import { carbonTexture } from '../textures';
+import { CARBON_TILE, carbonTexture } from '../textures';
 import { loft, plate, wingElement, type Section } from './loft';
 
 /**
@@ -99,12 +103,14 @@ export class CarModel {
   private readonly textures: Texture[] = [];
   private readonly geo: CarGeometry;
   private readonly bodyBox = new Box3();
+  private readonly dash: Dashboard | null;
   private ghostMaterial: MeshStandardMaterial | null = null;
 
   constructor(geo: CarGeometry, livery: Livery, quality: Quality, ghost = false) {
     this.geo = geo;
     this.root.name = ghost ? 'ghost-car' : 'car';
     this.root.add(this.body);
+    this.dash = ghost ? null : new Dashboard();
     const m = this.buildMaterials(livery, quality, ghost);
     this.buildBody(geo, livery, m);
     this.buildWings(geo, m);
@@ -157,7 +163,7 @@ export class CarModel {
       };
     }
     const carbonMap = carbonTexture(q.anisotropy);
-    carbonMap.repeat.set(1 / 0.05, 1 / 0.05);
+    carbonMap.repeat.set(1 / CARBON_TILE, 1 / CARBON_TILE);
     this.textures.push(carbonMap);
     const paint = new MeshPhysicalMaterial({
       vertexColors: true,
@@ -486,18 +492,18 @@ export class CarModel {
     // Plate is in X–Y; turn it to face the driver (normal −X): the plate's X becomes Z.
     wheel.rotateY(Math.PI / 2);
     this.add(this.steeringWheel, wheel, m.carbon, 'steering-wheel');
-    const display = plate(
-      [
-        [-0.05, -0.025],
-        [0.05, -0.025],
-        [0.05, 0.035],
-        [-0.05, 0.035],
-      ],
-      0.004,
-    );
-    display.rotateY(Math.PI / 2);
-    display.translate(-0.016, 0, 0);
-    this.add(this.steeringWheel, display, m.visor, 'wheel-display');
+    // Display: a live canvas (gear, speed, rev lights) facing the driver, drawn only when the
+    // values change and only while the cockpit view shows it.
+    const display = new PlaneGeometry(0.1, 0.0625);
+    display.rotateY(-Math.PI / 2);
+    display.translate(-0.016, 0.003, 0);
+    if (this.dash) {
+      const screen = new Mesh(this.g(display), this.dash.material);
+      screen.name = 'wheel-display';
+      this.steeringWheel.add(screen);
+    } else {
+      this.add(this.steeringWheel, display, m.visor, 'wheel-display');
+    }
     this.body.add(this.steeringWheel);
   }
 
@@ -700,12 +706,26 @@ export class CarModel {
     return out;
   }
 
+  /**
+   * Update the steering-wheel display. Cheap when nothing changed; call while the cockpit view
+   * is active. `revLights` is 0–15 lit, 16 at the limiter.
+   */
+  setDashboard(gear: number, speedKmh: number, revLights: number): void {
+    this.dash?.draw(gear, speedKmh, revLights);
+  }
+
+  /** What the display last drew, for tests. */
+  get dashboard(): { gear: string; speed: string; revs: number } | null {
+    return this.dash?.shown ?? null;
+  }
+
   /** Show or hide the driver's helmet (hidden for the cockpit camera). */
   setHelmetVisible(visible: boolean): void {
     this.driverHead.visible = visible;
   }
 
   dispose(): void {
+    this.dash?.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials) m.dispose();
     for (const t of this.textures) t.dispose();
@@ -768,4 +788,69 @@ function solidColours(g: BufferGeometry, c: Color): BufferAttribute {
   const out = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) out.set([c.r, c.g, c.b], i * 3);
   return new BufferAttribute(out, 3);
+}
+
+const REV_COLOURS = ['#38d07a', '#e5484d', '#4f7dff'] as const;
+
+/** The steering wheel's screen: a small canvas texture redrawn when its values change. */
+class Dashboard {
+  readonly material: MeshBasicMaterial;
+  shown: { gear: string; speed: string; revs: number } | null = null;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly ctx: CanvasRenderingContext2D | null;
+  private readonly texture: CanvasTexture;
+
+  constructor() {
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = 256;
+    this.canvas.height = 160;
+    this.ctx = this.canvas.getContext('2d');
+    this.texture = new CanvasTexture(this.canvas);
+    this.texture.colorSpace = SRGBColorSpace;
+    this.material = new MeshBasicMaterial({ map: this.texture, toneMapped: false });
+    this.draw(0, 0, 0);
+  }
+
+  draw(gear: number, speedKmh: number, revLights: number): void {
+    const g = gear < 0 ? 'R' : gear === 0 ? 'N' : String(gear);
+    const v = String(Math.max(0, Math.round(speedKmh)));
+    const revs = Math.max(0, Math.min(16, Math.round(revLights)));
+    const s = this.shown;
+    if (s && s.gear === g && s.speed === v && s.revs === revs) return;
+    this.shown = { gear: g, speed: v, revs };
+    const c = this.ctx;
+    if (!c) return;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    c.fillStyle = '#07080a';
+    c.fillRect(0, 0, W, H);
+    // Rev lights: 15 segments, green, red, blue; all flash blue at the limiter.
+    const seg = (W - 24) / 15;
+    for (let i = 0; i < 15; i++) {
+      const on = revs > 15 || i < revs;
+      c.fillStyle = on
+        ? revs > 15
+          ? REV_COLOURS[2]
+          : (REV_COLOURS[Math.floor(i / 5)] ?? REV_COLOURS[0])
+        : '#1c1f24';
+      c.fillRect(12 + i * seg + 1, 10, seg - 3, 16);
+    }
+    c.fillStyle = '#f2f0eb';
+    c.textBaseline = 'alphabetic';
+    c.textAlign = 'center';
+    c.font = '700 96px "Barlow Semi Condensed", Archivo, sans-serif';
+    c.fillText(g, W / 2, 132);
+    c.textAlign = 'left';
+    c.font = '600 40px "Barlow Semi Condensed", Archivo, sans-serif';
+    c.fillText(v, 14, 132);
+    c.fillStyle = '#7d7c78';
+    c.font = '600 18px Archivo, sans-serif';
+    c.fillText('KM/H', 14, 152);
+    this.texture.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.texture.dispose();
+    this.material.dispose();
+  }
 }

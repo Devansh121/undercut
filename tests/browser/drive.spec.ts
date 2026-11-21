@@ -196,6 +196,32 @@ test.describe('drive', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the steering-wheel display shows the gear, speed and revs in the cockpit', async ({
+    page,
+  }) => {
+    await startSession(page);
+    await page.evaluate(() => {
+      window.__undercut?.camera('cockpit');
+      window.__undercut?.teleport(300, 0, 200);
+      window.__undercut?.drive({ throttle: 1, steer: 0 });
+    });
+    await expect
+      .poll(async () => {
+        const [dash, t] = await page.evaluate(() => [
+          window.__undercut?.dashboard(),
+          window.__undercut?.telemetry(),
+        ]);
+        const d = dash as { gear: string; speed: string; revs: number } | null;
+        const tel = t as { gear: number; speed: number };
+        return (
+          d !== null &&
+          d.gear === String(tel.gear) &&
+          Math.abs(Number(d.speed) - tel.speed * 3.6) < 15
+        );
+      })
+      .toBe(true);
+  });
+
   test('draws a non-empty 3D view behind the HUD', async ({ page }) => {
     await startSession(page);
     await page.addStyleTag({ content: '#app, .ut-touch { visibility: hidden; }' });

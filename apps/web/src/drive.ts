@@ -404,6 +404,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const t = session.readTelemetry();
     const renderTime = loop.renderTime;
     const ghostOn = session.ghostPoseAt(renderTime, ghostPose);
+    const revLights =
+      t.engineRpm >= REV_FLASH
+        ? 16
+        : Math.max(
+            0,
+            Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
+          );
     view.render({
       pose,
       ghost: ghostOn ? ghostPose : null,
@@ -414,6 +421,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       dt: realDt,
       time: clock,
       lookBack,
+      gear: t.gear,
+      revLights,
     });
 
     // HUD.
@@ -422,13 +431,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     h.speed = t.speed;
     h.gear = t.gear;
     h.rpm = t.engineRpm;
-    h.revLights =
-      t.engineRpm >= REV_FLASH
-        ? 16
-        : Math.max(
-            0,
-            Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
-          );
+    h.revLights = revLights;
     h.lap = timer.lap;
     h.running = timer.running;
     h.valid = timer.valid;

@@ -226,9 +226,13 @@ export function fenceTexture(anisotropy = 8): Texture {
   return finish(el, true, anisotropy);
 }
 
-/** Carbon twill weave as a colour map for the car's bare carbon. */
+/**
+ * Carbon 2x2 twill as a colour map for the car's bare carbon: 16 tows across one tile. With the
+ * tile at `CARBON_TILE` metres a tow is 2.5 mm wide, as on real 3K cloth.
+ */
+export const CARBON_TILE = 0.04;
 export function carbonTexture(anisotropy = 8): Texture {
-  const size = 64;
+  const size = 128;
   const { el, ctx } = canvas(size);
   const cell = 8;
   for (let y = 0; y < size; y += cell) {
