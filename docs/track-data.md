@@ -208,6 +208,73 @@ Nothing third-party was committed in this research slice. All raw data is fetche
 - **Names.** Corners are named by place. Two corners are commonly called after people; the file uses the older place names instead: Vialone for turns 8 to 10, Parabolica for turn 11.
 - **Licence.** `ODbL-1.0` was added to `tools/assets/licences.json` for track databases, as section 3 requires; the notices are in `packages/track/data/LICENSE-DATA.md` and `CREDITS.md`.
 
+- **Format 3 (M4).** Rebuilt with the timing line and environment metadata (section 5.4). Geometry and every other field are byte-identical to the format 2 file except DRS zone 2's activation, which moved from s = 12 m to s = 5484.5 m (section 5.5).
+
+### 5.2 As built for Spa-Francorchamps (M4)
+
+`tools/track-pipeline/circuits/spa.json`; validation `packages/track/validation/spa.test.ts`; evidence `docs/evidence/m4-tracks/spa-*.png`. Rebuild and compare with `npm run track:build -- spa --offline --check`.
+
+- **Loop and frame.** OSM relation 284560, closed, no leftover ways, start heading 330°. Origin 50.4370° N, 5.9686° E, heights relative to 364 m above EGM2008. Ellipsoidal OSM length 7004.0 m; smoothing (Gaussian sigma 6 m) changes it by −0.174 %; scale factor 1.001747 to the official 7004 m; 3502 samples.
+- **Corners.** The default curvature rule finds 16 of the 19 official corners: it drops the Eau Rouge left (turn 2, 17° of turn) and merges Pouhon (turns 10 and 11) and Campus with Stavelot (turns 14 and 15). The circuit's rule (enter 1/300 m, leave 1/600 m, merge gap 30 m, minimum 15°) finds exactly the 19 in order; the file records it in `source.cornerRule` and the validation repeats it. Names by place: La Source, Eau Rouge, Raidillon (3, 4), Les Combes (5, 6), Malmedy, Bruxelles, Speaker's Corner, Pouhon (10, 11), Les Fagnes (12, 13), Campus, Stavelot (15, instead of the person's name it is often given), Blanchimont (16, 17), Bus Stop (18, 19).
+- **Elevation.** 90 m opening, 90 m average, 20 m Gaussian. The opening was not in section 2.2's recommendation: the raw surface model has a narrow bump of about 6 m on early Kemmel (s 1400 to 1450 m, probably a structure or canopy over the track) that puts the steepest grade 250 m past the top of Raidillon and a −1.5 g crest at 300 km/h on Kemmel; a 90 m opening keeps every published check and halves that crest. Results against the published figures:
+
+| Quantity | Built | Published | Residual |
+|---|---|---|---|
+| Range | 102.3 m (364.3 m at s 5040, 466.6 m at s 2530) | 102.2 m [8] | +0.1 m |
+| Lowest / highest point | turn 15 (Stavelot) / turn 7 (Malmedy) | turn 15 / turn 7 [8] | within 30 m of the apexes |
+| Bottom of Eau Rouge to the top of Les Combes | +79.1 m | +79 m [7] | +0.1 m |
+| Bottom of Eau Rouge to the top of the climb (s ≈ 1490 m) | +41.2 m | about 40 m [15]; +55 m from the operator's labels [7] | +1.2 m / −13.8 m |
+| Steepest grade | 13.1 % on Raidillon (s ≈ 1054 m) | 17 % [15] | −3.9 points: the 30 m grid and the 90 m average soften it |
+| Compression and crest at 300 km/h | +1.15 g at the bottom of Eau Rouge (s 976 m); −0.6 g over the top of Raidillon (s 1170 m); −0.88 g on early Kemmel (s 1434 m, residue of the bump above) | — | `spa-vertical.png` |
+
+- **Widths, banking, kerbs.** Half-widths from authored keys: 7.5 m on the start straight, up to 9 m and 8.5 m through La Source, 5.0–5.5 m round the lap, 6 m at the Bus Stop (FIA reference width 10 m as the floor; the TUMFTM profile, used only locally, was scaled by about 1.1 as at Monza). Banking: 1–2.5° into the turn at La Source, Eau Rouge, Raidillon, Bruxelles, Pouhon, Stavelot and Blanchimont. Kerbs: Monza's three profiles; sausage kerbs at the Bus Stop.
+- **Run-off and barriers.** OSM gravel along 1218 m (left) and 854 m (right). OSM walls, fences and guard rails are used where mapped within 45 m; fences are read as guard rails (they are the debris fences on them), and type changes shorter than 20 m are merged. Totals: concrete 3118 m / 4954 m, Armco 3030 m / 1538 m, tyres 856 m / 512 m (left / right). Every barrier is kept inside the frame limit the runtime computes (`clampToFrame`), which moved the pit-side barrier at the Bus Stop by up to 0.25 m.
+- **Pit lane.** OSM way 323851541, on the right: entry at s = 6657.0 m inside the Bus Stop, exit at s = 433.0 m on the descent from La Source after looping inside the hairpin; 717.2 m long (OSM 720.5 m). The brief's "exit before the first hairpin's braking zone" does not match the mapped way, which rejoins after La Source; the mapped way was kept.
+- **Grid.** 20 slots, pole 5 m behind the start line on the right (the 2025 pit-lane drawing marks pole on the right-hand side), 8 m apart; pole to the La Source apex 279 m (published 165 m to the braking point).
+
+### 5.3 As built for Singapore Marina Bay (M4)
+
+`tools/track-pipeline/circuits/singapore.json`; validation `packages/track/validation/singapore.test.ts`; evidence `docs/evidence/m4-tracks/singapore-*.png`. Rebuild and compare with `npm run track:build -- singapore --offline --check`.
+
+- **Loop and frame.** OSM relation 421263 (public-road members plus raceway sections), closed, start heading 352°. Origin 1.2907° N, 103.8580° E, heights relative to 3 m above EGM2008.
+- **Junctions.** Road centrelines meet at sharp vertices (after smoothing alone, radii under 5 m at turns 8 and 14). The pipeline now rounds each vertex turning more than 10° with a 12 m arc before smoothing (`geometry.filletRadius`, estimate), capped at half the distance to the next such vertex. With Gaussian sigma 6 m, the loop shortens by 1.10 % (OSM 4954.7 m to 4900.3 m; the allowance is 1.5 % for this circuit) and the scale factor to the official 4927 m is 1.005457. Tightest radius: turn 13 hairpin, about 8.3 m, where OSM turns 138° within 13 m; the inside half-width there is held at 4.5 m (estimate).
+- **Corners.** The 2025 FIA map numbers 19 corners; the default rule merges the turn 4 kink into the turn 3 hairpin and the three final lefts. The circuit's rule (enter 1/300 m, leave 1/600 m, merge gap 20 m) finds exactly the 19 in order: L R L L R R L R L L R L L R L R L L L. Names by the road beside each corner (the nearest named road in OpenStreetMap), avoiding names used as personal names for corners: Republic Boulevard (1–4), Raffles Boulevard (5, 6), Nicoll Highway, Stamford Road, Saint Andrew's Road, Connaught Drive (10, 11), Fullerton Road, Esplanade Drive, Esplanade, Raffles Avenue (15, 16), Marina Promenade (17–19).
+- **Elevation.** 400 m opening, 90 m average, 20 m Gaussian, then the bridges. Section 2.3 recommended 300 m; with it a 9 m plateau remains on Raffles Avenue (s 3850 to 4100 m, tree canopy along the avenue by its shape) and a 5 % drop into turn 16. With 400 m the range is 3.9 m (3.1 m at s 1556, 7.0 m at the Esplanade Drive bridge crown) against the published 5.3 ± 1.5 m, which was measured on the pre-2023 layout; steepest grade 3.2 %. Bridges: OSM ways 29377119 (Fullerton Road, s 2775 to 2846 m) and 35037538 (Esplanade Drive, s 2938 to 3228 m) are put back as decks straight between their abutment heights with parabolic crowns of 1.0 m and 1.5 m (estimates); the grade smoothing leaves about 0.26 m of the short Fullerton Road crown.
+- **Widths.** From the OSM `lanes` tag of the road under each point, 3.2 m a lane, clipped to 9.5–15 m, 12 m on raceway sections without the tag, smoothed over 25 m (`widths.lanes`); the turn 13 override above.
+- **Walls and escape roads.** Concrete walls 1.5 m beyond the kerb or white line on both sides (OSM walls and fences here belong to the city and are not used); escape roads with tyre walls at turns 1, 7, 8, 10, 13, 14 and 16 (estimates; turns 8 and 14 face each other 40 m apart, so their offsets are 12 m and 18 m). Concrete runs along 4721 m (left) and 4535 m (right) of the lap. Run-off nearest the track is road surface (asphalt) everywhere. No banking.
+- **Pit lane.** OSM way 100484287, on the left (the inside of the final lefts): entry at s = 4448.1 m between turns 17 and 18, exit at s = 383.4 m at turn 2; 819.7 m long (OSM 822.2 m). 80 km/h from 2025.
+- **Grid.** Pole 5 m behind the start line on the right (as marked on the 2025 pit-lane drawing); pole to the turn 1 apex 301 m (published 178 m to the braking point).
+- **Night.** `environment.lighting` is `floodlit`. No floodlight mast is mapped (one Overpass query for masts, towers and lamps in the circuit's box found one tower and no lamps), so the masts are a rule: one every 40 m along each side, the sides staggered by 20 m, 1 m behind the wall, 10 m tall (estimates).
+
+### 5.4 Timing lines and environment (track format 3)
+
+Lap and sector times are measured from the timing (control) line, which the circuit maps draw apart from the start line (s = 0, the OpenStreetMap start node). Format 3 carries it as `timingLine: { s, uncertainty, source }`; the game still times laps from s = 0. Each position was measured by fitting the map's drawn track to the committed centreline with a similarity transform (`tools/research/map_fit.py`) and projecting the map's control-line tick; the other ticks under the same fit give the uncertainty.
+
+| Circuit | Timing line | Before the start line | Fit (median miss) | Other ticks against their stored positions | Uncertainty |
+|---|---|---|---|---|---|
+| Monza | s = 5472.5 m | 320.5 m | 3.4 m | S1 −8.0, S2 −6.6, trap +12.6 m (physics-validation 7.6) | ±13 m |
+| Spa | s = 6875.4 m | 128.6 m | 4.7 m | trap +2, S2 +5, S1 −15 m (the S1 centroid is pulled off the track by its label) | ±15 m |
+| Singapore | s = 4798.4 m | 128.6 m | 2.7 m | trap −8.3, S1 +0.8, S2 −9.0 m | ±10 m |
+
+Two sector lines are anchored on the start of their corner rather than its apex, because the map's tick shows the source measures from there: Spa sector 2 (48 m before turn 15, Stavelot, a 150 m corner: 5 m from the start-based position, 67 m from the apex-based one) and Singapore sector 1 (150 m before turn 7: 0.8 m against 25 m).
+
+`environment` holds the circuit's position (the world origin), the world yaw of true north (π/2: north is −Z in the tangent plane at the origin), the lap's mean altitude, a typical race air temperature (estimates: Monza 26 °C, Spa 20 °C, Singapore 30 °C) and the ISA pressure at that altitude (Monza 99.1 kPa at 186 m, Spa 96.5 kPa at 408 m, Singapore 101.3 kPa at 5 m), the time zone and UTC offset, a representative race date, the usual local start times of qualifying and the race (2025 events: 16:00 and 15:00 at Monza and Spa, 21:00 and 20:00 at Singapore), the lighting and the floodlights. Format 2 files are migrated on load: the timing line goes on the start line with an unknown uncertainty, and the environment is null.
+
+### 5.5 Offsets measured from "the line"
+
+Every per-circuit position in section 4 and physics-validation 4.6 was checked for which line it is measured from:
+
+| Position | Source wording | Measured from | Change |
+|---|---|---|---|
+| Monza DRS 2 activation | 12 m after the finish line | the timing (control) line, which the 2025 map labels the finish | moved from s = 12 m to s = 5484.5 m (±13 m with the timing line); the zone now opens before s = 0 and runs through it to turn 1 |
+| Monza grid, pole to turn 1 braking (472 m) | from pole position | the grid, behind the start line | none |
+| Spa DRS 2 activation | 30 m after turn 19 | turn 19 | none; the zone runs through s = 0 |
+| Singapore DRS 4 activation | exit of turn 19 | turn 19's end | none; the zone runs through s = 0 |
+| All sector lines, speed traps, other DRS points | before or after a numbered turn | the turn | none (two anchored on the corner's start, section 5.4) |
+| Pit-lane limit lines | not in the sources | authored, in the pit frame | none |
+
+The Monza correction changes the DRS zone the reference driver's speed profile uses, so the committed Monza racing-line artefact (`packages/ai/data/monza-low.line.json`) is stale against this track file until it is rebuilt with `npm run ai:build`.
+
 ## 6. Sources
 
 All URLs were opened while doing this work (2026-11-21).

@@ -83,6 +83,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Tyre compounds use an invented scheme (`design/compounds.json`): soft magenta with three ticks, medium orange with two, hard steel blue with one; the maker's mark appears once per sidewall. The HUD mock tokens follow it.
 - Car suspension links are one mesh with morph targets (bump per corner, steer per front corner) rather than one rotating node per link, to keep draw calls near 40 on High.
 - The far car LOD has no suspension links, uprights or decals; it is 10.6k triangles against the 12k budget.
+- Spa and Singapore corner names are places: Stavelot for turn 15 rather than the person's name it is often given, and Singapore corners after the road beside them (docs/track-data.md 5.2, 5.3).
+- Elevation filters differ from the research recommendation after looking at the profiles: Spa gets a 90 m opening (removes a surface-model bump on early Kemmel), Singapore a 400 m opening instead of 300 m (removes a canopy plateau on Raffles Avenue).
+- Monza's DRS zone 2 now opens 12 m after the timing line (s = 5484.5 m) instead of 12 m after the start line; the Monza racing-line artefact is stale until it is rebuilt.
+- Spa's pit lane follows the mapped way, which rejoins after La Source, not before its braking zone.
 
 - Online rooms (M5): a disconnected or silent player's car becomes a ghost (others drive through it) instead of being handed to the host's AI, until the player resumes within 60 s or the car retires.
 - Online rooms: a player who leaves before lights out is replaced by an AI car so the grid stays full; after the start their car retires.

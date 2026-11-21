@@ -8,8 +8,13 @@ DEM code in `tools/research/`. The steps follow `docs/track-data.md` section 5.
 npm run track:build -- monza            # fetch what is not cached, build, write the file
 npm run track:build -- monza --offline  # never fetch; fail if an input is not cached
 npm run track:build -- monza --check    # rebuild in memory and compare with the committed file
-npm run track:plot -- monza             # plan, close-ups and profiles to docs/evidence/m1-track/
+npm run track:plot -- spa               # plan, close-ups and profiles to docs/evidence/m4-tracks/
+npm run track:plot -- spa --vertical 0:2000   # also the side elevation with grade and vertical g
+npm run track:plot -- monza             # Monza's evidence goes to docs/evidence/m1-track/
 ```
+
+Circuits: `monza`, `spa`, `singapore`. Output is track format 3 (`packages/track/src/data.ts`),
+which adds the timing line and the environment; format 2 files still load through a migration.
 
 The pipeline does not run in CI. CI validates the committed file instead
 (`packages/track/validation/`), and `licence.test.mjs` here checks its manifest entry and notices.
@@ -32,19 +37,31 @@ file changes, the build stops until its sidecar is deleted, which records the ne
 
 ## Adding a circuit
 
-Add `circuits/<id>.json`; no code changes. It holds:
+Add `circuits/<id>.json`; no code changes for a circuit like the three built. It holds:
 
 - `osm`: the circuit relation, the pit-lane way and the bounding box for the feature query;
 - `geometry`: densify step, smoothing sigma, sample step, the allowed length change and the start
-  heading range used to check the loop;
-- `elevation`: the circuit's filter (opening window, average, Gaussian) and the published range
-  the result must match;
+  heading range used to check the loop; optional `filletRadius` rounds sharp vertices (road
+  junctions on a street circuit) with arcs of that radius before smoothing;
+- `cornerRule` (optional): overrides of the curvature rule (`smoothSigma`, `enter`, `exit`,
+  `mergeGap`, `minTurn`) where the official numbering needs them; the file records the rule used;
+- `elevation`: the circuit's filter (opening window, average, Gaussian), the published range the
+  result must match, and optional `bridges` (OSM ways put back as crowned decks after the opening);
 - `corners`: official numbering, names by place and direction. The build fails unless the
-  curvature rule in `lib/corners.py` finds exactly these corners in this order;
-- `timing`, `grid`, `pit`: positions as offsets from corners (`{"corner": 4, "offset": -233}`),
-  from the start line (`{"s": 12}`) or from the pit junctions (`{"pit": "entry", "offset": 40}`);
-- `widths`, `banking`, `kerbProfiles`, `kerbs`, `runoff`, `barriers`: authored tables. Every value
-  in them is an estimate and says so in its `note`.
+  curvature rule finds exactly these corners in this order;
+- `timing`, `grid`, `pit`: positions as offsets from corners (`{"corner": 4, "offset": -233}`,
+  from the apex, or with `"at": "start"` or `"end"`), from the start line (`{"s": 12}`), from the
+  timing line (`{"line": "timing", "offset": 12}`) or from the pit junctions
+  (`{"pit": "entry", "offset": 40}`). A DRS zone runs to the next corner's start unless it names an
+  `end`;
+- `timingLine`: where lap and sector times run from, with its uncertainty and source;
+- `environment`: time zone, race date, session times, typical air temperature, lighting and
+  floodlights (mapped masts or a placement rule); the build adds position, north, altitude and
+  ISA pressure;
+- `widths` (keys, or `lanes` from the OSM lanes tag with `overrides`), `banking`, `kerbProfiles`,
+  `kerbs`, `runoff`, `barriers`: authored tables. Every value in them is an estimate and says so
+  in its `note`. `barriers` may remap mapped types (`mappedTypes`), merge short type runs
+  (`minTypeRun`) and keep every barrier inside the runtime's frame limit (`clampToFrame`).
 
 ## What is measured and what is authored
 
