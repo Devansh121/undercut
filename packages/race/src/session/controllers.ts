@@ -103,9 +103,13 @@ class PitLaneDriving {
   readonly takeover: number;
   private still = 0;
 
-  constructor(params: CarParams, takeover = 120) {
+  /** Hand the car back as soon as it leaves the pit lane (a racing driver that can rejoin). */
+  readonly handBackOnExit: boolean;
+
+  constructor(params: CarParams, takeover = 120, handBackOnExit = false) {
     this.follower = new PathFollower(params);
     this.takeover = takeover;
+    this.handBackOnExit = handBackOnExit;
   }
 
   reset(): void {
@@ -168,6 +172,11 @@ class PitLaneDriving {
       this.follower.reset();
       this.follower.setPath(pitOutPath(ctx.track, ctx.circuit, f.pitS, 0), false);
     }
+    // Off the pit-lane surface the car is back on the lap: the driver takes over there (a racing
+    // driver rejoins off line while the traffic passes; the follower would slow it on the lap).
+    if (this.mode === 'out' && phase === 'none' && !f.inPitLane && this.handBackOnExit) {
+      this.mode = 'none';
+    }
     if (this.mode === 'out' && phase === 'none' && !f.inPitLane && this.follower.remaining() < 2) {
       this.mode = 'none';
     }
@@ -220,7 +229,7 @@ export class AiController implements CarController {
   constructor(o: AiControllerOptions) {
     this.driver = o.driver;
     this.reaction = o.reaction;
-    this.pit = new PitLaneDriving(o.params);
+    this.pit = new PitLaneDriving(o.params, 120, o.driver.sense !== undefined);
     this.launchSpeed = o.launchSpeed ?? 25;
     this.blueThrottle = o.blueThrottle ?? 0.85;
     this.jumpAfter = o.jumpAfter ?? null;
