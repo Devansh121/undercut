@@ -1,0 +1,170 @@
+import { el } from '../ui/dom';
+import { displayCode, inviteLink } from './invite';
+import type { OnlineSession } from './session';
+
+/** Room screens share the game's typography and buttons; all data comes from the session. */
+export class RoomScreens {
+  readonly root = el('main', 'online-screen');
+  private name = 'Driver';
+  private code: string;
+  private notice = '';
+  constructor(
+    private readonly session: OnlineSession,
+    code: string | null,
+    private readonly back: () => void,
+  ) {
+    this.code = code ?? '';
+  }
+  show(): void {
+    const active = document.activeElement as HTMLInputElement | null;
+    const focus = active?.id;
+    const s = this.session.state;
+    const title = el(
+      'h1',
+      '',
+      s.results ? 'Race results' : s.room ? 'Room ' + displayCode(s.code ?? '') : 'Online rooms',
+    );
+    const content = el('div', 'online-screen__content');
+    const button = (text: string, action: () => void, disabled = false): HTMLButtonElement => {
+      const b = el('button', 'button', text);
+      b.type = 'button';
+      b.disabled = disabled;
+      b.id = 'online-' + text.toLowerCase().replaceAll(' ', '-');
+      b.onclick = action;
+      return b;
+    };
+    const field = (label: string, value: string, change: (v: string) => void): HTMLLabelElement => {
+      const l = el('label', 'online-field', label);
+      const i = el('input');
+      i.id = 'online-' + label.toLowerCase().replaceAll(' ', '-');
+      i.value = value;
+      i.maxLength = label === 'Driver name' ? 24 : 7;
+      i.oninput = () => change(i.value);
+      l.append(i);
+      return l;
+    };
+    if (s.ended) content.append(el('h2', '', s.ended.title), el('p', '', s.ended.detail));
+    if (!s.room || s.ended) {
+      content.append(
+        field('Driver name', this.name, (v) => (this.name = v)),
+        field('Room code', this.code, (v) => (this.code = v)),
+        button('Create room', () => void this.session.create(this.name), s.busy),
+        button('Join room', () => void this.session.join(this.code, this.name), s.busy),
+        button('Back', this.back),
+      );
+    } else {
+      const invite = inviteLink(location.href, s.code!);
+      const link = el('a', '', invite);
+      link.href = invite;
+      link.dataset.testid = 'invite';
+      content.append(
+        link,
+        button('Copy invite', () => {
+          void navigator.clipboard
+            ?.writeText(invite)
+            .then(() => this.say('Invite copied'))
+            .catch(() => this.say('Select the invite link to copy it'));
+        }),
+        el(
+          'p',
+          '',
+          'On another device use the Wi-Fi address printed by start.sh, with ?room=' + s.code,
+        ),
+      );
+      const list = el('ul', 'online-members');
+      for (const m of s.members) {
+        const row = el(
+          'li',
+          '',
+          m.name +
+            (m.you ? ' · You' : '') +
+            (m.host ? ' · Host' : '') +
+            ' · ' +
+            m.livery.teamName +
+            ' · ' +
+            (m.connected ? (m.ready ? 'Ready' : 'Not ready') : 'Reconnecting'),
+        );
+        row.style.borderLeft = '4px solid ' + m.livery.primary;
+        list.append(row);
+      }
+      content.append(list);
+      if (s.results) {
+        const order = el('ol', 'online-results');
+        order.dataset.testid = 'online-results';
+        for (const r of s.results.rows)
+          order.append(
+            el(
+              'li',
+              '',
+              r.name +
+                ' · ' +
+                r.laps +
+                ' laps · ' +
+                r.status +
+                ' · ' +
+                (r.timeMs === null ? '—' : (r.timeMs / 1000).toFixed(3) + ' s'),
+            ),
+          );
+        content.append(order);
+        if (s.isHost)
+          content.append(
+            button('Rematch', () => {
+              this.session.rematch();
+            }),
+          );
+        else content.append(el('p', '', 'Waiting for the host to choose rematch'));
+      } else {
+        const laps = field('Laps', String(s.room.settings.laps), (v) =>
+          this.session.setLaps(Number(v)),
+        );
+        const i = laps.querySelector('input')!;
+        i.type = 'number';
+        i.min = '1';
+        i.max = '99';
+        i.disabled = !s.isHost || s.stage !== 'lobby';
+        content.append(
+          el('p', '', 'Monza · Equal cars · Team assigned by seat · AI fill off'),
+          laps,
+        );
+        for (const key of Object.keys(
+          s.room.settings.assists,
+        ) as (keyof typeof s.room.settings.assists)[]) {
+          const l = el('label', 'online-assist', key.replace(/([A-Z])/g, ' $1'));
+          const check = el('input');
+          check.type = 'checkbox';
+          check.checked = s.room.settings.assists[key];
+          check.disabled = !s.isHost || s.stage !== 'lobby';
+          check.onchange = () => this.session.setAssists({ [key]: check.checked });
+          l.prepend(check);
+          content.append(l);
+        }
+        const me = s.members.find((m) => m.you);
+        content.append(
+          button(
+            me?.ready ? 'Not ready' : s.isHost ? 'Ready to start' : 'Ready',
+            () => {
+              this.session.setReady(!me?.ready);
+            },
+            s.status !== 'joined',
+          ),
+          el(
+            'p',
+            '',
+            s.stage === 'countdown'
+              ? 'Starting shortly'
+              : 'The countdown begins when everyone is ready',
+          ),
+        );
+      }
+      content.append(button('Leave room', () => this.session.leave()));
+    }
+    const status = el('p', '', s.busy ? 'Connecting' : s.status);
+    status.setAttribute('role', 'status');
+    this.root.replaceChildren(title, status, content, el('p', 'online-notice', this.notice));
+    if (focus) document.getElementById(focus)?.focus();
+  }
+  say(message: string): void {
+    this.notice = message;
+    this.show();
+  }
+}

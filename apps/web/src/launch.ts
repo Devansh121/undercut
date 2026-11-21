@@ -7,6 +7,7 @@ export interface LaunchScreenOptions {
   /** Best lap at the circuit from storage, if any. */
   record: number | null;
   onStart(): void;
+  onOnline?(): void;
 }
 
 export interface LaunchScreen {
@@ -52,7 +53,10 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const build = el('footer', 'launch__build');
   build.append('Build ', el('code', '', options.buildHash));
 
-  bar.append(mode, start, build);
+  const online = el('button', 'button', 'Online rooms');
+  online.type = 'button';
+  online.onclick = () => options.onOnline?.();
+  bar.append(mode, start, online, build);
   screen.append(stage, bar);
   root.replaceChildren(screen);
 
