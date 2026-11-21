@@ -32,7 +32,8 @@
       "crowd": 0.85,
       "coverResolution": 1.5,
       "treeNear": 260,
-      "treeFar": 4500
+      "treeFar": 4500,
+      "structures": true
     }
   },
   "high": {
@@ -67,7 +68,8 @@
       "crowd": 0.8,
       "coverResolution": 2,
       "treeNear": 220,
-      "treeFar": 4000
+      "treeFar": 4000,
+      "structures": true
     }
   },
   "medium": {
@@ -102,7 +104,8 @@
       "crowd": 0.6,
       "coverResolution": 2,
       "treeNear": 160,
-      "treeFar": 3000
+      "treeFar": 3000,
+      "structures": true
     }
   },
   "mobile": {
@@ -137,7 +140,8 @@
       "crowd": 0.3,
       "coverResolution": 4,
       "treeNear": 120,
-      "treeFar": 2000
+      "treeFar": 2000,
+      "structures": true
     }
   },
   "lite": {
@@ -172,7 +176,8 @@
       "crowd": 0.02,
       "coverResolution": 8,
       "treeNear": 60,
-      "treeFar": 800
+      "treeFar": 800,
+      "structures": false
     }
   }
 }

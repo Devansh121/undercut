@@ -5,7 +5,7 @@ import monzaTrackJson from '@undercut/track/data/monza.json';
 import brandsJson from '../../../design/brands.json';
 import monzaDressingJson from '../data/monza.dressing.json';
 import { decodeTerrain, gridHeight, hash01, type DressingFile } from '../src/world/dressing';
-import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
+import { buildHistoricBanking, buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { buildStands, crowdSeats, fitStand, type StandFrame } from '../src/world/grandstands';
 import { LapIndex } from '../src/world/lap-index';
 import {
@@ -188,5 +188,52 @@ describe('grandstands, start gantry, and over-track bridges', () => {
     }
     for (const m of bridges.materials) m.dispose();
     tex.dispose();
+  });
+});
+
+describe('lap index and the old oval', () => {
+  const track = new Track(monzaTrackData);
+  const lap = new LapIndex(track);
+
+  it('finds the same nearest lap sample as a brute-force search, near the circuit and kilometres away', () => {
+    const brute = (x: number, z: number): number => {
+      let best = Infinity;
+      for (let i = 0; i < track.lap.count; i++) {
+        const d = Math.hypot((track.lap.x[i] as number) - x, (track.lap.z[i] as number) - z);
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    for (let k = 0; k < 400; k++) {
+      // Points from on the circuit out to the 6 km horizon of the terrain.
+      const r = 6000 * hash01(k, 1) ** 2;
+      const a = hash01(k, 2) * Math.PI * 2;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      expect(lap.nearest(x, z).dist).toBeCloseTo(brute(x, z), 6);
+    }
+  });
+
+  it('builds no old-oval concrete beside the circuit, only overpasses where it crosses', () => {
+    const { geometry } = buildHistoricBanking(monzaDressing.mapped.raceway, () => 0, lap);
+    expect(geometry).toBeDefined();
+    const p = (geometry as NonNullable<typeof geometry>).getAttribute('position');
+    // The oval's mapped ways share Monza's main straight, where they once raised a deck over the
+    // start line for hundreds of metres. Concrete within 20 m of the centreline may only be a
+    // crossing: each cluster of it spans a short stretch of lap.
+    const near: number[] = [];
+    for (let i = 0; i < p.count; i++) {
+      const hit = lap.nearest(p.getX(i), p.getZ(i));
+      if (hit.dist < 20) near.push(hit.s);
+    }
+    near.sort((x, y) => x - y);
+    let start = near[0] ?? 0;
+    for (let i = 1; i <= near.length; i++) {
+      const s = near[i];
+      if (s === undefined || s - (near[i - 1] as number) > 50) {
+        expect((near[i - 1] as number) - start).toBeLessThan(100);
+        if (s !== undefined) start = s;
+      }
+    }
   });
 });

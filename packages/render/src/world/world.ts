@@ -70,6 +70,11 @@ export interface WorldQuality {
   /** Tree cards drawn near / far (m from the chunk centre). */
   treeNear: number;
   treeFar: number;
+  /**
+   * Build the structures (pit complex, buildings, stands and crowd, trackside furniture,
+   * bridges, decals). Off on Lite (software-WebGL tests): ground and a few trees only.
+   */
+  structures: boolean;
 }
 
 export interface CircuitWorldOptions {
@@ -166,12 +171,22 @@ export class CircuitWorld {
   private pitComplex: PitComplexData | null = null;
   private startGantry: StartGantry | null = null;
 
+  /** Milliseconds per build step (start-up budget). */
+  readonly buildTimes: Record<string, number> = {};
+
   constructor(o: CircuitWorldOptions) {
     const { track, dressing, quality } = o;
     const wq = quality.world;
     this.group.name = 'world';
+    let mark = performance.now();
+    const step = (name: string): void => {
+      const now = performance.now();
+      this.buildTimes[name] = Math.round(now - mark);
+      mark = now;
+    };
     this.lap = new LapIndex(track);
     const grid = decodeTerrain(dressing.terrain);
+    step('index');
 
     // Ground.
     const terrain = buildTerrain(
@@ -182,6 +197,7 @@ export class CircuitWorld {
       wq.terrain === 'high' ? TERRAIN_HIGH : TERRAIN_MOBILE,
     );
     this.heightAt = terrain.heightAt;
+    step('terrain');
     const lapBox = bounds(
       Array.from({ length: track.lap.count * 2 }, (_, i) =>
         i % 2 === 0 ? (track.lap.x[i >> 1] as number) : (track.lap.z[i >> 1] as number),
@@ -194,6 +210,7 @@ export class CircuitWorld {
       wq.coverResolution,
     );
     this.textures.push(this.cover.texture);
+    step('cover');
     const macro = macroNoise();
     this.textures.push(macro);
     const ground = surfaceMaterial(
@@ -239,12 +256,23 @@ export class CircuitWorld {
     this.geometries.push(terrain.geometry);
     this.group.add(groundMesh);
 
+    step('ground');
+    if (!wq.structures) {
+      this.placeTrees(o, lapBox);
+      step('trees');
+      return;
+    }
     // Build pit complex before generic buildings so its footprint excludes mapped pit slabs.
     this.placePitComplex(o);
+    step('pit');
     this.placeTrees(o, lapBox);
+    step('trees');
     this.placeBuildings(o);
+    step('buildings');
     this.placeStands(o);
+    step('stands');
     this.placeFurnitureAndDecals(o);
+    step('furniture');
   }
 
   /** Set the 5 start-gantry lights (bits 0..4 red pods, bit 5 green). */

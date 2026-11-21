@@ -68,25 +68,36 @@ export class LapIndex {
     const cz = Math.floor((z - this.z0) / this.cell);
     let best = -1;
     let bestD2 = Infinity;
-    const maxRing = Math.max(this.cols, this.rows) + Math.abs(cx) + Math.abs(cz);
-    for (let ring = 0; ring <= maxRing; ring++) {
-      for (let j = cz - ring; j <= cz + ring; j++) {
-        if (j < 0 || j >= this.rows) continue;
-        for (let i = cx - ring; i <= cx + ring; i++) {
-          if (i < 0 || i >= this.cols) continue;
-          if (ring > 0 && j !== cz - ring && j !== cz + ring && i !== cx - ring && i !== cx + ring)
-            continue;
-          const k = j * this.cols + i;
-          for (let e = this.start[k] as number; e < (this.start[k + 1] as number); e++) {
-            const idx = this.items[e] as number;
-            const dx = (lap.x[idx] as number) - x;
-            const dz = (lap.z[idx] as number) - z;
-            const d2 = dx * dx + dz * dz;
-            if (d2 < bestD2) {
-              bestD2 = d2;
-              best = idx;
-            }
-          }
+    const cols = this.cols;
+    const rows = this.rows;
+    const visit = (i: number, j: number): void => {
+      const k = j * cols + i;
+      for (let e = this.start[k] as number; e < (this.start[k + 1] as number); e++) {
+        const idx = this.items[e] as number;
+        const dx = (lap.x[idx] as number) - x;
+        const dz = (lap.z[idx] as number) - z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = idx;
+        }
+      }
+    };
+    // Rings of cells around the query's cell, clipped to the grid: only the cells on each ring's
+    // border inside the grid are visited, starting at the first ring that reaches the grid.
+    const outside = Math.max(0, -cx, cx - (cols - 1), -cz, cz - (rows - 1));
+    const maxRing = outside + cols + rows;
+    for (let ring = outside; ring <= maxRing; ring++) {
+      const j0 = Math.max(0, cz - ring);
+      const j1 = Math.min(rows - 1, cz + ring);
+      const i0 = Math.max(0, cx - ring);
+      const i1 = Math.min(cols - 1, cx + ring);
+      for (let j = j0; j <= j1; j++) {
+        if (j === cz - ring || j === cz + ring) {
+          for (let i = i0; i <= i1; i++) visit(i, j);
+        } else {
+          if (cx - ring >= 0) visit(cx - ring, j);
+          if (ring > 0 && cx + ring < cols) visit(cx + ring, j);
         }
       }
       // Anything in a further ring is at least (ring) cells away from the query's cell.
