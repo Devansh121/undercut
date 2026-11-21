@@ -16,8 +16,27 @@ player drives; drivers follow them and produce only a `ControlInput`. No speed o
    banking and vertical curvature, DRS in the zones, MGU-K deployment within the per-lap budget.
    About 10 ms per line.
 4. **Artefacts** (`data/`): `<circuit>-<trim>.envelope.json` and `<circuit>-<trim>.line.json`,
-   each with a hash of its inputs. `npm run ai:build -- --check` (and the physics suite) report a
-   stale file when the car, the track or the code changed.
+   each with a fingerprint of what produced it.
+
+## Staleness
+
+`npm run ai:build -- --check` and the physics suite recompute the fingerprints and compare them
+with the stored ones (about 5 s). A fingerprint is behavioural: a hash of what the code
+computes, every number rounded to six significant digits, never of source text. So a comment,
+a rename or reformatting anywhere leaves the artefacts current, and any change in behaviour that
+reaches them, in the sim, the track or this package, makes them stale.
+
+- Envelope: the envelope is remeasured (about 1 s of driving) and the measurement, with the car's
+  parameters, the air and the fuel, is the fingerprint.
+- Racing line: a probe run of the pipeline on the real track: the corridor (widths, kerbs, frame
+  limits), the minimum-curvature line, its geometry (positions, elevation and slopes from
+  `Track.ground`, banking, surface grip under the wheels), its speed profile with the DRS zones, a
+  short refinement pass, and the line configuration, skill and envelope fingerprint.
+
+When either is stale the failure says so and what to do: run `npm run ai:build` (about 15–30 s),
+then commit `packages/ai/data/<circuit>-<trim>.envelope.json` and `.line.json`. A behaviour change
+the probes cannot see (a new input to the line that the probe does not exercise) needs the
+`PROCEDURE` constant in `validation/lib/artefacts.ts` bumped with it.
 
 ## Driving
 
@@ -31,6 +50,7 @@ tick costs about 1.3 µs.
 
 ## Validation
 
-`validation/reference-lap.test.ts` (physics job) drives one flying lap at Monza; the ten-lap soak
+`validation/reference-lap.test.ts` (physics job) drives an out-lap and one timed lap at Monza,
+timed from the circuit's control line (`CircuitSetup.controlLine`); the ten-lap soak
 is `validation/soak/` (nightly). `npm run telemetry -- lap` prints the tables and writes a trace.
 Results and the time-loss analysis: `docs/physics-validation.md` section 7.6.

@@ -79,7 +79,8 @@ def driven_lap(cid):
         for row in csv.DictReader(f):
             if row["lap"] == "0":
                 pts.append((float(row["s"]), float(row["speed_kmh"])))
-    return pts or None
+    # A lap timed from a control line away from s = 0 wraps through s = 0: plot it in s order.
+    return sorted(pts) or None
 
 
 def speed_svg(tr, title, plan_kmh, driven, marks):
@@ -172,6 +173,9 @@ def main(argv):
         plot.write(speed_legend(svg.finish([])), os.path.join(out_dir, "%s-%s-line-%s" % (cid, trim, label.lower())), keep_svg)
 
     marks = [(c["s"], "T%d" % c["number"]) for c in cs]
+    if cid == "monza":
+        # Control line measured on the FIA circuit map (packages/ai/validation/lib/circuits.ts).
+        marks.append((5472.5, "CTRL"))
     plot.write(speed_svg(tr, "%s, %s trim: target speed along the lap (planned %.3f s)" % (name, trim, lap), speeds, driven_lap(cid), marks), os.path.join(out_dir, "%s-%s-speed" % (cid, trim)), keep_svg)
     return 0
 

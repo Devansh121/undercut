@@ -25,7 +25,7 @@ npm run telemetry -- lap --laps 10     # ten consecutive laps (fuel for all of t
 | `coast-down` | Neutral from 320 km/h: deceleration against speed |
 | `assists` | Full throttle out of a slow corner and full brake in a turn (both at 85 % of the limit) with TC or ABS 0–3; full-pedal straight stop from 300 km/h with ABS 0–3 |
 | `validate` | The table of every target: result, stated target, band, verdict (pass, gap, fail) |
-| `lap` | The reference driver on the committed racing line (`packages/ai`): flying lap(s) at Monza in the doc 2.1 conditions; lap, sector, corner and trap tables against the published figures, driver cost per tick; `lap-monza.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-monza.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
+| `lap` | The reference driver on the committed racing line (`packages/ai`): an out-lap, then timed lap(s) from the control line at Monza in the doc 2.1 conditions; lap, sector, corner, corner-geometry and trap tables against the published figures, driver cost per tick; `lap-monza.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-monza.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
 
 Each run writes `<name>.csv` per trace (40 Hz rows: speed, rpm, gear, pedals, g, per-wheel
 load, slip ratio and slip angle, ride heights, pitch, roll, aero forces, DRS, ERS, fuel, yaw
