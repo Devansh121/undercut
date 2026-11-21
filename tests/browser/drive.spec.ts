@@ -316,6 +316,9 @@ test.describe('drive', () => {
   test('lays out the HUD inside the viewport with nothing overlapping', async ({
     drive: { page },
   }) => {
+    // Measure the steady HUD: the camera test above leaves a 1.4 s "Far chase" notice, which on
+    // a slow runner can still be showing here (the message slot's layout is a separate check).
+    await expect(page.locator('[data-testid=hud-message]')).toBeHidden({ timeout: 10_000 });
     const report = await page.evaluate(() => {
       const problems: string[] = [];
       const { innerWidth: w, innerHeight: h } = window;

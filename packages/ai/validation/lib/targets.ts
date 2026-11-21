@@ -53,9 +53,10 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 84.969,
+    measured: 84.872,
     reason:
-      'On the footprint-checked legal corridor the lap is 2.24 s outside the M1 band. The ' +
+      'On the footprint-checked legal corridor, with DRS zone 2 opening 12 m after the timing ' +
+      'line, the lap is 2.14 s outside the M1 band. The ' +
       'full-envelope profile on that line is a quasi-steady prediction of 83.45 s; the rest is ' +
       'the car and the track as modelled. docs/physics-validation.md section 7.6.',
   },

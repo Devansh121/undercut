@@ -34,6 +34,9 @@ def build(cfg, cl, frame):
     raw = [frame.to_xz(lat, lon) for lat, lon in cl["pts"][:-1]]  # last point repeats the first
     raw_len = geom.cumulative(raw, True)[-1]
     dense_step = g["denseStep"]
+    if g.get("filletRadius"):
+        # Street circuits: road centrelines meet at junction vertices; round them first.
+        raw = geom.fillet(raw, True, g["filletRadius"], dense_step)
     dense = geom.densify(raw, True, dense_step)
     smooth = geom.smooth_points(dense, True, g["smoothSigma"] / dense_step)
     # The smoothed loop starts where the start/finish node projects onto it.

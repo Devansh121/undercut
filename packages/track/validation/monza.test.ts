@@ -133,6 +133,14 @@ describe('Monza: centreline', () => {
 });
 
 describe('Monza: timing and rules metadata', () => {
+  it('carries the timing line measured on the circuit map, 320.5 m before the start line', () => {
+    expect(data.timingLine.s).toBe(5472.5);
+    expect(data.timingLine.uncertainty).toBe(13);
+    expect(track.timingLine).toBe(5472.5);
+    expect(track.lapDelta(0, data.timingLine.s)).toBeCloseTo(-320.5, 6);
+    expect(data.environment!.lighting).toBe('daylight');
+  });
+
   it('puts every metadata point inside the lap', () => {
     const points = [
       ...data.timing.sectors,
@@ -167,7 +175,10 @@ describe('Monza: timing and rules metadata', () => {
     expect(near(z1!.detection, corner(7) - 95)).toBeLessThan(0.01);
     expect(near(z1!.activation, corner(7) + 170)).toBeLessThan(0.01);
     expect(near(z2!.detection, corner(11) + 20)).toBeLessThan(0.01);
-    expect(near(z2!.activation, 12)).toBeLessThan(0.01);
+    // "12 m after the finish line": the map's finish line is the timing (control) line, 320.5 m
+    // before the start line at s = 0, so the zone opens before s = 0 and runs through it.
+    expect(near(z2!.activation, data.timingLine.s + 12)).toBeLessThan(0.01);
+    expect(near(z2!.activation, 5484.5)).toBeLessThan(0.01);
     for (const z of data.timing.drs) {
       // Detection comes before activation (zone 2: in the Parabolica, then past the line),
       // activation before the end of the zone.
@@ -175,9 +186,15 @@ describe('Monza: timing and rules metadata', () => {
       expect(track.forwardDistance(z.activation, z.end)).toBeGreaterThan(300);
       expect(track.forwardDistance(z.activation, z.end)).toBeLessThan(1200);
     }
-    // Zone 1 is the run from Lesmo 2 to the Vialone, zone 2 the main straight.
+    // Zone 1 is the run from Lesmo 2 to the Vialone, zone 2 the main straight, wrapping through
+    // the start line: activation before s = 0, end after it.
     expect(track.drsZoneAt((corner(7) + corner(8)) / 2)).toBe(0);
-    expect(track.drsZoneAt(300)).toBe(1);
+    expect(z2!.activation).toBeGreaterThan(L - 400);
+    expect(z2!.end).toBeLessThan(corner(1));
+    for (const s of [z2!.activation + 1, L - 1, 0, 1, 300, z2!.end - 1])
+      expect(track.drsZoneAt(s)).toBe(1);
+    expect(track.drsZoneAt(z2!.activation - 1)).toBe(-1);
+    expect(track.drsZoneAt(z2!.end + 1)).toBe(-1);
     expect(track.drsZoneAt(corner(3))).toBe(-1);
   });
 
