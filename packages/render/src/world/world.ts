@@ -674,6 +674,7 @@ export class CircuitWorld {
       mobile,
       geometries: this.geometries,
       materials: this.materials,
+      textures: this.textures,
     });
     Object.assign(this.counts, furnCounts);
 

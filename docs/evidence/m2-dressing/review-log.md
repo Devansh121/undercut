@@ -24,11 +24,20 @@ Pit complex and pit-wall canopies with crew, sloped grandstands with roofs, inve
 - Giveaways: (1) isolated catch-fence panels standing alone in the first chicane's run-off (`chicane-outside`); (2) found by the direct-path browser test: the old oval's mapped ways share Monza's main straight, and the banking builder raised a 7 m concrete deck along it, right over the start line (a dark slab over the chase camera); (3) one invented brand ("MARETTI, TORREFAZIONE") read one letter away from a famous real brand.
 - Fixed: catch fencing is now placed only in continuous runs of at least 24 m; old-oval concrete is built only more than 32 m from the centreline, or as an overpass where a segment actually crosses the circuit; the brand is renamed VASSERO. The prop catalogue from the prop kit (`packages/render/data/props.catalog.json`) is read when the build has one, so the modelled props replace the stand-ins as a data change.
 
+## Round 10: the prop kit swapped in
+
+The modelled kit (#27) merged. The world places its hoardings, catch fence, braking and DRS boards, marshal posts, absorber blocks, screen towers and camera towers at the stand-ins' placements; kinds the kit lacks keep their stand-ins (`packages/render/data/world-props.json` lists what is loaded; the budget counts it).
+
+- Thumbnail: better on the start straight: real fence posts with overhangs both sides of the grid, framed hoardings at a 4 m module, a lattice camera tower.
+- Giveaways found and fixed: (1) brand text upside down on the kit hoardings and boards: the kit's faces use glTF uv (v down), the brand and signage atlases are canvas textures (v up), so v is turned over for kit faces; (2) the kit screen tower's face is a blank panel: the live timing face now goes on its catalogued `screen-face` attachment; (3) kit boards would have thrown on the stand-in's separate post kind; (4) a shader compile error from the kit's instance-tint guard (vColor is a vec4 in this three.js); (5) the lifecycle test caught a GL texture leaked per session (the kit boards' slot textures were not released with the world).
+- New giveaway: absorber blocks read as plain black boxes at the chicane exits.
+
 ## Remaining giveaways, ranked
 
 1. Tree impostors are painted cards: from the trackside camera near trees show their planes and a speckled, painterly leaf texture. Real geometry or a baked multi-view impostor is next.
-2. Stand-in props (hoardings, fences, gantry, towers, crew) are procedural boxes; the modelled kit (PR #27) replaces them as it lands. The kit's hoarding module is 4 m against the stand-in's 6 m spacing, so kit hoardings will sit with 2 m gaps until placement reads `moduleLength`.
-3. Haze is still grey-blue at the horizon in the helicopter view; the warm-afternoon grade is not done.
-4. The far field beyond the mapped 600 m is open ground to a hard horizon in high views; a distant treeline and skyline ring is not built yet.
-5. Large flat paved areas (car parks) read as untextured grey from above.
-6. The crowd is low-poly blocks: fine beyond 40 m, blocky close up in the stand-straight station.
+2. The kit's grandstands, pit building, pit wall, start gantry, crew, crowd figures, bridges and barriers are not placed yet: the world still builds its own stands, pit complex and gantry, and the track package draws the barriers. The kit crowd figure (368 to 732 triangles) needs an impostor before it can fill tens of thousands of seats.
+3. Absorber blocks are flat black boxes at the chicane exits.
+4. Haze is still grey-blue at the horizon in the helicopter view; the warm-afternoon grade is not done.
+5. The far field beyond the mapped 600 m is open ground to a hard horizon in high views; a distant treeline and skyline ring is not built yet.
+6. Large flat paved areas (car parks) read as untextured grey from above.
+7. The crowd is low-poly blocks: fine beyond 40 m, blocky close up in the stand-straight station.

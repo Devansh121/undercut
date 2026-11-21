@@ -941,7 +941,8 @@ export function placeTracksideFurniture(options: {
   mobile: boolean;
   geometries: BufferGeometry[];
   materials: Material[];
-  textures?: Texture[];
+  /** Textures the furniture creates (released with the world). */
+  textures: Texture[];
 }): Record<string, number> {
   const {
     track,
@@ -1223,7 +1224,7 @@ export function placeTracksideFurniture(options: {
       slotTex.repeat.set(0.25, -0.5);
       slotTex.offset.set(col * 0.25, 1 - row * 0.5);
       slotTex.needsUpdate = true;
-      textures?.push(slotTex);
+      textures.push(slotTex);
       const slotMat = new MeshStandardMaterial({
         map: slotTex,
         roughness: 0.5,
