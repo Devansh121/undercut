@@ -39,16 +39,17 @@ export const STOP_RATE = 5e6;
  */
 export const GROUND_STEP_RISE = 0.15;
 /**
- * Penetration beyond any physical deflection, m: a wheel this far past its bottoming depth, or
- * a floor this far into the ground. The car is lifted out and its velocity into the ground
- * removed (an inelastic rim or floor strike). The racing line never gets there (at most 33 mm
- * of tyre compression; the floor never touches). Off it, a raised kerb taken at speed can bottom
- * a tyre and put the floor's edge into the kerb, which is a real strike and is resolved here;
- * the drive fuzz on the real circuits asserts that strikes happen only with a wheel on a kerb
- * (`CarState.contactLifts`).
+ * Where the contact treats a wheel or the floor as striking the ground: a tyre at its bottoming
+ * deflection (rim on the ground, margin 0 m), or a floor skid at the depth where its force
+ * saturates (the tyre's bottoming load over half the plank stiffness, 24 mm for the reference
+ * car). Past that the car is lifted back to it and its velocity into the ground removed, an
+ * inelastic rim or floor strike. Resolving it there and not deeper matters: a strike held 50 mm
+ * past bottoming left about 2 kJ in each tyre, which came back as a launch when the kerb fell
+ * away (review of PR 19). The racing line never gets there (at most 33 mm of tyre compression;
+ * the floor never touches). Off it, a raised kerb taken at speed is a real strike; the drive fuzz
+ * asserts strikes happen only with a wheel on a kerb (`CarState.contactLifts`).
  */
-export const CONTACT_LIFT_MARGIN = 0.05;
-export const FLOOR_LIFT_DEPTH = 0.05;
+export const CONTACT_LIFT_MARGIN = 0;
 
 /**
  * The body's footprint for barrier contact, m: nose ahead of the front axle, tail behind the

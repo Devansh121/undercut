@@ -8,7 +8,6 @@ import {
   BUMP_STOP_GAP,
   CONTACT_LIFT_MARGIN,
   DROOP_STOP_GAP,
-  FLOOR_LIFT_DEPTH,
   GROUND_STEP_RISE,
   STOP_RATE,
   WALL_FRICTION,
@@ -541,7 +540,7 @@ function wallContact(
  *   wheels move with their body corners, so no spring or tyre compression changes and no
  *   velocity changes: the step adds potential energy only.
  * - Penetration no deflection explains (a wheel past its bottoming depth by CONTACT_LIFT_MARGIN,
- *   or the floor deeper than FLOOR_LIFT_DEPTH): the car moves up until it is back at that depth
+ *   or a floor skid past its saturation depth): the car moves up until it is back at that depth
  *   and its downward velocity is removed, as in an inelastic rim or floor strike.
  */
 function liftOutOfGround(s: CarState, h: number, sprungA: number, sprungB: number): void {
@@ -573,6 +572,7 @@ function liftOutOfGround(s: CarState, h: number, sprungA: number, sprungB: numbe
   for (let i = 0; i < 4; i++) ghRate[i] = ghRate[i]! - stepLift[i]! / h;
 
   const depthMax = tyreBottomDeflection(p.tyre) + CONTACT_LIFT_MARGIN;
+  const floorMax = s.model.tyreForceMax / (0.5 * p.suspension.plankStiffness);
   let lift = 0;
   for (let i = 0; i < 4; i++) {
     const over = gh[i]! + R - s.wheelY[i]! - depthMax;
@@ -586,7 +586,7 @@ function liftOutOfGround(s: CarState, h: number, sprungA: number, sprungB: numbe
     const l = front ? 0 : 2;
     const across = yl / (2 * s.model.wheelLeft[l]!);
     const ground = (gh[l]! + gh[l + 1]!) / 2 + across * (gh[l]! - gh[l + 1]!);
-    const over = ground - (s.y + xb * s.pitch + yl * s.roll) - FLOOR_LIFT_DEPTH;
+    const over = ground - (s.y + xb * s.pitch + yl * s.roll) - floorMax;
     if (over > lift) lift = over;
   }
   if (lift <= 0) return;

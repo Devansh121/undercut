@@ -42,9 +42,8 @@ export interface InvariantOptions {
  */
 export const AIRBORNE_ALLOWANCE = 0.5;
 /**
- * How far the floor may sink below the ground, m: twice FLOOR_LIFT_DEPTH, the depth at which the
- * contact lifts the car out. A skid's force saturates at the tyre's bottoming load at 24 mm of
- * plank deflection, well inside it.
+ * How far the floor may sink below the ground, m: about four times the 24 mm at which a skid's
+ * force saturates and the contact treats the floor as striking the ground.
  */
 export const PLANK_ALLOWANCE = 0.1;
 
