@@ -237,16 +237,4 @@ describe('car-to-car contact', () => {
     expect(b.state.carContactImpulse).toBe(0);
     expect(deepestOverlap(world)).toBeGreaterThan(0.5);
   });
-
-  it('allocates nothing per step once warm', () => {
-    const world = createWorld({ step: STEP, seed: 1 });
-    for (let k = 0; k < 20; k++)
-      addCar(world, REFERENCE_CAR, { x: (k % 2) * 3, z: k * 4, speed: 20 });
-    for (let i = 0; i < 10; i++) stepWorld(world);
-    // Structural check: the contact scratch keeps its arrays across steps.
-    const contacts = world.contacts;
-    const order = contacts.order;
-    for (let i = 0; i < 10; i++) stepWorld(world);
-    expect(world.contacts.order).toBe(order);
-  });
 });

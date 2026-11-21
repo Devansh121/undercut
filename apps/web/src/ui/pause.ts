@@ -26,6 +26,8 @@ export interface PauseActions {
   resume(): void;
   /** Absent: no restart (an online race cannot restart one car's lap). */
   restartLap?: () => void;
+  /** Label of the restart button; default "Restart lap" (a Quick Race restarts the race). */
+  restartLabel?: string;
   resetToTrack(): void;
   quit(): void;
   /** Label of the quit button; default "Quit to launch". */
@@ -94,7 +96,8 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     action('Resume', 'play', actions.resume, 'resume', true);
-    if (actions.restartLap) action('Restart lap', 'restart', actions.restartLap, 'restart');
+    if (actions.restartLap)
+      action(actions.restartLabel ?? 'Restart lap', 'restart', actions.restartLap, 'restart');
     action('Reset to track', 'reset', actions.resetToTrack, 'reset');
     this.controls = controls ? new ControlsPanel(controls) : null;
     const panel = this.controls;

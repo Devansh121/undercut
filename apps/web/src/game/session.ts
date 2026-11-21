@@ -1,5 +1,5 @@
 import { createAiField, type SessionResult, type AiController } from '@undercut/race';
-import { decodeEnvelope, decodeRacingLine } from '@undercut/ai';
+import { decodeEnvelope, decodeRacingLine, racingLineOffsets } from '@undercut/ai';
 import raceLine from '../../../../packages/ai/data/monza-low.line.json';
 import raceEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
 import {
@@ -50,6 +50,8 @@ export const SIM_STEP = 1 / 240;
 export const TIME_TRIAL_FUEL = 20;
 /** Rolling start speed, m/s (150 km/h). */
 export const ROLLING_START_SPEED = 150 / 3.6;
+/** A reset car in a race is parked with its centre this far inside the track edge, m. */
+export const PARK_MARGIN = 1.6;
 /** Rolling start: this far before the circuit's timing line, on the centreline, m. */
 export const ROLLING_START_RUN_UP = 160;
 
@@ -61,7 +63,9 @@ export type SessionEvent =
   /** Something to persist: a new best lap, better sector minima, or both. */
   | { type: 'record'; circuit: string; update: RecordUpdate }
   /** `safety`: the car's pose broke the sim's invariants and the session put it back. */
-  | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' | 'safety' };
+  | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' | 'safety' }
+  /** Quick Race: something race control tells the player (a penalty, a flag, the finish). */
+  | { type: 'notice'; tag: string; text: string; tone: 'info' | 'invalid' };
 
 export interface QuickRaceOptions {
   laps?: number;
@@ -69,6 +73,8 @@ export interface QuickRaceOptions {
   gridPosition?: number;
   /** Skill spread across the AI field, 0 to 1. */
   skillSpread?: number;
+  /** How far AI pace is shuffled against the grid order, 0 to 1 (default 0.5). */
+  gridNoise?: number;
 }
 
 export interface DriveSessionOptions {
@@ -133,6 +139,8 @@ export class DriveSession {
   private readonly poseLimits: InvariantLimits;
   private safetyResetsValue = 0;
   private wallHitsValue = 0;
+  /** Racing-line offset per lap sample (Quick Race: where a reset car is parked out of the way). */
+  private readonly lineOffsets: ArrayLike<number> | null;
 
   constructor(options: DriveSessionOptions) {
     this.quickRace = options.quickRace !== undefined;
@@ -150,11 +158,15 @@ export class DriveSession {
     };
     const record = options.record ?? null;
     const limits = options.limits;
-    const field = this.quickRace
+    const line = this.quickRace ? decodeRacingLine(raceLine) : null;
+    this.lineOffsets = line ? racingLineOffsets(line) : null;
+    const field = line
       ? createAiField({
           track: this.track,
           params: this.params,
-          line: decodeRacingLine(raceLine),
+          line,
+          // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
+          gridNoise: options.quickRace?.gridNoise ?? 0.5,
           envelope: decodeEnvelope(raceEnvelope),
           count: 20,
           seed: options.seed,
@@ -422,7 +434,11 @@ export class DriveSession {
    * both laps.
    */
   private onRaceEvent(e: RaceEvent, events: SessionEvent[]): void {
-    if (this.quickRace) return;
+    if (this.quickRace) {
+      const n = raceNotice(e);
+      if (n) events.push(n);
+      return;
+    }
     switch (e.type) {
       case 'lapStart':
         events.push({ type: 'lapStart', lap: e.lap, time: e.time });
@@ -452,6 +468,11 @@ export class DriveSession {
    */
   private safetyReset(lastS: number, events: SessionEvent[]): void {
     this.safetyResetsValue++;
+    if (this.quickRace) {
+      this.parkOffLine(lastS, events);
+      events.push({ type: 'reset', reason: 'safety' });
+      return;
+    }
     const pose = this.race.lapPose(lastS, 0);
     this.place(pose.x, pose.z, pose.yaw, 0, events);
     for (const e of this.race.control.invalidateLap(0, 'reset')) {
@@ -476,6 +497,14 @@ export class DriveSession {
   /** On the centreline at the nearest point, stopped, facing along the lap. Invalidates the lap. */
   resetToTrack(): SessionEvent[] {
     const events: SessionEvent[] = [];
+    if (this.quickRace) {
+      // In a race the car is not dropped on the racing line in front of the field: it is parked
+      // at the edge on the side away from the line, stopped, and rejoins from there.
+      this.parkOffLine(this.s, events);
+      if (this.phaseValue === 'paused') this.phaseValue = 'running';
+      events.push({ type: 'reset', reason: 'track' });
+      return events;
+    }
     const pose = this.race.lapPose(this.s, 0);
     this.place(pose.x, pose.z, pose.yaw, 0, events);
     for (const e of this.race.control.invalidateLap(0, 'reset')) this.onRaceEvent(e, events);
@@ -524,10 +553,70 @@ export class DriveSession {
     this.onLine(at);
   }
 
+  /**
+   * Quick Race: stopped at lap position `s`, facing along the lap, at the track edge on the side
+   * away from the racing line (the AI drivers see a car parked off line and go by it).
+   */
+  private parkOffLine(s: number, events: SessionEvent[]): void {
+    const track = this.track;
+    const s0 = track.wrap(s);
+    const offsets = this.lineOffsets;
+    const i = Math.round(s0 / track.lap.step) % track.lap.count;
+    const lineD = offsets ? (offsets[i] ?? 0) : 0;
+    const margin = PARK_MARGIN;
+    const d = lineD >= 0 ? -(track.halfWidthAt(s0, 1) - margin) : track.halfWidthAt(s0, 0) - margin;
+    const pose = this.race.lapPose(s0, d);
+    this.place(pose.x, pose.z, pose.yaw, 0, events);
+  }
+
   /** Move the car without crossing any line; a retired car is back in the session. */
   private place(x: number, z: number, yaw: number, speed: number, events: SessionEvent[]): void {
     for (const e of this.race.placeCar(0, x, z, yaw, speed, true)) this.onRaceEvent(e, events);
     this.assistMemory = createAssistState();
+  }
+}
+
+const PENALTY_TEXT: Record<string, string> = {
+  jumpStart: 'Jump start',
+  trackLimits: 'Track limits',
+  leavingTrack: 'Place gained off track',
+  pitSpeeding: 'Pit lane speeding',
+  blueFlags: 'Ignoring blue flags',
+};
+
+/** What race control tells the player about one of the player's own race events, if anything. */
+export function raceNotice(e: RaceEvent): Extract<SessionEvent, { type: 'notice' }> | null {
+  switch (e.type) {
+    case 'penalty':
+      return {
+        type: 'notice',
+        tag: `${e.seconds} s penalty`,
+        text: PENALTY_TEXT[e.reason] ?? e.reason,
+        tone: 'invalid',
+      };
+    case 'trackLimits':
+      return e.outcome === 'penalty'
+        ? null
+        : {
+            type: 'notice',
+            tag: e.outcome === 'blackWhite' ? 'Black and white flag' : 'Track limits',
+            text: `Warning ${e.strike}`,
+            tone: 'invalid',
+          };
+    case 'flag':
+      return e.flag === 'blue' && e.on
+        ? { type: 'notice', tag: 'Blue flag', text: 'Let the car behind through', tone: 'info' }
+        : null;
+    case 'warning':
+      return e.reason === 'overtakeUnderYellow'
+        ? { type: 'notice', tag: 'Warning', text: 'Passing under yellow', tone: 'invalid' }
+        : null;
+    case 'penaltyServed':
+      return { type: 'notice', tag: 'Penalty served', text: `${e.seconds} s`, tone: 'info' };
+    case 'finish':
+      return { type: 'notice', tag: 'Chequered flag', text: `P${e.position}`, tone: 'info' };
+    default:
+      return null;
   }
 }
 

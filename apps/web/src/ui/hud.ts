@@ -97,7 +97,7 @@ export class Hud {
     const sBody = el('div', 'hud-session__body');
     const lapRow = el('div', 'hud-row');
     lapRow.append(el('span', 'label', 'Lap'), txt('lap', el('b', 'num')));
-    const pbRow = el('div', 'hud-row');
+    const pbRow = el('div', 'hud-row hud-row--record');
     pbRow.append(el('span', 'label', 'Record'), txt('record', el('b', 'num hud-pb')));
     sBody.append(lapRow, pbRow);
     session.append(sHead, sBody);

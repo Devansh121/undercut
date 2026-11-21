@@ -333,19 +333,34 @@ export function resolveCarContacts(cars: readonly ContactBody[], contacts: CarCo
         a.carContacts += 1;
         b.carContacts += 1;
       }
-      respond(a, b, mass[i]!, mass[j]!, inertia[i]!, inertia[j]!);
+      respond(a, b, i, j, contacts);
     }
     if (!any) break;
   }
   contacts.touching = touching;
 }
 
+/**
+ * Scratch for the response, so no call passes or returns a loose number (V8 boxes doubles that
+ * cross a call it does not inline): lever arms of A and B (0–3), a unit direction (4, 5), an
+ * impulse (6, 7), a relative speed (8), and the two cars' inverse masses and inertias (9–12).
+ */
+const sc = new Float64Array(13);
+
 /** Push apart, then the normal and friction impulses, for the contact in `hit`. */
-function respond(a: CarState, b: CarState, ma: number, mb: number, ia: number, ib: number): void {
+function respond(a: CarState, b: CarState, i: number, j: number, contacts: CarContacts): void {
+  const ma = contacts.mass[i]!;
+  const mb = contacts.mass[j]!;
+  const ia = contacts.inertia[i]!;
+  const ib = contacts.inertia[j]!;
   const nx = hit.nx;
   const nz = hit.nz;
   const wa = 1 / ma;
   const wb = 1 / mb;
+  sc[9] = wa;
+  sc[10] = wb;
+  sc[11] = 1 / ia;
+  sc[12] = 1 / ib;
   // Position: remove the overlap down to the slop, split by inverse mass.
   const push = hit.depth - CONTACT_SLOP;
   if (push > 0) {
@@ -360,79 +375,75 @@ function respond(a: CarState, b: CarState, ma: number, mb: number, ia: number, i
   const raz = hit.pz - a.z;
   const rbx = hit.px - b.x;
   const rbz = hit.pz - b.z;
+  sc[0] = rax;
+  sc[1] = raz;
+  sc[2] = rbx;
+  sc[3] = rbz;
   // Normal impulse.
-  const vn = relativeAlong(a, b, rax, raz, rbx, rbz, nx, nz);
+  sc[4] = nx;
+  sc[5] = nz;
+  relativeAlong(a, b);
+  const vn = sc[8]!;
   if (vn >= 0) return;
-  const closing = -vn;
   const ran = raz * nx - rax * nz;
   const rbn = rbz * nx - rbx * nz;
   const jn = (-(1 + CAR_RESTITUTION) * vn) / (wa + wb + (ran * ran) / ia + (rbn * rbn) / ib);
-  applyImpulse(a, b, rax, raz, rbx, rbz, nx * jn, nz * jn, wa, wb, ia, ib);
+  sc[6] = nx * jn;
+  sc[7] = nz * jn;
+  applyImpulse(a, b);
   // Friction along the tangent, from the velocities the normal impulse left.
   const tx = -nz;
   const tz = nx;
-  const vt = relativeAlong(a, b, rax, raz, rbx, rbz, tx, tz);
+  sc[4] = tx;
+  sc[5] = tz;
+  relativeAlong(a, b);
+  const vt = sc[8]!;
   const rat = raz * tx - rax * tz;
   const rbt = rbz * tx - rbx * tz;
   let jt = -vt / (wa + wb + (rat * rat) / ia + (rbt * rbt) / ib);
   const jmax = CAR_FRICTION * jn;
   if (jt > jmax) jt = jmax;
   else if (jt < -jmax) jt = -jmax;
-  applyImpulse(a, b, rax, raz, rbx, rbz, tx * jt, tz * jt, wa, wb, ia, ib);
-  const j = Math.hypot(jn, jt);
-  a.carContactImpulse += j;
-  b.carContactImpulse += j;
-  if (closing > a.carContactSpeed) a.carContactSpeed = closing;
-  if (closing > b.carContactSpeed) b.carContactSpeed = closing;
+  sc[6] = tx * jt;
+  sc[7] = tz * jt;
+  applyImpulse(a, b);
+  const jm = Math.sqrt(jn * jn + jt * jt);
+  a.carContactImpulse += jm;
+  b.carContactImpulse += jm;
+  if (-vn > a.carContactSpeed) a.carContactSpeed = -vn;
+  if (-vn > b.carContactSpeed) b.carContactSpeed = -vn;
 }
 
-/** Velocity of B's contact point relative to A's along the unit (ux, uz), world frame. */
-function relativeAlong(
-  a: CarState,
-  b: CarState,
-  rax: number,
-  raz: number,
-  rbx: number,
-  rbz: number,
-  ux: number,
-  uz: number,
-): number {
+/**
+ * Velocity of B's contact point relative to A's along the unit direction in `sc[4..5]`, world
+ * frame, into `sc[8]`. Lever arms from `sc[0..3]`.
+ */
+function relativeAlong(a: CarState, b: CarState): void {
   const ca = Math.cos(a.yaw);
   const sa = Math.sin(a.yaw);
   const cb = Math.cos(b.yaw);
   const sb = Math.sin(b.yaw);
   // Body velocity in the world (vx forward, vy left), plus ω × r with ω about +Y.
-  const pax = a.vx * ca - a.vy * sa + a.yawRate * raz;
-  const paz = -a.vx * sa - a.vy * ca - a.yawRate * rax;
-  const pbx = b.vx * cb - b.vy * sb + b.yawRate * rbz;
-  const pbz = -b.vx * sb - b.vy * cb - b.yawRate * rbx;
-  return (pbx - pax) * ux + (pbz - paz) * uz;
+  const pax = a.vx * ca - a.vy * sa + a.yawRate * sc[1]!;
+  const paz = -a.vx * sa - a.vy * ca - a.yawRate * sc[0]!;
+  const pbx = b.vx * cb - b.vy * sb + b.yawRate * sc[3]!;
+  const pbz = -b.vx * sb - b.vy * cb - b.yawRate * sc[2]!;
+  sc[8] = (pbx - pax) * sc[4]! + (pbz - paz) * sc[5]!;
 }
 
-/** Impulse (jx, jz) on B at its contact point, and its opposite on A. */
-function applyImpulse(
-  a: CarState,
-  b: CarState,
-  rax: number,
-  raz: number,
-  rbx: number,
-  rbz: number,
-  jx: number,
-  jz: number,
-  wa: number,
-  wb: number,
-  ia: number,
-  ib: number,
-): void {
-  push(b, jx, jz, rbx, rbz, wb, ib);
-  push(a, -jx, -jz, rax, raz, wa, ia);
-}
-
-function push(s: CarState, jx: number, jz: number, rx: number, rz: number, w: number, i: number) {
-  const c = Math.cos(s.yaw);
-  const sn = Math.sin(s.yaw);
-  // World impulse into the car's frame: forward and left components.
-  s.vx += (jx * c - jz * sn) * w;
-  s.vy += (-jx * sn - jz * c) * w;
-  s.yawRate += (rz * jx - rx * jz) / i;
+/** The impulse in `sc[6..7]` on B at its contact point, and its opposite on A. */
+function applyImpulse(a: CarState, b: CarState): void {
+  const jx = sc[6]!;
+  const jz = sc[7]!;
+  let c = Math.cos(b.yaw);
+  let sn = Math.sin(b.yaw);
+  // World impulse into each car's frame: forward and left components; torque about +Y.
+  b.vx += (jx * c - jz * sn) * sc[10]!;
+  b.vy += (-jx * sn - jz * c) * sc[10]!;
+  b.yawRate += (sc[3]! * jx - sc[2]! * jz) * sc[12]!;
+  c = Math.cos(a.yaw);
+  sn = Math.sin(a.yaw);
+  a.vx -= (jx * c - jz * sn) * sc[9]!;
+  a.vy -= (-jx * sn - jz * c) * sc[9]!;
+  a.yawRate -= (sc[1]! * jx - sc[0]! * jz) * sc[11]!;
 }

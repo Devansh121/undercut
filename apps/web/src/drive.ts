@@ -110,6 +110,8 @@ export interface DriveOptions {
   today: string;
   quickRace?: QuickRaceOptions;
   onQuit(): void;
+  /** Quick Race: start the same race again from the grid (the page rebuilds the session). */
+  onRestartRace?(): void;
   /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
   /** A short note for the pause menu about sound ('' when sound works). */
@@ -351,9 +353,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     pilot.pilot.reset();
     resume();
   };
+  // In a Quick Race the restart is the whole race, from the grid; a lap restart would teleport
+  // the player out of the race.
+  const restartRace = (): void => {
+    if (o.onRestartRace) o.onRestartRace();
+    else quit();
+  };
   const actions = {
     resume: () => resume(),
-    ...(ext ? {} : { restartLap }),
+    ...(ext
+      ? {}
+      : session.quickRace
+        ? { restartLap: restartRace, restartLabel: 'Restart race' }
+        : { restartLap }),
     resetToTrack: () => {
       onEvents(loop.resetToTrack());
       resume();
@@ -502,6 +514,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
               say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
           });
           break;
+        case 'notice':
+          say({ tag: e.tag, text: e.text, tone: e.tone }, 4);
+          break;
         case 'invalidated':
           // The flag shows an invalid lap for as long as it lasts; a message as well showed the
           // same words twice.
@@ -575,6 +590,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     'padding:8px 16px;white-space:pre-line;text-align:center;max-height:60vh;overflow:auto;pointer-events:auto';
   if (session.quickRace) {
     (hud.root.querySelector('.hud-control') ?? o.host).append(raceStatus);
+    hud.root.dataset.mode = 'race';
   }
 
   const audioState = defaultCarState();
@@ -759,6 +775,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     h.lastClass = lastLap?.cls ?? null;
     h.best = timer.bestLap;
     h.record = timer.record.lap;
+    if (session.quickRace) {
+      // A race has no out lap, no lap invalidation (track limits are strikes, shown as notices)
+      // and no time-trial record.
+      h.lap = Math.max(1, Math.min(timer.lap, o.quickRace?.laps ?? 5));
+      h.valid = true;
+      h.record = null;
+      h.liveDelta = null;
+    }
     h.ers = Math.max(0, Math.min(1, t.ersStore / params.ers.storeWindow));
     h.ersLap = Math.max(0, Math.min(1, 1 - t.ersDeployLap / params.ers.deployPerLap));
     h.ersMode = ERS_MODE_LABEL[t.ersMode] ?? 'Balanced';
@@ -959,7 +983,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     pause: doPause,
     resume,
     restartLap: () => {
-      if (!ext) restartLap();
+      if (!ext && !session.quickRace) restartLap();
     },
     resetToTrack: actions.resetToTrack,
     teleport: (s, d, speed) => {
@@ -1003,7 +1027,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       loop.timeScale = 1;
       view.setSkyProbe(null);
       view.setCamera('chase-near');
-      if (!ext) restartLap();
+      if (!ext && !session.quickRace) restartLap();
       results.hide();
       message = null;
     },

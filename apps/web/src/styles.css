@@ -1479,3 +1479,8 @@ button {
 .online-notice {
   min-height: 24px;
 }
+
+/* Quick Race: the time-trial record row has no meaning in a race. */
+.hud[data-mode='race'] .hud-row--record {
+  display: none;
+}

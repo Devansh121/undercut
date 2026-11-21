@@ -153,6 +153,9 @@ function showOnline(code: string | null): void {
   );
 }
 
+/** A Quick Race to start again as soon as the current one has quit (Restart race). */
+let restartWith: QuickRaceOptions | null = null;
+
 /** What to start: a Quick Race, an online extension, or (neither) a time trial. */
 export interface StartOptions {
   quickRace?: QuickRaceOptions;
@@ -185,10 +188,22 @@ async function start(o: StartOptions = {}): Promise<DriveHandle> {
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
         ...(quickRace ? { quickRace } : {}),
+        ...(quickRace
+          ? {
+              onRestartRace: () => {
+                restartWith = quickRace;
+                drive?.quit();
+              },
+            }
+          : {}),
         ...(extension ? { extension } : {}),
         onQuit: () => {
           drive = null;
-          if (quit) quit();
+          if (restartWith) {
+            const again = restartWith;
+            restartWith = null;
+            start({ quickRace: again }).catch(() => undefined);
+          } else if (quit) quit();
           else showLaunch();
         },
       });
