@@ -88,7 +88,64 @@ function bench(lib, options) {
   console.log(`wrote ${path.relative(root, file)}`);
 }
 
+async function loadAiLib() {
+  const { module } = await runnerImport(path.join(root, 'packages/ai/validation/lib/index.ts'), {
+    root,
+    configFile: false,
+    logLevel: 'error',
+  });
+  return module;
+}
+
+// The reference driver on the committed racing line: flying lap(s) in the doc 2.1 conditions.
+async function lap(options) {
+  const ai = await loadAiLib();
+  const laps = Number(options.laps ?? 1);
+  const setup = ai.MONZA;
+  const fuel = Number(options.fuel ?? (laps > 1 ? setup.fuel + 2.2 * (laps + 1) : setup.fuel));
+  const every = Number(options.every ?? 6);
+  const t0 = performance.now();
+  const { result, plan } = ai.referenceLap(setup, {
+    laps,
+    fuel,
+    recordEvery: every,
+    clock: () => performance.now(),
+  });
+  const wall = (performance.now() - t0) / 1000;
+  if (result.spun) console.log('The car spun; no lap completed.');
+  const summary = { circuit: setup.id, trim: setup.trim, fuel, laps: [], traces: [] };
+  result.laps.forEach((l, k) => {
+    const report = ai.monzaLapReport(l, plan, setup.controlLine);
+    console.log(`\nLap ${k + 1}\n${ai.formatLapReport(report)}`);
+    summary.laps.push(report);
+  });
+  if (result.laps.length > 1) {
+    const times = result.laps.map((l) => l.time);
+    console.log(
+      `\n${times.length} laps: ${times.map((t) => t.toFixed(3)).join(', ')}; ` +
+        `spread ${(Math.max(...times) - Math.min(...times)).toFixed(3)} s`,
+    );
+  }
+  console.log(
+    `\n${result.simTime.toFixed(1)} s simulated in ${wall.toFixed(2)} s ` +
+      `(${(result.simTime / wall).toFixed(0)}× real time); driver ${result.driverTickUs.toFixed(2)} µs per tick`,
+  );
+  fs.mkdirSync(outDir, { recursive: true });
+  if (result.trace) {
+    const file = path.join(outDir, `lap-${setup.id}.csv`);
+    fs.writeFileSync(file, ai.lapTraceToCsv(result.trace));
+    summary.traces.push(path.relative(root, file));
+  }
+  const file = path.join(outDir, `lap-${setup.id}.json`);
+  fs.writeFileSync(file, JSON.stringify(summary, null, 2) + '\n');
+  console.log(`wrote ${summary.traces.length + 1} file(s) to ${path.relative(root, outDir)}/`);
+}
+
 const { name, options } = parseArgs(process.argv.slice(2));
+if (name === 'lap') {
+  await lap(options);
+  process.exit(0);
+}
 const lib = await loadLib();
 const names = Object.keys(lib.MANOEUVRES);
 if (name === 'list' || options.help) {
@@ -97,6 +154,9 @@ if (name === 'list' || options.help) {
   console.log(`  ${'all'.padEnd(15)} every manoeuvre above`);
   console.log(
     `  ${'bench'.padEnd(15)} real-time factor for 1 and 20 cars (--seconds, default 300)`,
+  );
+  console.log(
+    `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
   );
 } else if (name === 'bench') {
   bench(lib, options);
