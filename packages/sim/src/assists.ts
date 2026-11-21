@@ -62,6 +62,11 @@ const SLIDE_BRAKE_RELEASE = 12;
 const SLIDE_BRAKE_FLOOR = 0.2;
 /** Below this speed sideslip means nothing (parking, a spin already over). */
 const SLIDE_MIN_SPEED = 8;
+/**
+ * Below this road speed a driver's downshift request in first passes through, so a stopped car
+ * can go 1 → N → R with automatic gears on. The gearbox itself refuses reverse above 1 m/s.
+ */
+const REVERSE_SELECT_SPEED = 1;
 const DOWNSHIFT_TARGET_RPM = 10800;
 
 /**
@@ -126,8 +131,11 @@ export function applyAssists(
   let tcCut = 1;
   if (tcLimit !== Infinity && throttle > 0) {
     let excess = -Infinity;
+    // Driving slip is in the direction the gearbox drives: negative in reverse. Slip the other
+    // way is braking or deflection left in a stopped tyre, never wheelspin.
+    const drive = car.gear < 0 ? -1 : 1;
     for (let i = 2; i < 4; i++) {
-      if (car.slipRatio[i]! <= 0) continue;
+      if (car.slipRatio[i]! * drive <= 0) continue;
       excess = Math.max(excess, combinedSlip(car, curve, i) - tcLimit);
     }
     if (excess > 0) memory.tcScale -= TC_GAIN * excess * dt;
@@ -215,6 +223,8 @@ function automaticShift(memory: AssistState, car: CarState, driver: ControlInput
   const gear = car.gear;
   // Reverse and neutral stay manual; a driver request out of neutral is passed through.
   if (gear <= 0) return driver.gearShift;
+  // Nearly stopped in first, the driver may step down to neutral (and on to reverse).
+  if (gear === 1 && driver.gearShift < 0 && Math.abs(car.vx) < REVERSE_SELECT_SPEED) return -1;
   const wheel = (car.wheelSpeed[2]! + car.wheelSpeed[3]!) / 2;
   const rpmNow = (Math.abs(gearRatio(p, gear) * wheel) * 60) / (2 * Math.PI);
   let request: -1 | 0 | 1 = 0;

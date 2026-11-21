@@ -18,6 +18,8 @@ const STEPPED = new Set<number>([
   F.shiftDirection,
   F.revLimiter,
   F.pitLimiter,
+  F.impactSpeed,
+  F.impactSerial,
 ]);
 
 /** Fields that hold a whole number or a flag: rounded after clamping. */
@@ -28,6 +30,7 @@ const DISCRETE = new Set<number>([
   F.shiftDirection,
   F.revLimiter,
   F.pitLimiter,
+  F.impactSerial,
 ]);
 /** Fields given as a magnitude whose sign does not matter: slips. */
 const MAGNITUDE = new Set<number>([F.slipFront, F.slipRear]);

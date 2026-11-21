@@ -1,4 +1,4 @@
-import type { AudioCarState } from '@undercut/audio';
+import type { AudioView, AudioCarState } from '@undercut/audio';
 
 /**
  * The seam between the drive screen and engine audio. Every frame the drive screen maps the
@@ -6,7 +6,11 @@ import type { AudioCarState } from '@undercut/audio';
  * the session is paused (pause and tab-hide suspend sound). The page wires the sink to the
  * audio engine (`apps/web/src/audio.ts`); without one the game is silent.
  */
-export type CarAudioSink = (state: Readonly<AudioCarState>, paused: boolean) => void;
+export type CarAudioSink = (
+  state: Readonly<AudioCarState>,
+  paused: boolean,
+  view?: AudioView,
+) => void;
 
 /** The default sink: no sound. */
 export const silentAudio: CarAudioSink = () => {};

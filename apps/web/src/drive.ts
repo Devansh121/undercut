@@ -40,7 +40,7 @@ import monza from '@undercut/track/data/monza.json';
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
-import { toAudioCarState } from './game/audio-map';
+import { ImpactEvents, toAudioCarState } from './game/audio-map';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
@@ -282,6 +282,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     () => session.car.state,
   );
   const loop = new GameLoop(session, human);
+  // Barrier impacts for the audio seam, from the hardest strike of each frame.
+  const impacts = new ImpactEvents();
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
@@ -448,14 +450,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           });
           break;
         case 'invalidated':
-          say(
-            {
-              tag: 'Lap invalid',
-              text: e.reason === 'reset' ? 'Reset to track' : 'Track limits',
-              tone: 'invalid',
-            },
-            3,
-          );
+          // The flag shows an invalid lap for as long as it lasts; a message as well showed the
+          // same words twice.
+          hud.setInvalidReason(e.reason === 'limits' ? 'Track limits' : 'Reset to track');
           break;
         case 'reset':
           view.snapCamera();
@@ -554,6 +551,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
     if (session.phase === 'running') {
       const r = loop.frame(dt);
+      impacts.observe(r.wallImpact, dt);
       onEvents(r.events);
       lookBack = r.lookBack;
       for (const action of r.actions) {
@@ -655,12 +653,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         state: car.state,
         telemetry: t,
+        surface: session.world.surface,
+        impactSpeed: impacts.speed,
+        impactSerial: impacts.serial,
         pitLimiter: car.input.pitLimiter,
         kerbRoughness: session.kerbUnderWheels(),
       },
       audioState,
     );
-    sink(audioState, !playing || document.visibilityState === 'hidden');
+    const camera = view.cameraName;
+    sink(
+      audioState,
+      !playing || document.visibilityState === 'hidden',
+      camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
+    );
 
     handle = requestAnimationFrame(frame);
   };
