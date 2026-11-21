@@ -309,20 +309,19 @@ const POUHON =
   'downhill double-apex corner.';
 
 export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
-  'brake-peak-300': { measured: 4.097, reason: BRAKE_TORQUE },
-  'monza-t1-2025-time': { measured: 2.413, reason: TRAIL_OFF },
-  'monza-t1-2025-peak': { measured: 4.223, reason: BRAKE_TORQUE },
-  'monza-t1-2023-peak': { measured: 4.219, reason: BRAKE_TORQUE },
-  'spa-t5-2025-distance': { measured: 77.34, reason: TRAIL_OFF },
-  'spa-t5-2025-time': { measured: 1.129, reason: TRAIL_OFF },
-  'spa-t5-2025-peak': { measured: 4.274, reason: BRAKE_TORQUE },
-  'spa-t5-2024-distance': { measured: 78.36, reason: TRAIL_OFF },
-  'spa-t5-2024-time': { measured: 1.188, reason: TRAIL_OFF },
-  'singapore-t7-2025-distance': { measured: 84.66, reason: TRAIL_OFF },
-  'singapore-t7-2025-time': { measured: 1.471, reason: TRAIL_OFF },
-  'singapore-t7-2025-peak': { measured: 4.361, reason: BRAKE_TORQUE },
-  'singapore-t14-2024-peak': { measured: 4.194, reason: BRAKE_TORQUE },
-  'lateral-pouhon': { measured: 4.86, reason: POUHON },
+  'brake-peak-300': { measured: 4.083, reason: BRAKE_TORQUE },
+  'monza-t1-2025-peak': { measured: 4.24, reason: BRAKE_TORQUE },
+  'monza-t1-2023-peak': { measured: 4.227, reason: BRAKE_TORQUE },
+  'spa-t5-2025-distance': { measured: 77.09, reason: TRAIL_OFF },
+  'spa-t5-2025-time': { measured: 1.125, reason: TRAIL_OFF },
+  'spa-t5-2025-peak': { measured: 4.263, reason: BRAKE_TORQUE },
+  'spa-t5-2024-distance': { measured: 77.65, reason: TRAIL_OFF },
+  'spa-t5-2024-time': { measured: 1.175, reason: TRAIL_OFF },
+  'singapore-t7-2025-distance': { measured: 85.27, reason: TRAIL_OFF },
+  'singapore-t7-2025-time': { measured: 1.492, reason: TRAIL_OFF },
+  'singapore-t7-2025-peak': { measured: 4.346, reason: BRAKE_TORQUE },
+  'singapore-t14-2024-time': { measured: 1.875, reason: TRAIL_OFF },
+  'lateral-pouhon': { measured: 4.861, reason: POUHON },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';

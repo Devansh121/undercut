@@ -48,9 +48,18 @@ export interface TyreParams {
   freeRadius: number;
   /** Vertical stiffness per tyre, N/m. Doc 1.6: 250–300 kN/m. */
   verticalStiffness: number;
-  /** Vertical damping per tyre, N·s/m. Estimate: about 5 % of critical on the unsprung mass. */
+  /**
+   * Vertical damping at each tyre, N·s/m. Estimate: with springs five times stiffer than the
+   * tyres, corner dampers barely act on the body modes, so the damping that gives doc 1.6's
+   * ratios (heave 0.3–0.5, roll 0.6–0.8) is lumped here: tyre carcass plus the inerter and heave
+   * damper of a real car. Measured free decay: heave ζ 0.33, roll ζ 0.60.
+   */
   verticalDamping: number;
-  /** Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN (estimate). */
+  /**
+   * Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN as a starting point
+   * below [44]'s 1.85–2.15, calibrated to the cornering targets: fitted once to the centre of the
+   * slow-corner band (2.15 g, high trim, 85 km/h), giving 2.12.
+   */
   muY: number;
   /** Peak longitudinal friction as a share of lateral. Doc 1.2: 0.9 ([44] 0.89–0.91). */
   muXRatio: number;
@@ -96,13 +105,13 @@ export interface SuspensionParams {
    */
   springFront: number;
   springRear: number;
-  /** Anti-roll bar rate as a force per metre of left–right travel difference, N/m. */
+  /** Anti-roll bar rate per metre of left–right travel difference, N/m: 56 % front roll stiffness. */
   antiRollFront: number;
   antiRollRear: number;
-  /** Per-corner dampers, N·s/m: heave damping ratio about 0.4 (doc 1.6: 0.3–0.5). */
+  /** Per-corner dampers, N·s/m. Estimate; they mainly damp wheel hop (see `verticalDamping`). */
   damperFront: number;
   damperRear: number;
-  /** Extra roll damping per axle on the travel difference, N·s/m (doc 1.6 roll ratio 0.6–0.8). */
+  /** Extra roll damping per axle on the left–right travel-rate difference, N·s/m. Estimate. */
   rollDamperFront: number;
   rollDamperRear: number;
   /**
@@ -336,7 +345,7 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     rollingRadius: 0.355,
     freeRadius: 0.36,
     verticalStiffness: 300e3,
-    verticalDamping: 300,
+    verticalDamping: 7000,
     muY: 2.12,
     muXRatio: 0.9,
     loadSensitivity: -5e-5,
@@ -362,8 +371,8 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     antiRollRear: 0.25e6,
     damperFront: 5000,
     damperRear: 4800,
-    rollDamperFront: 2500,
-    rollDamperRear: 1500,
+    rollDamperFront: 800,
+    rollDamperRear: 500,
     plankStiffness: 2e6,
     plankDamping: 2e4,
     plankFriction: 0.3,

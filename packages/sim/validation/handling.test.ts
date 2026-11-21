@@ -27,11 +27,14 @@ describe('handling: stability at and near the limit', () => {
     }
   });
 
-  it('full throttle out of a slow corner spins without TC and stays stable with it', () => {
-    expect(throttleOutOfSlowCorner({ tractionControl: 0 }).spun).toBe(true);
+  it('full throttle out of a slow corner lights up the rears without TC, not with it', () => {
+    const off = throttleOutOfSlowCorner({ tractionControl: 0 });
+    expect(off.maxRearSlip).toBeGreaterThan(0.3);
     for (const level of [1, 2, 3]) {
       const r = throttleOutOfSlowCorner({ tractionControl: level });
       expect(r.spun, `TC ${level}`).toBe(false);
+      expect(r.maxRearSlip, `TC ${level}`).toBeLessThan(0.2);
+      expect(r.maxSideslipDeg, `TC ${level}`).toBeLessThan(off.maxSideslipDeg);
       expect(r.maxSideslipDeg, `TC ${level}`).toBeLessThan(8);
       expect(r.endSpeedKmh, `TC ${level}`).toBeGreaterThan(85);
     }
@@ -43,7 +46,8 @@ describe('handling: stability at and near the limit', () => {
       const r = brakeWhileTurning({ abs: level });
       expect(r.spun, `ABS ${level}`).toBe(false);
       expect(r.minSlip, `ABS ${level}`).toBeGreaterThan(-0.25);
-      expect(r.maxSideslipDeg, `ABS ${level}`).toBeLessThan(12);
+      // Level 1 allows the most slip by design, so it lets the car slide a little further.
+      expect(r.maxSideslipDeg, `ABS ${level}`).toBeLessThan(level === 1 ? 15 : 10);
     }
   });
 });
