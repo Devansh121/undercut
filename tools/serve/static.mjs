@@ -35,6 +35,24 @@ const TYPES = {
 /** Headers the proxy sets itself; a client's own values are dropped. */
 const SET_BY_PROXY = new Set(['cf-connecting-ip', 'x-forwarded-for']);
 
+/**
+ * The encoding to send for an `Accept-Encoding` header: 'br', 'gzip' or null. Honours q=0
+ * refusals; prefers Brotli.
+ */
+export function pickEncoding(header) {
+  if (!header) return null;
+  const accepted = new Map();
+  for (const part of String(header).split(',')) {
+    const [name, ...params] = part.trim().toLowerCase().split(';');
+    const q = params.map((p) => /^\s*q=([\d.]+)/.exec(p)?.[1]).find((v) => v !== undefined);
+    accepted.set(name, q === undefined ? 1 : Number(q));
+  }
+  const ok = (name) => (accepted.get(name) ?? accepted.get('*') ?? 0) > 0;
+  if (ok('br')) return 'br';
+  if (ok('gzip')) return 'gzip';
+  return null;
+}
+
 /** True for `/rooms` and anything under `/rooms/`. */
 export function isRoomsPath(url) {
   const pathname = (url ?? '/').split('?')[0];
@@ -165,20 +183,36 @@ export function createHandlers({ root, roomsPort }) {
       sendStatus(res, opened.status);
       return;
     }
-    const { fd, stat } = opened;
+    let { fd, stat } = opened;
     const hashed = file.startsWith(path.join(absRoot, 'assets') + path.sep);
+    const type = TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+    // Precompressed sibling (tools/serve/precompress.mjs) when the client accepts it. The server
+    // has no range support, so every response is the whole (possibly encoded) file.
+    const encoding = pickEncoding(req.headers['accept-encoding']);
+    let encoded = null;
+    if (encoding) {
+      const sibling = openFile(`${file}.${encoding === 'br' ? 'br' : 'gz'}`);
+      if (sibling.fd !== undefined) {
+        fs.close(fd, () => {});
+        ({ fd, stat } = sibling);
+        encoded = encoding;
+      }
+    }
+    const compressible = encoded !== null || fs.existsSync(`${file}.gz`);
     res.writeHead(200, {
-      'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
+      'content-type': type,
       'content-length': stat.size,
       'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
       'x-content-type-options': 'nosniff',
+      ...(encoded ? { 'content-encoding': encoded } : {}),
+      ...(compressible ? { vary: 'Accept-Encoding' } : {}),
     });
     if (req.method === 'HEAD') {
       fs.close(fd, () => {});
       res.end();
       return;
     }
-    const stream = fs.createReadStream(file, { fd, autoClose: true });
+    const stream = fs.createReadStream(null, { fd, autoClose: true });
     stream.on('error', () => res.destroy());
     res.on('close', () => stream.destroy());
     stream.pipe(res);
