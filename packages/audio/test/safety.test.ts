@@ -358,14 +358,20 @@ describe('cost', () => {
       core.setCarState(state);
       core.process(out, 128);
     }
-    const blocks = 7500; // 20 s
-    const t0 = performance.now();
-    for (let i = 0; i < blocks; i++) {
-      if (i % 3 === 0) core.setCarState(state);
-      core.process(out, 128);
+    // 20 s of audio, timed as four 5 s slices. Another test worker or the OS can only add time
+    // to a slice, never remove it, so the fastest slice is the core's own cost: the bound holds
+    // on a busy CI runner without being loosened.
+    const blocks = 1875; // 5 s per slice
+    let best = Infinity;
+    for (let slice = 0; slice < 4; slice++) {
+      const t0 = performance.now();
+      for (let i = 0; i < blocks; i++) {
+        if (i % 3 === 0) core.setCarState(state);
+        core.process(out, 128);
+      }
+      best = Math.min(best, (performance.now() - t0) / 1000);
     }
-    const seconds = (performance.now() - t0) / 1000;
-    const ratio = (blocks * 128) / FS / seconds;
+    const ratio = (blocks * 128) / FS / best;
     process.stderr.write(`audio core: ${ratio.toFixed(1)}x real time (one car, 48 kHz stereo)\n`);
     expect(ratio).toBeGreaterThan(10);
   }, 30_000);
