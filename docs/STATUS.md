@@ -10,10 +10,11 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M2 rendering: the game now draws with the real car and real surfaces under a photographed sky. HDR pipeline (MSAA, half-resolution ground-truth AO, bloom on what is actually bright, Khronos PBR Neutral tone map, SMAA, edge speed blur), a CC0 HDRI that lights the scene with its measured sun at Monza's bearing, three cascades of sun shadow to 300 m, height haze. Track surfaces from CC0 texture sets with a rubbered racing line, marbles, worn kerbs and paint, oil and launch marks on the grid. The car asset with liveries, numbers, every moving part driven by the sim and glowing brake discs; other cars instanced (a full grid of twenty holds 60 fps at 1080p High). Ultra, High, Medium and Mobile presets with a first-run benchmark, dynamic resolution and a Graphics setting in the pause menu; a loading screen with progress and Try again. Hooks for the trackside dressing (prop registry, board material, time of day, floodlights). Details in `docs/render.md`, evidence in `docs/evidence/m2-render/`.
 - M1 drive: Time Trial at Monza is playable. From the launch screen, Start puts the car on the back of the grid rolling at 150 km/h; the lap clock starts at the line. Keyboard, gamepad and touch all drive it, with assists from the device presets (changeable in the pause menu).
 - Session rules: lap and three-sector timing to the millisecond (crossings interpolated inside the 4.2 ms tick), purple/green/yellow sector and lap colours, lap invalidated when all four wheels are past the white line, DRS only inside the two DRS zones, ERS lap counters and fuel reset at the line. The best lap (with its own splits and ghost) and the best time in each sector are saved per circuit (Web Storage; in memory when storage is blocked or full, and the HUD and pause menu say so) and the ghost drives the next laps as a translucent car with a live delta.
 - Rendering (`packages/render`): sRGB output with ACES filmic tone mapping, a physically based sun with a fitted soft shadow map, a procedural sky with clouds that also lights the scene (prefiltered environment map), haze, MSAA, a pixel-ratio cap and High/Mobile presets. The circuit is built from the track package's meshes with procedural materials per surface (asphalt with a rubbered racing line, painted lines, kerb stripes, grass with mowing bands, gravel, run-off, Armco, concrete, tyre walls, fences).
-- An interim car built in code from lofted sections (M2 replaces it): monocoque and nose, sidepods, floor and diffuser, four-element front wing, rear wing with a DRS flap that opens, halo, wheel covers and tyres that spin at road speed, steering front wheels, a turning steering wheel, suspension arms that follow the wheels, and body heave, pitch and roll from the sim. Kestrel Grand Prix colours.
+- M1: an interim car built in code from lofted sections (replaced in M2 by the car asset): monocoque and nose, sidepods, floor and diffuser, four-element front wing, rear wing with a DRS flap that opens, halo, wheel covers and tyres that spin at road speed, steering front wheels, a turning steering wheel, suspension arms that follow the wheels, and body heave, pitch and roll from the sim. Kestrel Grand Prix colours.
 - Cameras, switchable live with C or the camera button: near chase, far chase (both spring-damped with look-ahead into corners), T-cam, cockpit (head moves with g-load) and look-back (B). Field of view widens and a small shake grows with speed.
 - HUD on the design tokens: speed, gear, rev lights, lap time with live delta, sector times, last and best, ERS store and lap allowance, DRS state, minimap with the car and ghost, lap-invalid flag and message slot; results strip at each lap; pause menu with resume, restart lap, reset to track, camera, assists and volume. The steering wheel's display shows gear, speed and rev lights in the cockpit view; on a phone the chase cameras frame the car above the driver cluster. Lays out at 1440×900 and 844×390 with safe-area insets.
 - Engine and road sound from `packages/audio`: the engine is created on the first gesture (the Start click or a first key or touch), follows the car every frame and suspends on pause, tab hide and quit; master, engine and effects volume sliders in the pause menu are saved with the settings.
@@ -22,6 +23,12 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
 
 ## Try this
+
+M2 rendering, three things to look at:
+
+1. Graphics in the pause menu: switch between Ultra, High, Medium and Mobile and watch the loading screen, then the shadows' reach and the ambient occlusion under the car change. A first run on a new browser picks a preset by itself after five seconds of driving.
+2. Brake hard into the first chicane from 300 km/h in the near chase camera and look at the front brake discs (they glow), the rubbered line and marbles off line, and the kerbs as you clip them.
+3. Add `?tod=night-floodlit` or `?tod=overcast-day` to the address: the same circuit at night under floodlights and on an overcast day.
 
 Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks for DRS, Space overtake, C camera, B look back, Esc pause, Backspace reset to track.
 
@@ -71,6 +78,15 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - The overtake button is passed to the sim as is; the ERS mode shown is the sim's.
 - Steering help applies to gamepad and touch (speed-sensitive lock); the keyboard's own axis shaping already narrows lock with speed, so keyboard steering is not scaled twice.
 - ACES filmic tone mapping rather than AgX: AgX washed the saturated livery blue toward white under the sun. Revisit with the real car and HDRIs in M2.
+- M2: Khronos PBR Neutral tone map rather than AgX (the visual direction's choice) or ACES. Compared on the same frames with the real car and HDRI: AgX desaturated liveries and grass, ACES shifted blue toward purple; Neutral keeps authored colours (`docs/render.md`).
+- M2: WebP textures with GPU mipmaps, not KTX2/Basis: the transcoder could not be verified on a phone-class GPU here. The first race is 7.4 MB on High, 2.9 MB on Mobile, well inside 25 MB.
+- M2: Monza's sun elevation is the HDRI's own (48°), not the 35° in the visual direction, so shadows match the sky; the bearing (235°, south-west) is the visual direction's.
+- M2: the Poly Haven asphalt scan (fresh black tarmac, albedo 0.015) is lifted to about 0.08, the grey of a used circuit surface.
+- M2: grass is ambientCG Grass001 (a mowed lawn) instead of the survey's Poly Haven sparse_grass, which is dry grass over dirt.
+- M2: three cascades of shadow from three.js CSM with the cascade-blend fade, PCF; a blob contact shadow under the car on Mobile and Lite.
+- M2: other cars are drawn instanced; they share one level-of-detail cross-fade (4 m, dithered) and are static in this milestone (AI cars driving come later).
+- M2: the first-run benchmark keeps the starting preset when only a vsync-capped frame time is available and it holds 60 fps; it steps up only on measured GPU time.
+- M2: a night circuit lights the track near the camera through eight pooled point lights; further lamps need a baked lighting texture (next for Singapore).
 - One fitted sun shadow map (4096 on High, 1024 on Mobile) that follows the car, not cascades; distant barriers get no shadow in M1.
 - Browser tests ask for the Mobile preset, because software WebGL is slow; logic is the same at every preset.
 - Records and ghosts persist in Web Storage until IndexedDB lands in M6; when storage is blocked or full they last for the session and the HUD says so.
