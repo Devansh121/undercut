@@ -5,15 +5,7 @@ import type { TestProject } from 'vitest/node';
 import type { RoomTimings } from '@undercut/protocol';
 import { freePort } from '../../../tools/serve/ports.mjs';
 import { startRooms } from '../../../tools/serve/rooms.mjs';
-
-declare module 'vitest' {
-  export interface ProvidedContext {
-    roomsUrl: string;
-    /** File collecting the service's own log output (errors only). */
-    roomsLog: string;
-    roomTimings: Partial<RoomTimings>;
-  }
-}
+import './context';
 
 /**
  * Room timings for tests: the real sequence (countdown, grid, formation, five lights,

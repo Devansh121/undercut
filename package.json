@@ -21,7 +21,7 @@
     "test:physics": "vitest run --project physics",
     "test:rooms": "vitest run --project rooms",
     "test:browser": "playwright test",
-    "test:soak": "node -e \"console.log('no soak tests yet')\"",
+    "test:soak": "vitest run --project soak",
     "build": "npm run build -w @undercut/web && node tools/budget/check.mjs",
     "audio:render": "node tools/audio/render.mjs",
     "audio:browser-check": "node tools/audio/browser-check/run.mjs",

@@ -9,6 +9,7 @@ import {
   type ServerMessage,
 } from '@undercut/protocol';
 import { realTimers, wsTransport } from '../../../tools/netsim/node';
+import './context';
 
 export const base = inject('roomsUrl');
 export const roomsUrl = `${base}/rooms`;

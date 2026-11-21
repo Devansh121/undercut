@@ -23,5 +23,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
-      # Full-race soaks and the screenshot-station run land here as they are written.
+      # Rooms soak: eight clients through the network simulator for a full race.
+      # The screenshot-station run lands here as it is written.
       - run: npm run test:soak
+        env:
+          SOAK_REPORT: soak-report.md
+      - name: Soak report
+        if: always()
+        run: if [ -f soak-report.md ]; then cat soak-report.md >> "$GITHUB_STEP_SUMMARY"; fi

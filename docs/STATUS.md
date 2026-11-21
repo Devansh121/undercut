@@ -12,6 +12,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 - M0 foundation: npm workspaces, TypeScript strict, Vite client, rooms service on the local Workers runtime, CI with eight required checks, the one-command run.
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
+- M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. Headless and soak-tested; the lobby and in-race UI come next. See `docs/netcode.md`.
 
 ## Try this
 
@@ -33,7 +34,15 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - Committed track files will be offered under ODbL 1.0 with the OpenStreetMap and Copernicus notices, separate from the MIT code.
 - The TUMFTM track dataset is used only as a local cross-check, never shipped: it is OSM-derived but published under LGPL-3.0.
 - Race start fuel 105 kg in the physics targets: the commonly quoted 110 kg cap was not found in the 2025 regulation text.
+- Online rooms (M5): a disconnected or silent player's car becomes a ghost (others drive through it) instead of being handed to the host's AI, until the player resumes within 60 s or the car retires.
+- Online rooms: a player who leaves before lights out is replaced by an AI car so the grid stays full; after the start their car retires.
+- Online rooms: the lights-out time, including the random hold, is sent to every client before the first light, as the brief asks; a modified client could know the hold, and jump starts are still caught from snapshots.
+- Online rooms: the host role passes to the longest-connected human as soon as the host disconnects or goes silent for 6 s; a host who comes back is a guest.
+- Online rooms: penalties are time penalties (jump start 5 s; track limits 5 s per report after three warnings), not drive-throughs.
+- Online rooms: room creation is limited to 30 per 10 minutes per client address; codes are six characters with no vowels or look-alikes.
+- The soak runs in real time (the Durable Object clock cannot be accelerated): 3 laps in the `rooms` CI job, 12 laps nightly.
 
 ## Optional, needs you
 
 - A Cloudflare account to deploy the rooms Worker, and a static host for the client. Neither blocks a milestone; everything runs locally.
+  Deploying the rooms service would take: a Cloudflare account on the Workers plan that includes Durable Objects with SQLite storage; `npx wrangler login`, then `npx wrangler deploy --config services/rooms/wrangler.jsonc` (the migrations `v1` and `v2` create the `Room` and `CreateLimiter` classes); optionally a route so the Worker answers `/rooms/*` on the game's own domain. If the client is served from a different origin, set the rooms URL setting (`settings.roomsUrl`, or `VITE_ROOMS_URL` at build time) to `https://<worker host>/rooms`. Nothing has been deployed.

@@ -258,8 +258,20 @@ describe('RemoteCarBuffer', () => {
       expect(v.mode).toBe('interpolated');
       worst = Math.max(worst, Math.hypot(v.x - truth.x, v.z - truth.z));
     }
-    // Chord error of a 1.67 m step on a 100 m radius is 3.5 mm.
-    expect(worst).toBeLessThan(0.005);
+    // A straight line would be off by the chord error, 3.5 mm here; the cubic follows the arc.
+    expect(worst).toBeLessThan(0.0005);
+  });
+
+  it('follows the curve across gaps left by lost snapshots', () => {
+    const b = new RemoteCarBuffer();
+    // Every third snapshot arrives: 100 ms gaps, a 5 m step on a 100 m radius.
+    for (let i = 0; i <= 30; i += 3) b.push(circle((i * 1000) / 30), (i * 1000) / 30 + 50);
+    let worst = 0;
+    for (let t = 10; t < 990; t += 7) {
+      const v = b.sampleSeat(1, t)!;
+      worst = Math.max(worst, Math.hypot(v.x - circle(t).x, v.z - circle(t).z));
+    }
+    expect(worst).toBeLessThan(0.001);
   });
 
   it('extrapolates for a bounded time, then holds and fades', () => {

@@ -1,7 +1,8 @@
 /**
  * Remote cars at render time. Each car is shown at the same server time, a little in
  * the past (the interpolation delay), so there are usually snapshots on both sides of
- * it to interpolate between. The delay is sized from measured transit time and jitter
+ * it to interpolate between (cubic in position, from the snapshot velocities). The
+ * delay is sized from measured transit time and jitter
  * of every sender. When snapshots stop, the car is extrapolated from its velocity for
  * a bounded time, then held in place, then faded out: the game treats a held or
  * fading car as a ghost (no collisions).
@@ -65,14 +66,31 @@ function lerpAngle(a: number, b: number, t: number): number {
   return a + d * t;
 }
 
+/**
+ * Cubic Hermite between two samples using their velocities as end tangents: follows
+ * a curve through a gap left by lost snapshots far better than a straight line (on a
+ * 75 m radius at 80 m/s across 100 ms: under a millimetre instead of about 15 cm).
+ */
+function hermite(p0: number, v0: number, p1: number, v1: number, s: number, dt: number): number {
+  const s2 = s * s;
+  const s3 = s2 * s;
+  return (
+    (2 * s3 - 3 * s2 + 1) * p0 +
+    (s3 - 2 * s2 + s) * dt * v0 +
+    (-2 * s3 + 3 * s2) * p1 +
+    (s3 - s2) * dt * v1
+  );
+}
+
 function interpolate(a: CarSnapshot, b: CarSnapshot, t: number): CarSnapshot {
   const near = t < 0.5 ? a : b;
+  const dt = (b.t - a.t) / 1000;
   return {
     ...near,
     t: lerp(a.t, b.t, t),
-    x: lerp(a.x, b.x, t),
-    y: lerp(a.y, b.y, t),
-    z: lerp(a.z, b.z, t),
+    x: hermite(a.x, a.vx, b.x, b.vx, t, dt),
+    y: hermite(a.y, a.vy, b.y, b.vy, t, dt),
+    z: hermite(a.z, a.vz, b.z, b.vz, t, dt),
     yaw: lerpAngle(a.yaw, b.yaw, t),
     pitch: lerpAngle(a.pitch, b.pitch, t),
     roll: lerpAngle(a.roll, b.roll, t),

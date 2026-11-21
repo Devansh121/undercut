@@ -38,6 +38,8 @@ export const NO_IMPAIRMENT: NetConditions = {
 
 export interface NetStats {
   sent: number;
+  /** Payload bytes handed to this direction (before loss or duplication). */
+  bytes: number;
   delivered: number;
   dropped: number;
   duplicated: number;
@@ -48,6 +50,7 @@ export interface NetStats {
 
 const newStats = (): NetStats => ({
   sent: 0,
+  bytes: 0,
   delivered: 0,
   dropped: 0,
   duplicated: 0,
@@ -62,6 +65,7 @@ class Lane {
   /** Delivery time of the last control message, to keep them in order. */
   private lastControlAt = 0;
   private lastBinarySeq = -1;
+  private readonly controlQueue: { at: number; deliver: () => void }[] = [];
   private seq = 0;
 
   constructor(
@@ -75,20 +79,48 @@ class Lane {
     return Math.max(0, c.latencyMs + (this.rng.next() * 2 - 1) * c.jitterMs);
   }
 
-  control(deliver: () => void): void {
+  control(deliver: () => void, bytes = 0): void {
     const c = this.conditions();
     this.stats.sent++;
+    this.stats.bytes += bytes;
     let d = this.delay();
     if (this.rng.next() < c.loss) d += c.retransmitMs;
     const now = this.timers.now();
     const at = Math.max(now + d, this.lastControlAt);
     this.lastControlAt = at;
-    this.schedule(at - now, deliver);
+    // One FIFO drained by a single timer: separate timers could fire out of order
+    // when their delays round differently, and TCP never reorders.
+    this.controlQueue.push({ at, deliver });
+    this.inFlight++;
+    this.stats.maxInFlight = Math.max(this.stats.maxInFlight, this.inFlight);
+    if (this.controlQueue.length === 1) this.armControl();
   }
 
-  binary(deliver: () => void): void {
+  private armControl(): void {
+    const head = this.controlQueue[0];
+    if (!head) return;
+    this.timers.setTimeout(
+      () => {
+        const now = this.timers.now();
+        while (
+          this.controlQueue.length > 0 &&
+          (this.controlQueue[0] as { at: number }).at <= now + 0.5
+        ) {
+          const item = this.controlQueue.shift() as { deliver: () => void };
+          this.inFlight--;
+          this.stats.delivered++;
+          item.deliver();
+        }
+        this.armControl();
+      },
+      Math.max(0, head.at - this.timers.now()),
+    );
+  }
+
+  binary(deliver: () => void, bytes = 0): void {
     const c = this.conditions();
     this.stats.sent++;
+    this.stats.bytes += bytes;
     if (this.rng.next() < c.loss) {
       this.stats.dropped++;
       return;
@@ -141,8 +173,8 @@ export class NetsimTransport implements Transport {
     const conn = this.inner.open(url, {
       // Open and close travel like control messages, in order with them.
       onOpen: () => down.control(() => !closed && handlers.onOpen()),
-      onText: (text) => down.control(() => !closed && handlers.onText(text)),
-      onBinary: (data) => down.binary(() => !closed && handlers.onBinary(data)),
+      onText: (text) => down.control(() => !closed && handlers.onText(text), text.length),
+      onBinary: (data) => down.binary(() => !closed && handlers.onBinary(data), data.byteLength),
       onClose: (code, reason) =>
         down.control(() => {
           if (closed) return;
@@ -151,8 +183,8 @@ export class NetsimTransport implements Transport {
         }),
     });
     return {
-      sendText: (text) => up.control(() => conn.sendText(text)),
-      sendBinary: (data) => up.binary(() => conn.sendBinary(data)),
+      sendText: (text) => up.control(() => conn.sendText(text), text.length),
+      sendBinary: (data) => up.binary(() => conn.sendBinary(data), data.byteLength),
       get bufferedAmount() {
         return conn.bufferedAmount;
       },
