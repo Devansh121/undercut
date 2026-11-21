@@ -69,6 +69,7 @@ export {
   createTyreCurve,
   createTyreForce,
   lateralMu,
+  longitudinalMu,
   tyreForce,
   type TyreCurve,
   type TyreForce,

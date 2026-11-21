@@ -56,16 +56,26 @@ export interface TyreParams {
    */
   verticalDamping: number;
   /**
-   * Peak lateral friction at the reference load. Doc 1.2: about 1.8 at 3 kN, below [44]'s
-   * 1.85–2.15. This is the model's one fitted parameter: fitted to the Monza T1 2025 peak
-   * deceleration (4.7 g, [21][47]) with the hardware-derived brakes, it comes out at 1.80.
+   * Peak lateral friction at the reference load. Fitted to the low-trim slow-corner lateral
+   * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.145. Range 1.7–2.2
+   * (doc 1.2): [56] gives 1.71 at 3 kN, [44] 1.85 front and 2.15 rear.
    */
   muY: number;
-  /** Peak longitudinal friction as a share of lateral. Doc 1.2: 0.9 ([44] 0.89–0.91). */
-  muXRatio: number;
-  /** d(mu)/d(Fz), 1/N. Doc 1.2: −5e-5 ([44]). */
-  loadSensitivity: number;
-  /** Reference load for `muY`, N. Doc 1.2: 3 kN. */
+  /**
+   * Peak longitudinal friction at the reference load. Fitted to the low-load launch
+   * (0–100 km/h, doc 2.3) and the low-trim braking peak (Monza T1 2025, doc 2.4), which agree
+   * on it: 1.765. Range 1.6–2.0 (doc 1.2). μx/μy at 3 kN is 0.82, below [44]'s 0.89–0.91 and
+   * [56]'s 0.97 (doc 7.4).
+   */
+  muX: number;
+  /**
+   * d(mu)/d(Fz) in each direction, 1/N. Set from [56] (Perantoni and Limebeer's single-seater
+   * tyre: μx 1.75 → 1.40 and μy 1.80 → 1.45 from 2 to 6 kN): −8.75e-5 in both directions.
+   * Range −5e-5 ([44], both directions) to −8.75e-5 ([56]).
+   */
+  loadSensitivityY: number;
+  loadSensitivityX: number;
+  /** Reference load for `muY` and `muX`, N. Doc 1.2: 3 kN. */
   referenceLoad: number;
   /** Floor on the load-sensitive friction so very high loads stay physical. Estimate. */
   muMin: number;
@@ -147,14 +157,23 @@ export interface AeroParams {
   drsOpenTime: number;
   drsCloseTime: number;
   /**
-   * Ride-height map (doc 1.4, shape estimate). ClA·(1 + k·(h0 − h)) with h a front-weighted
-   * mean of the floor heights at the axles, a smooth stall of `stallLoss` over `stallWidth` once the floor's
-   * leading edge drops below `stallHeight`, and drag sensitivity one third of the downforce
-   * sensitivity. `referenceHeight` (h0) is the mean floor height at which the table ClA and
-   * CdA hold: the doc fitted them to speed-trap and braking data, so h0 is the height the car
-   * runs at 300 km/h on a flat straight in that trim (measured, see the Results section).
+   * Ride-height map (doc 1.4, shape estimate). ClA·(1 − f + f·(1 + k·(h0 − h))·S), f the floor
+   * share, h a front-weighted mean of the floor heights at the axles, and S a smooth stall of
+   * the floor alone: it loses `stallLoss` of its own downforce over `stallWidth` once its
+   * leading edge drops below `stallHeight`, with drag and balance unchanged. Drag sensitivity
+   * is one third of the downforce sensitivity, on the floor's share. `referenceHeight` (h0) is the mean
+   * floor height at which the table ClA and CdA hold: the doc fitted them to speed-trap and
+   * braking data, so h0 is the height the car runs at 300 km/h on a flat straight in that trim
+   * (measured, see the Results section).
    */
   heightSensitivity: number;
+  /**
+   * Share of the downforce (and of the drag's height sensitivity) made by the floor. Only that
+   * share follows the floor height: `heightSensitivity` is per metre of the floor's own
+   * downforce, and the wings and bodywork do not see the floor height. Estimate: the floor makes
+   * most of the downforce in this era (doc 1.4); 0.6.
+   */
+  floorShare: number;
   /** Weight of the front ride height in h; the floor's ground effect is led by its front. */
   frontHeightWeight: number;
   referenceHeight: number;
@@ -286,7 +305,9 @@ export interface CarParams {
 
 export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   name: 'low',
-  cdA: 1.15, // doc 1.4: 1.15 (1.05–1.25), Monza
+  // Doc 1.4: 1.15 (1.05–1.25), derived from the Monza trap; re-fitted to it with the
+  // calibrated tyres and floor (Results section): 1.16.
+  cdA: 1.16,
   clA: 3.6, // doc 1.4: 3.6 (3.0–4.2)
   balance: 0.44,
   drsDrag: -0.12,
@@ -295,7 +316,8 @@ export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   rideHeightRear: 0.065,
   drsOpenTime: 0.2,
   drsCloseTime: 0.15,
-  heightSensitivity: 20, // doc 1.4: k_h ≈ 0.02 per mm
+  heightSensitivity: 20, // doc 1.4: k_h ≈ 0.02 per mm of the floor's downforce
+  floorShare: 0.6, // estimate (doc 1.4): the floor makes most of this era's downforce
   frontHeightWeight: 0.7, // estimate: "downforce rises as the floor's front ride height falls"
   referenceHeight: 0.0214, // measured at 300 km/h, 50 kg fuel (Results section)
   leadingEdge: 0.3, // estimate: the floor starts about 1.1 m behind the front axle
@@ -372,9 +394,10 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     freeRadius: 0.36,
     verticalStiffness: 300e3,
     verticalDamping: 7000,
-    muY: 1.8,
-    muXRatio: 0.9,
-    loadSensitivity: -5e-5,
+    muY: 2.145,
+    muX: 1.765,
+    loadSensitivityY: -8.75e-5,
+    loadSensitivityX: -8.75e-5,
     referenceLoad: 3000,
     muMin: 0.9,
     peakSlipRatio: 0.1,
