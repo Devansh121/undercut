@@ -7,14 +7,14 @@
     "truePeakDbtp": -20.29,
     "loudnessLufs": -27.2,
     "rmsDbfs": -29.5,
-    "dcOffset": 0.00000226,
+    "dcOffset": 0.00000129,
     "maxStep": 0.0068,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 92,
-      "medianErrorPct": 0.028,
-      "p95ErrorPct": 0.046,
-      "maxErrorPct": 0.052
+      "medianErrorPct": 0.029,
+      "p95ErrorPct": 0.047,
+      "maxErrorPct": 0.053
     },
     "layersDbfs": {
       "exhaust": -26.9,
@@ -31,7 +31,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 38.3
+    "realtimeRatio": 30.5
   },
   "full-throttle": {
     "title": "Full throttle through all eight gears",
@@ -41,14 +41,14 @@
     "truePeakDbtp": -7.35,
     "loudnessLufs": -15.8,
     "rmsDbfs": -19.3,
-    "dcOffset": 0.00000288,
+    "dcOffset": 0.00000229,
     "maxStep": 0.1154,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 185,
       "medianErrorPct": 0.03,
-      "p95ErrorPct": 0.08,
-      "maxErrorPct": 0.109
+      "p95ErrorPct": 0.082,
+      "maxErrorPct": 0.112
     },
     "layersDbfs": {
       "exhaust": -20.3,
@@ -65,7 +65,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 45.2
+    "realtimeRatio": 35.1
   },
   "lift-off": {
     "title": "Lift-off and coast from high rpm",
@@ -75,14 +75,14 @@
     "truePeakDbtp": -7.84,
     "loudnessLufs": -20.5,
     "rmsDbfs": -23.8,
-    "dcOffset": 0.00000176,
+    "dcOffset": 0.0000021,
     "maxStep": 0.1069,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 163,
-      "medianErrorPct": 0.042,
-      "p95ErrorPct": 0.098,
-      "maxErrorPct": 0.287
+      "medianErrorPct": 0.043,
+      "p95ErrorPct": 0.099,
+      "maxErrorPct": 0.286
     },
     "layersDbfs": {
       "exhaust": -23.5,
@@ -99,7 +99,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 46
+    "realtimeRatio": 34.2
   },
   "braking-downshifts": {
     "title": "Braking zone with downshifts, 8th to 2nd",
@@ -109,14 +109,14 @@
     "truePeakDbtp": -7.65,
     "loudnessLufs": -19.1,
     "rmsDbfs": -22.6,
-    "dcOffset": 0.00000146,
+    "dcOffset": 0.00000286,
     "maxStep": 0.11,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 47,
-      "medianErrorPct": 0.008,
-      "p95ErrorPct": 0.073,
-      "maxErrorPct": 0.178
+      "medianErrorPct": 0.009,
+      "p95ErrorPct": 0.074,
+      "maxErrorPct": 0.179
     },
     "layersDbfs": {
       "exhaust": -23.3,
@@ -133,7 +133,7 @@
       "kerb": null,
       "scrape": -46
     },
-    "realtimeRatio": 35.1
+    "realtimeRatio": 20.4
   },
   "limiter": {
     "title": "On the rev limiter in 6th",
@@ -143,13 +143,13 @@
     "truePeakDbtp": -7.06,
     "loudnessLufs": -19.1,
     "rmsDbfs": -22.8,
-    "dcOffset": 0.0000035,
+    "dcOffset": 0.00000117,
     "maxStep": 0.1149,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 97,
-      "medianErrorPct": 0.202,
-      "p95ErrorPct": 0.369,
+      "medianErrorPct": 0.2,
+      "p95ErrorPct": 0.367,
       "maxErrorPct": 0.4
     },
     "layersDbfs": {
@@ -167,7 +167,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 50.7
+    "realtimeRatio": 36
   },
   "slow-corner": {
     "title": "Slow corner: scrub, squeal and a kerb strike",
@@ -177,14 +177,14 @@
     "truePeakDbtp": -6.43,
     "loudnessLufs": -18.3,
     "rmsDbfs": -21.6,
-    "dcOffset": 9.31e-7,
+    "dcOffset": 0.00000169,
     "maxStep": 0.1117,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 42,
       "medianErrorPct": 0.029,
       "p95ErrorPct": 0.118,
-      "maxErrorPct": 0.241
+      "maxErrorPct": 0.242
     },
     "layersDbfs": {
       "exhaust": -22.9,
@@ -201,7 +201,7 @@
       "kerb": -40.3,
       "scrape": -56.3
     },
-    "realtimeRatio": 40
+    "realtimeRatio": 33.7
   },
   "pit-lane": {
     "title": "Pit lane at 80 km/h on the pit limiter",
@@ -211,14 +211,14 @@
     "truePeakDbtp": -9.91,
     "loudnessLufs": -20.8,
     "rmsDbfs": -23.8,
-    "dcOffset": 0.0000067,
+    "dcOffset": 0.00000611,
     "maxStep": 0.0585,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 116,
-      "medianErrorPct": 0.01,
-      "p95ErrorPct": 0.024,
-      "maxErrorPct": 0.165
+      "medianErrorPct": 0.011,
+      "p95ErrorPct": 0.025,
+      "maxErrorPct": 0.166
     },
     "layersDbfs": {
       "exhaust": -24.5,
@@ -235,7 +235,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 54.5
+    "realtimeRatio": 37.1
   },
   "rev-sweep": {
     "title": "Full-load sweep from idle to the limiter",
@@ -245,14 +245,14 @@
     "truePeakDbtp": -8.46,
     "loudnessLufs": -17,
     "rmsDbfs": -20.3,
-    "dcOffset": 0.00000161,
+    "dcOffset": 9.14e-7,
     "maxStep": 0.1093,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 155,
-      "medianErrorPct": 0.06,
-      "p95ErrorPct": 0.086,
-      "maxErrorPct": 0.097
+      "medianErrorPct": 0.062,
+      "p95ErrorPct": 0.089,
+      "maxErrorPct": 0.1
     },
     "layersDbfs": {
       "exhaust": -21,
@@ -269,7 +269,7 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 58.7
+    "realtimeRatio": 39.8
   },
   "load-steps": {
     "title": "Fixed 11 000 rpm, throttle on and off",
@@ -279,13 +279,13 @@
     "truePeakDbtp": -7.57,
     "loudnessLufs": -18,
     "rmsDbfs": -21.6,
-    "dcOffset": 0.00000137,
+    "dcOffset": 0.00000153,
     "maxStep": 0.1039,
     "limiterMinGainDb": 0,
     "tracking": {
       "windows": 139,
       "medianErrorPct": 0.016,
-      "p95ErrorPct": 0.124,
+      "p95ErrorPct": 0.125,
       "maxErrorPct": 0.569
     },
     "layersDbfs": {
@@ -303,6 +303,6 @@
       "kerb": null,
       "scrape": null
     },
-    "realtimeRatio": 59
+    "realtimeRatio": 41.6
   }
 }

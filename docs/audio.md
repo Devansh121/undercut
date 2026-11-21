@@ -28,7 +28,7 @@ The game sends an `AudioCarState` (`packages/audio/src/dsp/state.ts`) every sim 
 | `kerb`, `kerbFrequency` | 0–1, Hz | Kerb rumble at the ridge-passing rate |
 | `bottoming` | 0–1 | Plank scrape, with a thump on first contact |
 
-Every continuous field ramps linearly from its current value to the new one over the measured update interval, so the control signals are continuous at any update rate. This costs one interval of latency (4–17 ms). Flags switch at the update. Every audible quantity is smoothed again inside the voices.
+Every field is first checked at the core boundary, whichever form it arrives in (struct or packed): it is clamped to its supported range (`CAR_STATE_RANGE`; engine speed to 15 000 rpm, the pulse tables' limit), and NaN or infinity keeps the field's last valid value. Filters also drop non-finite memory and the mix never passes NaN on, so no update can leave the DSP broken. Every continuous field then ramps linearly from its current value to the new one over the measured update interval, so the control signals are continuous at any update rate. This costs one interval of latency (4–17 ms). Flags switch at the update. Every audible quantity is smoothed again inside the voices.
 
 ## Synthesis
 
@@ -37,6 +37,7 @@ Every continuous field ramps linearly from its current value to the new one over
 On top of that:
 
 - **Turbo:** spool state with time constants 0.3 s up, 1.4 s down; whine from 1.8 kHz (idle) to 7.2 kHz (full spool) with a second partial, plus band-passed hiss. Exactly zero while `boost` and the spool are zero.
+- **Near Nyquist:** every turbo and MGU-K partial fades linearly to silence between 0.40 and 0.45 of the sample rate, so none aliases and none switches on or off abruptly. The supported sample rates are 22.05 to 384 kHz; the core rejects lower rates and the browser engine falls back to silent there.
 - **MGU-K:** electrical whine at crank speed × 3.3 (shaft ratio, estimate) × 4 pole pairs, about 2.6 kHz at 12 000 rpm; deploy and harvest have different harmonic mixes. Exactly zero at zero power.
 - **Overrun pops:** short noise bursts through a random resonance (350–1450 Hz), with a small chance per firing event after a lift (decaying over about 1.2 s), after a downshift, and on cut events. Kept subtle.
 - **Limiters:** the rev limiter cuts ignition in long runs (an 18-event pattern), the pit limiter in single events (a 14-event pattern). A cut cylinder keeps 25 % of its pulse. Cylinder gains only change while that cylinder is quiet, so cuts never step the waveform.
@@ -44,7 +45,7 @@ On top of that:
 
 **Road voice** (`road-voice.ts`): rolling noise low-passed at 90 Hz rising to about 600 Hz at 324 km/h, a tyre cavity resonance at 225 Hz, wind band-passed at 280 Hz rising to about 1.7 kHz at 324 km/h, scaled by speed², with slow gusts, broadband scrub per axle, a narrow squeal resonance per axle (930 Hz front, 780 Hz rear, with a slight wobble), kerb thumps at `kerbFrequency` with a rattle, and a gritty 2.7 kHz scrape with a 65 Hz thump on first contact.
 
-**Master bus** (`core.ts`, `limiter.ts`): voices → engine, effects and UI buses → bus gains → master gain and pause fade → DC blocker (12 Hz) → look-ahead limiter → soft clipper. Gains are smoothed over 30 ms; pause fades over about 10 ms, then outputs exact zeros and stops computing. The limiter looks 1.5 ms ahead and holds −1.5 dBFS exactly (the gain at each delayed sample is a moving average of sliding minima of the gain each sample needs, so it is never above what the peak needs); the clipper after it is the identity below −1.3 dBFS and never reaches −0.5 dBFS.
+**Master bus** (`core.ts`, `limiter.ts`): voices → engine, effects and UI buses → bus gains → master gain and pause fade → DC blocker (12 Hz) → look-ahead true-peak limiter → soft clipper. Gains are smoothed over 30 ms; pause fades over about 10 ms, then outputs exact zeros and stops computing. The limiter detects true peak (each sample and the points the same 4× interpolator as the true-peak meter puts around it), looks 1.5 ms ahead and holds −1.5 dBTP on that measure exactly (the gain at each delayed sample is a moving average of sliding minima of the gain each sample needs, so it is never above what the peak needs); its latency is 79 samples at 48 kHz; the clipper after it is the identity below −1.3 dBFS and never reaches −0.5 dBFS.
 
 **More cars later.** The core mixes cars (`CarSource`: controls, an engine voice, a road voice and pan gains) into buses. Adding other cars means more sources with distance gain, pan and Doppler; nothing in the bus or master path changes. Only the player's car exists in this slice.
 
@@ -62,7 +63,7 @@ audio.setCarState(state);
 audio.setVolume('engine', 0.8); // master | engine | effects | ui
 ```
 
-The worklet module is bundled by Vite through `processor?worker&url` (one file, about 28 kB, nothing fetched from elsewhere). The AudioContext is created inside the first `resume()` so that it starts from a user gesture. When the tab is hidden the engine fades out and suspends the context, and resumes when the tab is shown again if the player had started it. Any failure (no AudioWorklet, module blocked, context refused) switches to silent and reports once through `onFallback` (default `console.warn`).
+The worklet module is bundled by Vite through `processor?worker&url` (one file, about 28 kB, nothing fetched from elsewhere). The AudioContext is created inside the first `resume()` so that it starts from a user gesture. When the tab is hidden the engine fades out and suspends the context, and resumes when the tab is shown again if the player had started it. The engine records what the game asked for (running, suspended, disposed) and reconciles it in serialised steps, so a `suspend()`, `dispose()` or hidden tab while the worklet is still loading is honoured when the load completes; the processor is created paused and is silent until told to run. Any failure (no AudioWorklet, a sample rate below 22.05 kHz, module blocked, context refused) switches to silent and reports once through `onFallback` (default `console.warn`).
 
 `npm run audio:browser-check` builds a test page with Vite, runs the bundled worklet in Playwright's Chromium in an OfflineAudioContext and checks the pitch, then starts, suspends, resumes and disposes the facade on a live context. Result on this laptop: peak 0.35, firing peak 449.999 Hz for 9000 rpm (expected 450), statuses idle, running, suspended, running, silent.
 
@@ -77,7 +78,7 @@ Writes `artifacts/audio/<scenario>.wav` (48 kHz, 16-bit stereo), `<scenario>.jso
 
 ## Checks and thresholds
 
-Unit tests (`npm test`): `packages/audio/test/` and `tools/audio/*.test.ts`, about 10 s in total.
+Unit tests (`npm test`): `packages/audio/test/` and `tools/audio/*.test.ts`, about 15 s in total.
 
 | Check | Threshold | Why |
 |---|---|---|
@@ -86,15 +87,19 @@ Unit tests (`npm test`): `packages/audio/test/` and `tools/audio/*.test.ts`, abo
 | Same rpm, full vs trailing throttle (7000 and 11 000 rpm) | centroid ×1.25 or more; share of energy above 2 kHz +6 dB or more; level +5 dB or more | Tone must follow load, not only pitch |
 | Turbo, ERS deploy, ERS harvest | layer exactly 0 when the input is 0; > −60 dBFS and +10 dB in their band when on | Present only when asked for |
 | Every road layer | exactly 0 at rest; > −60 dBFS when its input is set | Same |
-| Everything at maximum, all gains at 2 | limiter engages; sample and true peak (4× oversampled) below 0 dBFS | The limiter must hold |
+| Everything at maximum, all gains at 2 | limiter engages; sample and true peak (4× oversampled, flushed past the last sample) below 0 dBFS | The limiter must hold |
+| Full-scale 8 kHz and 12 kHz square waves and a clipped 9 kHz sine through the limiter | true peak below 0 dBFS | Sample-peak detection let these through at up to +0.36 dBTP |
+| Invalid input: NaN, ±infinity, ±1e12 and −1 in every field, packed and as a struct | output finite throughout; within 1 s of valid input, level within 1 dB and pitch within 0.5 Hz of a clean render | Bad data from the game must not break or stick |
+| Sample rates | below 22 050 Hz rejected; at 22.05 kHz with every tonal source at its highest frequency, every spectral line also exists in a 96 kHz render | No aliasing at the lowest supported rate |
+| Browser engine lifecycle | resume then suspend, resume then dispose, and a hidden tab, each while the worklet loads: nothing left running or unpaused | Asynchronous start-up must not override the game |
 | Clicks: start, stop, pause and resume, upshift, downshift, a jump of every input in one update, gain changes, limiters | largest sample-to-sample step in the 150 ms after the event ≤ 1.2 × the largest in steady state around it (for shifts, including steady full load) | A click is a step far larger than the signal's own motion |
 | Pause | exact zeros once faded | Silence must be silence |
 | DC | \|mean\| < 1e-3 | |
 | Loudness, every scenario | −28 to −14 LUFS (BS.1770-4 integrated, K-weighted, gated) | A sane in-game level with headroom |
 | Loudness spread, scenarios with the car moving | ≤ 8 LU | The player should not ride the volume between manoeuvres; idle and the stationary sweep are excluded |
-| Determinism | identical bits for the same seed and inputs, and for block sizes 1, 37, 128, 400 and 1000 | Offline renders must predict the browser |
+| Determinism | identical bits for the same seed and inputs, and for block sizes 1 to 4096 at 22.05 and 48 kHz, through limiter cuts, dense overrun pops at 15 000 rpm and rapid shifts | Offline renders must predict the browser |
 | Allocation | young generation grows < 16 kB and no scavenge runs over 40 s of audio, state passed packed as the worklet receives it | The audio thread must not trigger garbage collection; one boxed number per block would be 240 kB. Measured after warm-up, a forced collection and a re-settle, since a collection can discard optimised code and the interpreter boxes numbers until it is rebuilt |
-| Speed | > 10× real time (CI margin); measured 52–54× on this laptop (Ryzen 7 7435HS) | One car at about 2 % of one core |
+| Speed | > 10× real time (CI margin); measured 36–38× on this laptop (Ryzen 7 7435HS) | One car at about 3 % of one core; the true-peak detector costs about a quarter of it |
 
 ## Results
 
@@ -102,14 +107,14 @@ From `docs/evidence/m1-audio/summary.json`.
 
 | Scenario | Duration (s) | Sample peak (dBFS) | True peak (dBTP) | Loudness (LUFS) | Firing error, median / max (%) |
 |---|---|---|---|---|---|
-| `idle` | 4 | −20.3 | −20.3 | −27.2 | 0.028 / 0.052 |
-| `full-throttle` | 13 | −7.4 | −7.3 | −15.8 | 0.030 / 0.109 |
-| `lift-off` | 7 | −7.9 | −7.8 | −20.5 | 0.042 / 0.287 |
-| `braking-downshifts` | 4.5 | −7.7 | −7.7 | −19.1 | 0.008 / 0.178 |
-| `limiter` | 4.5 | −7.1 | −7.1 | −19.1 | 0.202 / 0.400 |
-| `slow-corner` | 6 | −6.5 | −6.4 | −18.3 | 0.029 / 0.241 |
-| `pit-lane` | 5 | −9.9 | −9.9 | −20.8 | 0.010 / 0.165 |
-| `rev-sweep` | 8 | −8.5 | −8.5 | −17.0 | 0.060 / 0.097 |
+| `idle` | 4 | −20.3 | −20.3 | −27.2 | 0.029 / 0.053 |
+| `full-throttle` | 13 | −7.4 | −7.3 | −15.8 | 0.030 / 0.112 |
+| `lift-off` | 7 | −7.9 | −7.8 | −20.5 | 0.043 / 0.286 |
+| `braking-downshifts` | 4.5 | −7.7 | −7.7 | −19.1 | 0.009 / 0.179 |
+| `limiter` | 4.5 | −7.1 | −7.1 | −19.1 | 0.200 / 0.400 |
+| `slow-corner` | 6 | −6.5 | −6.4 | −18.3 | 0.029 / 0.242 |
+| `pit-lane` | 5 | −9.9 | −9.9 | −20.8 | 0.011 / 0.166 |
+| `rev-sweep` | 8 | −8.5 | −8.5 | −17.0 | 0.062 / 0.100 |
 | `load-steps` | 6 | −7.6 | −7.6 | −18.0 | 0.016 / 0.569 |
 
 DC offset is below 1e-5 in every scenario. The limiter never engages in normal driving; it only acts in the everything-at-maximum test.
@@ -136,6 +141,7 @@ Render first with `npm run audio:render -- all`, then play, in this order:
 
 ## Decided without the owner
 
+- Supported sample rates start at 22.05 kHz and lower rates are rejected, on top of the Nyquist fades: browsers run at 44.1 or 48 kHz, and below 22.05 kHz the pulse tables would keep too few harmonics to sound like this engine.
 - Engine speed is passed in rad/s, not rpm, to keep SI in code (AGENTS.md); `rpmToRadPerSecond` converts at the edge.
 - Idle at 4500 rpm and the limiter at 12 500 rpm (physics doc estimate); MGU-K shaft ratio 3.3 and 4 pole pairs are estimates, not published figures.
 - The turbo is driven by a `boost` demand input rather than computed from rpm and load inside audio, so the vehicle model owns it; the scenarios use load × rpm ramp.

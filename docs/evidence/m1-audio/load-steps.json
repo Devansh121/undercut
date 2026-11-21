@@ -6,13 +6,13 @@
   "truePeakDbtp": -7.57,
   "loudnessLufs": -18,
   "rmsDbfs": -21.6,
-  "dcOffset": 0.00000137,
+  "dcOffset": 0.00000153,
   "maxStep": 0.1039,
   "limiterMinGainDb": 0,
   "tracking": {
     "windows": 139,
     "medianErrorPct": 0.016,
-    "p95ErrorPct": 0.124,
+    "p95ErrorPct": 0.125,
     "maxErrorPct": 0.569
   },
   "layersDbfs": {
@@ -30,5 +30,5 @@
     "kerb": null,
     "scrape": null
   },
-  "realtimeRatio": 59
+  "realtimeRatio": 41.6
 }
