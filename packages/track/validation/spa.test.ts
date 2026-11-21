@@ -58,16 +58,11 @@ const { data, track } = describeCircuit({
   timingLine: { s: 6875.4, uncertainty: 15 },
   poleToBraking: 165,
   pit: { side: 'right', osmLength: 720.5 },
-  // The real compression at the bottom of Eau Rouge and the crest over Raidillon. The other
-  // straights carry undulations of up to about 0.8 g from the surface model (the descent to
-  // Pouhon, the run to the Bus Stop), not yet checked against the circuit.
-  verticalAllowed: (c) => [
-    [c.apex(2) - 200, c.apex(4) + 150, 'Eau Rouge and Raidillon'],
-    // A steady 15 m climb over 150 m in the raw surface model (not a narrow spike), taken as
-    // terrain; not yet checked against a published figure.
-    [c.end(17) - 100, c.start(18) - 300, 'the climb from Blanchimont to the Bus Stop'],
-  ],
-  maxStraightG: 0.8,
+  // The real compression at the bottom of Eau Rouge and the crest over Raidillon. The largest
+  // undulations left on the straights: -0.42 g on the main straight before the line, +0.35 g
+  // on the run down to Les Fagnes, -0.32 g just after the line (docs/track-data.md 5.2).
+  verticalAllowed: (c) => [[c.apex(2) - 200, c.apex(4) + 150, 'Eau Rouge and Raidillon']],
+  maxStraightG: 0.5,
   // The start straight beside the run down from La Source; the two legs of Bruxelles.
   closeRuns: [
     [60, 520],
@@ -133,10 +128,11 @@ describe('Spa: elevation', () => {
     let sag = 0;
     for (let s = corner(2) - 60; s <= corner(3); s += step) sag = Math.max(sag, vc(s));
     let crest = 0;
-    for (let s = corner(4); s <= corner(4) + 400; s += step) crest = Math.min(crest, vc(s));
+    for (let s = corner(4) - 60; s <= corner(4) + 400; s += step) crest = Math.min(crest, vc(s));
     expect(sag).toBeGreaterThan(1 / 1000);
-    // About -1/1090 per metre over the top of Raidillon (-0.65 g at 300 km/h).
-    expect(crest).toBeLessThan(-1 / 2000);
+    // About -1/1090 per metre over the top of Raidillon (-0.65 g at 300 km/h), just before
+    // turn 4's apex.
+    expect(crest).toBeLessThan(-1 / 1300);
   });
 });
 
@@ -160,9 +156,11 @@ describe('Spa: Kemmel', () => {
     expect(worst, `s ${where.toFixed(0)}`).toBeLessThan(0.3);
     // The data's correction is recorded where it was applied.
     const fixes = (data.source.dem as { corrections: { from: number; to: number }[] }).corrections;
-    expect(fixes).toHaveLength(1);
-    expect(fixes[0]!.from).toBeGreaterThan(corner(4));
-    expect(fixes[0]!.to).toBeLessThan(corner(5));
+    const kemmel = fixes.filter((f) => f.from > corner(4) && f.to < corner(5));
+    expect(kemmel).toHaveLength(1);
+    // Every correction is on a straight, clear of Eau Rouge and Raidillon.
+    expect(fixes).toHaveLength(3);
+    for (const f of fixes) expect(f.from > corner(4) || f.to < corner(2) - 200).toBe(true);
   });
 });
 

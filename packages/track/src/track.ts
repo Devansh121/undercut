@@ -22,6 +22,11 @@ export const PIT_GROUND_SIGMA = 15;
 /** Beyond the pit lane's edges its ground blends back to the lap's over this band, metres. */
 export const PIT_GROUND_BAND = 2;
 
+/** Smoothstep on [0, 1], and 1 above. */
+function smoothUnit(t: number): number {
+  return t >= 1 ? 1 : t * t * (3 - 2 * t);
+}
+
 /** Gaussian smoothing of an open sequence, ends reflected about their values. */
 function smoothOpen(values: ArrayLike<number>, sigmaSamples: number): Float64Array {
   const n = values.length;
@@ -568,9 +573,9 @@ export class Track {
     const hr = this.pitPath.interpolate(this.pitHalfRight, out.s);
     const outside = Math.max(out.d - hl, -hr - out.d);
     if (outside >= PIT_GROUND_BAND) return 0;
-    const smooth = (t: number): number => (t >= 1 ? 1 : t * t * (3 - 2 * t));
     return (
-      smooth(1 - Math.max(0, outside) / PIT_GROUND_BAND) * smooth(beyondEdge / PIT_GROUND_BAND)
+      smoothUnit(1 - Math.max(0, outside) / PIT_GROUND_BAND) *
+      smoothUnit(beyondEdge / PIT_GROUND_BAND)
     );
   }
 

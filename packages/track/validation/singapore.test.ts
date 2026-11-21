@@ -64,7 +64,7 @@ const { data, track } = describeCircuit({
     (
       raw as unknown as { source: { dem: { bridges: { from: number; to: number }[] } } }
     ).source.dem.bridges.map((b) => [b.from - 50, b.to + 50, 'bridge'] as const),
-  maxStraightG: 0.8,
+  maxStraightG: 0.5,
   // Turns 1 to 4; turn 8 beside turn 14; the hairpin's two legs by the waterfront; the final
   // corners under the grandstand beside the pit lane.
   closeRuns: [
