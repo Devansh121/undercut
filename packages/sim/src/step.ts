@@ -302,16 +302,22 @@ function substep(
     let fy = tf.fy;
     const w = 1 - speed / tyre.lowSpeed;
     if (w > 0 && tyreZ[i]! > 0) {
-      fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
-      fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
-      // The damped force obeys the same combined friction limit as the steady force.
-      const ex = fx / tf.dx;
-      const ey = fy / tf.dy;
-      const e = ex * ex + ey * ey;
-      if (e > 1) {
-        const k = 1 / Math.sqrt(e);
-        fx *= k;
-        fy *= k;
+      if (tf.dx > 0 && tf.dy > 0) {
+        fx += (w * tyre.carcassDampingX * (ux - oldX)) / h;
+        fy += (w * tyre.carcassDampingY * (uy - oldY)) / h;
+        // The damped force obeys the same combined friction limit as the steady force.
+        const ex = fx / tf.dx;
+        const ey = fy / tf.dy;
+        const e = ex * ex + ey * ey;
+        if (e > 1) {
+          const k = 1 / Math.sqrt(e);
+          fx *= k;
+          fy *= k;
+        }
+      } else {
+        // No friction available (zero grip): nothing bounds the damping, so no force.
+        fx = 0;
+        fy = 0;
       }
     }
     s.forceX[i] = fx;

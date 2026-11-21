@@ -467,6 +467,33 @@ describe('tyre force limit at low speed', () => {
       }
     });
   }
+
+  // With no grip there is no friction to bound the low-speed carcass damping by: the tyre must
+  // pass no tangential force at all, in pure longitudinal, pure lateral and combined slip.
+  for (const [what, vx, vy] of [
+    ['pure longitudinal', 0.5, 0],
+    ['pure lateral', 0, 0.5],
+    ['combined', 0.5, 0.4],
+  ] as const) {
+    it(`passes no tyre force with zero grip, ${what} sliding at (${vx}, ${vy}) m/s`, () => {
+      const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+      car.gripScale.fill(0);
+      car.vx = vx;
+      car.vy = vy;
+      car.wheelSpeed.fill(0);
+      for (let k = 0; k < 8; k++) {
+        stepCar(car, input({ brake: 1 }), FLAT_SURFACE, 1 / 960, env);
+        for (let i = 0; i < 4; i++) {
+          expect(car.load[i]!).toBeGreaterThan(0);
+          expect(Math.abs(car.forceX[i]!)).toBe(0);
+          expect(Math.abs(car.forceY[i]!)).toBe(0);
+        }
+      }
+      // Only aero drag acts (well under a newton at walking pace).
+      expect(car.vx).toBeCloseTo(vx, 4);
+      expect(car.vy).toBeCloseTo(vy, 4);
+    });
+  }
 });
 
 describe('snapshots', () => {
