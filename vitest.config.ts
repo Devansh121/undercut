@@ -11,14 +11,30 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['{apps,packages,tools}/**/*.test.{ts,mjs}'],
-          exclude: ['**/node_modules/**', 'packages/sim/validation/**', '**/*.runtime.test.*'],
+          exclude: [
+            '**/node_modules/**',
+            'packages/sim/validation/**',
+            'packages/ai/validation/**',
+            '**/*.runtime.test.*',
+          ],
         },
       },
       {
         test: {
           name: 'physics',
           environment: 'node',
-          include: ['packages/sim/validation/**/*.test.ts'],
+          include: ['packages/sim/validation/**/*.test.ts', 'packages/ai/validation/**/*.test.ts'],
+          exclude: ['**/node_modules/**', '**/*.soak.test.ts'],
+        },
+      },
+      {
+        // Nightly only (npm run test:soak): long runs of the reference driver.
+        test: {
+          name: 'soak',
+          environment: 'node',
+          include: ['packages/**/*.soak.test.ts'],
+          testTimeout: 600_000,
+          hookTimeout: 600_000,
         },
       },
       {
