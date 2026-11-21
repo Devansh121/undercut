@@ -227,6 +227,31 @@ describe('Monza: timing and rules metadata', () => {
 });
 
 describe('Monza: barriers and surfaces', () => {
+  it('puts every pose on the sampled ground: grid, pit boxes, pit entry and exit, start line', () => {
+    const surface = new TrackSurface(track);
+    const out = createSurfaceSample();
+    const poses = [
+      ...track.gridSlots.map((p, k) => ['grid ' + (k + 1), p] as const),
+      ...track.pit.boxes.map((p, k) => ['box ' + (k + 1), p] as const),
+      ['pit entry', track.pit.entryPose] as const,
+      ['pit exit', track.pit.exitPose] as const,
+      ['start line', track.startPose] as const,
+    ];
+    let worst = 0;
+    let where = '';
+    for (const [name, p] of poses) {
+      surface.sample(p.x, p.z, createSurfaceHint(), out);
+      const gap = Math.abs(p.y - out.height);
+      if (gap > worst) {
+        worst = gap;
+        where = `${name}: pose y ${p.y.toFixed(6)}, ground ${out.height.toFixed(6)}`;
+      }
+    }
+    expect(poses).toHaveLength(20 + 10 + 3);
+    expect(worst, where).toBeLessThan(0.001);
+    expect(track.startPose.s).toBe(0);
+  });
+
   it('never lets a barrier cross the track or its kerbs', () => {
     const q = createPathPoint();
     const hint = { index: -1 };

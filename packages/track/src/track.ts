@@ -125,9 +125,16 @@ export class PitLane {
   readonly halfWidthLeft: Float64Array;
   readonly halfWidthRight: Float64Array;
   readonly boxes: readonly Pose[];
+  /** Pit-lane centreline poses at s_pit = 0 (leaving the lap) and s_pit = length (rejoining). */
+  readonly entryPose: Pose;
+  readonly exitPose: Pose;
   readonly garageWall: readonly [number, number];
 
-  constructor(data: TrackData['pit']) {
+  /**
+   * `groundHeight` is the track's ground at a world point: the pit lane has no ground of its
+   * own, so poses on it sit on the same surface the sampler reports.
+   */
+  constructor(data: TrackData['pit'], groundHeight: (x: number, z: number) => number) {
     this.path = new TrackPath(data.x, data.y, data.z, data.length, false);
     this.side = data.side;
     this.entryS = data.entryS;
@@ -141,11 +148,14 @@ export class PitLane {
     this.garageWall = [data.garageWall[0], data.garageWall[1]];
     const p = createVec3();
     const t = createVec3();
-    this.boxes = data.boxes.map((b) => {
-      this.path.pointAt(b.s, b.d, p);
-      this.path.tangent(b.s, t);
-      return { s: b.s, d: b.d, x: p.x, y: p.y, z: p.z, yaw: Math.atan2(-t.z, t.x) };
-    });
+    const pose = (s: number, d: number): Pose => {
+      this.path.pointAt(s, d, p);
+      this.path.tangent(s, t);
+      return { s, d, x: p.x, y: groundHeight(p.x, p.z), z: p.z, yaw: Math.atan2(-t.z, t.x) };
+    };
+    this.boxes = data.boxes.map((b) => pose(b.s, b.d));
+    this.entryPose = pose(0, 0);
+    this.exitPose = pose(data.length, 0);
   }
 
   /** True between the speed-limit lines. */
@@ -189,6 +199,8 @@ export class Track {
   readonly speedTrap: number;
   readonly drsZones: readonly DrsZone[];
   readonly gridSlots: readonly Pose[];
+  /** On the centreline at the start/finish line, facing the direction of travel. */
+  readonly startPose: Pose;
   readonly barriers: readonly Barrier[];
   /** White-line outer edges (track limits) as closed x, z polylines, one point per sample. */
   readonly trackLimits: readonly [Float64Array, Float64Array];
@@ -215,7 +227,6 @@ export class Track {
     const c = data.centreline;
     const n = data.sampleCount;
     this.lap = new TrackPath(c.x, c.y, c.z, data.length, true);
-    this.pit = new PitLane(data.pit);
     this.lineWidth = data.lineWidth;
     this.bank = Float64Array.from(c.bank);
     this.tanBank = this.bank.map(Math.tan);
@@ -253,12 +264,17 @@ export class Track {
     const p = createVec3();
     const t = createVec3();
     const g = createGround();
-    this.gridSlots = data.grid.map((slot) => {
-      this.lap.pointAt(slot.s, slot.d, p);
-      this.ground(slot.s, slot.d, g);
-      this.lap.tangent(slot.s, t);
-      return { s: slot.s, d: slot.d, x: p.x, y: g.height, z: p.z, yaw: Math.atan2(-t.z, t.x) };
-    });
+    // Every pose sits on the one ground the sampler reports: grid slots and the start line from
+    // their (s, d), the pit lane's poses from their world position.
+    const lapPose = (s: number, d: number): Pose => {
+      this.lap.pointAt(s, d, p);
+      this.ground(s, d, g);
+      this.lap.tangent(s, t);
+      return { s, d, x: p.x, y: g.height, z: p.z, yaw: Math.atan2(-t.z, t.x) };
+    };
+    this.gridSlots = data.grid.map((slot) => lapPose(slot.s, slot.d));
+    this.startPose = lapPose(0, 0);
+    this.pit = new PitLane(data.pit, (x, z) => this.groundHeightAt(x, z));
 
     this.trackLimits = [new Float64Array(2 * n), new Float64Array(2 * n)];
     for (let i = 0; i < n; i++) {
@@ -390,6 +406,18 @@ export class Track {
   project(x: number, z: number, hint: { index: number }, out: PathPoint): PathPoint {
     return this.lap.project(x, z, hint, out);
   }
+
+  /**
+   * Ground height at a world point: the point projected onto the lap, then the lap's
+   * cross-section there. The surface sampler, the meshes and every pose use this ground.
+   * `hint` speeds up repeated queries for one moving point; omit it for a one-off query.
+   */
+  groundHeightAt(x: number, z: number, hint: { index: number } = { index: -1 }): number {
+    const q = this.project(x, z, hint, this.worldPoint);
+    return this.ground(q.s, q.d, this.groundScratch).height;
+  }
+
+  private readonly worldPoint = createPathPoint();
 
   /** Ground height at (s, d). */
   heightAt(s: number, d: number): number {

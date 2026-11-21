@@ -7,6 +7,8 @@ import {
   type MeshData,
   type TrackMeshes,
 } from '../src/mesh';
+import { createSurfaceHint, createSurfaceSample } from '@undercut/sim';
+import { TrackSurface } from '../src/surface';
 import { Track } from '../src/track';
 import { syntheticTrackData } from './fixtures';
 
@@ -161,6 +163,19 @@ describe('track meshes on Monza', () => {
     }
     expect(lapMin - minX).toBeGreaterThan(300);
     expect(maxX - lapMax).toBeGreaterThan(300);
+  });
+
+  it('lays the pit lane on the same ground the sampler reports, lifted 1 cm', () => {
+    const surface = new TrackSurface(track);
+    const out = createSurfaceSample();
+    const hint = createSurfaceHint();
+    const p = high.pit.positions;
+    let worst = 0;
+    for (let k = 0; k < p.length; k += 3) {
+      surface.sample(p[k]!, p[k + 2]!, hint, out);
+      worst = Math.max(worst, Math.abs(p[k + 1]! - 0.01 - out.height));
+    }
+    expect(worst).toBeLessThan(0.001);
   });
 
   it('marks the start line, twenty grid slots, DRS lines and the pit', () => {
