@@ -54,3 +54,20 @@ export function envelopeFile(setup: CircuitSetup): string {
 export function lineFile(setup: CircuitSetup): string {
   return `packages/ai/data/${setup.id}-${setup.trim}.line.json`;
 }
+
+/**
+ * The track with one DRS zone's activation point moved, for measurements only: the track file
+ * is the source of truth and is not edited here. The Monza file anchors zone 2's activation at
+ * s = 12 m, 12 m after its start line; the FIA map anchors it 12 m after the finish (control)
+ * line, which is at s = 5472.5 m, so the corrected activation is s = 5484.5 m
+ * (docs/physics-validation.md section 7.6). Clearly labelled wherever it is used.
+ */
+export function withDrsActivation(track: Track, zone: number, activation: number): Track {
+  const zones = track.drsZones.map((z, k) => (k === zone ? { ...z, activation } : z));
+  const moved = Object.create(track) as Track & { drsZones: typeof zones };
+  Object.defineProperty(moved, 'drsZones', { value: zones });
+  return moved;
+}
+
+/** Monza's corrected zone 2 activation (index 1): 12 m after the control line. */
+export const MONZA_DRS2_ACTIVATION = 5484.5;

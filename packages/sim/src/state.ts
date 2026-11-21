@@ -1,9 +1,5 @@
-import {
-  createSurfaceHint,
-  createSurfaceSample,
-  type SurfaceHint,
-  type SurfaceSampler,
-} from './contracts';
+import { createSurfaceHint, type SurfaceHint, type SurfaceSampler } from './contracts';
+import { PATCH_HINTS, createPatchSample, samplePatch } from './contact';
 import { STANDARD_GRAVITY } from './environment';
 import { createCarModel, type CarModel } from './model';
 import type { CarParams } from './params';
@@ -37,6 +33,11 @@ export class CarState {
     createSurfaceHint(),
     createSurfaceHint(),
   ];
+  /** Hints for the contact-patch sample points, `PATCH_HINTS` per wheel. Caches only. */
+  readonly patchHints: readonly SurfaceHint[] = Array.from(
+    { length: 4 * PATCH_HINTS },
+    createSurfaceHint,
+  );
 
   // Planar motion.
   x = 0;
@@ -107,6 +108,13 @@ export class CarState {
   readonly travel = new Float64Array(4);
   /** Per-wheel grip multiplier for later tyre temperature, wear and damage. */
   readonly gripScale = new Float64Array([1, 1, 1, 1]);
+  /**
+   * Diagnostics from the last substep, never part of a snapshot (they are outputs, recomputed
+   * every substep): the carcass damping share of each tyre's vertical load, N, and the total
+   * vertical force of the floor's skid points on the ground, N.
+   */
+  readonly tyreDamping = new Float64Array(4);
+  plankForce = 0;
 
   constructor(model: CarModel) {
     this.model = model;
@@ -217,6 +225,7 @@ export function restoreCar(state: CarState, snapshot: ArrayLike<number>): void {
     for (let i = 0; i < 4; i++) arr[i] = snapshot[k++] as number;
   }
   for (const hint of state.hints) hint.index = -1;
+  for (const hint of state.patchHints) hint.index = -1;
 }
 
 export interface CarStartOptions {
@@ -339,7 +348,7 @@ function settleSuspension(s: CarState, surface: SurfaceSampler | undefined, rho:
   const g = STANDARD_GRAVITY;
   const m = computeMass(model, s.fuelMass, settleMass);
   const L = p.geometry.wheelbase;
-  const sample = createSurfaceSample();
+  const patch = createPatchSample();
   const c = Math.cos(s.yaw);
   const sn = Math.sin(s.yaw);
   for (let i = 0; i < 4; i++) {
@@ -347,8 +356,22 @@ function settleSuspension(s: CarState, surface: SurfaceSampler | undefined, rho:
     const by = model.wheelLeft[i] as number;
     const px = s.x + bx * c - by * sn;
     const pz = s.z - bx * sn - by * c;
-    if (surface) surface.sample(px, pz, s.hints[i] as SurfaceHint, sample);
-    s.groundY[i] = surface ? sample.height : 0;
+    const width = i < 2 ? p.tyre.patchWidthFront : p.tyre.patchWidthRear;
+    if (surface) {
+      samplePatch(
+        surface,
+        px,
+        pz,
+        c,
+        -sn,
+        width,
+        p.tyre.patchLength,
+        s.patchHints,
+        i * PATCH_HINTS,
+        patch,
+      );
+    }
+    s.groundY[i] = surface ? patch.height : 0;
   }
   // Aero load at the start speed with the reference coefficients (refined by the step itself).
   const q = 0.5 * rho * s.vx * s.vx;
