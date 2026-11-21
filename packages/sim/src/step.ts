@@ -1,5 +1,6 @@
 import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
-import { createSurfaceSample, createWallSample } from './contracts';
+import { createWallSample } from './contracts';
+import { PATCH_HINTS, createPatchSample, samplePatch, tyreVerticalForce } from './contact';
 import type { Environment } from './environment';
 import {
   BODY_HALF_WIDTH,
@@ -46,8 +47,18 @@ const ERS_MODES = [
 
 // Per-step scratch. Module-level so the hot loop never allocates; the sim is single-threaded.
 const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
-const sample = createSurfaceSample();
 const wallSample = createWallSample();
+const patch = createPatchSample();
+// Per-step patch samples (`samplePatchesAhead`) and the ground of the current substep.
+const patchStart = new Float64Array(4);
+const patchEnd = new Float64Array(4);
+const patchHeight = new Float64Array(4);
+const patchGrip = new Float64Array(4);
+const patchDrag = new Float64Array(4);
+const patchNx = new Float64Array(4);
+const patchNy = new Float64Array(4);
+const patchNz = new Float64Array(4);
+const damp = { damping: 0 };
 const tf = createTyreForce();
 const gh = new Float64Array(4);
 const ghRate = new Float64Array(4);
@@ -80,7 +91,62 @@ export function stepCar(
   applyDriverRequests(state, input);
   state.wallImpactSpeed = 0;
   state.wallContact = 0;
-  for (let k = 0; k < n; k++) substep(state, input, surface, h, env);
+  samplePatchesAhead(state, surface, dt);
+  for (let k = 0; k < n; k++) {
+    // The ground under each patch moves from where it was (groundY) to the patch sample at the
+    // end of the step, evenly across the substeps.
+    const f = (k + 1) / n;
+    for (let i = 0; i < 4; i++) {
+      patchHeight[i] = patchStart[i]! + (patchEnd[i]! - patchStart[i]!) * f;
+    }
+    substep(state, input, surface, h, env);
+  }
+}
+
+/**
+ * Contact patches sampled once per step, not per substep: each wheel's patch grid is read where
+ * the wheel will be at the end of the step (its position and the car's yaw carried forward by
+ * the current velocities), and the substeps run the ground from the last height (`groundY`, part
+ * of the snapshot) to it. The patch's normal, grip and drag are the end sample's. The prediction
+ * misses the step's accelerations by about ½·a·dt² (under a millimetre); the next step starts
+ * from wherever this one ended, so the ground stays continuous.
+ */
+function samplePatchesAhead(s: CarState, surface: SurfaceSampler, dt: number): void {
+  const model = s.model;
+  const tyre = model.params.tyre;
+  computeMass(model, s.fuelMass, mass);
+  const c0 = Math.cos(s.yaw);
+  const s0 = Math.sin(s.yaw);
+  const x = s.x + dt * (s.vx * c0 - s.vy * s0);
+  const z = s.z + dt * (-s.vx * s0 - s.vy * c0);
+  const yaw = s.yaw + dt * s.yawRate;
+  const c = Math.cos(yaw);
+  const sn = Math.sin(yaw);
+  for (let i = 0; i < 4; i++) {
+    const bx = i < 2 ? mass.a : -mass.b;
+    const by = model.wheelLeft[i]!;
+    // The front patch turns with the steer.
+    const yawW = i < 2 ? yaw + s.steerAngle : yaw;
+    samplePatch(
+      surface,
+      x + bx * c - by * sn,
+      z - bx * sn - by * c,
+      i < 2 ? Math.cos(yawW) : c,
+      i < 2 ? -Math.sin(yawW) : -sn,
+      i < 2 ? tyre.patchWidthFront : tyre.patchWidthRear,
+      tyre.patchLength,
+      s.patchHints,
+      i * PATCH_HINTS,
+      patch,
+    );
+    patchStart[i] = s.groundY[i]!;
+    patchEnd[i] = patch.height;
+    patchGrip[i] = patch.grip;
+    patchDrag[i] = patch.drag;
+    patchNx[i] = patch.normalX;
+    patchNy[i] = patch.normalY;
+    patchNz[i] = patch.normalZ;
+  }
 }
 
 const cornerMass: MassState = {
@@ -180,25 +246,18 @@ function substep(
   let ny = 0;
   let nz = 0;
   for (let i = 0; i < 4; i++) {
-    const bx = i < 2 ? mass.a : -mass.b;
-    wheelX[i] = bx;
+    wheelX[i] = i < 2 ? mass.a : -mass.b;
     bodyX[i] = i < 2 ? mass.sprungA : -mass.sprungB;
-    const by = model.wheelLeft[i]!;
-    surface.sample(
-      s.x + bx * c - by * sn,
-      s.z - bx * sn - by * c,
-      s.hints[i] as SurfaceHint,
-      sample,
-    );
-    const height = sample.height;
+    // The contact patch's ground for this substep (`samplePatchesAhead`).
+    const height = patchHeight[i]!;
     ghRate[i] = (height - s.groundY[i]!) / h;
     gh[i] = height;
     s.groundY[i] = height;
-    grip[i] = sample.grip * s.gripScale[i]!;
-    rollDrag[i] = sample.drag;
-    nx += sample.normalX;
-    ny += sample.normalY;
-    nz += sample.normalZ;
+    grip[i] = patchGrip[i]! * s.gripScale[i]!;
+    rollDrag[i] = patchDrag[i]!;
+    nx += patchNx[i]!;
+    ny += patchNy[i]!;
+    nz += patchNz[i]!;
   }
   const nInv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
   nx *= nInv;
@@ -218,16 +277,16 @@ function substep(
   const tyreMax = model.tyreForceMax;
   for (let i = 0; i < 4; i++) {
     const comp = gh[i]! + tyre.freeRadius - s.wheelY[i]!;
-    let f = 0;
-    if (comp > 0) {
-      // A tyre only pushes, and never past its bottoming load: a step in the ground (a wheel
-      // suddenly deep below it, or a huge ground rate) then gives a bounded force.
-      f = kt * comp + ct * (ghRate[i]! - s.wheelVy[i]!);
-      if (f < 0) f = 0;
-      else if (f > tyreMax) f = tyreMax;
+    // A tyre only pushes, and never past its bottoming load: a step in the ground (a wheel
+    // suddenly deep below it, or a huge ground rate) then gives a bounded force.
+    let f = tyreVerticalForce(comp, ghRate[i]! - s.wheelVy[i]!, kt, ct, tyre.dampingOnset, damp);
+    if (f > tyreMax) {
+      damp.damping -= f - tyreMax;
+      f = tyreMax;
     }
     tyreZ[i] = f;
     s.load[i] = f;
+    s.tyreDamping[i] = damp.damping;
   }
   for (let i = 0; i < 4; i++) {
     const front = i < 2;
@@ -322,6 +381,8 @@ function substep(
     skidY -= scale * vpy;
     skidYaw += px * -scale * vpy + yl * scale * vpx;
   }
+
+  s.plankForce = skidHeave;
 
   // ---- Tyre slip and force (transient contact-patch deflection). ----
   const curve = model.curve;

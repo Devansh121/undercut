@@ -56,6 +56,19 @@ export interface TyreParams {
    */
   verticalDamping: number;
   /**
+   * Contact patch that envelops the ground (`contact.ts`), m. Estimate: about 0.88 of the
+   * tread width (doc 1.2: 345–375 mm front, 440–470 mm rear) and 0.15 m long at running load.
+   */
+  patchWidthFront: number;
+  patchWidthRear: number;
+  patchLength: number;
+  /**
+   * Deflection over which the carcass damping grows from nothing at first touch to its full
+   * value, m. Estimate: well under the static deflection (about 7–9 mm), so a loaded tyre always
+   * has its full damping and a landing or re-contacting wheel takes no damping step.
+   */
+  dampingOnset: number;
+  /**
    * Peak lateral friction at the reference load. Fitted to the low-trim slow-corner lateral
    * acceleration (doc 2.5: 2.0–2.3 g at 85 km/h, band centre 2.15 g): 2.145. Range 1.7–2.2
    * (doc 1.2): [56] gives 1.71 at 3 kN, [44] 1.85 front and 2.15 rear.
@@ -394,6 +407,10 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     freeRadius: 0.36,
     verticalStiffness: 300e3,
     verticalDamping: 7000,
+    patchWidthFront: 0.32,
+    patchWidthRear: 0.4,
+    patchLength: 0.15,
+    dampingOnset: 0.003,
     muY: 2.145,
     muX: 1.765,
     loadSensitivityY: -8.75e-5,

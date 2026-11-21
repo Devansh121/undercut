@@ -28,6 +28,14 @@ export {
 } from './envelope/measure';
 export { engineRpm, fullLoadTorque, optimalShiftRpm } from './envelope/shift';
 export { buildCorridor, type Corridor, type CorridorOptions } from './line/corridor';
+export {
+  TYRE_HALF_TREAD,
+  buildLegalCorridor,
+  legalBound,
+  usableBeyondLine,
+  wheelOff,
+  type LegalCorridorOptions,
+} from './line/limits';
 export { computeLineGeometry, type LineGeometry } from './line/geometry';
 export { curvatureCost, minimumCurvatureLine } from './line/min-curvature';
 export { refineLine, type RefineOptions, type RefineResult } from './line/refine';
@@ -56,6 +64,7 @@ export {
 export {
   createReferenceDriver,
   planFromRacingLine,
+  referenceCorridor,
   referenceLineConfig,
   type ReferenceDriverSetup,
 } from './reference-setup';

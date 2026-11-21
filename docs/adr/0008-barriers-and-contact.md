@@ -54,7 +54,7 @@ with limits derived from the car (docs/physics-validation.md, section 7.7). The 
 the player's car every tick and resets the car if it ever fails (a safety net, counted in the
 debug API; a browser test shows normal play never uses it).
 
-**Consequences.** The reference lap is bit-identical (85.539 s before and after) and the AI
+**Consequences.** The reference lap is bit-identical (85.539 s before and after this change, and 84.969 s on both sides after the contact patch of #17) and the AI
 artefacts' behavioural fingerprints are unchanged: none of the new mechanisms acts on the racing
 line. Barrier contact costs four wall queries per substep. Barrier data that sits beyond where
 the lap frame is one-to-one would make the wall query ambiguous; on Monza every barrier offset

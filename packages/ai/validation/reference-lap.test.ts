@@ -40,6 +40,10 @@ describe('validation: reference lap, Monza (doc 2.1)', () => {
     expect(lap!.maxWheelsOff).toBeLessThan(4);
   });
 
+  it('keeps every tyre off grass and gravel (centre and both tread edges, every tick)', () => {
+    expect(lap!.grassSamples).toBe(0);
+  });
+
   it('keeps the MGU-K within its per-lap limits', () => {
     expect(lap!.deployMJ).toBeLessThanOrEqual(4 + 1e-6);
     expect(lap!.harvestMJ).toBeLessThanOrEqual(2 + 1e-6);

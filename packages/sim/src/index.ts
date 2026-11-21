@@ -16,6 +16,7 @@ export {
   createWallSample,
   resetControlInput,
   type ControlInput,
+  type PatchSample,
   type SurfaceHint,
   type SurfaceSample,
   type SurfaceSampler,
@@ -83,6 +84,15 @@ export {
   type InvariantLimits,
   type InvariantOptions,
 } from './invariants';
+export {
+  PATCH_ACROSS,
+  PATCH_ALONG,
+  PATCH_HINTS,
+  PATCH_POINTS,
+  createPatchSample,
+  samplePatch,
+  tyreVerticalForce,
+} from './contact';
 export {
   MAX_SUBSTEP,
   aeroCoefficients,

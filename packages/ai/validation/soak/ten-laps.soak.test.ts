@@ -24,6 +24,11 @@ describe('soak: ten consecutive reference laps, Monza', () => {
     for (const lap of result.laps) expect(lap.allOffTicks).toBe(0);
   });
 
+  it('keeps every tyre off grass and gravel on every lap', () => {
+    // Measured when written: 0 samples on each of the ten laps.
+    for (const lap of result.laps) expect(lap.grassSamples).toBe(0);
+  });
+
   it(`repeats its lap time within ${MAX_SPREAD} s`, () => {
     const times = result.laps.map((l) => l.time);
     expect(Math.max(...times) - Math.min(...times)).toBeLessThanOrEqual(MAX_SPREAD);
