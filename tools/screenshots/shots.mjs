@@ -7,6 +7,9 @@
 //                                                      1080p High and 844x390 Mobile, vsync off
 //   npm run shots -- monza --moving                    also a 10 s recording cut into frame strips
 //   npm run shots -- monza --lap                       also a full scripted lap and its HUD
+//   npm run shots -- monza --lifecycle                 also five High sessions on one page: no GL
+//                                                      object or program may leak (GPU twin of
+//                                                      tests/browser/lifecycle.spec.ts)
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
 //
 // Output: artifacts/screenshots/<git-sha>/<station>-<w>x<h>.png and report.json. The GPU is
@@ -493,6 +496,79 @@ async function moving(browser, report) {
   fs.rmSync(videoDir, { recursive: true, force: true });
 }
 
+/**
+ * The lifecycle check on the High preset, on the GPU (tests/browser/lifecycle.spec.ts runs it on
+ * Mobile in CI): five sessions started and quit on one page; GL objects counted at the API must
+ * not grow between sessions, and only the renderer's own state may remain (no geometry, at most
+ * two textures and two programs), with no console warnings or errors.
+ */
+async function lifecycle(browser, report) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const problems = [];
+  page.on('console', (m) => ['error', 'warning'].includes(m.type()) && problems.push(m.text()));
+  page.on('pageerror', (e) => problems.push(e.message));
+  await page.addInitScript(() => {
+    const balance = {};
+    globalThis.__glBalance = balance;
+    const proto = globalThis.WebGL2RenderingContext.prototype;
+    for (const kind of [
+      'Texture',
+      'Framebuffer',
+      'Program',
+      'Shader',
+      'Buffer',
+      'Renderbuffer',
+      'VertexArray',
+    ]) {
+      const create = proto[`create${kind}`];
+      const remove = proto[`delete${kind}`];
+      balance[kind] = 0;
+      proto[`create${kind}`] = function (...a) {
+        balance[kind]++;
+        return create.apply(this, a);
+      };
+      proto[`delete${kind}`] = function (...a) {
+        if (a[0]) balance[kind]--;
+        return remove.apply(this, a);
+      };
+    }
+  });
+  await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high`);
+  await page.waitForFunction(() => Boolean(globalThis.__undercut));
+  const after = [];
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => globalThis.__undercut.start());
+    await page.waitForFunction(
+      () => globalThis.document.documentElement.dataset.ready !== undefined,
+    );
+    await page.waitForFunction(() => globalThis.__undercut.state().tick > 20);
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await page.waitForFunction(
+      () => globalThis.document.documentElement.dataset.ready === undefined,
+    );
+    after.push(
+      await page.evaluate(() => ({
+        gl: { ...globalThis.__glBalance },
+        info: globalThis.__undercut.rendererInfo(),
+      })),
+    );
+  }
+  await context.close();
+  const same = after.every((a) => JSON.stringify(a) === JSON.stringify(after[0]));
+  const info = after[0].info;
+  const ok =
+    same &&
+    info.geometries === 0 &&
+    info.textures <= 2 &&
+    info.programs <= 2 &&
+    problems.length === 0;
+  report.lifecycle = { quality: 'high', ok, after, problems };
+  console.log(`  lifecycle (high, GPU): ${ok ? 'ok' : 'FAILED'} ${JSON.stringify(after[0])}`);
+  if (!ok)
+    report.errors.push(`High lifecycle check failed: ${JSON.stringify({ same, info, problems })}`);
+}
+
 async function lap(browser, report) {
   const vp = VIEWPORTS[0];
   const { context, page, errors } = await openGame(browser, vp);
@@ -534,6 +610,7 @@ try {
     if (!flag('no-shots')) await shots(browser, report);
     if (flag('lap')) await lap(browser, report);
     if (flag('moving')) await moving(browser, report);
+    if (flag('lifecycle')) await lifecycle(browser, report);
   } finally {
     await browser.close();
   }

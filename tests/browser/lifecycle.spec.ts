@@ -6,10 +6,11 @@ import { expect, test } from '@playwright/test';
  * minus every delete, per kind.
  */
 /*
- * Mobile and High: High adds the HDR pipeline's GTAO, bloom and SMAA passes and three shadow
- * cascades, so their releases are covered too (the software renderer in CI runs them all).
+ * Mobile here. The same check on High (GTAO, bloom, SMAA, three cascades) runs on the GPU in
+ * `npm run shots -- monza --lifecycle` (tools/screenshots/shots.mjs): five High sessions on
+ * CI's software renderer take minutes and starve the other browser tests.
  */
-for (const quality of ['mobile', 'high'] as const) {
+for (const quality of ['mobile'] as const) {
   test(`starting and quitting five sessions on one page leaks nothing and warns about nothing (${quality})`, async ({
     page,
   }, info) => {

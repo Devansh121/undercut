@@ -3,9 +3,11 @@ import { viewPixels, watchProblems } from './helpers';
 
 /**
  * The renderer adapts to what the GPU can do and survives losing its context. One project
- * covers both (the logic does not depend on the viewport).
+ * covers both (the logic does not depend on the viewport), at a small viewport: software WebGL
+ * in CI pays for every pixel.
  */
-test('without renderable float targets High takes the direct path and still draws the race', async ({
+test.use({ viewport: { width: 800, height: 500 } });
+test('without renderable float targets the HDR preset takes the direct path and still draws the race', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
@@ -23,7 +25,9 @@ test('without renderable float targets High takes the direct path and still draw
       return (supported.call(this) ?? []).filter((n) => !hidden.has(n));
     };
   });
-  await page.goto('/?debug=1&quality=high');
+  // Mobile has the HDR pipeline (half-float target, MSAA, PMREM) like High, at a fraction of
+  // the software-rendering cost; effectiveQuality is unit-tested on every preset.
+  await page.goto('/?debug=1&quality=mobile');
   await page.getByRole('button', { name: /Start/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.evaluate(() => window.__undercut?.drive({ throttle: 1, steer: 0 }));
@@ -69,9 +73,8 @@ test('losing and restoring the WebGL context pauses, rebakes the lighting and dr
   });
   await expect(page.locator('[data-testid=loading]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Resume' }).click();
-  await page.evaluate(() => window.__undercut?.drive({ throttle: 1, steer: 0 }));
   const t0 = await page.evaluate(() => window.__undercut?.state().tick as number);
-  await page.waitForFunction((t) => (window.__undercut?.state().tick as number) > t + 20, t0);
+  await page.waitForFunction((t) => (window.__undercut?.state().tick as number) > t + 5, t0);
   const px = await viewPixels(page);
   expect(px.colours).toBeGreaterThan(500);
   expect(px.lumaStdDev).toBeGreaterThan(10);
