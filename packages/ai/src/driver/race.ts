@@ -107,6 +107,8 @@ const SEE_DELAY = 0.12;
 const CORNER_CURVATURE = 1 / 150;
 /** Speed below which a car is still launching (or crawling) and does not start a pass, m/s. */
 const LAUNCHED = 25;
+/** Room to the edge a car turning round keeps before it changes direction, m. */
+const TURN_ROOM = 3.5;
 
 const TWO_PI = 2 * Math.PI;
 const wrapAngle = (a: number): number => a - TWO_PI * Math.floor((a + Math.PI) / TWO_PI);
@@ -744,32 +746,52 @@ export class RaceDriver implements Driver {
     out.drs = false;
     out.overtake = false;
     const turn = Math.abs(err) < 0.35 ? 0 : err > 0 ? -1 : 1;
-    if (this.carApproaching(view, s0, view.self.d, 150) && Math.abs(err) > 0.8) {
-      // Wait for the gap: stopped, out of the way.
+    // On the racing surface, wait for the cars coming; off it (run-off, at a barrier) there is
+    // no need.
+    const d = view.self.d;
+    const onTrack =
+      d < track.halfWidthAt(track.wrap(s0), 0) && -d < track.halfWidthAt(track.wrap(s0), 1);
+    if (onTrack && this.carApproaching(view, s0, d, 150) && Math.abs(err) > 0.8) {
+      // Wait for the gap: stopped, out of the way. Waiting is not being stuck.
+      this.stillTime = 0;
       out.steer = 0;
       out.throttle = 0;
       out.brake = 1;
       out.gearShift = 0;
       return;
     }
+    // A multi-point turn: forward on full lock until near the edge the car is heading for (or
+    // pressed against something), then back on the opposite lock (which turns the car the same
+    // way) until near the other edge, pressed again, or pointing the right way.
+    const half = track.wrap(s0);
+    const roomLeft = track.halfWidthAt(half, 0) - d;
+    const roomRight = d + track.halfWidthAt(half, 1);
+    const lat = Math.sin(err);
+    const ahead = lat > 0.3 ? roomLeft : lat < -0.3 ? roomRight : Infinity;
+    const behind = lat > 0.3 ? roomRight : lat < -0.3 ? roomLeft : Infinity;
     if (this.backTime > 0) {
-      // Backing away: into reverse, opposite lock (in reverse it turns the car the same way).
       this.backTime -= dt;
-      out.steer = -turn;
-      out.brake = 0;
-      out.gearShift = tel.gear >= 0 && !tel.shifting && Math.abs(v) < 1 ? -1 : 0;
-      out.throttle = tel.gear < 0 && v > -4 ? 0.35 : 0;
-      if (this.backTime <= 0) this.stillTime = 0;
-      return;
-    }
-    // Pressed against something going forward: back away.
-    if (this.stillTime > 1.5) {
-      this.backTime = 2.5;
+      if (behind < TURN_ROOM || Math.abs(err) < 0.5 || this.stillTime > 1.5) {
+        this.backTime = 0;
+        this.stillTime = 0;
+      }
+    } else if (ahead < TURN_ROOM || this.stillTime > 1.5) {
+      this.backTime = 4;
       this.stillTime = 0;
     }
+    // Gears: first to go forward, reverse to back, stepping down through the box from wherever
+    // the spin left it.
+    const shiftable = !tel.shifting && Math.abs(v) < 3;
+    if (this.backTime > 0) {
+      out.steer = -turn;
+      out.brake = v > 0.5 || v < -6 ? 0.6 : 0;
+      out.gearShift = shiftable && tel.gear >= 0 && (tel.gear > 0 || Math.abs(v) < 1) ? -1 : 0;
+      out.throttle = tel.gear < 0 && v > -4 ? 0.35 : 0;
+      return;
+    }
     out.steer = turn;
-    out.gearShift = tel.gear < 1 && !tel.shifting && Math.abs(v) < 1 ? 1 : 0;
-    out.throttle = tel.gear >= 1 && v < 4 ? 0.3 : 0;
+    out.gearShift = !shiftable ? 0 : tel.gear > 1 ? -1 : tel.gear < 1 && Math.abs(v) < 1 ? 1 : 0;
+    out.throttle = tel.gear === 1 && v < 4 ? 0.3 : 0;
     out.brake = v > 7 || v < -0.5 ? 0.4 : 0;
   }
 }
