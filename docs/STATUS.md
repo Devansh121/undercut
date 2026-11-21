@@ -80,11 +80,15 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Steering help applies to gamepad and touch (speed-sensitive lock); the keyboard's own axis shaping already narrows lock with speed, so keyboard steering is not scaled twice.
 - ACES filmic tone mapping rather than AgX: AgX washed the saturated livery blue toward white under the sun. Revisit with the real car and HDRIs in M2.
 - M2: Khronos PBR Neutral tone map rather than AgX (the visual direction's choice) or ACES. Compared on the same frames with the real car and HDRI: AgX desaturated liveries and grass, ACES shifted blue toward purple; Neutral keeps authored colours (`docs/render.md`).
-- M2: WebP textures with GPU mipmaps, not KTX2/Basis: the transcoder could not be verified on a phone-class GPU here. The first race is 8.0 MB on High, 3.1 MB on Mobile, well inside 25 MB.
+- M2: WebP textures with GPU mipmaps, not KTX2/Basis: the transcoder could not be verified on a phone-class GPU here. The first race is 7.8 MiB on High, 2.9 MiB on Mobile as the server sends it (Brotli for text), well inside 25 MB.
 - M2: Monza's sun elevation is the HDRI's own (48°), not the 35° in the visual direction, so shadows match the sky; the bearing (235°, south-west) is the visual direction's.
 - M2: the Poly Haven asphalt scan (fresh black tarmac, albedo 0.015) is lifted to about 0.08, the grey of a used circuit surface.
 - M2: grass is ambientCG Grass001 (a mowed lawn) instead of the survey's Poly Haven sparse_grass, which is dry grass over dirt.
-- M2: three cascades of shadow from three.js CSM with the cascade-blend fade, PCF; a blob contact shadow under the car on Mobile and Lite.
+- M2: three cascades of shadow from three.js CSM with the cascade-blend fade, PCF; a blob contact shadow under every car on Mobile and Lite, and on any preset when no key light casts shadows (night).
+- M2 review: the asset's near-black materials (`dark`, `carbon_matte` at 0.3 % albedo) are lifted to 2.5 % on load and bare carbon is #2a2c30 instead of the contract's #141518; the baked AO darkens albedo by three quarters of its depth rather than fully. Both depart from `docs/car-asset.md` for readable shadow sides; the car slice may prefer to change the asset.
+- M2 review: the High-preset lifecycle (leak) check runs on the GPU in `npm run shots -- monza --lifecycle`, not in CI: five High sessions on CI's software renderer took 2.6 minutes and starved the other browser tests. CI runs the Mobile one.
+- M2 review: the context-loss and float-fallback browser tests run the Mobile preset at 800x500 (it has the same HDR pipeline as High); the fallback rule itself is unit-tested on every preset.
+- M2 review: the cockpit camera exposes +0.4 EV over the circuit's exposure, as an onboard camera exposing for its interior would.
 - M2: other cars are drawn instanced and switch level by the car contract's projected-size thresholds with a 0.3 s dithered cross-fade; they are static in this milestone (AI cars driving come later), so their suspension links stay at rest.
 - M2: Ultra switches car levels later than the contract's High-preset thresholds (110 and 40 px instead of 160 and 50) to keep more detail; the other presets use the contract's numbers.
 - M2: the first-run benchmark keeps the starting preset when only a vsync-capped frame time is available and it holds 60 fps; it steps up only on measured GPU time.

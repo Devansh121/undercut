@@ -47,11 +47,30 @@ PR #11 landed with a second modelling pass and a revised contract: 36 / 23 / 11 
 - Compound ticks read on the sidewalls at the pit-lane station (two orange per group, Medium); numbers and codes sit on the nose and flanks.
 - The full grid's draw calls fell from 1016 to 468 per frame at 1080p High (shadow passes included); every vsync run still holds 60 fps.
 
+## Round 7: independent review and playtest (`rounds/r7-1440x900.jpg`, `shadow-side-before-after.jpg`)
+
+An independent review and playtest of the PR confirmed the frame rates and the asset pipeline, and found nine blocking problems. Each was fixed with a regression test where one is possible:
+
+1. No renderable float targets gave a black race on High: `effectiveQuality` now drops to the direct path (unit test on every preset, browser test with the extensions hidden).
+2. A restored WebGL context left lighting and timer queries broken: the session pauses, the view releases everything while the context is lost, and a fresh view is built on restore (browser test with `WEBGL_lose_context`, no warnings through quit).
+3. A failed load could leave Draco workers running: loads settle before release and late files are not decoded (browser test counts workers).
+4. Dynamic resolution ignored sustained overload: three slow frames in a row now count (unit test). Measuring afterwards showed the rule also reacted to the stalls right after a teleport, stepping the scale down and back with 50 ms reallocation hitches (1 % low 34 fps on High); a 60-sample warm-up after each start or snap and GPU-time-only sampling fixed it (unit test; High drive back to 59.5).
+5. GTAO leaked two programs per High session (three.js's `GTAOPass.dispose()` skips them): disposed explicitly; the High lifecycle check runs on the GPU (`--lifecycle`), Mobile's in CI.
+6. The budget counted gzip that the server never sent: the build precompresses, the server negotiates Brotli and gzip, and the check measures what the server sends; a browser test matches its inventory to a real first race byte for byte (Mobile, 47 requests).
+7. The bloom threshold moved with exposure: now scene-linear (unit test).
+8. Shadow-side detail went black. Measured: the HDRI's lower half was not black (a blue 0.15–0.26, above a matched ground bounce); the causes were compounded occlusion (baked AO in the albedo, again on reflections, squared on the clear coat, plus GTAO) and the asset's 0.3 % `dark` and `carbon_matte` materials. Occlusion is applied once per term, near-black materials get a 2.5 % albedo floor, the ground below the horizon is a matched bounce, GTAO is lighter, and the cockpit camera exposes +0.4 EV. In the cockpit the share of near-black pixels fell from 56 % to 32 %; before and after on the cockpit, chase and trackside stations in `shadow-side-before-after.jpg`.
+9. Cars floated at night on High: contact shadows now go under every car whenever no key light casts shadows (`time-of-day-night.jpg`).
+
+Also done: cascade registration is enforced (prop registry hook, a development-mode check), no per-frame allocations in the view, fleet and light pool, preset-tied grain (0.3–0.5 %, was 1.2 %), fabric gloves, a run-time sky dither against banding, and restrained roughness variation and rear road dirt on the paint.
+
+- Thumbnail: yes for every station; the cockpit reads now.
+- At full size: the surroundings first, then the items below.
+
 ## Remaining giveaways, ranked
 
 1. **Undressed surroundings.** A flat green plane to the horizon, a dark band of barrier tops, no trees, stands, boards, fences, marshal posts or skyline. Expected: the dressing slice uses the prop registry, board material and time-of-day hooks in `docs/render.md`.
-2. **Cockpit interior.** Better with the gloves and wheel of the merged car, but still dark below the wheel; a small fill for the cockpit camera would lift it.
-3. **Paint reads slightly plastic at distance.** Clear coat and base are right up close (pit-lane station), but from the chase camera large panels are uniform. A subtle flake or orange-peel normal and dirt build-up toward the rear would help.
+2. **Cockpit interior.** Readable now (round 7), but plain: no belts or fabric texture, and the wheel's grips are simple shapes. A modelling pass on the car.
+3. **Paint is still clean for a race car.** Roughness variation and rear road dirt are in (round 7); rubber pick-up on the sidepods and brake dust on the wheels are not.
 4. **Grass is uniform at mid distance.** Macro variation breaks tiling, but there are no mowing stripes, verge wear, tyre tracks or patches of dry grass where real circuits have them.
 5. **Far-field haze meets a flat horizon.** The height fog is tinted by the sky and works, but with no terrain or tree line the horizon is a straight edge.
 6. **Night is a proof, not a look.** Eight pooled point lights near the camera light the track; further out it is dark. A circuit at night needs the baked track-lighting texture described in `docs/render.md` and emissive fixtures.
