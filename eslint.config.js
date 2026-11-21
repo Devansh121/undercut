@@ -7,7 +7,14 @@ import tseslint from 'typescript-eslint';
  * (never its own layer's siblings, never higher). services/rooms is separate: it may
  * use core and protocol only. Change this together with AGENTS.md.
  */
-const LAYERS = [['core'], ['sim'], ['track', 'ai'], ['protocol'], ['input', 'audio', 'render']];
+const LAYERS = [
+  ['core'],
+  ['sim'],
+  ['track', 'ai'],
+  ['race'],
+  ['protocol'],
+  ['input', 'audio', 'render'],
+];
 const ALL = LAYERS.flat();
 
 // track and ai share a layer, but ai drives cars on a track, so it may read track.
@@ -46,7 +53,7 @@ const layerConfigs = LAYERS.flatMap((layer, index) =>
 );
 
 // Pure packages: no wall clock, no unseeded randomness, no DOM.
-const PURE = ['core', 'sim', 'track', 'ai', 'protocol'];
+const PURE = ['core', 'sim', 'track', 'ai', 'race', 'protocol'];
 const pureConfig = {
   files: PURE.map((name) => `packages/${name}/src/**/*.ts`),
   rules: {

@@ -96,7 +96,8 @@ test.describe('drive', () => {
   test('times the start line and a sector line', async ({ drive: { page, problems } }) => {
     await page.evaluate(() => {
       const u = window.__undercut;
-      u?.teleport(5560, 0, 250);
+      // 72 m before Monza's timing line (the control line, s = 5472.5).
+      u?.teleport(5400, 0, 250);
       u?.autopilot(true);
       u?.setTimeScale(4);
     });

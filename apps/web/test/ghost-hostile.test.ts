@@ -163,7 +163,7 @@ describe('hostile stored ghosts and records (fuzz)', () => {
     const track = loadMonza();
     const raws: unknown[] = [
       {
-        version: 2,
+        version: 3,
         lap: 90,
         lapSectors: [30, 30, 30],
         bestSectors: [30, 30, 30],
@@ -171,7 +171,7 @@ describe('hostile stored ghosts and records (fuzz)', () => {
         date: '',
       },
       {
-        version: 2,
+        version: 3,
         lap: 90,
         lapSectors: [30, 30, 30],
         bestSectors: [30, 30, 30],
@@ -179,16 +179,16 @@ describe('hostile stored ghosts and records (fuzz)', () => {
         date: '',
       },
       {
-        version: 2,
+        version: 3,
         lap: 90,
         lapSectors: [30, 30, 30],
         bestSectors: [30, 30, 30],
         ghost: 12,
         date: '',
       },
-      { version: 2, lap: 'x', lapSectors: [30], bestSectors: [30] },
+      { version: 3, lap: 'x', lapSectors: [30], bestSectors: [30] },
       {
-        version: 2,
+        version: 3,
         lap: 90,
         lapSectors: [30, 30, 30],
         bestSectors: [30, 30, 30],
