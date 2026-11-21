@@ -162,8 +162,19 @@ fs.writeFileSync(
     2,
   )}\n`,
 );
+const propCatalogue = JSON.parse(
+  fs.readFileSync(path.join(root, 'packages/render/data/props.catalog.json'), 'utf8'),
+);
+// Reserve every prop LOD until the dressing consumer defines the fetched subset. Keep the
+// first-race inventory exact: these files are delivered but not loaded by the game yet.
+const propReserve = propCatalogue.totalBytes;
 const checks = [
   ['JS, as sent', jsSent, budget.jsGzipMaxBytes],
+  [
+    'First race plus complete prop kit reserve',
+    worst.total + propReserve,
+    budget.firstRaceTransferMaxBytes,
+  ],
   [
     `First-race transfer (${worst.name}, the largest preset)`,
     worst.total,

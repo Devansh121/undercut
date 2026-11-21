@@ -1,3 +1,4 @@
+import { format } from 'prettier';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -59,7 +60,7 @@ for (const prop of catalog.props) {
 catalog.totalBytes = total;
 fs.writeFileSync(
   'packages/render/data/props.catalog.json',
-  `${JSON.stringify(catalog, null, 2)}\n`,
+  await format(JSON.stringify(catalog), { parser: 'json' }),
 );
 fs.writeFileSync('assets/MANIFEST.json', `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`${catalog.props.length} props, ${total} bytes; root ${root}`);

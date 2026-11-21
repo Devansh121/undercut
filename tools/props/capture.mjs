@@ -1,5 +1,6 @@
 /* global window, document */
 import fs from 'node:fs';
+import { format } from 'prettier';
 import { createServer } from 'vite';
 import { chromium } from '@playwright/test';
 
@@ -30,6 +31,16 @@ try {
       });
       console.log(`${id} ${mode}`);
     }
+  await page.evaluate(() => window.corridor());
+  await page.screenshot({
+    path: 'docs/evidence/m2-models/corridor.jpg',
+    type: 'jpeg',
+    quality: 90,
+  });
+  fs.writeFileSync(
+    'docs/evidence/m2-models/corridor.json',
+    JSON.stringify(await page.evaluate(() => window.corridorStats), null, 2) + '\n',
+  );
   const gpu = await page.evaluate(() => {
     const gl = document.querySelector('canvas').getContext('webgl2');
     const e = gl.getExtension('WEBGL_debug_renderer_info');
@@ -50,6 +61,10 @@ try {
       2,
     ) + '\n',
   );
+  for (const name of ['capture', 'corridor']) {
+    const file = `docs/evidence/m2-models/${name}.json`;
+    fs.writeFileSync(file, await format(fs.readFileSync(file, 'utf8'), { parser: 'json' }));
+  }
 } finally {
   await browser.close();
   await server.close();
