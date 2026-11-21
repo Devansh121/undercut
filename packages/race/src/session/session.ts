@@ -29,7 +29,7 @@ import { TrackLimits, type WheelsOffCounter } from '../limits-geometry';
 import { buildResult, type EntrantInfo, type SessionResult } from '../results';
 import type { RaceRules } from '../rules';
 import type { TimingBests } from '../timing/lap-timer';
-import type { CarController, ControlContext } from './controllers';
+import type { CarController, ControlContext, ControllerState } from './controllers';
 
 /** Sim step: 240 Hz (ADR 0007). */
 export const RACE_STEP = 1 / 240;
@@ -73,9 +73,16 @@ export interface RaceSessionOptions {
 }
 
 export interface RaceSessionSnapshot {
-  version: 1;
+  version: 2;
   control: RaceControlSnapshot;
   world: { tick: number; time: number; rng: RngState; cars: number[][] };
+  /** Each car's driver (AI memory, pit-lane follower). */
+  controllers: ControllerState[];
+  /**
+   * Search hints of every projection per car (surface sampling per wheel, the car's lap and
+   * pit-lane position, the track-limit wheels): caches, kept so a restore is bit-identical.
+   */
+  hints: { surface: number[]; lap: number; pit: number; limits: number[] | null }[];
 }
 
 /**
@@ -327,7 +334,7 @@ export class RaceSession {
 
   snapshot(): RaceSessionSnapshot {
     return {
-      version: 1,
+      version: 2,
       control: this.control.snapshot(),
       world: {
         tick: this.world.tick,
@@ -335,18 +342,29 @@ export class RaceSession {
         rng: this.world.rng.getState(),
         cars: this.world.cars.map((c) => Array.from(snapshotCar(c.state))),
       },
+      controllers: this.cars.map(
+        (c) => JSON.parse(JSON.stringify(c.controller.snapshot())) as ControllerState,
+      ),
+      hints: this.world.cars.map((c, i) => ({
+        surface: c.state.hints.map((h) => h.index),
+        lap: this.hints[i]!.index,
+        pit: this.pitHints[i]!.index,
+        limits: this.limits[i]!.hintState?.() ?? null,
+      })),
     };
   }
 
   /**
-   * Restore a snapshot taken from a session built with the same options. The drivers' own
-   * memory is not part of it: they are reset and pick up from the restored cars.
+   * Restore a snapshot taken from a session built with the same options (the same track, cars,
+   * drivers and seed): the rules, the world, every driver's memory and every cache, so the
+   * session continues exactly as the original would have.
    */
   restore(snap: RaceSessionSnapshot): void {
-    if (snap.version !== 1)
+    if (snap.version !== 2)
       throw new Error(`unknown session snapshot version ${String(snap.version)}`);
     if (
       snap.world.cars.length !== this.world.cars.length ||
+      snap.controllers.length !== this.cars.length ||
       snap.world.cars[0]?.length !== CAR_SNAPSHOT_LENGTH
     ) {
       throw new Error('snapshot does not match this session');
@@ -357,12 +375,15 @@ export class RaceSession {
     this.world.rng.setState(snap.world.rng);
     this.world.cars.forEach((c, i) => {
       restoreCar(c.state, snap.world.cars[i]!);
+      const h = snap.hints[i]!;
+      c.state.hints.forEach((hint, k) => (hint.index = h.surface[k] ?? -1));
       readCarPose(c.state, c.pose);
       readCarPose(c.state, c.previousPose);
-      this.hints[i]!.index = -1;
-      this.pitHints[i]!.index = -1;
-      this.limits[i]!.reset();
-      this.cars[i]!.controller.reset();
+      this.hints[i]!.index = h.lap;
+      this.pitHints[i]!.index = h.pit;
+      if (h.limits && this.limits[i]!.setHintState) this.limits[i]!.setHintState!(h.limits);
+      else this.limits[i]!.reset();
+      this.cars[i]!.controller.restore(snap.controllers[i]!);
       this.locate(i);
     });
   }

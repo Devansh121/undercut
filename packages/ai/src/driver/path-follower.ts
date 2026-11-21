@@ -57,6 +57,20 @@ export interface FollowPoint {
   v: number;
 }
 
+/** A follower's path and carried state, as plain JSON. */
+export interface FollowerState {
+  x: number[];
+  z: number[];
+  cap: (number | null)[];
+  dist: number[];
+  stopAtEnd: boolean;
+  hint: number;
+  throttleCap: number;
+  brakeCap: number;
+  shiftTimer: number;
+  progress: number;
+}
+
 export class PathFollower {
   readonly gains: FollowerGains;
   private readonly params: CarParams;
@@ -130,6 +144,35 @@ export class PathFollower {
     this.throttleCap = 1;
     this.brakeCap = 1;
     this.shiftTimer = 0;
+  }
+
+  /** The path and everything carried between ticks (Infinity caps as null), for snapshots. */
+  getState(): FollowerState {
+    return {
+      x: Array.from(this.x),
+      z: Array.from(this.z),
+      cap: Array.from(this.cap, (v) => (Number.isFinite(v) ? v : null)),
+      dist: Array.from(this.dist),
+      stopAtEnd: this.stopAtEnd,
+      hint: this.hint,
+      throttleCap: this.throttleCap,
+      brakeCap: this.brakeCap,
+      shiftTimer: this.shiftTimer,
+      progress: this.progressValue,
+    };
+  }
+
+  setState(s: FollowerState): void {
+    this.x = Float64Array.from(s.x);
+    this.z = Float64Array.from(s.z);
+    this.cap = Float64Array.from(s.cap, (v) => (v === null ? Infinity : v));
+    this.dist = Float64Array.from(s.dist);
+    this.stopAtEnd = s.stopAtEnd;
+    this.hint = s.hint;
+    this.throttleCap = s.throttleCap;
+    this.brakeCap = s.brakeCap;
+    this.shiftTimer = s.shiftTimer;
+    this.progressValue = s.progress;
   }
 
   /** Distance left to the end of the path, m. */

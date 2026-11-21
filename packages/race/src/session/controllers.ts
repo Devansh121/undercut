@@ -1,4 +1,4 @@
-import { PathFollower, type Driver } from '@undercut/ai';
+import { PathFollower, type Driver, type DriverMemory, type FollowerState } from '@undercut/ai';
 import { NEUTRAL_INPUT, type CarParams, type CarTelemetry, type ControlInput } from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import type { CircuitInfo } from '../circuit';
@@ -34,8 +34,24 @@ export interface CarController {
   /** The session engages the pit limiter for this car in the pit lane. */
   readonly autoLimiter: boolean;
   control(ctx: ControlContext, out: ControlInput): void;
-  /** Forget carried state (after a teleport or a restore). */
+  /** Forget carried state (after a teleport). */
   reset(): void;
+  /** Everything carried between ticks, as plain JSON; restoring it continues bit for bit. */
+  snapshot(): ControllerState;
+  restore(state: ControllerState): void;
+}
+
+/** A controller's carried state, as plain JSON. */
+export interface ControllerState {
+  driver?: DriverMemory;
+  launching?: boolean;
+  launchCap?: number;
+  pit?: PitLaneState | null;
+}
+
+interface PitLaneState {
+  mode: 'none' | 'in' | 'out';
+  follower: FollowerState;
 }
 
 function hold(out: ControlInput, steer = 0): void {
@@ -73,6 +89,15 @@ class PitLaneDriving {
   reset(): void {
     this.mode = 'none';
     this.follower.reset();
+  }
+
+  getState(): PitLaneState {
+    return { mode: this.mode, follower: this.follower.getState() };
+  }
+
+  setState(s: PitLaneState): void {
+    this.mode = s.mode;
+    this.follower.setState(s.follower);
   }
 
   /** Writes pit-lane driving into `out` and returns true while the pit lane has the car. */
@@ -163,6 +188,23 @@ export class AiController implements CarController {
     this.pit.reset();
   }
 
+  snapshot(): ControllerState {
+    return {
+      driver: this.driver.snapshot(),
+      launching: this.launching,
+      launchCap: this.launchCap,
+      pit: this.pit.getState(),
+    };
+  }
+
+  restore(s: ControllerState): void {
+    if (!s.driver || !s.pit) throw new Error('not an AI controller state');
+    this.driver.restore(s.driver);
+    this.launching = s.launching === true;
+    this.launchCap = s.launchCap ?? this.launchCap;
+    this.pit.setState(s.pit);
+  }
+
   control(ctx: ControlContext, out: ControlInput): void {
     const c = ctx.control;
     const i = ctx.car;
@@ -227,6 +269,15 @@ export class InputController implements CarController {
 
   reset(): void {
     this.pit?.reset();
+  }
+
+  /** The assisted pit lane's state; the player's own input carries nothing here. */
+  snapshot(): ControllerState {
+    return { pit: this.pit ? this.pit.getState() : null };
+  }
+
+  restore(s: ControllerState): void {
+    if (this.pit && s.pit) this.pit.setState(s.pit);
   }
 
   control(ctx: ControlContext, out: ControlInput): void {

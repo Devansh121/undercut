@@ -12,6 +12,9 @@ export interface WheelsOffCounter {
   wheelsOff(car: CarState): number;
   /** Forget cached search positions (after a teleport). */
   reset(): void;
+  /** Cached search positions, for snapshots that continue bit for bit (optional). */
+  hintState?(): number[];
+  setHintState?(hints: readonly number[]): void;
 }
 
 /**
@@ -40,6 +43,14 @@ export class TrackLimits implements WheelsOffCounter {
 
   reset(): void {
     for (const h of this.hints) h.index = -1;
+  }
+
+  hintState(): number[] {
+    return this.hints.map((h) => h.index);
+  }
+
+  setHintState(hints: readonly number[]): void {
+    this.hints.forEach((h, i) => (h.index = hints[i] ?? -1));
   }
 
   /** How many wheels are wholly beyond the track-limit lines. Allocation-free. */
