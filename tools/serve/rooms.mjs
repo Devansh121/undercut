@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from './ports.mjs';
@@ -60,6 +62,10 @@ export function createRoomsService({
   vars = {},
 }) {
   const url = `http://127.0.0.1:${port}`;
+  // Each instance keeps its Durable Object state (SQLite) in a directory of its own: the shared
+  // default (.wrangler/state) let two runtimes started side by side (the test suite's service and
+  // a test's own server) lock each other's databases (SQLITE_BUSY).
+  const persist = fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
   const cancel = new AbortController();
   /** @type {import('node:child_process').ChildProcess | null} */
   let child = null;
@@ -90,6 +96,8 @@ export function createRoomsService({
         String(port),
         '--inspector-port',
         String(inspectorPort),
+        '--persist-to',
+        persist,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
@@ -146,7 +154,10 @@ export function createRoomsService({
 
   async function doStop() {
     cancel.abort();
-    if (!child) return;
+    if (!child) {
+      fs.rmSync(persist, { recursive: true, force: true });
+      return;
+    }
     const pgid = child.pid;
     if (!childExited) {
       signalGroup(pgid, 'SIGTERM');
@@ -162,6 +173,7 @@ export function createRoomsService({
       await new Promise((r) => setTimeout(r, 25));
     }
     process.off('exit', killOnExit);
+    fs.rmSync(persist, { recursive: true, force: true });
   }
 
   return {
