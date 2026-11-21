@@ -1,0 +1,34 @@
+{
+  "title": "Full-load sweep from idle to the limiter",
+  "listen": "One clean pitch sweep at full load, for the harmonic ladder; no road noise.",
+  "durationS": 8,
+  "samplePeakDbfs": -8.49,
+  "truePeakDbtp": -8.46,
+  "loudnessLufs": -17,
+  "rmsDbfs": -20.3,
+  "dcOffset": 9.14e-7,
+  "maxStep": 0.1093,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 155,
+    "medianErrorPct": 0.062,
+    "p95ErrorPct": 0.089,
+    "maxErrorPct": 0.1
+  },
+  "layersDbfs": {
+    "exhaust": -21,
+    "intake": -33.4,
+    "combustion": -39.2,
+    "turbo": -44.8,
+    "ers": null,
+    "crackle": null,
+    "shift": null,
+    "roll": null,
+    "wind": null,
+    "scrub": null,
+    "squeal": null,
+    "kerb": null,
+    "scrape": null
+  },
+  "realtimeRatio": 39.8
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Slow corner: scrub, squeal and a kerb strike",
+  "listen": "Brake to about 85 km/h, understeer scrub then squeal, a kerb rumble with a plank tap at the apex, wheelspin squeal on exit, one upshift.",
+  "durationS": 6,
+  "samplePeakDbfs": -6.48,
+  "truePeakDbtp": -6.43,
+  "loudnessLufs": -18.3,
+  "rmsDbfs": -21.6,
+  "dcOffset": 0.00000169,
+  "maxStep": 0.1117,
+  "limiterMinGainDb": 0,
+  "tracking": {
+    "windows": 42,
+    "medianErrorPct": 0.029,
+    "p95ErrorPct": 0.118,
+    "maxErrorPct": 0.242
+  },
+  "layersDbfs": {
+    "exhaust": -22.9,
+    "intake": -36.3,
+    "combustion": -42.7,
+    "turbo": -48.1,
+    "ers": null,
+    "crackle": null,
+    "shift": -72.5,
+    "roll": -59.2,
+    "wind": -51,
+    "scrub": -31.9,
+    "squeal": -31.1,
+    "kerb": -40.3,
+    "scrape": -56.3
+  },
+  "realtimeRatio": 33.7
+}
