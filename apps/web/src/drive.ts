@@ -310,7 +310,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           say(
             {
               tag: 'Lap invalid',
-              text: e.reason === 'reset' ? 'Reset to track' : 'Track limits',
+              text: e.reason === 'limits' ? 'Track limits' : 'Reset to track',
               tone: 'invalid',
             },
             3,

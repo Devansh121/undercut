@@ -4,7 +4,8 @@
  * drive the game through it instead of timing key presses.
  *
  *   await __undercut.start()                 // launch screen -> Time Trial at Monza
- *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera
+ *   __undercut.state()                       // screen, phase, lap, timing, s/d, camera,
+ *                                            // safety-net resets
  *   __undercut.telemetry()                   // CarTelemetry (SI units)
  *   __undercut.teleport(s, d?, kmh?)         // place the car on the lap; timing restarts
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
@@ -101,6 +102,7 @@ export function installDebugApi(
       surface: s.surfaceUnderCar(),
       wheelsOff: s.wheelsOff,
       drsAvailable: s.drsAvailable,
+      safetyResets: s.safetyResets,
       camera: d.view.cameraName,
       device: s.device,
       assists: { ...s.assists },

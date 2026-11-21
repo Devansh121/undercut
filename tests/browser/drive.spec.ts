@@ -155,6 +155,82 @@ test.describe('drive', () => {
     expect(problems).toEqual([]);
   });
 
+  test('stays sane off the track: stops at the barrier with a bounded pose', async ({
+    drive: { page, problems },
+  }, testInfo) => {
+    // The owner's run: last grid slot, 30 m/s, wheel straight, full throttle. The track bends
+    // away and the car leaves it on the run to the first chicane.
+    const slot = track.gridSlots[track.gridSlots.length - 1]!;
+    await page.evaluate(
+      ([s, d]) => {
+        window.__undercut?.teleport(s, d, 108);
+        window.__undercut?.drive({ throttle: 1, steer: 0 });
+        window.__undercut?.setTimeScale(8);
+      },
+      [slot.s, slot.d] as const,
+    );
+    interface Pose {
+      s: number;
+      d: number;
+      time: number;
+      safetyResets: number;
+      pitch: number;
+      roll: number;
+      rideHeightFront: number;
+      rideHeightRear: number;
+      wallContact: boolean;
+      wallImpact: number;
+      speed: number;
+    }
+    const pose = (): Promise<Pose> =>
+      page.evaluate(() => {
+        const st = window.__undercut!.state();
+        const t = window.__undercut!.telemetry();
+        return { ...st, ...t } as unknown as Pose;
+      });
+    const seen: Pose[] = [];
+    let touched = false;
+    const t0 = (await pose()).time;
+    // Up to 40 s of sim time, as in the owner's run, or 5 s past the first barrier contact.
+    let touchedAt = Infinity;
+    for (;;) {
+      const p = await pose();
+      seen.push(p);
+      if (p.wallContact && !touched) {
+        touched = true;
+        touchedAt = p.time;
+      }
+      if (p.time - t0 > 40 || p.time > touchedAt + 5) break;
+      await page.waitForTimeout(100);
+    }
+    expect(touched, 'the car reached the barrier').toBe(true);
+    // The game checks the sim's invariants every tick; the safety net never had to act.
+    expect(seen.at(-1)!.safetyResets).toBe(0);
+    for (const p of seen) {
+      expect(Math.abs(p.pitch)).toBeLessThan(0.2);
+      expect(Math.abs(p.roll)).toBeLessThan(0.2);
+      expect(Math.max(p.rideHeightFront, p.rideHeightRear)).toBeLessThan(0.65);
+      // The car's centre is always inside the barrier line on its side.
+      const side = p.d >= 0 ? 0 : 1;
+      expect(Math.abs(p.d)).toBeLessThan(track.barrierAt(p.s, side));
+    }
+    // Lift off and brake: the car comes to rest against the barrier.
+    await page.evaluate(() => window.__undercut?.drive({ throttle: 0, brake: 1, steer: 0 }));
+    await expect
+      .poll(async () => Math.abs((await pose()).speed), { timeout: 20_000 })
+      .toBeLessThan(0.5);
+    await page.evaluate(() => {
+      window.__undercut?.setTimeScale(1);
+      window.__undercut?.camera('chase-far');
+    });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: testInfo.outputPath('car-at-barrier.png') });
+    const rest = await pose();
+    expect(rest.safetyResets).toBe(0);
+    await page.evaluate(() => window.__undercut?.drive(null));
+    expect(problems).toEqual([]);
+  });
+
   test('switches cameras live on the camera key and from the pause menu', async ({
     drive: { page, problems },
   }) => {

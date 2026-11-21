@@ -196,6 +196,40 @@ describe('GameLoop and DriveSession', () => {
     expect(events.some((e) => e.type === 'invalidated')).toBe(true);
   });
 
+  it('never needs the safety net in normal driving', () => {
+    const { loop, driver, session } = setup();
+    driver.control.throttle = 1;
+    run(loop, 6);
+    driver.control.steer = 0.4;
+    run(loop, 6);
+    expect(session.safetyResets).toBe(0);
+  });
+
+  it('puts a car with a broken pose back on the track, invalidates the lap and counts it', () => {
+    const { loop, driver, session } = setup();
+    driver.control.throttle = 1;
+    run(loop, 4);
+    expect(session.timer.valid).toBe(true);
+    const s = session.s;
+    // Whatever produced it, a pose outside the invariants must never reach the player.
+    session.car.state.pitch = 1.5;
+    session.car.state.heaveRate = 40;
+    const events = run(loop, 1 / 60);
+    expect(session.safetyResets).toBe(1);
+    expect(session.timer.valid).toBe(false);
+    expect(events).toContainEqual({ type: 'invalidated', reason: 'safety' });
+    expect(events).toContainEqual({ type: 'reset', reason: 'safety' });
+    expect(Math.abs(session.car.state.pitch)).toBeLessThan(0.1);
+    expect(Math.abs(session.d)).toBeLessThan(0.05);
+    expect(Math.abs(track.lapDelta(session.s, s))).toBeLessThan(5);
+    // A NaN state is caught too, and the car goes back to the last place it was sane.
+    session.car.state.x = Number.NaN;
+    run(loop, 1 / 60);
+    expect(session.safetyResets).toBe(2);
+    expect(Number.isFinite(session.s)).toBe(true);
+    expect(Math.abs(track.lapDelta(session.s, s))).toBeLessThan(5);
+  });
+
   it('restart lap returns to the rolling start with timing cleared', () => {
     const { loop, driver, session } = setup();
     driver.control.throttle = 1;
