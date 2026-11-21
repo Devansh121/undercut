@@ -69,7 +69,7 @@ function row(label: string, result: number, unit: string, digits = 2): ReportRow
 function targetRow(id: string, value: number, digits = 2): ReportRow {
   const t = TARGETS[id]!;
   return {
-    label: t.label,
+    label: t.fit ? `${t.label} (the fit)` : t.label,
     result: num(value, digits),
     unit: t.unit,
     target: t.stated,

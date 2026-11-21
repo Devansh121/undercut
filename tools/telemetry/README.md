@@ -16,12 +16,12 @@ npm run telemetry -- bench             # real-time factor, 1 and 20 cars
 | --- | --- |
 | `standing-start` | Launch to 300 km/h, medium trim, 105 kg fuel, driver holds wheelspin; best of 5 (`--slip` for one) |
 | `top-speed` | Long flat straight from 200 km/h per trim, DRS open and closed, Monza air |
-| `braking` | The published braking events, then threshold stops from `--speeds` in Monza trim |
+| `braking` | The published braking events (with the event pedal profile), then threshold stops from `--speeds` in Monza trim |
 | `cornering` | Constant-speed sweeps to sustained lateral g per trim (`--trim`, `--speeds`) |
 | `step-steer` | Step steer at 80, 150 and 250 km/h: rise time, overshoot, sideslip |
-| `lift-off` | Lift the throttle mid-corner with the wheel held; pass means no spin |
+| `lift-off` | Lift the throttle mid-corner at 60–95 % of the lateral limit with the wheel held; pass means no spin |
 | `coast-down` | Neutral from 320 km/h: deceleration against speed |
-| `assists` | Full throttle out of a slow corner with TC 0–3, full brake in a turn with ABS 0–3 |
+| `assists` | Full throttle out of a slow corner and full brake in a turn (both at 85 % of the limit) with TC or ABS 0–3; full-pedal straight stop from 300 km/h with ABS 0–3 |
 | `validate` | The table of every target: result, stated target, band, verdict (pass, gap, fail) |
 
 Each run writes `<name>.csv` per trace (40 Hz rows: speed, rpm, gear, pedals, g, per-wheel
