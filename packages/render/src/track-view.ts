@@ -2,15 +2,11 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  DataTexture,
   DoubleSide,
-  FloatType,
   Group,
-  LinearFilter,
   Mesh,
   MeshStandardMaterial,
-  RedFormat,
-  RepeatWrapping,
+  Vector2,
   type Material,
   type Texture,
 } from 'three';
@@ -21,14 +17,47 @@ import {
   type MeshData,
   type Track,
 } from '@undercut/track';
+import {
+  LINE_RANGE,
+  lapTexture,
+  macroNoise,
+  surfaceMaterial,
+  type PbrSet,
+} from './materials/surface';
 import type { Quality } from './quality';
 import { estimateRacingLine } from './racing-line';
-import { fenceTexture, noiseColourTexture, noiseGreyTexture, noiseNormalTexture } from './textures';
+import { fenceTexture } from './textures';
+
+/** The texture sets a circuit's surfaces use (ids in assets/index.json). */
+export const TRACK_TEXTURE_IDS = [
+  'asphalt',
+  'asphalt_worn',
+  'concrete',
+  'grass',
+  'gravel',
+  'metal',
+  'rubber',
+] as const;
+export type TrackTextureId = (typeof TRACK_TEXTURE_IDS)[number];
+
+export interface TrackViewOptions {
+  track: Track;
+  quality: Quality;
+  sets: Readonly<Record<TrackTextureId, PbrSet>>;
+  /** Racing-line lateral offset per lap sample (m), e.g. from the AI's line; estimated if absent. */
+  racingLine?: ArrayLike<number> | null;
+}
+
+const MAX_GRID = 24;
+/** Linear gain on the asphalt set's colour (see buildMaterials). */
+const ASPHALT_GAIN = [4.9, 5.4, 5.9] as const;
 
 /**
- * The circuit as three.js meshes: `buildTrackMeshes` output split by surface, each surface with
- * its own physically based material. All textures are procedural (no third-party images in M1);
- * UVs from the track package are in metres, so texture scale is a repeat per metre.
+ * The circuit as three.js meshes: `buildTrackMeshes` output split by surface, each surface with a
+ * physically based material over a real texture set (docs/asset-survey.md), plus what wear puts
+ * on a circuit: a rubbered racing line and marbles off it in the corners, dust toward the
+ * unused edges, oil and launch marks on the grid, worn paint and rubber on the kerbs. Track UVs
+ * are in metres (u = d across, v = s along the lap), so texture scale is the set's real size.
  */
 export class TrackView {
   readonly group = new Group();
@@ -36,10 +65,11 @@ export class TrackView {
   private readonly textures: Texture[] = [];
   private readonly geometries: BufferGeometry[] = [];
 
-  constructor(track: Track, quality: Quality) {
+  constructor(options: TrackViewOptions) {
+    const { track, quality } = options;
     this.group.name = 'track';
     const meshes = buildTrackMeshes(track, MESH_LOD[quality.meshLod]);
-    const mat = this.buildMaterials(track, quality);
+    const mat = this.buildMaterials(options);
     const add = (data: MeshData, name: string, receive = true, cast = false): void => {
       for (const [surface, geometry] of splitBySurface(data)) {
         const material = mat.get(surface) ?? mat.get(MeshSurface.Asphalt);
@@ -48,7 +78,6 @@ export class TrackView {
         mesh.name = `${name}:${surface}`;
         mesh.receiveShadow = receive;
         mesh.castShadow = cast;
-        // The track is static: compute matrices once.
         mesh.matrixAutoUpdate = false;
         mesh.updateMatrix();
         this.geometries.push(geometry);
@@ -65,234 +94,265 @@ export class TrackView {
     add(meshes.barriers, 'barriers', true, quality.sceneryShadows);
   }
 
-  private tex<T extends Texture>(t: T): T {
-    this.textures.push(t);
-    return t;
-  }
-
-  private material(m: MeshStandardMaterial): MeshStandardMaterial {
+  private keep<T extends Material>(m: T): T {
     this.materials.push(m);
     return m;
   }
 
-  private buildMaterials(track: Track, q: Quality): Map<number, Material> {
-    const size = q.textureSize;
-    const an = q.anisotropy;
-    const repeat = (t: Texture, metres: number): Texture => {
-      t.repeat.set(1 / metres, 1 / metres);
-      return t;
-    };
+  private buildMaterials({ track, sets, racingLine }: TrackViewOptions): Map<number, Material> {
     const map = new Map<number, Material>();
+    const macro = macroNoise();
+    this.textures.push(macro);
 
-    // Asphalt: warm grey aggregate, a fine normal map, and a rubbered racing line drawn in the
-    // shader from an estimate of the line (a 1D texture of lateral offset along s).
-    const asphaltMap = this.tex(
-      repeat(
-        noiseColourTexture(
-          size,
-          11,
-          '#4a4846',
-          '#6d6a66',
-          { cells: 16, speckle: 0.06, speckleColour: '#8f8a83' },
-          an,
-        ),
-        3,
+    // Lap lookup: racing line and corner strength (curvature smoothed over ±30 m, so the marble
+    // zone covers entry to exit).
+    const n = track.lap.count;
+    const line = racingLine && racingLine.length === n ? racingLine : estimateRacingLine(track);
+    const raw = new Float64Array(n);
+    for (let i = 0; i < n; i++) raw[i] = track.curvatureAt(i * track.lap.step);
+    const reach = Math.round(30 / track.lap.step);
+    const curv = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let acc = 0;
+      for (let k = -reach; k <= reach; k++) acc += Math.abs(raw[(i + k + n) % n] as number);
+      curv[i] = acc / (2 * reach + 1);
+    }
+    const lap = lapTexture(line, curv);
+    this.textures.push(lap);
+    const grid = Array.from({ length: MAX_GRID }, (_, i) => {
+      const g = track.gridSlots[i];
+      return g ? new Vector2(g.s, g.d) : new Vector2(-1e6, 0);
+    });
+    let gs0 = Infinity;
+    let gs1 = -Infinity;
+    for (const g of track.gridSlots) {
+      gs0 = Math.min(gs0, g.s - 12);
+      gs1 = Math.max(gs1, g.s + 12);
+    }
+
+    // Asphalt.
+    const asphalt = this.keep(
+      surfaceMaterial(
+        sets.asphalt,
+        macro,
+        {
+          key: 'asphalt',
+          uniforms: {
+            uLap: { value: lap },
+            uLength: { value: track.length },
+            uGrid: { value: grid },
+            uGridCount: { value: Math.min(MAX_GRID, track.gridSlots.length) },
+            uGridRange: { value: new Vector2(gs0, gs1) },
+          },
+          pars: `
+          uniform sampler2D uLap;
+          uniform float uLength;
+          uniform vec2 uGrid[${MAX_GRID}];
+          uniform int uGridCount;
+          uniform vec2 uGridRange;
+          float trackRubber;
+          float trackOil;`,
+          colour: `
+          {
+            vec4 lapS = texture2D(uLap, vec2(vSurfUv.y / uLength, 0.5));
+            float lineD = (lapS.r * 2.0 - 1.0) * ${LINE_RANGE.toFixed(1)};
+            float corner = lapS.g;
+            float dist = abs(vSurfUv.x - lineD);
+            // Rubber: darker and a touch smoother along the line, widest where cars brake.
+            float band = 1.0 - smoothstep(0.3, 1.3 + 0.7 * macroFine.r + 0.6 * corner, dist);
+            trackRubber = band * (0.55 + 0.45 * macro.g);
+            // Dust on the unused width away from the line.
+            float dust = smoothstep(2.2, 5.5, dist) * (0.4 + 0.6 * macro.b);
+            // Marbles: rubber crumbs off line in the corners.
+            float crumbs = smoothstep(0.62, 0.9, texture2D(uMacro, vSurfUv * 0.53).b);
+            float marbles = crumbs * smoothstep(2.0, 3.2, dist) * (1.0 - smoothstep(6.0, 8.5, dist)) * smoothstep(0.08, 0.4, corner);
+            // Older and newer surface in large irregular patches.
+            diffuseColor.rgb *= mix(0.88, 1.08, macro.r) * mix(0.96, 1.03, macroFine.g);
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.14 + 0.012, dust * 0.55);
+            diffuseColor.rgb *= 1.0 - 0.4 * trackRubber;
+            diffuseColor.rgb *= 1.0 - 0.55 * marbles;
+            // Grid: oil under each car and launch marks ahead of the rear wheels.
+            trackOil = 0.0;
+            if (vSurfUv.y > uGridRange.x && vSurfUv.y < uGridRange.y) {
+              for (int i = 0; i < ${MAX_GRID}; i++) {
+                if (i >= uGridCount) break;
+                vec2 q = vec2(vSurfUv.y - uGrid[i].x, vSurfUv.x - uGrid[i].y);
+                float r = length((q + vec2(0.6, 0.0)) * vec2(0.55, 1.1));
+                trackOil = max(trackOil, (1.0 - smoothstep(0.15, 0.75 + 0.5 * macroFine.g, r)) * (0.45 + 0.55 * macroFine.b));
+                float ahead = smoothstep(-2.0, -1.6, q.x) * (1.0 - smoothstep(1.5, 7.0, q.x));
+                float wheel = 1.0 - smoothstep(0.12, 0.22, abs(abs(q.y) - 0.78));
+                trackOil = max(trackOil, ahead * wheel * 0.7 * (0.6 + 0.4 * macroFine.r));
+              }
+            }
+            diffuseColor.rgb *= 1.0 - 0.5 * trackOil;
+          }`,
+          roughness: `
+          roughnessFactor *= mix(1.0, 0.8, trackRubber);
+          roughnessFactor = mix(roughnessFactor, 0.45, trackOil * 0.6);`,
+        },
+        { aoMapIntensity: 0.6 },
       ),
     );
-    const asphaltNormal = this.tex(repeat(noiseNormalTexture(size, 12, 64, 2.2, an), 3));
-    const asphaltRough = this.tex(repeat(noiseGreyTexture(size, 13, 16, 0.78, 0.95, an), 3));
-    const line = estimateRacingLine(track);
-    const lineTex = this.tex(new DataTexture(line, line.length, 1, RedFormat, FloatType));
-    lineTex.wrapS = RepeatWrapping;
-    lineTex.magFilter = LinearFilter;
-    lineTex.minFilter = LinearFilter;
-    lineTex.needsUpdate = true;
-    const macro = this.tex(noiseGreyTexture(256, 14, 6, 0, 1, an));
-    const asphalt = this.material(
-      new MeshStandardMaterial({
-        color: '#ffffff',
-        map: asphaltMap,
-        normalMap: asphaltNormal,
-        roughnessMap: asphaltRough,
-        roughness: 1,
-        metalness: 0,
-      }),
-    );
-    asphalt.normalScale.set(0.6, 0.6);
-    addTrackDetail(asphalt, lineTex, macro, track.length, true);
+    // The scanned set is fresh black tarmac (albedo 0.015); a used circuit surface is a light,
+    // aggregate-rich grey around 0.08. Scale in linear light, nudged from warm toward neutral.
+    asphalt.color.setRGB(ASPHALT_GAIN[0], ASPHALT_GAIN[1], ASPHALT_GAIN[2]);
+    asphalt.normalScale.set(0.9, 0.9);
     map.set(MeshSurface.Asphalt, asphalt);
 
-    const pit = this.material(asphalt.clone());
-    addTrackDetail(pit, lineTex, macro, track.length, false);
-    pit.color = new Color('#d8d5d0');
-    map.set(MeshSurface.PitLane, pit);
+    // Pit lane and run-off asphalt: the worn set, no racing line.
+    const worn = (key: string, tint: string): MeshStandardMaterial => {
+      const m = this.keep(
+        surfaceMaterial(sets.asphalt_worn, macro, {
+          key,
+          colour: `diffuseColor.rgb *= mix(0.9, 1.06, macro.r) * mix(0.95, 1.03, macroFine.g);`,
+        }),
+      );
+      m.color = new Color(tint).multiplyScalar(1.9);
+      return m;
+    };
+    map.set(MeshSurface.PitLane, worn('pit', '#d9d6d0'));
+    map.set(MeshSurface.RunoffAsphalt, worn('runoff', '#e4e1db'));
 
-    // Run-off asphalt: lighter, smoother, less used.
-    const runoffAsphalt = this.material(
-      new MeshStandardMaterial({
-        map: this.tex(
-          repeat(
-            noiseColourTexture(size, 21, '#5d5b58', '#7c7974', { cells: 12, speckle: 0.04 }, an),
-            3,
-          ),
-        ),
-        normalMap: asphaltNormal,
-        roughness: 0.9,
-        metalness: 0,
-      }),
+    // Paint: white lines and markings over the asphalt grain, worn through in places.
+    const paint = this.keep(
+      surfaceMaterial(
+        sets.asphalt,
+        macro,
+        {
+          key: 'paint',
+          antiTile: false,
+          pars: 'float paintWear;',
+          colour: `
+          {
+            float grain = dot(diffuseColor.rgb, vec3(0.33));
+            paintWear = smoothstep(0.66, 0.9, macroFine.g * 0.7 + grain * 0.9 + macro.b * 0.25);
+            vec3 paintCol = vec3(0.80, 0.795, 0.77) * mix(0.92, 1.0, macro.r);
+            diffuseColor.rgb = mix(paintCol, diffuseColor.rgb, paintWear * 0.85);
+          }`,
+          roughness: 'roughnessFactor = mix(0.5, roughnessFactor, paintWear);',
+        },
+        { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 },
+      ),
     );
-    runoffAsphalt.normalScale.set(0.4, 0.4);
-    map.set(MeshSurface.RunoffAsphalt, runoffAsphalt);
-
-    // Paint: white line and markings, slightly smoother than the asphalt.
-    const paint = this.material(
-      new MeshStandardMaterial({
-        color: '#e9e6df',
-        roughness: 0.62,
-        metalness: 0,
-        normalMap: asphaltNormal,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
-      }),
-    );
-    paint.normalScale.set(0.3, 0.3);
+    paint.color.setRGB(ASPHALT_GAIN[0], ASPHALT_GAIN[1], ASPHALT_GAIN[2]);
+    paint.normalScale.set(0.45, 0.45);
     map.set(MeshSurface.Paint, paint);
     map.set(MeshSurface.Marking, paint);
 
-    // Kerbs: red and white blocks along s, 1 m each; the raised sausage kerb yellow and black.
-    const kerb = this.material(
-      new MeshStandardMaterial({
-        color: '#ffffff',
-        roughness: 0.55,
-        metalness: 0,
-        normalMap: asphaltNormal,
-      }),
-    );
-    kerb.normalScale.set(0.25, 0.25);
-    addKerbStripes(kerb, '#b8241f', '#ece9e2', 2.0);
-    map.set(MeshSurface.Kerb, kerb);
-    const kerbHigh = this.material(
-      new MeshStandardMaterial({ color: '#ffffff', roughness: 0.6, metalness: 0 }),
-    );
-    addKerbStripes(kerbHigh, '#e2b51c', '#1d1e20', 1.2);
-    map.set(MeshSurface.KerbHigh, kerbHigh);
+    // Kerbs: painted concrete in 1 m red and white blocks along s, with chipped paint and rubber
+    // streaks; the raised sausage kerb yellow and black.
+    const kerb = (key: string, a: string, b: string, period: number): MeshStandardMaterial =>
+      this.keep(
+        surfaceMaterial(sets.concrete, macro, {
+          key,
+          uniforms: {
+            uKerbA: { value: new Color(a) },
+            uKerbB: { value: new Color(b) },
+            uKerbPeriod: { value: period },
+          },
+          pars: 'uniform vec3 uKerbA; uniform vec3 uKerbB; uniform float uKerbPeriod; float kerbPaint;',
+          colour: `
+          {
+            float x = vSurfUv.y / uKerbPeriod;
+            float w = fwidth(x) + 0.01;
+            float stripe = clamp((0.25 - abs(fract(x) - 0.5)) / w + 0.5, 0.0, 1.0);
+            vec3 paintCol = mix(uKerbA, uKerbB, stripe);
+            float chip = smoothstep(0.68, 0.82, macroFine.b * 0.6 + texture2D(uMacro, vSurfUv * 0.9).b * 0.6);
+            kerbPaint = 1.0 - chip;
+            vec3 concrete = diffuseColor.rgb;
+            diffuseColor.rgb = mix(concrete * 0.9, paintCol * mix(0.9, 1.0, macroFine.r), kerbPaint);
+            float streak = smoothstep(0.55, 0.85, texture2D(uMacro, vec2(vSurfUv.x * 0.9, vSurfUv.y * 0.015)).g);
+            diffuseColor.rgb *= 1.0 - 0.45 * streak * (0.5 + 0.5 * macro.g);
+          }`,
+          roughness: 'roughnessFactor = mix(roughnessFactor, 0.48, kerbPaint);',
+        }),
+      );
+    map.set(MeshSurface.Kerb, kerb('kerb', '#a8221d', '#e6e3dc', 2.0));
+    map.set(MeshSurface.KerbHigh, kerb('kerb-high', '#d9ab1a', '#1b1c1e', 1.2));
 
-    // Grass: parkland greens with mowing bands along the track.
-    const grassMap = this.tex(
-      repeat(
-        noiseColourTexture(
-          size,
-          31,
-          '#3f552d',
-          '#6f7d4a',
-          { cells: 10, speckle: 0.05, speckleColour: '#86905c' },
-          an,
-        ),
-        6,
+    // Grass: real grass, its colour broken by two noise scales, and a coarser sample of the same
+    // texture faded in with distance so the tile never repeats visibly toward the horizon.
+    const grassColour = `
+      {
+        float far = smoothstep(12.0, 60.0, length(vSurfWorld - cameraPosition));
+        vec3 coarse = texture2D(map, vMapUv * 0.21 + 0.13).rgb;
+        diffuseColor.rgb = mix(diffuseColor.rgb, coarse * diffuseColor.a, far * 0.6);
+        vec3 lush = vec3(0.86, 0.95, 0.8);
+        vec3 dry = vec3(1.1, 1.04, 0.82);
+        diffuseColor.rgb *= mix(lush, dry, smoothstep(0.3, 0.9, macro.r)) * mix(0.84, 1.08, macro.g);
+      }`;
+    const grass = this.keep(
+      surfaceMaterial(
+        sets.grass,
+        macro,
+        { key: 'grass', colour: grassColour },
+        { aoMapIntensity: 1 },
       ),
     );
-    const grassNormal = this.tex(repeat(noiseNormalTexture(size, 32, 96, 3, an), 2));
-    const grass = this.material(
-      new MeshStandardMaterial({
-        map: grassMap,
-        normalMap: grassNormal,
-        roughness: 0.95,
-        metalness: 0,
-      }),
-    );
-    addMowingBands(grass, 6);
     map.set(MeshSurface.Grass, grass);
-    const terrain = this.material(
-      new MeshStandardMaterial({
-        map: this.tex(
-          repeat(
-            noiseColourTexture(size, 33, '#34482a', '#5f6e40', { cells: 6, speckle: 0.03 }, an),
-            24,
-          ),
-        ),
-        normalMap: grassNormal,
-        roughness: 1,
-        metalness: 0,
-      }),
+    map.set(MeshSurface.Verge, grass);
+    const terrain = this.keep(
+      surfaceMaterial(
+        sets.grass,
+        macro,
+        { key: 'terrain', colour: grassColour + 'diffuseColor.rgb *= 0.92;', worldMacro: true },
+        { aoMapIntensity: 1 },
+      ),
     );
     map.set(MeshSurface.Terrain, terrain);
-    map.set(MeshSurface.Verge, grass);
 
-    // Gravel: sand-coloured stones, rough, with a strong fine normal.
-    const gravel = this.material(
-      new MeshStandardMaterial({
-        map: this.tex(
-          repeat(
-            noiseColourTexture(
-              size,
-              41,
-              '#a08e6c',
-              '#cdbd99',
-              { cells: 48, octaves: 3, speckle: 0.25, speckleColour: '#e3d7bd', contrast: 2.2 },
-              an,
-            ),
-            2,
-          ),
-        ),
-        normalMap: this.tex(repeat(noiseNormalTexture(size, 42, 128, 5, an), 2)),
-        roughness: 1,
-        metalness: 0,
+    const gravel = this.keep(
+      surfaceMaterial(sets.gravel, macro, {
+        key: 'gravel',
+        colour: 'diffuseColor.rgb *= vec3(1.06, 1.0, 0.9) * mix(0.9, 1.08, macro.r);',
       }),
     );
     map.set(MeshSurface.Gravel, gravel);
 
-    // Barriers.
-    map.set(
-      MeshSurface.Armco,
-      this.material(
-        new MeshStandardMaterial({
-          color: '#b4b9bd',
-          metalness: 0.85,
-          roughness: 0.38,
-          roughnessMap: this.tex(repeat(noiseGreyTexture(size, 51, 24, 0.7, 1, an), 2)),
-        }),
-      ),
+    // Barriers: galvanised Armco (grey zinc over the plate's normals), concrete, tyre stacks.
+    const armco = this.keep(
+      surfaceMaterial(sets.metal, macro, {
+        key: 'armco',
+        antiTile: false,
+        colour: `
+          float zinc = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = vec3(0.56, 0.58, 0.6) * mix(0.8, 1.1, zinc * 2.0) * mix(0.9, 1.05, macroFine.r);`,
+        roughness: 'roughnessFactor = clamp(roughnessFactor * 0.9 + 0.12, 0.2, 0.8);',
+      }),
     );
+    map.set(MeshSurface.Armco, armco);
     map.set(
       MeshSurface.Concrete,
-      this.material(
-        new MeshStandardMaterial({
-          map: this.tex(
-            repeat(
-              noiseColourTexture(size, 52, '#9c9a94', '#c6c3bb', { cells: 12, speckle: 0.03 }, an),
-              3,
-            ),
-          ),
-          roughness: 0.92,
-          metalness: 0,
+      this.keep(
+        surfaceMaterial(sets.concrete, macro, {
+          key: 'concrete',
+          colour: 'diffuseColor.rgb *= mix(0.9, 1.06, macro.r);',
         }),
       ),
     );
-    map.set(
-      MeshSurface.Tyres,
-      this.material(
-        new MeshStandardMaterial({
-          map: this.tex(
-            repeat(noiseColourTexture(size, 53, '#121314', '#2a2b2d', { cells: 32 }, an), 1),
-          ),
-          roughness: 0.9,
-          metalness: 0,
-        }),
-      ),
+    const tyres = this.keep(
+      surfaceMaterial(sets.rubber, macro, {
+        key: 'tyres',
+        antiTile: false,
+        colour: 'diffuseColor.rgb *= 0.35;',
+      }),
     );
-    const fence = this.tex(fenceTexture(an));
+    map.set(MeshSurface.Tyres, tyres);
+
+    const fence = fenceTexture(sets.metal.map.anisotropy);
+    this.textures.push(fence);
     fence.repeat.set(1 / 0.06, 1 / 0.06);
     map.set(
       MeshSurface.Fence,
-      this.material(
+      this.keep(
         new MeshStandardMaterial({
           map: fence,
           alphaTest: 0.5,
+          alphaToCoverage: true,
           transparent: false,
           side: DoubleSide,
-          metalness: 0.6,
-          roughness: 0.5,
+          metalness: 0.7,
+          roughness: 0.45,
         }),
       ),
     );
@@ -318,121 +378,17 @@ function splitBySurface(data: MeshData): Map<number, BufferGeometry> {
     list.push(a, idx[t + 1] as number, idx[t + 2] as number);
   }
   const out = new Map<number, BufferGeometry>();
+  const position = new BufferAttribute(data.positions, 3);
+  const normal = new BufferAttribute(data.normals, 3);
+  const uv = new BufferAttribute(data.uvs, 2);
   for (const [surface, list] of groups) {
     const g = new BufferGeometry();
-    g.setAttribute('position', new BufferAttribute(data.positions, 3));
-    g.setAttribute('normal', new BufferAttribute(data.normals, 3));
-    g.setAttribute('uv', new BufferAttribute(data.uvs, 2));
+    g.setAttribute('position', position);
+    g.setAttribute('normal', normal);
+    g.setAttribute('uv', uv);
     g.setIndex(new BufferAttribute(Uint32Array.from(list), 1));
     g.computeBoundingSphere();
     out.set(surface, g);
   }
   return out;
-}
-
-/** Shader chunk that passes the raw track UV (metres: u across, v along s) to the fragment. */
-function passTrackUv(shader: { vertexShader: string; fragmentShader: string }): void {
-  shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nvarying vec2 vTrackUv;')
-    .replace('#include <uv_vertex>', '#include <uv_vertex>\nvTrackUv = uv;');
-  shader.fragmentShader = shader.fragmentShader.replace(
-    '#include <common>',
-    '#include <common>\nvarying vec2 vTrackUv;',
-  );
-}
-
-/**
- * Asphalt detail: large patches of older and newer surface, and the rubbered line (darker and a
- * little less rough) where the racing line runs, faded out toward its edges.
- */
-function addTrackDetail(
-  material: MeshStandardMaterial,
-  line: DataTexture,
-  macro: Texture,
-  length: number,
-  rubber: boolean,
-): void {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uLine = { value: line };
-    shader.uniforms.uMacro = { value: macro };
-    shader.uniforms.uLength = { value: length };
-    shader.uniforms.uRubber = { value: rubber ? 1 : 0 };
-    passTrackUv(shader);
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nuniform sampler2D uLine;\nuniform sampler2D uMacro;\nuniform float uLength;\nuniform float uRubber;\nfloat trackRubber;',
-      )
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-        {
-          float lineD = texture2D(uLine, vec2(vTrackUv.y / uLength, 0.5)).r;
-          float dist = abs(vTrackUv.x - lineD);
-          float wobble = texture2D(uMacro, vTrackUv * vec2(0.08, 0.004)).r;
-          trackRubber = uRubber * (1.0 - smoothstep(0.5, 1.7 + wobble, dist)) * (0.55 + 0.45 * wobble);
-          float patches = texture2D(uMacro, vTrackUv * 0.012).r;
-          diffuseColor.rgb *= mix(0.86, 1.08, patches);
-          diffuseColor.rgb *= 1.0 - 0.38 * trackRubber;
-        }`,
-      )
-      .replace(
-        '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor - 0.12 * trackRubber, 0.0, 1.0);',
-      );
-  };
-  material.customProgramCacheKey = () => `track-detail-${rubber ? 1 : 0}`;
-}
-
-/** Alternating stripe colours along s, `period` metres per block. */
-function addKerbStripes(
-  material: MeshStandardMaterial,
-  a: string,
-  b: string,
-  period: number,
-): void {
-  const ca = new Color(a);
-  const cb = new Color(b);
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uKerbA = { value: ca };
-    shader.uniforms.uKerbB = { value: cb };
-    shader.uniforms.uKerbPeriod = { value: period };
-    passTrackUv(shader);
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nuniform vec3 uKerbA;\nuniform vec3 uKerbB;\nuniform float uKerbPeriod;',
-      )
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-        {
-          float x = vTrackUv.y / uKerbPeriod;
-          float w = fwidth(x) + 0.01;
-          // Square wave with antialiased edges at a quarter and three quarters of the period.
-          float stripe = clamp((0.25 - abs(fract(x) - 0.5)) / w + 0.5, 0.0, 1.0);
-          diffuseColor.rgb *= mix(uKerbA, uKerbB, stripe);
-        }`,
-      );
-  };
-  material.customProgramCacheKey = () => `kerb-${a}-${b}-${period}`;
-}
-
-/** Mowing bands: alternate light and dark grass every `period` metres along s. */
-function addMowingBands(material: MeshStandardMaterial, period: number): void {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uMowPeriod = { value: period };
-    passTrackUv(shader);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uMowPeriod;')
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-        {
-          float band = step(0.5, fract(vTrackUv.y / uMowPeriod));
-          diffuseColor.rgb *= mix(0.9, 1.06, band);
-        }`,
-      );
-  };
-  material.customProgramCacheKey = () => `mow-${period}`;
 }

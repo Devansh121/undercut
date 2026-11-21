@@ -342,7 +342,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
 | Monza reference lap 84.969 s against the M1 band 74.852–82.732 s (section 7.6) | 2.24 s outside M1 (2.14 s with DRS zone 2 at its mapped activation), 3.81 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
 | Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
-| Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0008) |
+| Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0009) |
 
 ## 6. Sources
 
@@ -922,7 +922,7 @@ manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both assert
 ### 7.7 Pose invariants and barrier contact
 
 Added after the owner found a car thrown hundreds of metres up beyond the barrier at Monza (ADR
-0008). `checkCarInvariants` in `packages/sim/src/invariants.ts` is the one checker; the game runs
+0009). `checkCarInvariants` in `packages/sim/src/invariants.ts` is the one checker; the game runs
 it on the player's car every tick, and the suites below call it every step.
 
 **Limits, reference car, low trim** (medium and high differ only by their static ride height):

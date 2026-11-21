@@ -8,7 +8,7 @@ import {
 } from '@undercut/sim';
 import { createPathPoint, type PathPoint } from '@undercut/track';
 import { Phase, type DrivingPlan } from '../profile/plan';
-import type { Driver, DriverSkill } from './driver';
+import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { lockExcess, spinExcess } from './feel';
 import { fullLoadTorque } from '../envelope/shift';
 
@@ -183,6 +183,53 @@ export class ReferenceDriver implements Driver {
     this.brakeOut = 0;
     this.wander = 0;
     this.rng = createRng(this.skill.seed);
+  }
+
+  snapshot(): DriverMemory {
+    return {
+      hint: this.hint.index,
+      rng: this.rng.getState().slice(),
+      havePrev: this.havePrev,
+      px: this.px,
+      pz: this.pz,
+      pyaw: this.pyaw,
+      prevS: this.prevS,
+      yawIntegral: this.yawIntegral,
+      throttleCap: this.throttleCap,
+      brakeCap: this.brakeCap,
+      shiftHold: this.shiftHold,
+      crossedLine: this.crossedLine,
+      steerOut: this.steerOut,
+      throttleOut: this.throttleOut,
+      brakeOut: this.brakeOut,
+      wander: this.wander,
+    };
+  }
+
+  restore(m: DriverMemory): void {
+    const num = (k: string): number => {
+      const v = m[k];
+      if (typeof v !== 'number') throw new Error(`driver memory: ${k} missing`);
+      return v;
+    };
+    const rng = m.rng;
+    if (!Array.isArray(rng) || rng.length !== 4) throw new Error('driver memory: rng missing');
+    this.hint.index = num('hint');
+    this.rng.setState([rng[0]!, rng[1]!, rng[2]!, rng[3]!]);
+    this.havePrev = m.havePrev === true;
+    this.px = num('px');
+    this.pz = num('pz');
+    this.pyaw = num('pyaw');
+    this.prevS = num('prevS');
+    this.yawIntegral = num('yawIntegral');
+    this.throttleCap = num('throttleCap');
+    this.brakeCap = num('brakeCap');
+    this.shiftHold = num('shiftHold');
+    this.crossedLine = m.crossedLine === true;
+    this.steerOut = num('steerOut');
+    this.throttleOut = num('throttleOut');
+    this.brakeOut = num('brakeOut');
+    this.wander = num('wander');
   }
 
   drive(tel: CarTelemetry, dt: number, out: ControlInput): ControlInput {

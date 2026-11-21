@@ -20,7 +20,17 @@ export interface Driver {
   reset(): void;
   /** One sim tick of length `dt`: read `telemetry`, write the demand into `out`. */
   drive(telemetry: CarTelemetry, dt: number, out: ControlInput): ControlInput;
+  /**
+   * Everything the driver carries between ticks, as plain JSON (saves, host migration): a
+   * driver restored from it drives the next ticks exactly as the original would.
+   */
+  snapshot(): DriverMemory;
+  /** Overwrite the carried state from `snapshot` of a driver built the same way. */
+  restore(memory: DriverMemory): void;
 }
+
+/** A driver's carried state: plain JSON numbers, booleans and number lists. */
+export type DriverMemory = { readonly [key: string]: number | boolean | readonly number[] };
 
 /**
  * How well a driver drives. The reference driver is "as fast as it can drive cleanly": the

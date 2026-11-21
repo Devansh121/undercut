@@ -16,15 +16,28 @@ import {
 import type { InputSystem } from '@undercut/input';
 import { mountTouchOverlay, type TouchOverlay } from '@undercut/input/dom';
 import {
+  AssetError,
   CAMERA_LABELS,
   CAMERA_ORDER,
+  MONZA_AFTERNOON,
+  PLAYER_QUALITIES,
+  TIMES_OF_DAY,
+  floodlightsAlong,
+  QUALITY,
   RaceView,
+  benchmarkPick,
   createRenderer,
   type CameraName,
+  type CarLivery,
+  type CompoundLook,
   type QualityName,
+  type ToneMap,
 } from '@undercut/render';
 import teams from '../../../design/teams.json';
+import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
+// The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
+import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { toAudioCarState } from './game/audio-map';
@@ -42,6 +55,9 @@ import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session
 import { Hud, type HudMessage, type HudState } from './ui/hud';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
+import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
+import { debugEnabled } from './debug';
+import { saveQuality } from './game/quality-setting';
 
 /** The team whose colours the player's car wears in M1. */
 const TEAM_ID = 'kestrel';
@@ -92,12 +108,72 @@ export interface DriveOptions {
   soundNote?: () => string;
   /** Session lifecycle and volumes for the page's audio engine; absent for no audio. */
   audio?: DriveAudio;
+  /** No saved or requested preset: benchmark the first seconds and pick one. */
+  autoQuality?: boolean;
+}
+
+/** Thrown when the player backs out of a failed load; the launch screen comes back. */
+export class LoadCancelled extends Error {
+  constructor() {
+    super('Loading cancelled');
+    this.name = 'LoadCancelled';
+  }
+}
+
+/** Every driver's car look, from design/teams.json: the player's team first. */
+function liveries(first: string): CarLivery[] {
+  const out: CarLivery[] = [];
+  const ordered = [...teams.teams].sort((a, b) => (a.id === first ? -1 : b.id === first ? 1 : 0));
+  for (const t of ordered) {
+    for (const d of t.drivers) {
+      out.push({
+        team: t.id,
+        primary: t.colours.primary,
+        secondary: t.colours.secondary,
+        accent: t.colours.accent,
+        number: d.number,
+        code: d.code,
+      });
+    }
+  }
+  return out;
+}
+
+/** A compound's look on the tyre, from design/compounds.json (the HUD reads the same file). */
+function compoundLook(id: string): CompoundLook {
+  const c = compounds.compounds.find((k) => k.id === id) ?? compounds.compounds[0];
+  if (!c) throw new Error('design/compounds.json has no compounds');
+  return {
+    colour: c.colour,
+    slots: c.slots,
+    groupsPerSidewall: compounds.tyreMarking.groupsPerSidewall,
+    slotSpacingU: compounds.tyreMarking.slotSpacingU,
+  };
+}
+
+/** `?tonemap=agx|aces|neutral` (render comparisons); Khronos PBR Neutral otherwise. */
+function toneMapParam(): ToneMap {
+  const t = new URLSearchParams(window.location.search).get('tonemap');
+  return t === 'aces' || t === 'agx' ? t : 'neutral';
+}
+
+function racingLineOffsets(count: number): Float64Array | null {
+  const raw = monzaLine as { count: number; offsetTenthMm: number[] };
+  if (raw.count !== count) return null;
+  return Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
 }
 
 export interface DriveHandle {
   readonly session: DriveSession;
   readonly loop: GameLoop;
   readonly view: RaceView;
+  /** The render preset in use, and a switch to another (rebuilds the view, keeps the session). */
+  readonly quality: QualityName;
+  /** Views built for this session (the first, quality switches, context restores). */
+  readonly viewBuilds: number;
+  setQuality(name: QualityName): Promise<void>;
+  /** Static cars on the grid slots in every livery (0 clears them). */
+  gridCars(count: number): void;
   readonly records: RecordStore;
   /** Frame times in ms, most recent last. */
   frameTimes(): number[];
@@ -140,22 +216,62 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     sprungB: 0,
     yawInertia: 0,
   });
-  const team = teams.teams.find((t) => t.id === TEAM_ID) ?? teams.teams[0];
-  if (!team) throw new Error('design/teams.json has no teams');
-  pageRenderer ??= createRenderer(o.canvas, o.quality);
-  const view = new RaceView(o.canvas, {
-    renderer: pageRenderer,
-    track,
-    quality: o.quality,
-    livery: team.colours,
-    car: {
-      wheelbase: params.geometry.wheelbase,
-      axleFront: mass.a,
-      trackFront: params.geometry.trackFront,
-      trackRear: params.geometry.trackRear,
-      tyreRadius: params.tyre.rollingRadius,
-    },
-  });
+  const all = liveries(TEAM_ID);
+  const playerLivery = all[0];
+  if (!playerLivery) throw new Error('design/teams.json has no teams');
+  pageRenderer ??= createRenderer(o.canvas);
+  const renderer = pageRenderer;
+  const carGeometry = {
+    wheelbase: params.geometry.wheelbase,
+    axleFront: mass.a,
+    trackFront: params.geometry.trackFront,
+    trackRear: params.geometry.trackRear,
+    tyreRadius: params.tyre.rollingRadius,
+  };
+  const line = racingLineOffsets(track.lap.count);
+  const loadView = async (quality: QualityName, screen: LoadingScreen): Promise<RaceView> => {
+    for (;;) {
+      try {
+        return await RaceView.load(o.canvas, {
+          renderer,
+          track,
+          quality,
+          livery: playerLivery,
+          fleetLiveries: all,
+          car: carGeometry,
+          racingLine: line,
+          assetsBase: 'assets/',
+          toneMap: toneMapParam(),
+          checkRegistration: import.meta.env.DEV || debugEnabled(),
+          compound: compoundLook('medium'),
+          timeOfDay: tod,
+          localLights: tod.localLightSlots > 0 ? floodlightsAlong(track, 36) : [],
+          dracoPath: new URL('assets/draco/', document.baseURI).href,
+          onProgress: (p) => screen.progress(p.loaded, p.total),
+        });
+      } catch (error) {
+        console.warn('Loading failed', error);
+        const what =
+          error instanceof AssetError
+            ? `Could not download ${error.path}.`
+            : 'Could not prepare the track and car.';
+        const choice = await screen.fail(`${what} Check the connection and try again.`);
+        if (choice === 'back') throw new LoadCancelled();
+        screen.reset();
+      }
+    }
+  };
+  // `?tod=overcast-day|night-floodlit` (render tests); Monza's afternoon otherwise.
+  const tod =
+    TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ?? MONZA_AFTERNOON;
+  let quality = o.quality;
+  const loading = mountLoadingScreen(o.host, track.name, 'Time trial');
+  let view: RaceView;
+  try {
+    view = await loadView(quality, loading);
+  } finally {
+    loading.remove();
+  }
 
   const input = o.input;
   const human = new InputControlSource(input);
@@ -203,6 +319,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         })),
         get: () => view.cameraName,
         set: (v) => view.setCamera(v as CameraName),
+      },
+      {
+        id: 'quality',
+        label: 'Graphics',
+        choices: PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
+        get: () => quality,
+        set: (v) => {
+          saveQuality(v as QualityName);
+          void setQuality(v as QualityName);
+        },
       },
       {
         id: 'tc',
@@ -346,6 +472,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (document.visibilityState === 'hidden') doPause();
   };
   document.addEventListener('visibilitychange', onVisibility);
+  // The GPU can drop the context (driver reset, memory pressure): stop the session until it is
+  // back; the view restores its own GPU state.
+  const onContextLost = (): void => {
+    if (session.phase === 'running') doPause();
+  };
+  // Back: build a fresh view from the cached downloads (the old one released everything when the
+  // context went). The session stays paused for the player.
+  const onContextRestored = (): void => {
+    void rebuildView('Restoring graphics');
+  };
+  o.canvas.addEventListener('webglcontextlost', onContextLost);
+  o.canvas.addEventListener('webglcontextrestored', onContextRestored);
 
   // Frame loop.
   const pose = createCarPose();
@@ -443,6 +581,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       speed: t.speed,
       longG: t.longG,
       latG: t.latG,
+      brake: t.brake,
+      frameMs: dt * 1000,
       dt: realDt,
       time: clock,
       lookBack,
@@ -523,12 +663,87 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   handle = requestAnimationFrame(frame);
   document.documentElement.dataset.ready = '';
 
+  /** Views built for this session (1 + quality switches + context restores). */
+  let viewBuilds = 1;
+
+  /** A new view at the current preset after a context restore. */
+  async function rebuildView(detail: string): Promise<void> {
+    if (quitting) return;
+    if (switching) await switching;
+    const screen = mountLoadingScreen(o.host, track.name, detail);
+    try {
+      const nv = await loadView(quality, screen);
+      const camera = view.cameraName;
+      view.dispose();
+      view = nv;
+      viewBuilds++;
+      view.setCamera(camera);
+      measureCluster();
+    } catch (error) {
+      if (!(error instanceof LoadCancelled)) console.warn('Could not restore the 3D view', error);
+    } finally {
+      screen.remove();
+    }
+  }
+
+  /** Rebuild the view at another preset; the session waits (paused) while it loads. */
+  let switching: Promise<void> | null = null;
+  async function setQuality(next: QualityName): Promise<void> {
+    if (next === quality || quitting) return;
+    if (switching) await switching;
+    switching = (async () => {
+      const wasRunning = session.phase === 'running';
+      if (wasRunning) loop.pause();
+      const screen = mountLoadingScreen(o.host, track.name, `Graphics: ${QUALITY[next].label}`);
+      try {
+        const nv = await loadView(next, screen);
+        const camera = view.cameraName;
+        view.dispose();
+        view = nv;
+        viewBuilds++;
+        quality = next;
+        view.setCamera(camera);
+        measureCluster();
+      } catch (error) {
+        if (!(error instanceof LoadCancelled))
+          console.warn('Could not change graphics quality', error);
+      } finally {
+        screen.remove();
+        if (wasRunning && !pause.open) resume();
+        pause.sync();
+      }
+    })();
+    await switching;
+    switching = null;
+  }
+
+  // First run without a saved preset: time a few seconds of driving and settle on a preset.
+  if (o.autoQuality) {
+    const measured = quality;
+    window.setTimeout(() => {
+      if (quitting) return;
+      const startAt = frameLog.length;
+      window.setTimeout(() => {
+        if (quitting) return;
+        const times = frameLog.slice(startAt).sort((a, b) => a - b);
+        if (times.length < 30) return;
+        const median = times[Math.floor(times.length / 2)] as number;
+        const gpu = view.stats().gpuMs;
+        const pick = benchmarkPick(measured, { gpuMs: gpu, frameMs: median }, o.touch);
+        saveQuality(pick);
+        if (pick !== quality) void setQuality(pick);
+      }, 3000);
+    }, 2500);
+  }
+
   function quit(): void {
     if (quitting) return;
     quitting = true;
     o.audio?.setActive(false);
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
+    o.canvas.removeEventListener('webglcontextlost', onContextLost);
+    o.canvas.removeEventListener('webglcontextrestored', onContextRestored);
     clusterObserver.disconnect();
     window.removeEventListener('resize', measureCluster);
     loop.quit();
@@ -552,7 +767,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   return {
     session,
     loop,
-    view,
+    get view() {
+      return view;
+    },
+    get quality() {
+      return quality;
+    },
+    get viewBuilds() {
+      return viewBuilds;
+    },
+    setQuality,
+    gridCars: (count) => view.setGridCars(count, pose),
     records,
     frameTimes: () => frameLog.slice(),
     resetFrameTimes: () => {
