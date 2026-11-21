@@ -22,7 +22,9 @@ across its circuits and breaks ties by count-back (most wins, then most second p
 
 After the chequered flag each car finishes when it next crosses the timing line (lapped cars
 with fewer laps); in timed sessions a car in the pit lane when the flag falls is done. The
-session ends when every car has finished or retired, or 240 s after the flag.
+session ends when no car is still running (all finished or retired, in any session type and
+with or without the flag: a race where every car retires ends there, classified by distance),
+or 240 s after the flag.
 
 ## Values
 
@@ -38,12 +40,12 @@ session ends when every car has finished or retired, or 240 s after the flag.
 | A new excursion counts after | 0.5 s back inside the line | Estimate |
 | Race strikes | 1–3 warnings (the 3rd with the black and white flag), 4th a time penalty; repeats (7th black and white, 8th penalty, ...) | Common race-director practice [8]; the exact count is an estimate |
 | Track-limits penalty | 5 s | Common race-director practice [8]; estimate |
-| Place gained off track | give it back within 15 s, or a 5 s penalty; a place counts as gained off track while off and for 2 s after rejoining | Estimate (simple rule; lasting time gained without a place is covered by lap invalidation and strikes) |
+| Place gained off track | give it back within 15 s, or a 5 s penalty; a place counts as gained off track while off and for 2 s after rejoining; a place still owed at the flag is penalised there, before the classification | Estimate (simple rule; lasting time gained without a place is covered by lap invalidation and strikes) |
 | Marshalling sectors for local yellows | lap cut into sectors of about 300 m from the timing line (Monza: 19) | Estimate |
 | Yellow: cause | a car on or near the track (within 25 m of the centreline, not in the pit lane) slower than 8 m/s for 1 s, from 4 s after the green | Estimate |
 | Yellow: shown in | the car's sector and the one before it, until 3 s after the cause has gone | Estimate |
 | Under yellow | DRS disabled in a zone touching a yellow sector; passing a car is a warning | [2] Art. 22.1 (DRS); the no-overtaking rule is a warning only for now |
-| Blue flag | a car about to lap another within 1 s behind it, measured at mini-sectors | [2]; race director practice |
+| Blue flag | a car about to lap another (one lap up or more) within 1 s behind it, measured at mini-sectors | [2]; race director practice |
 | Blue flag obligation | let the faster car by within 15 s, or a 5 s penalty | Estimate (the regulation speaks of three flag panels) |
 | DRS enabled (race) | when the leader starts lap 3 | The brief's default. Note: [2] Art. 22.1 as summarised in physics-validation 4.6 reads "from one lap after the start"; owner to confirm |
 | DRS gap at the detection line | less than 1 s behind the car that crossed it before (any car), times interpolated inside the tick | [2] Art. 22.1 |
@@ -56,8 +58,8 @@ session ends when every car has finished or retired, or 240 s after the flag.
 | Service time | tyres 2.4 s, plus uniform 0–0.8 s per stop, seeded | Estimate: 2.0–2.5 s stationary times are typical |
 | Team-mates sharing a box | the second car waits until the first is serviced | As in the real pit lane |
 | Release | waits while a moving car in the lane is between 20 m behind and 5 m ahead of the box | Estimate (unsafe-release avoidance) |
-| Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish | [2] |
-| Classified without the flag | 90 % of the winner's laps | [2] |
+| Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish. A penalty awarded during a hold is not part of it: it stays outstanding for the next stop or the finish | [2]; the in-hold case is a decision |
+| Classified | 90 % of the winner's laps, whether or not the car took the flag | [2] |
 | Two-compound rule | on by default at full race distance; a finisher on one compound is disqualified | [2]; the sanction is the conservative reading |
 | Points | 25, 18, 15, 12, 10, 8, 6, 4, 2, 1; no fastest-lap point | Published scale since 2010; fastest-lap point dropped for 2025 (not re-checked against [2] here) |
 | Fuel in every session | 10 kg (time trial 20 kg), topped up at each timing line | Decision for this slice: fuel arrives in M4 |
@@ -80,12 +82,26 @@ found in order, cars in the pit lane cross the lines like cars on track, and a r
 distance without crossing anything. When four wheels are off in the same tick as a line
 crossing, the reading counts against both laps.
 
+Across the field, every crossing of a tick (timing and sector lines, the speed trap, DRS
+detection and zone ends) is found first with its interpolated time and then applied in time
+order. Crossings at exactly the same time are applied in order of position at the start of the
+tick, then in the order the car made them. So who is first to the line under the chequered
+flag, which cars finish, DRS gaps (never negative) and session bests depend on when cars
+crossed, never on their car numbers. A finishing car's race distance is the line's, not where
+it was at the end of the tick.
+
+A car moved between ticks (reset to the track, restart, a teleport) is repositioned, not
+driven: no line is crossed. Lines it was moved over are skipped and the lap in progress stops
+counting; moved over the timing line, it starts its next lap there, already invalid, with no
+lap result. In time trial and practice a reset also brings a retired car back.
+
 Colours: purple beats everyone's best this session (in time trial, the record kept on this
 device), green is the car's own best, yellow is slower, red an invalid lap. Gaps and intervals
 for a timing tower are the time difference at the same point of race distance, about every
 150 m (mini-sectors), with laps down where cars are a lap or more apart. Positions are a total
 order by race distance (a finished car keeps its distance at the line), ties broken by finish
-time and then car number; retired cars come last.
+time; a complete tie keeps the previous order (entry order before the first tick); retired
+cars come last.
 
 ## The stuck-car watchdog
 
@@ -95,11 +111,27 @@ lights out or the green, not finished or retired), never while held in the pit b
 | Finding | Definition |
 | --- | --- |
 | stationary | slower than 1 m/s for 5 s |
-| no progress | less than 10 m of race distance gained in 10 s |
+| no progress | less than 10 m of race distance gained over the last 10 s, a rolling window over samples every 0.25 s: creeping, stop-start crawling and rocking back and forth are caught; the finding runs from the start of the first window that fell short for as long as every window falls short |
 | off track | all four wheels past the line, outside the pit lane, for 10 s |
 | wrong way | race distance falling faster than 1 m/s for 3 s |
 
-A car stationary or making no progress for 60 s (from when it stopped) is retired, "stuck".
+Never flagged: cars on the grid before lights out, in the garage, stopped in the box, serving
+a penalty or waiting for release, finished, or retired and parked.
+
+A car stationary or making no progress for 60 s (from when it stopped) is retired, "stuck",
+except a human driver in time trial or practice: they keep the warning and can reset or
+restart, which puts them back in the session.
+
+## Snapshots and cost
+
+`RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 2) adds
+the world, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
+follower's path) and every search hint, so a session restored from it continues bit for bit
+(checked at the lights, mid-race, on the pit approach and mid-service).
+
+A tick with nothing to report allocates nothing: it returns a shared frozen empty array, and the
+per-tick path uses reused buffers and passes no loose numbers into calls that might box them
+(checked over the quiet stretch of a twenty-car rail race).
 
 ## What the AI does that the rules need
 
