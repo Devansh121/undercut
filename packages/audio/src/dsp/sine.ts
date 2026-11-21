@@ -7,12 +7,14 @@
  * the voices.
  *
  * Read it inline (a function returning a fractional number would box it on the audio
- * thread), with the phase `p` in turns, p ≥ 0 and p × SINE_STEPS < 2³¹:
+ * thread), with the table and both constants copied into locals first (in Node the module
+ * runner turns each imported binding into a property read), and the phase `p` in turns,
+ * p ≥ 0 and p × SINE_STEPS < 2³¹:
  *
- *     const x = p * SINE_STEPS;
+ *     const x = p * steps;
  *     const i = x | 0;
  *     const f = x - i;
- *     const k = i & SINE_MASK;
+ *     const k = i & mask;
  *     const s = table[k] + f * (table[k + 1] - table[k]);
  */
 export const SINE_STEPS = 4096;

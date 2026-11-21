@@ -77,7 +77,10 @@ export class GearWhine {
     const overall = this.overall;
     const fadeTop = this.fadeTop;
     const fadeScale = this.fadeScale;
+    // Imported constants into locals (see EngineVoice.renderPulses).
     const sine = SINE_TABLE;
+    const steps = SINE_STEPS;
+    const mask = SINE_MASK;
     let e = 0;
     for (let i = 0; i < n; i++) {
       const w = speed[i] as number;
@@ -116,20 +119,20 @@ export class GearWhine {
       let gf = (fadeTop - fFinal) * fadeScale;
       gf = gf < 0 ? 0 : gf > 1 ? 1 : gf;
       // Mesh fundamental and second harmonic, and the final drive, from the table.
-      const x1 = this.meshPhase * SINE_STEPS;
+      const x1 = this.meshPhase * steps;
       let k = x1 | 0;
       let fr = x1 - k;
-      k &= SINE_MASK;
+      k &= mask;
       const sin1 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
       const x2 = 2 * x1;
       k = x2 | 0;
       fr = x2 - k;
-      k &= SINE_MASK;
+      k &= mask;
       const sin2 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
-      const xf = this.finalPhase * SINE_STEPS;
+      const xf = this.finalPhase * steps;
       k = xf | 0;
       fr = xf - k;
-      k &= SINE_MASK;
+      k &= mask;
       const sinF = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
       const mesh = g1 > 0 ? g1 * sin1 + 0.25 * g2 * sin2 : 0;
       const fin = gf > 0 ? 0.5 * gf * sinF : 0;
