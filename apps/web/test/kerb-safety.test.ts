@@ -90,6 +90,9 @@ describe('flat-out kerb strikes in the game never need the safety net (review of
       session.start();
       session.teleport(s, d, 300 / 3.6);
       session.setAssist('tractionControl', tc);
+      // The physics under test, not the stability assist: with it on, its wheel braking keeps
+      // some of these runs off the open run-off ramps and they would pass for that reason.
+      session.setAssist('stability', 0);
       const input = { ...NEUTRAL_INPUT, throttle: 1, steer };
       for (let k = 0; k < 240 * 15 && session.safetyResets === 0; k++)
         session.tick(input, 'keyboard');

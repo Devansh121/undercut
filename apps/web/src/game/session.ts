@@ -11,7 +11,6 @@ import {
 import { HIGH_KERB, type Track } from '@undercut/track';
 import {
   SurfaceKind,
-  applyAssists,
   checkCarInvariants,
   computeMass,
   createAssistState,
@@ -34,12 +33,23 @@ import {
   type WorldCar,
 } from '@undercut/sim';
 import type { DeviceKind } from '@undercut/input';
-import { assistSteer, assistsFor, type AssistConfig, type AssistOverrides } from './assists';
+import {
+  applyDriverAids,
+  assistsFor,
+  type AssistConfig,
+  type AssistOverrides,
+  type GuidePosition,
+  type SpeedGuide,
+} from './assists';
 import type { Ghost } from './ghost';
 import { GhostRecorder, decodeGhost, encodeGhost } from './ghost';
 import type { CircuitRecord, RecordUpdate } from './records';
 
 export type { WheelsOffCounter } from '@undercut/race';
+
+/** A spin: sideslip past this, rad; over once back under `SPIN_OVER`. */
+const SPIN_SIDESLIP = (30 * Math.PI) / 180;
+const SPIN_OVER = (10 * Math.PI) / 180;
 
 /** Sim step: 240 Hz (ADR 0007). */
 export const SIM_STEP = 1 / 240;
@@ -70,6 +80,8 @@ export interface DriveSessionOptions {
   today?: string;
   /** Track-limit counter; defaults to `TrackLimits` on this track. */
   limits?: WheelsOffCounter;
+  /** Advised speeds round the circuit (the driving line), for the braking help. */
+  guide?: SpeedGuide;
 }
 
 /**
@@ -113,12 +125,16 @@ export class DriveSession {
   private readonly sample = createSurfaceSample();
   private readonly telemetry: CarTelemetry = createCarTelemetry();
   private readonly today: string;
+  private readonly guidePosition: GuidePosition | null;
   private readonly poseLimits: InvariantLimits;
   private safetyResetsValue = 0;
   private wallHitsValue = 0;
+  private spinsValue = 0;
+  private spinning = false;
 
   constructor(options: DriveSessionOptions) {
     this.track = options.track;
+    this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
     this.params = options.params ?? createCarParams('low');
     this.today = options.today ?? '';
     this.pending = {
@@ -172,19 +188,27 @@ export class DriveSession {
     return this.wallHitsValue;
   }
 
+  /**
+   * Spins since the session began: body sideslip past 30° above 8 m/s, counted once until
+   * the car is pointing along its path again (under 10°).
+   */
+  get spins(): number {
+    return this.spinsValue;
+  }
+
   /** The player's input for this tick, with the device's assists, written into the car. */
   private drive(out: ControlInput): void {
-    const control = this.pending;
-    const car = this.car;
-    const a = this.assistValue;
-    out.steer = assistSteer(this.deviceValue, a.steering, control.steer, car.state.vx);
-    out.throttle = control.throttle;
-    out.brake = control.brake;
-    out.gearShift = control.gearShift;
-    out.overtake = control.overtake;
-    out.pitLimiter = control.pitLimiter;
-    out.drs = control.drs;
-    applyAssists(a, this.assistMemory, car.state, out, this.world.step, out);
+    if (this.guidePosition) this.guidePosition.s = this.s;
+    applyDriverAids(
+      this.deviceValue,
+      this.assistValue,
+      this.assistMemory,
+      this.car.state,
+      this.pending,
+      this.world.step,
+      out,
+      this.guidePosition ?? undefined,
+    );
   }
 
   get phase(): SessionPhase {
@@ -328,6 +352,7 @@ export class DriveSession {
       return events;
     }
     if (this.car.state.wallImpactSpeed > 0) this.wallHitsValue++;
+    this.countSpin();
     if (this.timer.running && this.recorder.recording) {
       this.recorder.sample(
         this.timer.currentLapTime(this.world.time),
@@ -336,6 +361,15 @@ export class DriveSession {
       );
     }
     return events;
+  }
+
+  private countSpin(): void {
+    const st = this.car.state;
+    const beta = Math.abs(Math.atan2(st.vy, Math.max(Math.abs(st.vx), 1)));
+    if (!this.spinning && beta > SPIN_SIDESLIP && Math.hypot(st.vx, st.vy) > 8) {
+      this.spinning = true;
+      this.spinsValue++;
+    } else if (this.spinning && beta < SPIN_OVER) this.spinning = false;
   }
 
   /**

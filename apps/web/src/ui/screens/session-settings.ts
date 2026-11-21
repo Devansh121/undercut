@@ -46,6 +46,8 @@ export function effectiveAssists(
     abs: a.abs,
     autoGears: a.autoGears,
     steering: a.steering,
+    stability: a.stability ?? 0,
+    braking: a.braking,
   };
 }
 
@@ -130,11 +132,28 @@ export class SettingsPanel {
     });
     // The keyboard shapes its own steering (input layer); steering help is for sticks and touch.
     steering.setDisabled(device === 'keyboard');
+    const stability = toggle({
+      label: S.setup.stability,
+      id: 'stability',
+      value: a().stability > 0,
+      onChange: (v) => setAssist('stability', v ? 1 : 0),
+    });
+    const braking = segmented({
+      label: S.setup.braking,
+      id: 'braking',
+      choices: LEVELS,
+      value: a().braking,
+      onChange: (v) => setAssist('braking', v),
+    });
+    // Braking help follows the driving line, built from the AI's racing line: Monza only for now.
+    braking.setDisabled(!circuit.raceReady);
     const controls: [Control<unknown>, () => unknown][] = [
       [tc as Control<unknown>, () => a().tractionControl],
       [abs as Control<unknown>, () => a().abs > 0],
       [gears as Control<unknown>, () => (a().autoGears ? 'auto' : 'manual')],
       [steering as Control<unknown>, () => a().steering],
+      [stability as Control<unknown>, () => a().stability > 0],
+      [braking as Control<unknown>, () => a().braking],
     ];
     this.syncers.push(() => {
       for (const [c, v] of controls) c.set(v());
@@ -142,6 +161,12 @@ export class SettingsPanel {
     rows.push(
       settingRow(S.setup.tractionControl, tc.root),
       settingRow(S.setup.abs, abs.root),
+      settingRow(S.setup.stability, stability.root),
+      settingRow(
+        S.setup.braking,
+        braking.root,
+        circuit.raceReady ? undefined : S.setup.brakingNoLine,
+      ),
       settingRow(S.setup.gears, gears.root),
       settingRow(
         S.setup.steering,

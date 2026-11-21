@@ -14,6 +14,7 @@ export interface Choice<T extends string | number> {
 export interface PauseSetting<T extends string | number = string | number> {
   id: string;
   label: string;
+  description?: string;
   choices: Choice<T>[];
   get(): T;
   set(value: T): void;
@@ -130,6 +131,12 @@ export class PauseMenu {
       const row = el('div', 'pause__setting');
       row.dataset.setting = setting.id;
       const name = el('span', 'pause__key', setting.label);
+      if (setting.description) {
+        const help = el('small', 'pause__help', setting.description);
+        help.id = `pause-help-${setting.id}`;
+        name.append(help);
+        row.setAttribute('aria-describedby', help.id);
+      }
       const hint = setting.hint ? el('small', 'pause__hint', setting.hint) : null;
       if (hint) {
         hint.hidden = true;

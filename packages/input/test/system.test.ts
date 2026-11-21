@@ -54,8 +54,8 @@ describe('keyboard', () => {
     expect(input.sample(0.1, s.highSpeed).control.steer).toBeCloseTo(s.lockAtHighSpeed, 12);
     input.keyboard.keyUp('KeyA');
     input.keyboard.keyDown('KeyD');
-    // From 0.3 toward -0.3: centre in 0.3 / 8 s, then out at the high-speed rate.
-    const t = 0.3 / s.returnRate;
+    // Cross centre at the return rate, then move outward at the high-speed rate.
+    const t = s.lockAtHighSpeed / s.returnRate;
     expect(input.sample(t + 0.05, s.highSpeed).control.steer).toBeCloseTo(
       -s.steerRateAtHighSpeed * 0.05,
       12,

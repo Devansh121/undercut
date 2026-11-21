@@ -15,6 +15,7 @@ export default defineConfig({
           include: ['{apps,packages,tools}/**/*.test.{ts,mjs}'],
           exclude: [
             '**/node_modules/**',
+            'packages/input/validation/**',
             'packages/sim/validation/**',
             'packages/ai/validation/**',
             'packages/track/validation/**',
@@ -31,6 +32,7 @@ export default defineConfig({
           // few seconds over vitest's 5 s default. A limit on run time, not on results.
           testTimeout: 60_000,
           include: [
+            'packages/input/validation/**/*.test.ts',
             'packages/sim/validation/**/*.test.ts',
             'packages/ai/validation/**/*.test.ts',
             'packages/track/validation/**/*.test.ts',

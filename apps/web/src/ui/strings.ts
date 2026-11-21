@@ -155,6 +155,18 @@ export const S = {
     summaryTimeTrial: (tod: string, device: string) => `${tod} · ${device} assists`,
     assistsFor: (device: string) => `${device} assists`,
     steeringKeyboard: 'Sticks and touch only',
+    stability: 'Stability help',
+    braking: 'Braking help',
+    brakingNoLine: 'Needs a driving line: Monza only for now',
+    help: {
+      tractionControl: 'Reduces engine drive when the rear tyres slip.',
+      abs: 'Eases braking to prevent wheel locking.',
+      gears: 'Shifts automatically at the engine speed limits.',
+      steering: 'Reduces analog steering lock as speed rises. Keys use their own ramps.',
+      stability: 'Brakes one wheel and trims the engine when the car starts to slide or push.',
+      braking:
+        'Brakes for you when you arrive at a corner faster than the driving line. On by default for keys (Low) and touch (Medium).',
+    },
   },
 
   summary: {
