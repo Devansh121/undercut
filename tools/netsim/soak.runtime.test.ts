@@ -120,6 +120,7 @@ describe(`soak: ${profile.name}`, () => {
       let maxTickGap = 0;
       const lastFrame = new Map<Recorder, number>();
       let maxFrameGap = 0;
+      const heldBySeat = new Map<number, number>();
       for (const r of rs) {
         r.client.on('snapshots', () => {
           const now = performance.now();
@@ -150,6 +151,7 @@ describe(`soak: ${profile.name}`, () => {
           maxRemoteSize = Math.max(maxRemoteSize, c.remoteCars.size);
           for (const v of views) {
             modes[v.mode]++;
+            if (v.mode === 'held') heldBySeat.set(v.seat, (heldBySeat.get(v.seat) ?? 0) + 1);
             const truth = carAt(track, v.seat, renderTime, room.start.lightsOutAt, 0);
             errors.push(Math.hypot(v.x - truth.x, v.z - truth.z));
           }
@@ -215,6 +217,11 @@ describe(`soak: ${profile.name}`, () => {
         `| longest stall of the test process / of relayed frames | ${maxTickGap.toFixed(0)} ms / ${maxFrameGap.toFixed(0)} ms |`,
         `| member status changes seen (stale or away) | ${awayEvents} |`,
         `| snapshots dropped by the simulator | ${lost} |`,
+        `| errors received by clients | ${JSON.stringify(rs.map((r) => r.of('error').map((e) => e.code)).map((codes) => Object.fromEntries([...new Set(codes)].map((c) => [c, codes.filter((x) => x === c).length]))))} |`,
+        `| client status, close codes | ${rs.map((r) => `${r.client.status}${r.last('closed') ? `:${r.last('closed')!.code}` : ''}`).join(' ')} |`,
+        `| snapshots sent / skipped (backpressure) per client | ${rs.map((r) => `${r.client.snapshotStats.sent}/${r.client.snapshotStats.skipped}`).join(' ')} |`,
+        `| held samples by seat | ${JSON.stringify(Object.fromEntries([...heldBySeat].sort((a, b) => a[0] - b[0])))} |`,
+        `| max in flight per client, up / down | ${nets.map((n) => `${Math.max(...n.links.map((l) => l.up.maxInFlight))}/${Math.max(...n.links.map((l) => l.down.maxInFlight))}`).join(' ')} |`,
         `| max in flight per direction / remote history | ${inFlight} msgs / ${maxRemoteSize} snapshots |`,
         `| bytes down per client, whole session over race time | ${(downBytes.reduce((a, b) => a + b, 0) / downBytes.length / raceSeconds / 1024).toFixed(1)} KiB/s (record ${CAR_RECORD_BYTES} B) |`,
         `| bytes up, host / guest, per race second | ${(upBytes[0]! / raceSeconds / 1024).toFixed(1)} / ${(upBytes[1]! / raceSeconds / 1024).toFixed(1)} KiB/s |`,
