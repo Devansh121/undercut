@@ -59,6 +59,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Drivability (PR 26): the stability assist is yaw-rate control that brakes one wheel and trims engine torque through a new optional per-wheel brake demand in `ControlInput`; it never steers or eases the brake. Braking help, already a preset field, is now implemented from the driving line and is on at `low` for keyboard (touch `medium`, gamepad off). The review's target of at most 1 spin in 10 laps for its clumsy keyboard driver is not met: 0.96 a lap (0.67 spins, 0.29 barrier strikes), from 5.00 on master. The validation harness charges a spin 5 s and counts it as time off the track; without that charge, saving a slide reads as more time off the track than a spin.
 - Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
 - Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
 - Start release happens at the first fixed simulation tick on or after server lights-out. Each frame maps its catch-up ticks to the elapsed server-clock interval, so ticks before lights-out remain held even when rendering stalls. The acceptance test compares the actual released ticks within one 240 Hz tick plus clock error, using the normal referee floors.
