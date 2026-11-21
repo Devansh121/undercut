@@ -11,7 +11,7 @@ import type { PrefsStore } from '../data/prefs';
 import { button } from '../kit/components';
 import type { Screen } from '../shell';
 import { S } from '../strings';
-import { circuitArt } from './circuit-art';
+import { circuitArt, circuitName } from './circuit-art';
 
 export class CircuitSelectScreen implements Screen {
   readonly id = 'circuits';
@@ -43,7 +43,7 @@ export class CircuitSelectScreen implements Screen {
       const head = el('div', 'ccard__head');
       head.append(
         el('span', 'label', S.circuit.round(i + 1, c.country)),
-        el('span', 'ccard__name', c.name),
+        circuitName('ccard__name', c.name),
       );
       // No AI racing line here yet: race modes are not available, Time Trial is.
       if (!c.raceReady) head.append(el('span', 'ccard__tag', S.circuit.timeTrialOnly));

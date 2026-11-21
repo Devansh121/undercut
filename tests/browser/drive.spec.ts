@@ -313,6 +313,28 @@ test.describe('drive', () => {
     expect(stats.lumaStdDev).toBeGreaterThan(10);
   });
 
+  test('on a phone every pause-menu control is a touch target of 44 px or more', async ({
+    drive: { page },
+  }, info) => {
+    test.skip(info.project.name !== 'phone', 'touch targets are a phone check');
+    await page.evaluate(() => window.__undercut?.pause());
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    const small = await menu.evaluate((root) =>
+      [...root.querySelectorAll<HTMLElement>('button, input, [data-nav]')]
+        .filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0)
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width < 43.5 || r.height < 43.5)
+        .map(
+          ({ el, r }) =>
+            `${el.dataset.action ?? el.dataset.value ?? el.className}: ${Math.round(r.width)} x ${Math.round(r.height)}`,
+        ),
+    );
+    expect(small).toEqual([]);
+    await page.evaluate(() => window.__undercut?.resume());
+    await expect(menu).toBeHidden();
+  });
+
   test('lays out the HUD inside the viewport with nothing overlapping', async ({
     drive: { page },
   }) => {

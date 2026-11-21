@@ -130,6 +130,10 @@ export const S = {
     livery: (team: string) => `${team} livery`,
     tiersOn: 'Performance tiers on',
     equalCars: 'Equal cars',
+    previous: 'Previous team',
+    next: 'Next team',
+    onlineNote:
+      'The room gives each driver a team and car by seat, on equal cars. Choose your name in the lobby.',
   },
 
   setup: {

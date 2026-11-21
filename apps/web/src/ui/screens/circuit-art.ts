@@ -1,5 +1,18 @@
 import type { CircuitPlan } from '../data/circuit-summary';
-import { svg } from '../dom';
+import { el, svg } from '../dom';
+
+/**
+ * A circuit's name as a heading. It may break only between words or after a hyphen
+ * ("Spa-" / "Francorchamps"), never inside a word: a name with a long word steps down a size
+ * (`data-len="long"`) so that word fits its column.
+ */
+export function circuitName(className: string, name: string): HTMLElement {
+  const node = el('span', className, name);
+  const longest = Math.max(...name.split(/[\s-]+/).map((w) => w.length));
+  // A long word, or a long name that takes two lines anyway, steps down a size.
+  if (longest >= 11 || name.length > 14) node.dataset.len = 'long';
+  return node;
+}
 
 /**
  * A circuit plan as SVG: a wide dark casing, the line, the start line in the brand colour and

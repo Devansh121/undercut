@@ -1414,14 +1414,15 @@ body {
     overflow-y: auto;
     padding-right: var(--sp-1);
   }
+  /* Touch targets 44 px or more on a phone. */
   .pause__action {
-    min-height: 36px;
-    height: 36px;
+    min-height: 44px;
+    height: 44px;
     font-size: var(--fs-12);
     padding: 0 var(--sp-3);
   }
   .pause__setting {
-    min-height: 30px;
+    min-height: 44px;
   }
   .pause__key {
     font-size: var(--fs-12);
@@ -1430,12 +1431,12 @@ body {
     padding-top: var(--sp-2);
   }
   .pause__quit {
-    height: 34px;
+    height: 44px;
     font-size: var(--fs-12);
   }
   .seg__opt {
-    min-width: 34px;
-    min-height: 24px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0 6px;
     font-size: var(--fs-11);
   }
@@ -1527,6 +1528,9 @@ body {
 @media (max-height: 500px) and (orientation: landscape) {
   .range {
     grid-template-columns: 96px 36px;
+  }
+  .range__input {
+    height: 44px;
   }
   .range__value {
     font-size: var(--fs-12);

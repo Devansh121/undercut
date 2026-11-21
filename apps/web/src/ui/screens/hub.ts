@@ -17,7 +17,7 @@ import { icon, type IconKey } from '../kit/icons';
 import type { NavAction } from '../kit/nav';
 import type { Screen } from '../shell';
 import { S } from '../strings';
-import { circuitArt } from './circuit-art';
+import { circuitArt, circuitName } from './circuit-art';
 import {
   SettingsPanel,
   settingsSummary,
@@ -77,6 +77,10 @@ export class HubScreen implements Screen {
   private readonly carFigure: HTMLElement;
   private readonly carImage: HTMLImageElement;
   private readonly teamAside: HTMLElement;
+  private readonly teamSwitch: HTMLElement;
+  private readonly teamSwitchName: HTMLElement;
+  private readonly teamNote: HTMLElement;
+  private readonly teamParts: HTMLElement[];
   private readonly recordRows = new Map<string, HTMLElement>();
   private readonly start: HTMLButtonElement;
   private readonly barSummary: HTMLElement;
@@ -86,6 +90,8 @@ export class HubScreen implements Screen {
   private readonly resetInline: HTMLButtonElement;
   private readonly changeCircuit: HTMLButtonElement;
   private device: DeviceKind;
+  /** Circuit and device the settings panels were built for. */
+  private panelsKey = '';
 
   constructor(private readonly o: HubOptions) {
     this.device = o.device();
@@ -191,7 +197,26 @@ export class HubScreen implements Screen {
     this.driverRow.dataset.navGroup = '';
     this.driverRow.setAttribute('role', 'radiogroup');
     this.driverRow.setAttribute('aria-label', S.team.driver);
-    teamCard.body.append(this.carFigure, grid, driverHead, this.driverRow);
+    // On a phone the ten-team grid does not fit at touch size: one team at a time, stepped with
+    // previous and next (CSS shows one or the other).
+    this.teamSwitch = el('div', 'team-switch');
+    const step = (delta: -1 | 1, iconName: 'chevronLeft' | 'chevron', label: string) =>
+      iconButton({
+        icon: iconName,
+        label,
+        action: delta < 0 ? 'team-prev' : 'team-next',
+        onClick: () => this.stepTeam(delta),
+      });
+    this.teamSwitchName = el('span', 'team-switch__name');
+    this.teamSwitch.append(
+      step(-1, 'chevronLeft', S.team.previous),
+      this.teamSwitchName,
+      step(1, 'chevron', S.team.next),
+    );
+    // Online the room assigns each driver a car by seat: one line instead of the picker.
+    this.teamNote = el('p', 'team-card__note', S.team.onlineNote);
+    this.teamParts = [this.carFigure, this.teamSwitch, grid, driverHead, this.driverRow];
+    teamCard.body.append(...this.teamParts, this.teamNote);
     right.append(teamCard.root);
 
     body.append(left, this.centre, right);
@@ -251,9 +276,19 @@ export class HubScreen implements Screen {
   setDevice(device: DeviceKind): void {
     if (device === this.device) return;
     this.device = device;
+    this.render();
+  }
+
+  /**
+   * The settings panels offer what the selected circuit and the device in use allow (time-of-day
+   * presets, steering help): rebuild both when either changed since they were built.
+   */
+  private syncPanels(): void {
+    const key = `${this.circuit().id}|${this.device}`;
+    if (key === this.panelsKey) return;
+    this.panelsKey = key;
     this.inline.build();
     this.inDialog.build();
-    this.render();
   }
 
   /** Start as if the start button was pressed (keyboard, gamepad accept, tests). */
@@ -310,6 +345,18 @@ export class HubScreen implements Screen {
     this.render();
   }
 
+  /** Previous or next team (the phone's team switcher), wrapping round the grid. */
+  private stepTeam(delta: -1 | 1): void {
+    const i = TEAMS.findIndex((t) => t.id === this.o.prefs.get().team);
+    const next = TEAMS[(i + delta + TEAMS.length) % TEAMS.length];
+    if (!next) return;
+    this.o.prefs.update((p) => {
+      p.team = next.id;
+      p.driver = 0;
+    });
+    this.render();
+  }
+
   private teamButton(t: Team): HTMLButtonElement {
     const b = el('button', 'team');
     b.type = 'button';
@@ -335,6 +382,7 @@ export class HubScreen implements Screen {
   }
 
   private render(): void {
+    this.syncPanels();
     const p = this.o.prefs.get();
     const mode = p.mode;
     // Online rooms race at Monza only (protocol v2): show that circuit, with no circuit choice.
@@ -354,7 +402,7 @@ export class HubScreen implements Screen {
     const art = el('div', 'circuit__art');
     art.append(circuitArt(c.plan));
     const title = el('div', 'circuit__title');
-    title.append(el('span', 'label', c.country), el('span', 'circuit__name', c.name));
+    title.append(el('span', 'label', c.country), circuitName('circuit__name', c.name));
     const stats = el('div', 'stats');
     const stat = (label: string, value: string, unit?: string): HTMLElement => {
       const s = el('div', 'stat');
@@ -403,8 +451,14 @@ export class HubScreen implements Screen {
       );
       this.noticeCard.replaceChildren(
         h,
-        el('p', 'notice__body', online ? S.notices.onlineBody : S.notices.racesBody),
-        ...(!online && !c.raceReady ? [el('p', 'notice__body', S.circuit.noRaceLine(c.name))] : []),
+        el(
+          'p',
+          online ? 'notice__body' : 'notice__body notice__body--races',
+          online ? S.notices.onlineBody : S.notices.racesBody,
+        ),
+        ...(!online && !c.raceReady
+          ? [el('p', 'notice__body notice__body--circuit', S.circuit.noRaceLine(c.name))]
+          : []),
       );
     }
     this.presetLabel.textContent = S.setup.preset(S.menu.deviceNames[this.device]);
@@ -414,7 +468,16 @@ export class HubScreen implements Screen {
     // Team and driver.
     const team = teamById(p.team);
     for (const [id, b] of this.teamButtons) b.setAttribute('aria-checked', String(id === team.id));
-    this.teamAside.textContent = team.code;
+    this.teamAside.textContent = online ? '' : team.code;
+    for (const part of this.teamParts) part.hidden = online;
+    this.teamNote.hidden = !online;
+    this.teamSwitch.style.setProperty('--team-bar', team.colours.tower);
+    this.teamSwitch.style.setProperty('--team-2', team.colours.secondary);
+    this.teamSwitchName.replaceChildren(
+      el('span', 'team__sw'),
+      el('b', '', team.name),
+      el('span', 'team__code', team.code),
+    );
     const src = teamCarImage(team.id, p.driver);
     if (this.carImage.getAttribute('src') !== src) {
       this.carImage.src = src;

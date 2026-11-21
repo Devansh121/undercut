@@ -369,7 +369,12 @@ test.describe('menus, touch only', () => {
     await page.locator('[data-action=mode-weekend]').tap();
     await expect(page.locator('[data-testid=mode-notice]')).toBeVisible();
     await page.locator('[data-action=mode-timeTrial]').tap();
-    await page.locator('.team[data-team=orrin]').tap();
+    // A phone steps through the teams one at a time.
+    const teamName = page.locator('.team-switch__name b');
+    const before = (await teamName.textContent()) ?? '';
+    await page.locator('[data-action=team-next]').tap();
+    await expect(teamName).not.toHaveText(before);
+    await expect(page.locator('.team-car__img')).toBeVisible();
     await page.locator('.driver[data-driver="1"]').tap();
     await expect(page.locator('.driver[data-driver="1"]')).toHaveAttribute('aria-checked', 'true');
 
@@ -389,51 +394,92 @@ test.describe('menus, touch only', () => {
  * trip for a whole screen's states: these checks are about layout, not input (the device tests
  * above drive the same controls with real input).
  */
+interface SweepStep {
+  label: string;
+  click?: string;
+  /** Selectors that must be visible after this step, and ones that must not be. */
+  shows?: string[];
+  hides?: string[];
+}
+
 function layoutSweep(
   page: Page,
-  steps: readonly { label: string; click?: string }[],
+  steps: readonly SweepStep[],
+  o: { minTarget?: number } = {},
 ): Promise<string[]> {
-  return page.evaluate((list) => {
-    const problems: string[] = [];
-    const { innerWidth: w, innerHeight: h } = window;
-    const root = document.documentElement;
-    for (const { label, click } of list) {
-      if (click) {
-        const target = document.querySelector<HTMLElement>(click);
-        if (!target) {
-          problems.push(`${label}: no ${click}`);
-          continue;
+  return page.evaluate(
+    ({ list, minTarget }) => {
+      const problems: string[] = [];
+      const { innerWidth: w, innerHeight: h } = window;
+      const root = document.documentElement;
+      const shown = (el: Element | null): boolean =>
+        el instanceof HTMLElement && !el.closest('[hidden]') && el.getClientRects().length > 0;
+      for (const { label, click, shows = [], hides = [] } of list) {
+        if (click) {
+          const target = document.querySelector<HTMLElement>(click);
+          if (!target) {
+            problems.push(`${label}: no ${click}`);
+            continue;
+          }
+          target.click();
         }
-        target.click();
-      }
-      if (root.scrollWidth > w) problems.push(`${label}: page is ${root.scrollWidth}px wide`);
-      if (root.scrollHeight > h) problems.push(`${label}: page is ${root.scrollHeight}px tall`);
-      for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
-        if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
-        const style = getComputedStyle(el);
-        if (style.visibility === 'hidden' || style.position === 'fixed') continue;
-        // Tooltips sit outside their control by design and show only on hover or focus.
-        if (el.closest('.tip')) continue;
-        const r = el.getBoundingClientRect();
-        const name = `${label}: ${el.tagName.toLowerCase()}.${String(el.className)}`;
-        if (
-          r.width > 0 &&
-          (r.left < -0.5 || r.top < -0.5 || r.right > w + 0.5 || r.bottom > h + 0.5)
-        ) {
-          problems.push(
-            `${name} leaves the viewport (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`,
-          );
+        if (root.scrollWidth > w) problems.push(`${label}: page is ${root.scrollWidth}px wide`);
+        if (root.scrollHeight > h) problems.push(`${label}: page is ${root.scrollHeight}px tall`);
+        for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
+          if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
+          const style = getComputedStyle(el);
+          if (style.visibility === 'hidden' || style.position === 'fixed') continue;
+          // Tooltips sit outside their control by design and show only on hover or focus.
+          if (el.closest('.tip')) continue;
+          const r = el.getBoundingClientRect();
+          const name = `${label}: ${el.tagName.toLowerCase()}.${String(el.className)}`;
+          if (
+            r.width > 0 &&
+            (r.left < -0.5 || r.top < -0.5 || r.right > w + 0.5 || r.bottom > h + 0.5)
+          ) {
+            problems.push(
+              `${name} leaves the viewport (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`,
+            );
+          }
+          const clipsX = el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible';
+          const clipsY =
+            el.scrollHeight > el.clientHeight + 1 &&
+            style.overflowY !== 'visible' &&
+            style.overflowY !== 'auto';
+          if (clipsX || clipsY) problems.push(`${name} clips its content`);
+          // Touch targets: every control at least `minTarget` px in both directions.
+          if (
+            minTarget &&
+            (el.matches('button, input, a, [data-nav]') || el.getAttribute('role') === 'slider') &&
+            (r.width < minTarget - 0.5 || r.height < minTarget - 0.5)
+          ) {
+            problems.push(`${name} is a ${Math.round(r.width)} x ${Math.round(r.height)} target`);
+          }
         }
-        const clipsX = el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible';
-        const clipsY =
-          el.scrollHeight > el.clientHeight + 1 &&
-          style.overflowY !== 'visible' &&
-          style.overflowY !== 'auto';
-        if (clipsX || clipsY) problems.push(`${name} clips its content`);
+        // Headings never break inside a word: each word sits on one line.
+        for (const heading of document.querySelectorAll<HTMLElement>(
+          '#app .circuit__name, #app .ccard__name, #app .lrow__title, #app .driver__last',
+        )) {
+          if (!shown(heading)) continue;
+          const text = heading.firstChild;
+          if (!(text instanceof Text)) continue;
+          const range = document.createRange();
+          for (const m of (text.data ?? '').matchAll(/[^\s-]+-?/g)) {
+            range.setStart(text, m.index ?? 0);
+            range.setEnd(text, (m.index ?? 0) + m[0].length);
+            const lines = new Set([...range.getClientRects()].map((q) => Math.round(q.top)));
+            if (lines.size > 1) problems.push(`${label}: "${m[0]}" breaks inside the word`);
+          }
+        }
+        for (const sel of shows)
+          if (!shown(document.querySelector(sel))) problems.push(`${label}: ${sel} is not shown`);
+        for (const sel of hides)
+          if (shown(document.querySelector(sel))) problems.push(`${label}: ${sel} is shown`);
       }
-    }
-    return problems;
-  }, steps);
+      return problems;
+    },
+    { list: steps, minTarget: o.minTarget ?? 0 },
+  );
 }
 
 for (const size of [
@@ -452,9 +498,11 @@ for (const size of [
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize(size);
     await page.goto('/');
-    expect(await layoutSweep(page, [{ label: 'launch' }])).toEqual([]);
+    // On a phone every control is a touch target of 44 px or more (docs/visual-direction.md).
+    const minTarget = size.height < 500 ? 44 : 0;
+    expect(await layoutSweep(page, [{ label: 'launch' }], { minTarget })).toEqual([]);
     await openMenu(page);
-    const hub = [
+    const hub: SweepStep[] = [
       ...['timeTrial', 'quickRace', 'weekend', 'championship', 'online'].map((m) => ({
         label: `main menu, ${m}`,
         click: `[data-action=mode-${m}]`,
@@ -473,12 +521,66 @@ for (const size of [
             },
           ]
         : []),
+      // Each circuit (long names, the Time Trial only mark), and a race mode at one of them.
+      ...['spa', 'singapore', 'monza'].flatMap((c) => [
+        { label: `circuit select before ${c}`, click: '[data-action=change-circuit]' },
+        { label: `main menu at ${c}`, click: `.ccard[data-circuit=${c}]` },
+      ]),
+      { label: 'circuit select for a race mode', click: '[data-action=change-circuit]' },
+      { label: 'main menu at spa again', click: '.ccard[data-circuit=spa]' },
+      { label: 'quick race at spa', click: '[data-action=mode-quickRace]' },
+      // Online the room assigns cars: no team picker, one line instead.
+      {
+        label: 'online rooms',
+        click: '[data-action=mode-online]',
+        shows: ['.team-card__note'],
+        hides: ['.teams', '.team-switch', '.drivers', '[data-action=change-circuit]'],
+      },
+      { label: 'time trial once more', click: '[data-action=mode-timeTrial]' },
       { label: 'circuit select', click: '[data-action=change-circuit]' },
     ];
-    expect(await layoutSweep(page, hub)).toEqual([]);
+    expect(await layoutSweep(page, hub, { minTarget })).toEqual([]);
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'circuits');
   });
 }
+
+test('time of day follows the circuit, and each circuit keeps its own choice', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  await page.goto('/');
+  await openMenu(page);
+  const tod = page.locator('.settings [data-setting=timeOfDay]');
+  const choices = tod.locator('[data-value]');
+  const chip = page.locator('.circuit .chip').first();
+  const pick = async (id: string): Promise<void> => {
+    await page.locator('[data-action=change-circuit]').click();
+    await page.locator(`.ccard[data-circuit=${id}]`).click();
+  };
+  // Monza: afternoon (default) or overcast.
+  await expect(choices).toHaveCount(2);
+  await expect(tod.locator('[data-value=monza-afternoon]')).toHaveAttribute('aria-checked', 'true');
+  // Spa: the day preset only, and the chip and the summary agree with the control.
+  await pick('spa');
+  await expect(choices).toHaveCount(1);
+  await expect(tod.locator('[data-value=overcast-day]')).toHaveAttribute('aria-checked', 'true');
+  await expect(chip).toContainText('Overcast');
+  await expect(page.locator('.actionbar__summary')).toContainText('Overcast');
+  // Saved at Spa, after a reload, back at Monza: Monza's two presets again.
+  await page.reload();
+  await openMenu(page);
+  await expect(choices).toHaveCount(1);
+  await pick('monza');
+  await expect(choices).toHaveCount(2);
+  await expect(tod.locator('[data-value=monza-afternoon]')).toHaveAttribute('aria-checked', 'true');
+  // Overcast at Monza is Monza's choice; Spa keeps its own.
+  await tod.locator('[data-value=overcast-day]').click();
+  await expect(chip).toContainText('Overcast');
+  await pick('spa');
+  await expect(tod.locator('[data-value=overcast-day]')).toHaveAttribute('aria-checked', 'true');
+  await pick('monza');
+  await expect(tod.locator('[data-value=overcast-day]')).toHaveAttribute('aria-checked', 'true');
+});
 
 test('reduced motion removes transitions and screen animations', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
