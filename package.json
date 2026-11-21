@@ -1,0 +1,43 @@
+{
+  "name": "undercut-workspace",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "start": "./start.sh",
+    "dev": "node tools/serve/dev.mjs",
+    "lint": "eslint . && prettier --check . && node tools/ci/check-names.mjs",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "test": "vitest run --project unit",
+    "test:physics": "vitest run --project physics",
+    "test:rooms": "vitest run --project rooms",
+    "test:browser": "playwright test",
+    "test:soak": "node -e \"console.log('no soak tests yet')\"",
+    "build": "npm run build -w @undercut/web && node tools/budget/check.mjs",
+    "check:assets": "node tools/assets/check-licences.mjs",
+    "check:secrets": "bash tools/ci/gitleaks.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
+    "@types/node": "20.19.43",
+    "@types/ws": "8.18.2",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "selfsigned": "5.5.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "4.1.12",
+    "ws": "8.23.0"
+  }
+}
