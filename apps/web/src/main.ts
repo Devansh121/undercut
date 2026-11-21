@@ -1,5 +1,9 @@
 import '../../../design/mock/tokens.css';
 import './styles.css';
+import './online/race-hud.css';
+import { OnlineFlow } from './online/flow';
+import { codeFromUrl } from './online/invite';
+import type { DriveExtension } from './drive';
 import { InputSystem } from '@undercut/input';
 import {
   WebStorageAdapter,
@@ -56,20 +60,22 @@ function chooseQuality(): { quality: QualityName; auto: boolean } {
   };
 }
 
+let online: OnlineFlow | null = null;
 let drive: DriveHandle | null = null;
 let driveModule: DriveModule | null = null;
 let launch: LaunchScreen | null = null;
 let starting: Promise<DriveHandle> | null = null;
-let menuHandle = 0;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 function showLaunch(): void {
+  online = null;
   drive = null;
   launch = mountLaunchScreen(app as HTMLElement, {
     buildHash: __BUILD_HASH__,
+    onOnline: () => showOnline(null),
     record: null,
     controls: { bindings: () => input.profile.bindings, device: () => input.activeDevice },
     onStart: () => {
@@ -79,29 +85,78 @@ function showLaunch(): void {
     },
   });
   void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
+}
+
+function pollMenus(): void {
   // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
   let last: number | null = null;
   const poll = (now: number): void => {
-    if (drive || starting) return;
+    if (drive || starting) {
+      requestAnimationFrame(poll);
+      last = now;
+      return;
+    }
     const dt = last === null ? 0 : (now - last) / 1000;
     last = now;
     const f = input.sample(dt, 0);
     for (const e of f.events) {
       // A focused button already clicks on Enter; gamepads need the accept passed on.
-      const native = f.device === 'keyboard' && document.activeElement?.tagName === 'BUTTON';
-      if (e.type === 'action' && e.action === 'menuAccept' && !native) launch?.accept();
+      const native =
+        f.device === 'keyboard' &&
+        ['BUTTON', 'INPUT', 'A'].includes(document.activeElement?.tagName ?? '');
+      if (e.type === 'action' && e.action === 'menuAccept' && !native) {
+        // The focused control (an online screen field, the controls list's Back) takes it;
+        // with nothing focused the launch screen starts, as on master.
+        if (
+          document.activeElement instanceof HTMLElement &&
+          document.activeElement !== document.body
+        )
+          document.activeElement.click();
+        else launch?.accept();
+      }
+      if (
+        e.type === 'action' &&
+        (e.action === 'menuLeft' || e.action === 'menuRight') &&
+        f.device === 'gamepad'
+      ) {
+        const field = document.activeElement;
+        if (field instanceof HTMLInputElement && field.type === 'number' && !field.disabled) {
+          if (e.action === 'menuRight') field.stepUp();
+          else field.stepDown();
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      if (e.type === 'action' && (e.action === 'menuDown' || e.action === 'menuUp')) {
+        const buttons = [
+          ...app!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a'),
+        ].filter((b) => !b.closest('[inert]'));
+        const at = buttons.indexOf(document.activeElement as HTMLElement);
+        buttons[
+          (at + (e.action === 'menuDown' ? 1 : buttons.length - 1)) % buttons.length
+        ]?.focus();
+      }
       if (e.type === 'action' && e.action === 'menuBack' && f.device !== 'keyboard') launch?.back();
     }
-    menuHandle = requestAnimationFrame(poll);
+    requestAnimationFrame(poll);
   };
-  menuHandle = requestAnimationFrame(poll);
+  requestAnimationFrame(poll);
 }
 
-async function start(): Promise<DriveHandle> {
+function showOnline(code: string | null): void {
+  launch = null;
+  online = new OnlineFlow(
+    app as HTMLElement,
+    code,
+    (extension, quit) => start(extension, quit),
+    showLaunch,
+  );
+}
+
+async function start(extension?: DriveExtension, quit?: () => void): Promise<DriveHandle> {
   if (drive) return drive;
   if (starting) return starting;
   launch?.setLoading(true);
-  cancelAnimationFrame(menuHandle);
+
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -120,7 +175,12 @@ async function start(): Promise<DriveHandle> {
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
-        onQuit: () => showLaunch(),
+        ...(extension ? { extension } : {}),
+        onQuit: () => {
+          drive = null;
+          if (quit) quit();
+          else showLaunch();
+        },
       });
       drive = handle;
       return handle;
@@ -141,6 +201,9 @@ async function start(): Promise<DriveHandle> {
 }
 
 showLaunch();
+pollMenus();
+const invite = codeFromUrl(location.href);
+if (invite) showOnline(invite);
 if (debugEnabled()) {
   installDebugApi(
     () => drive,
@@ -149,4 +212,13 @@ if (debugEnabled()) {
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),
   );
+}
+
+if (debugEnabled()) {
+  Object.assign(window.__undercut!, {
+    online: () => ({
+      state: online?.session.state ?? null,
+      race: online?.race?.snapshot() ?? null,
+    }),
+  });
 }
