@@ -114,7 +114,26 @@ describe(`soak: ${profile.name}`, () => {
       const modes: Record<RemoteCarMode, number> = { interpolated: 0, extrapolated: 0, held: 0 };
       let maxRemoteSize = 0;
       const delays: number[] = [];
+      // How long this process itself stalled (all eight senders live here), and the
+      // longest silence in relayed car frames any client saw.
+      let lastTick = 0;
+      let maxTickGap = 0;
+      const lastFrame = new Map<Recorder, number>();
+      let maxFrameGap = 0;
+      for (const r of rs) {
+        r.client.on('snapshots', () => {
+          const now = performance.now();
+          const prev = lastFrame.get(r);
+          if (prev !== undefined && r.client.room?.phase === 'racing') {
+            maxFrameGap = Math.max(maxFrameGap, now - prev);
+          }
+          lastFrame.set(r, now);
+        });
+      }
       sampler = setInterval(() => {
+        const tick = performance.now();
+        if (lastTick > 0) maxTickGap = Math.max(maxTickGap, tick - lastTick);
+        lastTick = tick;
         for (const r of rs) {
           const c = r.client;
           const room = c.room;
@@ -148,22 +167,66 @@ describe(`soak: ${profile.name}`, () => {
       clearInterval(sampler);
       sampler = null;
 
-      // Same phases, same start, same results for everyone.
+      // Gather everything first, so the report exists even when an assertion fails.
       const phases = rs.map((r) => {
         const seq: Phase[] = [];
         for (const room of r.of('room'))
           if (seq[seq.length - 1] !== room.phase) seq.push(room.phase);
         return seq.join(' > ');
       });
+      const starts = rs.map((r) => JSON.stringify(r.of('start')));
+      const results = rs.map((r) => JSON.stringify(r.last('results')));
+      const rows = (rs[0] as Recorder).last('results')!.results.rows;
+      const rejected = drivers.flatMap((d) => d.rejections);
+      const flagged = rows
+        .filter((r) => r.flags.length > 0)
+        .map((r) => `${r.seat}:${r.flags.join('+')}`);
+      errors.sort((a, b) => a - b);
+      const p50 = percentile(errors, 0.5);
+      const p99 = percentile(errors, 0.99);
+      const max = errors[errors.length - 1] ?? Number.NaN;
+      const inFlight = Math.max(
+        ...nets.flatMap((n) => n.links.flatMap((l) => [l.up.maxInFlight, l.down.maxInFlight])),
+      );
+      const raceSeconds = (rows[rows.length - 1]!.timeMs ?? 0) / 1000;
+      const downBytes = nets.map((n) => n.links.reduce((s, l) => s + l.down.bytes, 0));
+      const upBytes = nets.map((n) => n.links.reduce((s, l) => s + l.up.bytes, 0));
+      const lost = nets.reduce(
+        (s, n) => s + n.links.reduce((t, l) => t + l.up.dropped + l.down.dropped, 0),
+        0,
+      );
+      const total = errors.length;
+      const pct = (n: number) => `${((100 * n) / total).toFixed(1)}%`;
+      delays.sort((a, b) => a - b);
+      const awayEvents = rs[0]!
+        .of('room')
+        .reduce((n, room) => n + room.members.filter((m) => m.status !== 'active').length, 0);
+      report.push(
+        `Soak ${profile.name}: ${HUMANS} humans + ${AI} AI, ${profile.laps} laps of ${profile.lengthM} m`,
+        `| setting | value |`,
+        `| --- | --- |`,
+        `| latency / jitter / loss / duplication | ${CONDITIONS.latencyMs} ms / +-${CONDITIONS.jitterMs} ms / ${CONDITIONS.loss * 100}% / ${CONDITIONS.duplicate * 100}% |`,
+        `| wall time (join to results) | ${((Date.now() - started) / 1000).toFixed(1)} s, race ${raceSeconds.toFixed(1)} s |`,
+        `| phase sequence agreement | ${new Set(phases).size === 1 ? `${phases.length}/${phases.length} clients identical` : JSON.stringify(phases)} |`,
+        `| classification agreement | ${new Set(results).size === 1 ? `${results.length}/${results.length} identical` : 'DIFFERENT'}, ${rows.length} cars, rejected laps ${rejected.length}, flagged ${flagged.length ? flagged.join(', ') : 'none'} |`,
+        `| interpolation error p50 / p99 / max | ${(p50 * 100).toFixed(2)} cm / ${(p99 * 100).toFixed(2)} cm / ${(max * 100).toFixed(1)} cm (bounds ${P99_BOUND_M * 100} cm / ${MAX_BOUND_M * 100} cm) |`,
+        `| samples interpolated / extrapolated / held | ${pct(modes.interpolated)} / ${pct(modes.extrapolated)} / ${pct(modes.held)} of ${total} |`,
+        `| interpolation delay p50 / max | ${percentile(delays, 0.5).toFixed(0)} ms / ${delays[delays.length - 1]?.toFixed(0)} ms |`,
+        `| longest stall of the test process / of relayed frames | ${maxTickGap.toFixed(0)} ms / ${maxFrameGap.toFixed(0)} ms |`,
+        `| member status changes seen (stale or away) | ${awayEvents} |`,
+        `| snapshots dropped by the simulator | ${lost} |`,
+        `| max in flight per direction / remote history | ${inFlight} msgs / ${maxRemoteSize} snapshots |`,
+        `| bytes down per client, whole session over race time | ${(downBytes.reduce((a, b) => a + b, 0) / downBytes.length / raceSeconds / 1024).toFixed(1)} KiB/s (record ${CAR_RECORD_BYTES} B) |`,
+        `| bytes up, host / guest, per race second | ${(upBytes[0]! / raceSeconds / 1024).toFixed(1)} / ${(upBytes[1]! / raceSeconds / 1024).toFixed(1)} KiB/s |`,
+      );
+
+      // Same phases, same start, same results for everyone.
       expect(phases).toEqual(
         rs.map(() => 'lobby > grid > formation > lights > racing > finished > results'),
       );
-      const starts = rs.map((r) => JSON.stringify(r.of('start')));
       expect(new Set(starts).size).toBe(1);
-      const results = rs.map((r) => JSON.stringify(r.last('results')));
       expect(new Set(results).size).toBe(1);
 
-      const rows = (rs[0] as Recorder).last('results')!.results.rows;
       // Each car runs at its own constant speed, so the classification is known. The
       // leader (highest seat, fastest) finishes the full distance; every other car takes
       // the flag on its first crossing at or after the leader's race time, which on the
@@ -176,17 +239,9 @@ describe(`soak: ${profile.name}`, () => {
       expect(
         rows.map((r) => ({ seat: r.seat, laps: r.laps, timeMs: r.timeMs, status: r.status })),
       ).toEqual(expected);
-      const rejected = drivers.flatMap((d) => d.rejections);
       expect(rejected).toEqual([]);
-      const flagged = rows
-        .filter((r) => r.flags.length > 0)
-        .map((r) => `${r.seat}:${r.flags.join('+')}`);
 
       // Interpolation error.
-      errors.sort((a, b) => a - b);
-      const p50 = percentile(errors, 0.5);
-      const p99 = percentile(errors, 0.99);
-      const max = errors[errors.length - 1] ?? Number.NaN;
       expect(errors.length).toBeGreaterThan(1000);
       expect(p99).toBeLessThan(P99_BOUND_M);
       expect(max).toBeLessThan(MAX_BOUND_M);
@@ -195,40 +250,9 @@ describe(`soak: ${profile.name}`, () => {
       expect(maxRemoteSize).toBeLessThanOrEqual(
         DEFAULT_REMOTE_CAR_OPTIONS.capacity * (HUMANS + AI - 1),
       );
-      const inFlight = Math.max(
-        ...nets.flatMap((n) => n.links.flatMap((l) => [l.up.maxInFlight, l.down.maxInFlight])),
-      );
       expect(inFlight).toBeLessThan(400);
       for (const r of rs) expect(r.client.snapshotStats.queuedReports).toBe(0);
       expect(serviceErrors()).toEqual([]);
-
-      // Numbers for the record.
-      const raceSeconds = (rows[rows.length - 1]!.timeMs ?? 0) / 1000;
-      const downBytes = nets.map((n) => n.links.reduce((s, l) => s + l.down.bytes, 0));
-      const upBytes = nets.map((n) => n.links.reduce((s, l) => s + l.up.bytes, 0));
-      const lost = nets.reduce(
-        (s, n) => s + n.links.reduce((t, l) => t + l.up.dropped + l.down.dropped, 0),
-        0,
-      );
-      const total = errors.length;
-      const pct = (n: number) => `${((100 * n) / total).toFixed(1)}%`;
-      delays.sort((a, b) => a - b);
-      report.push(
-        `Soak ${profile.name}: ${HUMANS} humans + ${AI} AI, ${profile.laps} laps of ${profile.lengthM} m`,
-        `| setting | value |`,
-        `| --- | --- |`,
-        `| latency / jitter / loss / duplication | ${CONDITIONS.latencyMs} ms / +-${CONDITIONS.jitterMs} ms / ${CONDITIONS.loss * 100}% / ${CONDITIONS.duplicate * 100}% |`,
-        `| wall time (join to results) | ${((Date.now() - started) / 1000).toFixed(1)} s, race ${raceSeconds.toFixed(1)} s |`,
-        `| phase sequence agreement | ${phases.length}/${phases.length} clients identical |`,
-        `| classification agreement | ${results.length}/${results.length} identical, ${rows.length} cars, rejected laps ${rejected.length}, flagged ${flagged.length ? flagged.join(', ') : 'none'} |`,
-        `| interpolation error p50 / p99 / max | ${(p50 * 100).toFixed(2)} cm / ${(p99 * 100).toFixed(2)} cm / ${(max * 100).toFixed(1)} cm (bounds ${P99_BOUND_M * 100} cm / ${MAX_BOUND_M * 100} cm) |`,
-        `| samples interpolated / extrapolated / held | ${pct(modes.interpolated)} / ${pct(modes.extrapolated)} / ${pct(modes.held)} of ${total} |`,
-        `| interpolation delay p50 / max | ${percentile(delays, 0.5).toFixed(0)} ms / ${delays[delays.length - 1]?.toFixed(0)} ms |`,
-        `| snapshots dropped by the simulator | ${lost} |`,
-        `| max in flight per direction / remote history | ${inFlight} msgs / ${maxRemoteSize} snapshots |`,
-        `| bytes down per client, whole session over race time | ${(downBytes.reduce((a, b) => a + b, 0) / downBytes.length / raceSeconds / 1024).toFixed(1)} KiB/s (record ${CAR_RECORD_BYTES} B) |`,
-        `| bytes up, host / guest, per race second | ${(upBytes[0]! / raceSeconds / 1024).toFixed(1)} / ${(upBytes[1]! / raceSeconds / 1024).toFixed(1)} KiB/s |`,
-      );
     } finally {
       if (sampler) clearInterval(sampler);
       for (const d of drivers) d.stop();
