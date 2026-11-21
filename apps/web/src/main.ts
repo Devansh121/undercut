@@ -71,10 +71,10 @@ function showLaunch(): void {
   launch = mountLaunchScreen(app as HTMLElement, {
     buildHash: __BUILD_HASH__,
     record: null,
-    onStart: () => {
+    onStart: (quickRace) => {
       // The Start click is the gesture that may start audio.
       audio.gesture();
-      start().catch(() => undefined);
+      start(quickRace ? {} : undefined).catch(() => undefined);
     },
   });
   void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
@@ -95,7 +95,7 @@ function showLaunch(): void {
   menuHandle = requestAnimationFrame(poll);
 }
 
-async function start(): Promise<DriveHandle> {
+async function start(quickRace?: { laps?: number }): Promise<DriveHandle> {
   if (drive) return drive;
   if (starting) return starting;
   launch?.setLoading(true);
@@ -118,6 +118,7 @@ async function start(): Promise<DriveHandle> {
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
+        ...(quickRace ? { quickRace } : {}),
         onQuit: () => showLaunch(),
       });
       drive = handle;

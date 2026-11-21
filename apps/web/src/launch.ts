@@ -6,7 +6,7 @@ export interface LaunchScreenOptions {
   buildHash: string;
   /** Best lap at the circuit from storage, if any. */
   record: number | null;
-  onStart(): void;
+  onStart(quickRace?: boolean): void;
 }
 
 export interface LaunchScreen {
@@ -26,17 +26,14 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const stage = el('div', 'launch__stage');
   const title = el('h1', 'launch__title', GAME_NAME);
   title.id = 'launch-title';
-  stage.append(
-    title,
-    el('p', 'launch__tagline', 'Open-wheel racing. One car, one circuit, the clock.'),
-  );
+  stage.append(title, el('p', 'launch__tagline', 'Open-wheel racing. Twenty cars, five laps.'));
 
   const bar = el('div', 'launch__bar');
   const mode = el('div', 'launch__mode');
   const modeIcon = el('span', 'launch__mode-icon');
   modeIcon.append(icon('stopwatch'));
   const modeText = el('div', 'launch__mode-text');
-  modeText.append(el('span', 'launch__mode-name', 'Time Trial, Monza'));
+  modeText.append(el('span', 'launch__mode-name', 'Quick Race, Monza'));
   const record = el('span', 'launch__mode-desc');
   modeText.append(record);
   mode.append(modeIcon, modeText);
@@ -47,12 +44,15 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   const startLabel = el('span', 'button__label', 'Start');
   const key = el('span', 'key', 'Enter');
   start.append(startLabel, key, icon('chevron'));
-  start.addEventListener('click', () => options.onStart());
+  start.addEventListener('click', () => options.onStart(true));
 
   const build = el('footer', 'launch__build');
   build.append('Build ', el('code', '', options.buildHash));
 
-  bar.append(mode, start, build);
+  const trial = el('button', 'button', 'Time Trial');
+  trial.type = 'button';
+  trial.addEventListener('click', () => options.onStart(false));
+  bar.append(mode, start, trial, build);
   screen.append(stage, bar);
   root.replaceChildren(screen);
 

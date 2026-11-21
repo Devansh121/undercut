@@ -25,6 +25,7 @@ import type { DriveHandle } from './drive';
 
 export interface DebugApi {
   start(): Promise<void>;
+  startQuickRace(laps?: number): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
   teleport(s: number, d?: number, kmh?: number): void;
@@ -100,7 +101,7 @@ export function debugEnabled(): boolean {
 
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
-  start: () => Promise<DriveHandle>,
+  start: (quickRace?: { laps?: number }) => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   audioStatus: () => string,
   audioCapability: () => { supported: boolean; fallback: string | null },
@@ -124,6 +125,11 @@ export function installDebugApi(
     return {
       screen: 'drive',
       phase: s.phase,
+      racePhase: s.race.control.phase,
+      cars: s.race.world.cars.length,
+      raceResult: s.result,
+      standings: s.race.control.standings(),
+      raceEvents: s.raceEvents.slice(-30),
       paused: d.loop.paused,
       tick: s.world.tick,
       time: s.world.time,
@@ -149,9 +155,16 @@ export function installDebugApi(
       ghost: s.ghost !== null,
     };
   };
+  const needQuit = (): void => {
+    getDrive()?.quit();
+  };
   window.__undercut = {
     start: async () => {
       if (!getDrive()) await start();
+    },
+    startQuickRace: async (laps = 5) => {
+      needQuit();
+      await start({ laps });
     },
     state,
     telemetry,

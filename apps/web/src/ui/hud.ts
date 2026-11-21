@@ -42,6 +42,7 @@ export interface HudState {
   ghostX: number | null;
   ghostZ: number | null;
   message: HudMessage | null;
+  opponents?: readonly { x: number; z: number }[];
 }
 
 const REV_COLOURS = ['g', 'g', 'g', 'g', 'g', 'r', 'r', 'r', 'r', 'r', 'b', 'b', 'b', 'b', 'b'];
@@ -68,6 +69,7 @@ export class Hud {
   private readonly msgText: Text;
   private readonly invalidEl: HTMLElement;
   private readonly dot: SVGCircleElement;
+  private readonly opponentDots: SVGCircleElement[] = [];
   private readonly ghostDot: SVGCircleElement;
   private readonly plan: MinimapPlan;
   private lastErs = '';
@@ -192,6 +194,11 @@ export class Hud {
       opacity: 0,
     });
     this.dot = svg('circle', { r: 5, fill: '#3d6fe0', stroke: '#f2f0eb', 'stroke-width': 2 });
+    for (let i = 0; i < 19; i++) {
+      const dot = svg('circle', { r: '2', fill: '#b6bdc8', opacity: '0' });
+      this.opponentDots.push(dot);
+      s.append(dot);
+    }
     s.append(this.ghostDot, this.dot);
     map.append(mHead, s);
 
@@ -241,6 +248,15 @@ export class Hud {
   update(h: HudState): void {
     const t = this.t;
     t.circuit?.set(h.circuit);
+    this.opponentDots.forEach((dot, i) => {
+      const p = h.opponents?.[i];
+      dot.setAttribute('opacity', p ? '1' : '0');
+      if (p) {
+        const [x, y] = this.plan.project(p.x, p.z);
+        dot.setAttribute('cx', x.toFixed(1));
+        dot.setAttribute('cy', y.toFixed(1));
+      }
+    });
     t.mapName?.set(h.circuit);
     t.mapLen?.set(`${h.lengthKm} km`);
     t.lap?.set(h.lap > 0 ? String(h.lap) : 'Out lap');

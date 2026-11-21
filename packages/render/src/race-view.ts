@@ -431,6 +431,19 @@ export class RaceView {
    * the given liveries, for the grid station and the full-field performance run. `count` 0
    * clears them.
    */
+  /** Interpolated race fleet, player excluded. Livery indices follow entrant order. */
+  setRaceCars(poses: readonly CarPose[], drs: readonly number[]): void {
+    if (this.fleet.size !== poses.length) {
+      this.fleet.clear();
+      poses.forEach((pose, i) => {
+        const livery = this.fleetLiveries[i + 1];
+        if (livery) this.fleet.add(livery, pose);
+      });
+      this.environment.register(this.fleet.group);
+    }
+    poses.forEach((pose, i) => this.fleet.setPose(i, pose, drs[i] ?? 0));
+  }
+
   setGridCars(count: number, playerPose: CarPose): void {
     this.fleet.clear();
     if (count <= 0 || this.fleetLiveries.length === 0) return;

@@ -1,3 +1,7 @@
+import { createAiField, type SessionResult, type AiController } from '@undercut/race';
+import { decodeEnvelope, decodeRacingLine } from '@undercut/ai';
+import raceLine from '../../../../packages/ai/data/monza-low.line.json';
+import raceEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
 import {
   InputController,
   RaceSession,
@@ -57,6 +61,7 @@ export type SessionEvent =
 
 export interface DriveSessionOptions {
   track: Track;
+  quickRace?: { laps?: number };
   seed: number;
   params?: CarParams;
   /** All-time best for this circuit, from storage. */
@@ -75,6 +80,11 @@ export interface DriveSessionOptions {
  * Pure: no DOM, no renderer, no clock; the game loop drives `tick`.
  */
 export class DriveSession {
+  readonly quickRace: boolean;
+  private playerPilot: AiController | null = null;
+  scriptedRaceDriver = false;
+  readonly raceEvents: RaceEvent[] = [];
+  result: SessionResult | null = null;
   readonly track: Track;
   readonly race: RaceSession;
   readonly world: World;
@@ -110,6 +120,7 @@ export class DriveSession {
   private readonly today: string;
 
   constructor(options: DriveSessionOptions) {
+    this.quickRace = options.quickRace !== undefined;
     this.track = options.track;
     this.params = options.params ?? createCarParams('low');
     this.today = options.today ?? '';
@@ -124,19 +135,46 @@ export class DriveSession {
     };
     const record = options.record ?? null;
     const limits = options.limits;
+    const field = this.quickRace
+      ? createAiField({
+          track: this.track,
+          params: this.params,
+          line: decodeRacingLine(raceLine),
+          envelope: decodeEnvelope(raceEnvelope),
+          count: 20,
+          seed: options.seed,
+        })
+      : [];
+
+    this.playerPilot = field[0] ?? null;
     this.race = new RaceSession({
       track: this.track,
-      session: { kind: 'timeTrial' },
+      session: this.quickRace
+        ? { kind: 'race', laps: options.quickRace?.laps ?? 5 }
+        : { kind: 'timeTrial' },
       seed: options.seed,
       params: this.params,
-      fuel: TIME_TRIAL_FUEL,
+      fuel: this.quickRace ? 10 : TIME_TRIAL_FUEL,
       step: SIM_STEP,
       rollingStart: { before: ROLLING_START_RUN_UP, speed: ROLLING_START_SPEED },
       cars: [
         {
           entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0 },
-          controller: new InputController((_ctx, out) => this.drive(out)),
+          controller: new InputController((ctx, out) => {
+            if (this.scriptedRaceDriver && this.playerPilot) this.playerPilot.control(ctx, out);
+            else this.drive(out);
+          }),
         },
+        ...field.slice(1).map((controller, i) => ({
+          entrant: {
+            id: `driver${i + 1}`,
+            name: `Driver ${i + 1}`,
+            code: `D${i + 1}`,
+            team: Math.floor((i + 1) / 2),
+          },
+          controller,
+          ersMode: controller.driver.ersMode,
+        })),
       ],
       ...(record ? { record: { lap: record.lap, sectors: record.bestSectors } } : {}),
       ...(limits ? { limits: () => limits } : {}),
@@ -149,6 +187,13 @@ export class DriveSession {
 
   /** The player's input for this tick, with the device's assists, written into the car. */
   private drive(out: ControlInput): void {
+    if (
+      this.quickRace &&
+      (this.race.control.phase === 'grid' || this.race.control.phase === 'lights')
+    ) {
+      Object.assign(out, this.pending, { throttle: 0, brake: 1, gearShift: 0 });
+      return;
+    }
     const control = this.pending;
     const car = this.car;
     const a = this.assistValue;
@@ -296,7 +341,18 @@ export class DriveSession {
     }
     Object.assign(this.pending, control);
     const events: SessionEvent[] = [];
-    for (const e of this.race.tick()) this.onRaceEvent(e, events);
+    for (const e of this.race.tick()) {
+      if (this.quickRace) {
+        this.raceEvents.push(e);
+        if (this.raceEvents.length > 500) this.raceEvents.shift();
+        if (e.type === 'sessionEnd') {
+          this.result = this.race.result();
+          this.end();
+        }
+        if (e.type === 'finish' && e.car === 0) this.result = this.race.result();
+      }
+      if (!('car' in e) || e.car === 0) this.onRaceEvent(e, events);
+    }
     if (this.timer.running && this.recorder.recording) {
       this.recorder.sample(
         this.timer.currentLapTime(this.world.time),
@@ -314,6 +370,7 @@ export class DriveSession {
    * both laps.
    */
   private onRaceEvent(e: RaceEvent, events: SessionEvent[]): void {
+    if (this.quickRace) return;
     switch (e.type) {
       case 'lapStart':
         events.push({ type: 'lapStart', lap: e.lap, time: e.time });

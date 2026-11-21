@@ -101,6 +101,7 @@ export interface DriveOptions {
   touch: boolean;
   seed: number;
   today: string;
+  quickRace?: { laps?: number };
   onQuit(): void;
   /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
@@ -205,7 +206,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = Track.fromJSON(monza);
   const records = o.records;
   const record = await records.load(track.id);
-  const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
+  const session = new DriveSession({
+    track,
+    seed: o.seed,
+    record,
+    today: o.today,
+    ...(o.quickRace ? { quickRace: o.quickRace } : {}),
+  });
   const params = session.params;
   const mass = computeMass(session.car.state.model, TIME_TRIAL_FUEL, {
     total: 0,
@@ -265,7 +272,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const tod =
     TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ?? MONZA_AFTERNOON;
   let quality = o.quality;
-  const loading = mountLoadingScreen(o.host, track.name, 'Time trial');
+  const loading = mountLoadingScreen(
+    o.host,
+    track.name,
+    session.quickRace ? 'Quick Race' : 'Time trial',
+  );
   let view: RaceView;
   try {
     view = await loadView(quality, loading);
@@ -493,6 +504,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // Frame loop.
   const pose = createCarPose();
   const ghostPose = createCarPose();
+  const fleetPoses = Array.from({ length: session.quickRace ? 19 : 0 }, createCarPose);
+  const fleetDrs = new Array<number>(fleetPoses.length).fill(0);
+  const raceStatus = document.createElement('div');
+  raceStatus.className = 'panel';
+  raceStatus.dataset.testid = 'race-status';
+  raceStatus.style.cssText =
+    'position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:12px 20px;white-space:pre-line;text-align:center;max-height:70vh;overflow:auto';
+  if (session.quickRace) o.host.append(raceStatus);
+
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
@@ -579,6 +599,24 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             0,
             Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
           );
+    if (session.quickRace) {
+      fleetPoses.forEach((p, i) => {
+        const c = session.race.worldCar(i + 1);
+        interpolateCarPose(c.previousPose, c.pose, loop.alpha, p);
+        fleetDrs[i] = c.state.drsPosition;
+      });
+      view.setRaceCars(fleetPoses, fleetDrs);
+      const c = session.race.control;
+      const row = c.standings().find((r) => r.car === 0);
+      raceStatus.textContent = session.result
+        ? 'Race result\n' +
+          session.result.entries.map((e) => `${e.position}  ${e.code}  ${e.status}`).join('\n')
+        : c.phase === 'grid'
+          ? 'Quick Race · 20 cars · 5 laps'
+          : c.phase === 'lights'
+            ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
+            : `P${row?.position ?? 20} / 20 · Lap ${Math.min(session.timer.lap, o.quickRace?.laps ?? 5)} / ${o.quickRace?.laps ?? 5}`;
+    }
     view.render({
       pose,
       ghost: ghostOn ? ghostPose : null,
@@ -631,6 +669,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     h.carZ = pose.z;
     h.ghostX = ghostOn ? ghostPose.x : null;
     h.ghostZ = ghostOn ? ghostPose.z : null;
+    h.opponents = fleetPoses;
     h.message = message;
     hud.update(h);
     overlay?.update();
@@ -816,7 +855,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         setSource('script');
       }
     },
-    autopilot: (on) => setSource(on ? 'pilot' : 'human'),
+    autopilot: (on) => {
+      if (session.quickRace) session.scriptedRaceDriver = on;
+      else setSource(on ? 'pilot' : 'human');
+    },
     events: () => log.slice(),
     hudText: () => {
       const q = (id: string): string =>
