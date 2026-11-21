@@ -11,6 +11,7 @@ import { HIGH_KERB, type Track } from '@undercut/track';
 import {
   SurfaceKind,
   applyAssists,
+  checkCarInvariants,
   computeMass,
   createAssistState,
   createCarParams,
@@ -18,12 +19,14 @@ import {
   createCarTelemetry,
   createSurfaceHint,
   createSurfaceSample,
+  invariantLimits,
   readCarTelemetry,
   type AssistState,
   type CarParams,
   type CarPose,
   type CarTelemetry,
   type ControlInput,
+  type InvariantLimits,
   type MassState,
   type SurfaceHint,
   type World,
@@ -50,10 +53,11 @@ export type SessionPhase = 'ready' | 'running' | 'paused' | 'ended';
 
 export type SessionEvent =
   | TimingEvent
-  | { type: 'invalidated'; reason: 'limits' | 'reset' }
+  | { type: 'invalidated'; reason: 'limits' | 'reset' | 'safety' }
   /** Something to persist: a new best lap, better sector minima, or both. */
   | { type: 'record'; circuit: string; update: RecordUpdate }
-  | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' };
+  /** `safety`: the car's pose broke the sim's invariants and the session put it back. */
+  | { type: 'reset'; reason: 'track' | 'restart' | 'teleport' | 'safety' };
 
 export interface DriveSessionOptions {
   track: Track;
@@ -108,6 +112,9 @@ export class DriveSession {
   private readonly sample = createSurfaceSample();
   private readonly telemetry: CarTelemetry = createCarTelemetry();
   private readonly today: string;
+  private readonly poseLimits: InvariantLimits;
+  private safetyResetsValue = 0;
+  private wallHitsValue = 0;
 
   constructor(options: DriveSessionOptions) {
     this.track = options.track;
@@ -145,6 +152,21 @@ export class DriveSession {
     this.car = this.race.worldCar(0);
     this.timer = this.race.control.timer(0);
     this.ghostValue = record?.ghost ? decodeGhost(record.ghost) : null;
+    this.poseLimits = invariantLimits(this.car.state.model);
+  }
+
+  /**
+   * How many times the safety net put the car back because its pose broke the sim's
+   * invariants. The fixes are in the sim and the track; this is the last line, and it stays
+   * zero in normal play (a browser test checks).
+   */
+  get safetyResets(): number {
+    return this.safetyResetsValue;
+  }
+
+  /** Steps on which the car struck a barrier (moving into it) since the session began. */
+  get wallHits(): number {
+    return this.wallHitsValue;
   }
 
   /** The player's input for this tick, with the device's assists, written into the car. */
@@ -296,7 +318,13 @@ export class DriveSession {
     }
     Object.assign(this.pending, control);
     const events: SessionEvent[] = [];
+    const lastS = this.s;
     for (const e of this.race.tick()) this.onRaceEvent(e, events);
+    if (checkCarInvariants(this.car.state, this.poseLimits) !== null) {
+      this.safetyReset(lastS, events);
+      return events;
+    }
+    if (this.car.state.wallImpactSpeed > 0) this.wallHitsValue++;
     if (this.timer.running && this.recorder.recording) {
       this.recorder.sample(
         this.timer.currentLapTime(this.world.time),
@@ -335,6 +363,23 @@ export class DriveSession {
       default:
         break;
     }
+  }
+
+  /**
+   * The pose broke the invariants: back on the centreline where the car last was sane, the lap
+   * invalidated through the race engine (as a reset) and reported as a safety reset.
+   */
+  private safetyReset(lastS: number, events: SessionEvent[]): void {
+    this.safetyResetsValue++;
+    const pose = this.race.lapPose(lastS, 0);
+    this.place(pose.x, pose.z, pose.yaw, 0, events);
+    for (const e of this.race.control.invalidateLap(0, 'reset')) {
+      if (e.type === 'invalidated') {
+        this.recorder.cancel();
+        events.push({ type: 'invalidated', reason: 'safety' });
+      } else this.onRaceEvent(e, events);
+    }
+    events.push({ type: 'reset', reason: 'safety' });
   }
 
   /** Back to the rolling start; timing for the lap in progress is dropped. */
