@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runRace, runWeekend } from './lib/runner';
+import { expectCleanRace } from './lib/expect-race';
 
 // Nightly: twenty AI cars, race distance, and a race weekend. The product's acceptance test is a
 // scripted race weekend against nineteen AI cars with no stuck cars.
@@ -15,6 +16,14 @@ describe('twenty AI cars at Monza, race distance', () => {
     expect(run.cars.every((c) => c.beyondBarrier <= 0)).toBe(true);
     expect(run.cars.every((c) => c.longestContact < 5)).toBe(true);
   });
+});
+
+describe('Quick Race on more seeds, with pit stops', () => {
+  for (const seed of [2, 3, 4, 404]) {
+    it(`seed ${seed}`, () => {
+      expectCleanRace(runRace({ cars: 20, laps: 5, seed }), 5);
+    }, 600_000);
+  }
 });
 
 describe('a race weekend at Monza', () => {
