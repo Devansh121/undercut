@@ -187,8 +187,9 @@ lobby or at the results, not mid-race (`race_in_progress`).
 The client pings six times 150 ms apart after joining, then every 2 s. For a ping sent at
 local time `t0`, answered with server time `S`, received at `t1`: offset `S - (t0+t1)/2`,
 error at most `(t1-t0)/2`. The estimate is the median offset of the fastest third of the
-last 16 samples, and its error bound is half the slowest round trip among those. The
-client exposes `serverNow()` and `localTimeOf(serverTime)`.
+last 16 samples, and its error bound is half the slowest round trip among those plus
+1 ms, because the service's clock (`Date.now()` in the Workers runtime) has whole
+milliseconds and a stamp can be up to 1 ms early. The client exposes `serverNow()` and `localTimeOf(serverTime)`.
 
 ## The start
 
@@ -350,7 +351,11 @@ friends; a public mode would need server-side simulation checks.
 One Durable Object per room code, using the WebSocket hibernation API, so an idle lobby
 costs nothing. While cars are on track, snapshot traffic and a 500 ms alarm keep it
 awake. The machine's state is written to storage after every control event (not after
-snapshots), so a room survives eviction in the lobby and results. An alarm is kept at the
+snapshots), so a room survives eviction in the lobby and results. The runtime holds
+outgoing messages until a write is durable (its output gate). In the lobby and results
+writes are confirmed that way; while cars are on track they are written unconfirmed
+(`allowUnconfirmed`), so snapshot relays are never held behind the disk, and an eviction
+mid-race may lose the last few control events. An alarm is kept at the
 machine's next deadline; later deadlines never move an earlier alarm, so snapshot traffic
 does not write alarms. Snapshot bookkeeping (last snapshot per car) lives in memory only.
 
@@ -403,7 +408,7 @@ const remote = client.remoteCars.sample(client.serverNow()!);  // interpolated v
 | Command | What |
 | --- | --- |
 | `npm test` | validators (with fuzzing), snapshot codec bounds (including the angle seam), the state machine (every phase x every message, plus scenarios), timing referee, the flag's independence from arrival order (property test), classification, client library against an in-memory room, network simulator |
-| `npm run test:rooms` | real WebSockets against `wrangler dev`: endpoints, invalid input, strikes, rate limits, creation limit, a full three-lap race with two humans and host AI (synchronised start, fan-out, identical classification, rematch), leaving, host migration mid-race with AI handover, reconnect within and after grace, a race-time cheat refused, a silent retired host losing the AI, results resent on reconnect, socket admission limits, the client address set by both local proxies, and a short soak |
+| `npm run test:rooms` | real WebSockets against `wrangler dev`: endpoints, invalid input, strikes, rate limits, creation limit, a full three-lap race with two humans and host AI (synchronised start, fan-out, identical classification, rematch), leaving, host migration mid-race with AI handover, reconnect within and after grace, a race-time cheat refused, a silent retired host losing the AI, results resent on reconnect, socket admission limits, the client address set by both local proxies; then the short soak on its own (`rooms-soak-short`) |
 | `npm run test:soak` | both nightly soaks: `test:soak:sim` (reference driver) and `test:soak:rooms` (this soak at full length) |
 
 **Soak** (`tools/netsim/soak.runtime.test.ts`): eight headless clients, each behind the
@@ -414,7 +419,10 @@ schedules and classifications on all clients, the expected finishing order with 
 rejected lap, remote-car error under 10 cm at the 99th percentile and 3 m at worst (both
 derived in the file), bounded buffers and in-flight queues, and no errors in the service
 log. The service clock is the real one, so the race runs in real time: 3 laps (about 30 s)
-in CI, 12 laps (about 4 minutes) nightly.
+in CI, 12 laps (about 4 minutes) nightly. It runs alone, after the other runtime tests:
+centimetre-level error needs the service not to be starved of CPU by other races on a
+four-core CI runner. Its report includes the longest stall of the test process and of
+relayed frames, so starvation shows up as such rather than as a netcode error.
 
 The simulator treats snapshots as an unreliable stream (delayed independently, so jitter
 reorders them; dropped; duplicated) and control messages as TCP does (in order, once;

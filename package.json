@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tools/audio/tsconfig.json && tsc --noEmit -p tools/audio/browser-check/tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run --project unit",
     "test:physics": "vitest run --project physics",
-    "test:rooms": "vitest run --project rooms",
+    "test:rooms": "vitest run --project rooms && vitest run --project rooms-soak-short",
     "test:browser": "playwright test",
     "test:soak": "npm run test:soak:sim && npm run test:soak:rooms",
     "test:soak:sim": "vitest run --project soak",

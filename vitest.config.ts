@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
-// Projects map onto CI jobs: `unit`, `physics` and `rooms`, and the nightly `soak` and
-// `rooms-soak` (`npm run test:soak` runs both). Names must be unique.
+// Projects map onto CI jobs: `unit`, `physics` and `rooms` (with `rooms-soak-short` after
+// it), and the nightly `soak` and `rooms-soak` (`npm run test:soak` runs both). Names
+// must be unique.
 // Run one with `vitest run --project <name>` (see the npm scripts).
 export default defineConfig({
   test: {
@@ -42,18 +43,28 @@ export default defineConfig({
         },
       },
       {
-        // The real Workers runtime: the rooms service, the local server's lifecycle and
-        // a short network-simulator soak. Protocol logic is unit-tested in `unit`.
+        // The real Workers runtime: the rooms service and the local server's lifecycle.
+        // Protocol logic is unit-tested in `unit`.
         test: {
           name: 'rooms',
           environment: 'node',
-          include: [
-            'services/rooms/test/**/*.test.ts',
-            'tools/serve/**/*.runtime.test.mjs',
-            'tools/netsim/**/*.runtime.test.ts',
-          ],
+          include: ['services/rooms/test/**/*.test.ts', 'tools/serve/**/*.runtime.test.mjs'],
           globalSetup: ['services/rooms/test/global-setup.ts'],
           testTimeout: 90_000,
+          hookTimeout: 60_000,
+        },
+      },
+      {
+        // The short soak, run on its own after `rooms` (`npm run test:rooms`): it measures
+        // remote-car error to the centimetre, which needs the service not to be starved
+        // by other races running beside it on a small CI runner.
+        test: {
+          name: 'rooms-soak-short',
+          environment: 'node',
+          include: ['tools/netsim/**/*.runtime.test.ts'],
+          globalSetup: ['services/rooms/test/global-setup.ts'],
+          env: { SOAK: 'short' },
+          testTimeout: 5 * 60_000,
           hookTimeout: 60_000,
         },
       },
