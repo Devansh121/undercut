@@ -76,7 +76,7 @@ export class TrackSurface implements SurfaceSampler {
     }
     hint.index = this.lapHint.index + segs * (pitIndex + 1);
 
-    const nrm = track.groundNormal(s, d, g, this.t);
+    const nrm = track.groundNormal(g, this.t);
     out.normalX = nrm.x;
     out.normalY = nrm.y;
     out.normalZ = nrm.z;

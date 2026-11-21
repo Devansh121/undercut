@@ -74,10 +74,26 @@ export interface Ground {
   highKerb: boolean;
   /** Sample index of the lap used for the discrete zone data. */
   sample: number;
+  /** Unit lap tangent, curvature and the offset d at the point, for `groundNormal`. */
+  tx: number;
+  tz: number;
+  curvature: number;
+  d: number;
 }
 
 export function createGround(): Ground {
-  return { height: 0, slopeD: 0, slopeS: 0, kind: SurfaceKind.Asphalt, highKerb: false, sample: 0 };
+  return {
+    height: 0,
+    slopeD: 0,
+    slopeS: 0,
+    kind: SurfaceKind.Asphalt,
+    highKerb: false,
+    sample: 0,
+    tx: 1,
+    tz: 0,
+    curvature: 0,
+    d: 0,
+  };
 }
 
 function unrun<T, U>(
@@ -395,22 +411,35 @@ export class Track {
    */
   ground(s: number, d: number, out: Ground): Ground {
     const lap = this.lap;
-    const i = lap.sampleIndex(s);
+    lap.seek(s);
+    const i0 = lap.cursor;
+    const f = lap.cursorT;
+    const j = lap.next(i0);
+    const i = f < 0.5 ? i0 : j;
     const side: SideIndex = d >= 0 ? LEFT : RIGHT;
     const sign = side === LEFT ? 1 : -1;
     const a = d * sign;
-    const hw = lap.interpolate(this.halfWidth[side], s);
-    const tb = lap.interpolate(this.tanBank, s);
-    const yc = lap.interpolate(lap.y, s);
-    // d(tan bank)/ds from the neighbouring samples, for the along-track slope.
-    const j = lap.next(i);
-    const dtb = (this.tanBank[j]! - this.tanBank[i]!) / lap.chord[i]!;
+    const hws = this.halfWidth[side];
+    const hw = hws[i0]! + (hws[j]! - hws[i0]!) * f;
+    const tbs = this.tanBank;
+    const tb = tbs[i0]! + (tbs[j]! - tbs[i0]!) * f;
+    const yc = lap.y[i0]! + (lap.y[j]! - lap.y[i0]!) * f;
+    const grade = lap.grade[i0]! + (lap.grade[j]! - lap.grade[i0]!) * f;
+    // d(tan bank)/ds over this segment, for the along-track slope.
+    const dtb = (tbs[j]! - tbs[i0]!) / lap.chord[i0]!;
+    const tx = lap.tx[i0]! + (lap.tx[j]! - lap.tx[i0]!) * f;
+    const tz = lap.tz[i0]! + (lap.tz[j]! - lap.tz[i0]!) * f;
+    const tl = Math.sqrt(tx * tx + tz * tz);
+    out.tx = tx / tl;
+    out.tz = tz / tl;
+    out.curvature = lap.curvature[i0]! + (lap.curvature[j]! - lap.curvature[i0]!) * f;
+    out.d = d;
     out.sample = i;
     out.highKerb = false;
     if (a <= hw) {
       out.height = yc + d * tb;
       out.slopeD = tb;
-      out.slopeS = lap.interpolate(lap.grade, s) + d * dtb;
+      out.slopeS = grade + d * dtb;
       out.kind = a > hw - this.lineWidth ? SurfaceKind.Paint : SurfaceKind.Asphalt;
       return out;
     }
@@ -442,33 +471,30 @@ export class Track {
     }
     out.height = h;
     out.slopeD = sign * slope;
-    out.slopeS = lap.interpolate(lap.grade, s) + sign * hw * dtb;
+    out.slopeS = grade + sign * hw * dtb;
     out.kind = kind;
     return out;
   }
 
   /**
-   * Unit ground normal at (s, d) from a cross-section `g` computed there: the cross product of
-   * the tangent along the lap (stretched by 1 - curvature * d, as on a parallel offset curve) and
+   * Unit ground normal from a cross-section computed by `ground`: the cross product of the
+   * tangent along the lap (stretched by 1 - curvature * d, as on a parallel offset curve) and
    * the tangent across it.
    */
-  groundNormal(s: number, d: number, g: Ground, out: Vec3): Vec3 {
-    const t = this.lap.tangent(s, this.tmpNormal);
-    let m = 1 - this.curvatureAt(s) * d;
+  groundNormal(g: Ground, out: Vec3): Vec3 {
+    let m = 1 - g.curvature * g.d;
     if (m < 0.05) m = 0.05;
-    const nx = t.z;
-    const nz = -t.x;
-    const ax = g.slopeS * nz - m * t.z * g.slopeD;
+    const nx = g.tz;
+    const nz = -g.tx;
+    const ax = g.slopeS * nz - m * g.tz * g.slopeD;
     const ay = m;
-    const az = m * t.x * g.slopeD - g.slopeS * nx;
+    const az = m * g.tx * g.slopeD - g.slopeS * nx;
     const len = Math.sqrt(ax * ax + ay * ay + az * az);
     out.x = ax / len;
     out.y = ay / len;
     out.z = az / len;
     return out;
   }
-
-  private readonly tmpNormal = createVec3();
 
   /** Is (x, z), already projected to the lap at (s, d), on the pit-lane surface? Fills `out`. */
   onPitLane(

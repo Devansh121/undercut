@@ -215,6 +215,19 @@ export class TrackPath {
     return w < 0 ? w + this.length : w;
   }
 
+  /**
+   * Segment and parameter of s: after `seek(s)`, `cursor` is the segment's first sample and
+   * `cursorT` the fraction along it. Lets callers blend several arrays with one lookup.
+   */
+  seek(s: number): void {
+    this.locate(s);
+    this.cursor = this.li;
+    this.cursorT = this.lt;
+  }
+
+  cursor = 0;
+  cursorT = 0;
+
   private locate(s: number): void {
     let u = s / this.step;
     if (this.closed) {

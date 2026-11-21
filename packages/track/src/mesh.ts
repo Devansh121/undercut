@@ -221,7 +221,7 @@ function ribbon(
     cols.map((d, c) => {
       track.lap.pointAt(s, d, p);
       track.ground(s, d, g);
-      track.groundNormal(s, d, g, nrm);
+      track.groundNormal(g, nrm);
       return b.vertex(
         p.x,
         g.height + lift(sample, c),
@@ -490,7 +490,7 @@ function buildPit(track: Track, stride: number): { pit: MeshData; marks: MeshBui
     path.pointAt(sp, dp, p);
     track.project(p.x, p.z, hint, q);
     track.ground(q.s, q.d, g);
-    track.groundNormal(q.s, q.d, g, nrm);
+    track.groundNormal(g, nrm);
     return mb.vertex(p.x, g.height + lift, p.z, nrm.x, nrm.y, nrm.z, u, v, surface);
   };
   const pitRows: number[] = [];
@@ -531,7 +531,7 @@ function buildMarkings(track: Track, marks: MeshBuilder): MeshData {
   const vertexAt = (s: number, d: number, u: number, v: number): number => {
     track.lap.pointAt(s, d, p);
     track.ground(s, d, g);
-    track.groundNormal(s, d, g, nrm);
+    track.groundNormal(g, nrm);
     return marks.vertex(
       p.x,
       g.height + LIFT_MARKING,
