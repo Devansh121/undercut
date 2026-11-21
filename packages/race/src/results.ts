@@ -61,7 +61,8 @@ export interface SessionResult {
  *   unserved time penalties). A car is classified as a finisher only if it completed
  *   `classifiedShare` of the winner's laps, whether or not it took the flag; else it is not
  *   classified. Then retirements by
- *   distance, then disqualifications. A finisher that broke the two-compound rule (when it
+ *   distance, then disqualifications. Exact ties go to the order the cars took the flag, then
+ *   to the live classification. A finisher that broke the two-compound rule (when it
  *   applies) is disqualified. Points by `POINTS_TABLE` for classified finishers.
  * - Timed sessions: by best valid lap, then laps.
  */
@@ -118,8 +119,13 @@ export function buildResult(
       if (a.total !== null && b.total !== null && a.total !== b.total) return a.total - b.total;
       if (a.total !== null && b.total === null) return -1;
       if (b.total !== null && a.total === null) return 1;
+      // Exact ties: the order they took the flag (itself by time, then by position before
+      // the tick), then distance, then the live classification. Never the car number.
+      const fa = a.c.finishOrder;
+      const fb = b.c.finishOrder;
+      if (fa !== null && fb !== null && fa !== fb) return fa - fb;
       if (a.dist !== b.dist) return b.dist - a.dist;
-      return a.car - b.car;
+      return control.order.indexOf(a.car) - control.order.indexOf(b.car);
     });
   } else {
     const order = control.order;

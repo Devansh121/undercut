@@ -112,27 +112,38 @@ export class LimitsSystem implements RaceSystem<LimitsState> {
   }
 
   /**
-   * The car takes the flag at race distance `dist`: every place it still owes to a car behind
-   * it on the road (not finished, still running) is settled now, as a penalty, before the
-   * classification. A place taken in this very tick while off track counts too.
+   * The car takes the flag at race distance `dist`, at sim time `at`: every place it still owes
+   * to a car behind it on the road at that moment (not finished, still running; positions
+   * interpolated inside the tick) is settled now, as a penalty, before the classification. A
+   * place taken in this very tick while off track counts too.
    */
-  atFinish(core: RaceCore, car: number, dist: number): void {
+  atFinish(core: RaceCore, car: number, dist: number, at: number): void {
     if (core.strategy.limits !== 'race') return;
     const c = this.cars[car]!;
     const me = core.cars[car]!;
+    // Where another car was at the moment this one crossed the line: its distance interpolated
+    // inside the tick, like the crossing itself (its end-of-tick distance may already be past
+    // the line in a close finish).
+    const span = core.time - core.prevTime;
+    const f = span > 0 ? Math.min(1, Math.max(0, (at - core.prevTime) / span)) : 1;
+    const distAt = (j: number): number => {
+      const o = core.cars[j]!;
+      return o.prevDist + (o.dist - o.prevDist) * f;
+    };
     if (c.cutUntil !== null) {
       for (let k = 0; k < core.order.length; k++) {
         const j = core.order[k]!;
         if (j === car || !core.racing(j) || core.facts[j]!.inPitLane) continue;
         const other = core.cars[j]!;
-        if (me.prevDist < other.prevDist && dist > other.dist && !c.owed.some((o) => o.car === j)) {
+        if (me.prevDist < other.prevDist && dist > distAt(j) && !c.owed.some((o) => o.car === j)) {
           c.owed.push({ car: j, deadline: core.time });
         }
       }
     }
     for (const o of c.owed) {
       const other = core.cars[o.car]!;
-      if (other.status === 'running' && other.finishTime === null && other.dist < dist) {
+      // A car that took the flag earlier (this tick included) is ahead: the place was given back.
+      if (other.status === 'running' && other.finishTime === null && distAt(o.car) < dist) {
         core.penalise(car, 'leavingTrack', core.rules.cutPenalty);
       }
     }

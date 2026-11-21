@@ -714,7 +714,7 @@ export class RaceControl implements RaceCore {
   private finish(car: number, at: number, dist: number): void {
     const c = this.cars[car]!;
     if (c.status !== 'running' || c.finishTime !== null) return;
-    this.limits.atFinish(this, car, dist);
+    this.limits.atFinish(this, car, dist, at);
     c.finishTime = at;
     c.finishDist = dist;
     c.finishLaps = this.timers[car]!.lapsCompleted;
