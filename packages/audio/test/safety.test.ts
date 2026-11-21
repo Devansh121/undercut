@@ -54,6 +54,33 @@ describe('limiter', () => {
     expect(Math.max(samplePeak(l), samplePeak(r))).toBeLessThan(DEFAULT_LIMITER.ceiling);
   });
 
+  it('holds true peak under 0 dBFS on inputs with energy near Nyquist', () => {
+    // Detecting sample peaks alone lets the band-limited waveform overshoot between samples:
+    // a full-scale 8 kHz square wave came out at +0.19 dBTP before the detector oversampled.
+    const n = FS;
+    const cases: [string, (i: number) => number][] = [
+      ['square, 8 kHz', (i) => (Math.floor(i / 3) % 2 ? 5 : -5)],
+      ['square, 12 kHz', (i) => (Math.floor(i / 2) % 2 ? 3 : -3)],
+      [
+        'clipped sine, 9 kHz',
+        (i) => Math.max(-1, Math.min(1, 4 * Math.sin((2 * Math.PI * 9000 * i) / FS))),
+      ],
+    ];
+    for (const [name, f] of cases) {
+      const limiter = new SoftLimiter(FS);
+      const l = new Float64Array(n);
+      const r = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        l[i] = f(i);
+        r[i] = -f(i);
+      }
+      for (let i = 0; i < n; i += 128)
+        limiter.process(l.subarray(i, i + 128), r.subarray(i, i + 128), 128);
+      expect(truePeak(l), name).toBeLessThan(1);
+      expect(truePeak(r), name).toBeLessThan(1);
+    }
+  });
+
   it('holds the threshold without the clipper on a sudden overload', () => {
     const limiter = new SoftLimiter(FS);
     const l = new Float64Array(4800);

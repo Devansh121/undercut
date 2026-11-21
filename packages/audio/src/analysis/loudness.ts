@@ -1,3 +1,5 @@
+import { OVERSAMPLE, POLYPHASE, TAPS_PER_PHASE } from '../dsp/oversampling';
+
 /**
  * Loudness and level measures for rendered audio.
  *
@@ -119,46 +121,22 @@ export function maxStep(x: ArrayLike<number>, start = 1, end = x.length): number
   return m;
 }
 
-const OVERSAMPLE = 4;
-const TAPS_PER_PHASE = 16;
-let polyphase: Float64Array[] | undefined;
-
-/** Polyphase interpolation filter: Blackman-windowed sinc, cut off at the input Nyquist. */
-function interpolationFilter(): Float64Array[] {
-  if (polyphase) return polyphase;
-  const total = OVERSAMPLE * TAPS_PER_PHASE;
-  const centre = (total - 1) / 2;
-  const h = new Float64Array(total);
-  for (let n = 0; n < total; n++) {
-    const t = (n - centre) / OVERSAMPLE;
-    const sinc = t === 0 ? 1 : Math.sin(Math.PI * t) / (Math.PI * t);
-    const w =
-      0.42 -
-      0.5 * Math.cos((2 * Math.PI * n) / (total - 1)) +
-      0.08 * Math.cos((4 * Math.PI * n) / (total - 1));
-    h[n] = sinc * w;
-  }
-  polyphase = Array.from({ length: OVERSAMPLE }, (_, p) => {
-    const phase = new Float64Array(TAPS_PER_PHASE);
-    for (let t = 0; t < TAPS_PER_PHASE; t++) phase[t] = h[t * OVERSAMPLE + p] as number;
-    return phase;
-  });
-  return polyphase;
-}
-
 /**
  * True peak (BS.1770-4 Annex 2 method): the largest absolute value of the signal
  * oversampled 4x. Linear; 20·log10 gives dBTP.
  */
 export function truePeak(x: ArrayLike<number>): number {
-  const phases = interpolationFilter();
   let peak = samplePeak(x);
-  for (let n = 0; n < x.length; n++) {
-    for (const ph of phases) {
+  // Run the interpolator past the last sample (as if followed by silence) so that an
+  // overshoot after the final samples is measured too.
+  const end = x.length + TAPS_PER_PHASE;
+  for (let n = 0; n < end; n++) {
+    for (let p = 0; p < OVERSAMPLE; p++) {
       let acc = 0;
       for (let t = 0; t < TAPS_PER_PHASE; t++) {
         const idx = n - t;
-        if (idx >= 0) acc += (ph[t] as number) * (x[idx] as number);
+        if (idx >= 0 && idx < x.length)
+          acc += (POLYPHASE[p * TAPS_PER_PHASE + t] as number) * (x[idx] as number);
       }
       const a = Math.abs(acc);
       if (a > peak) peak = a;

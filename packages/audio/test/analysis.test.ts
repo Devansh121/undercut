@@ -74,6 +74,16 @@ describe('peaks and steps', () => {
     expect(truePeak(x)).toBeLessThan(1.03);
   });
 
+  it('includes the overshoot after the last sample (the interpolator tail)', () => {
+    // Four samples at 0.9 at the very end: the band-limited signal overshoots after them.
+    const x = new Float32Array(104);
+    x.fill(0.9, 100);
+    const flushed = new Float32Array(204);
+    flushed.fill(0.9, 100, 104);
+    expect(truePeak(x)).toBeGreaterThan(1);
+    expect(truePeak(x)).toBeCloseTo(truePeak(flushed), 9);
+  });
+
   it('measures the largest sample-to-sample step', () => {
     const x = new Float32Array([0, 0.1, 0.15, -0.2, -0.1]);
     expect(maxStep(x)).toBeCloseTo(0.35, 6);

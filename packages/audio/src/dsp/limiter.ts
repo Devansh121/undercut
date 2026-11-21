@@ -1,10 +1,15 @@
+import { INTERPOLATOR_DELAY, OVERSAMPLE, POLYPHASE, TAPS_PER_PHASE } from './oversampling';
+
 /**
- * Master-bus protection: a look-ahead peak limiter followed by a soft-knee clipper.
+ * Master-bus protection: a look-ahead true-peak limiter followed by a soft-knee clipper.
  *
- * The limiter is exact: the gain for each delayed sample is the moving average, over the
- * look-ahead window, of a sliding minimum of the gain every sample in that window needs.
- * Every value in that average is at most the gain the peak needs, so the delayed peak lands
- * at or under `threshold` with no overshoot, and the gain itself moves smoothly.
+ * The detector measures true peak: each input sample and the four points the 4× interpolator
+ * (the same one the true-peak meter uses) places around it, so overshoots between samples
+ * count. The limiter is exact on that measure: the gain for each delayed sample is the
+ * moving average, over the look-ahead window, of a sliding minimum of the gain every sample
+ * in that window needs. Every value in that average is at most the gain the peak needs, so
+ * the delayed peak lands at or under `threshold` with no overshoot, and the gain itself moves
+ * smoothly.
  * The clipper after it is the identity below `knee` and approaches `ceiling` asymptotically,
  * so no sample can reach `ceiling` whatever the input.
  */
@@ -37,6 +42,14 @@ export class SoftLimiter {
   private readonly minIndex: Int32Array;
   private readonly minValue: Float64Array;
   private readonly delay: number = 0;
+  /** Last TAPS_PER_PHASE inputs per channel, stored twice so a window is contiguous. */
+  private readonly histL = new Float64Array(2 * TAPS_PER_PHASE);
+  private readonly histR = new Float64Array(2 * TAPS_PER_PHASE);
+  private hpos = 0;
+  private readonly poly: Float64Array = POLYPHASE;
+  private readonly taps: number = TAPS_PER_PHASE;
+  private readonly phases: number = OVERSAMPLE;
+  private readonly lag: number = INTERPOLATOR_DELAY;
   private dpos = 0;
   private head = 0;
   private tail = 0;
@@ -53,9 +66,10 @@ export class SoftLimiter {
     private readonly opts: LimiterOptions = DEFAULT_LIMITER,
   ) {
     this.size = Math.max(1, Math.round(opts.lookahead * sampleRate));
-    // A peak entering now is covered by every average for the next `size` samples, so it
-    // is read out `size - 1` samples later, under the lowest of them.
-    this.delay = this.size - 1;
+    // The detector sees a sample INTERPOLATOR_DELAY samples after it arrives; from then a
+    // peak is covered by every average for the next `size` samples, so it is read out
+    // `size - 1` samples after that, under the lowest of them.
+    this.delay = this.size - 1 + INTERPOLATOR_DELAY;
     this.delayL = new Float64Array(Math.max(1, this.delay));
     this.delayR = new Float64Array(Math.max(1, this.delay));
     this.avgRing = new Float64Array(this.size).fill(1);
@@ -74,12 +88,44 @@ export class SoftLimiter {
   process(left: Float64Array, right: Float64Array, frames: number): void {
     const { threshold, knee, ceiling } = this.opts;
     const room = ceiling - knee;
+    // Module constants into locals: imported bindings can be slow to read in a hot loop.
+    const poly = this.poly;
+    const taps = this.taps;
+    const phases = this.phases;
+    const lag = this.lag;
     const size = this.size;
     const cap = size + 1;
     for (let i = 0; i < frames; i++) {
       const l = left[i] as number;
       const r = right[i] as number;
-      const peak = Math.max(Math.abs(l), Math.abs(r));
+      // True-peak detection for the sample INTERPOLATOR_DELAY behind the newest.
+      const hl = this.histL;
+      const hr = this.histR;
+      const hp = this.hpos;
+      hl[hp] = l;
+      hl[hp + taps] = l;
+      hr[hp] = r;
+      hr[hp + taps] = r;
+      // Newest sample at hp + taps; x[n - t] at hp + taps - t.
+      const newest = hp + taps;
+      let peak = Math.abs(hl[newest - lag] as number);
+      const pr = Math.abs(hr[newest - lag] as number);
+      if (pr > peak) peak = pr;
+      for (let ph = 0; ph < phases; ph++) {
+        const base = ph * taps;
+        let al = 0;
+        let ar = 0;
+        for (let t = 0; t < taps; t++) {
+          const c = poly[base + t] as number;
+          al += c * (hl[newest - t] as number);
+          ar += c * (hr[newest - t] as number);
+        }
+        if (al < 0) al = -al;
+        if (ar < 0) ar = -ar;
+        if (al > peak) peak = al;
+        if (ar > peak) peak = ar;
+      }
+      this.hpos = hp + 1 === taps ? 0 : hp + 1;
       const need = peak > threshold ? threshold / peak : 1;
 
       // Sliding minimum over the last `size` samples (monotonic deque in a ring).
