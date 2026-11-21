@@ -4,6 +4,7 @@ import {
   createTyreCurve,
   createTyreForce,
   lateralMu,
+  longitudinalMu,
   tyreForce,
 } from '../src/index';
 
@@ -42,7 +43,7 @@ describe('tyre model', () => {
     expect(fyPeak / FZ).toBeCloseTo(REFERENCE_CAR.tyre.muY, 6);
     const [fxPeak, kappaAt] = peakOver(2000, (k) => tyreForce(curve, FZ, k, 0, 1, out).fx, 0.6);
     expect(kappaAt).toBeCloseTo(REFERENCE_CAR.tyre.peakSlipRatio, 3);
-    expect(fxPeak / FZ).toBeCloseTo(REFERENCE_CAR.tyre.muY * REFERENCE_CAR.tyre.muXRatio, 6);
+    expect(fxPeak / FZ).toBeCloseTo(REFERENCE_CAR.tyre.muX, 6);
   });
 
   it('keeps sliding friction below the peak: about 0.76 locked, 0.85 sideways', () => {
@@ -54,11 +55,25 @@ describe('tyre model', () => {
     expect(sideways).toBeLessThan(0.9);
   });
 
-  it('loses friction coefficient with load (doc 1.2: −5e-5 per N)', () => {
-    const mu = REFERENCE_CAR.tyre.muY;
-    expect(lateralMu(curve, 3000)).toBeCloseTo(mu, 9);
-    expect(lateralMu(curve, 8000)).toBeCloseTo(mu - 0.25, 9);
-    expect(lateralMu(curve, 1e6)).toBe(REFERENCE_CAR.tyre.muMin);
+  it('loses friction coefficient with load, each direction at its own rate', () => {
+    const t = REFERENCE_CAR.tyre;
+    expect(lateralMu(curve, 3000)).toBeCloseTo(t.muY, 9);
+    expect(lateralMu(curve, 8000)).toBeCloseTo(t.muY + 5000 * t.loadSensitivityY, 9);
+    expect(longitudinalMu(curve, 3000)).toBeCloseTo(t.muX, 9);
+    expect(longitudinalMu(curve, 8000)).toBeCloseTo(t.muX + 5000 * t.loadSensitivityX, 9);
+    expect(lateralMu(curve, 1e6)).toBe(t.muMin);
+    expect(longitudinalMu(curve, 1e6)).toBe(t.muMin);
+  });
+
+  it('sets longitudinal and lateral peak friction independently', () => {
+    const other = createTyreCurve({ ...REFERENCE_CAR.tyre, muX: 1.2, loadSensitivityX: -2e-4 });
+    for (const fz of [1000, 3000, 6000, 9000]) {
+      expect(lateralMu(other, fz)).toBe(lateralMu(curve, fz));
+      const pure = tyreForce(other, fz, 0, 0.3, 1, createTyreForce());
+      const ref = tyreForce(curve, fz, 0, 0.3, 1, createTyreForce());
+      expect(pure.fy).toBe(ref.fy);
+      expect(pure.dx).toBeCloseTo(longitudinalMu(other, fz) * fz, 9);
+    }
   });
 
   it('stays inside the friction ellipse under combined slip', () => {

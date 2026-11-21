@@ -1,7 +1,9 @@
 import type { TyreParams } from './params';
 
 /**
- * Steady-state tyre force: a Pacejka-style magic formula with load-sensitive friction and a
+ * Steady-state tyre force: a Pacejka-style magic formula with load-sensitive friction, set
+ * separately for the longitudinal and lateral directions (peak and load slope each, as the
+ * magic formula's pDx1/pDx2 and pDy1/pDy2 are), and a
  * combined-slip method based on normalised slip (the "similarity" approach).
  *
  * Each slip is divided by the slip at which its pure-slip force peaks, giving sx and sy. The
@@ -23,9 +25,10 @@ export interface TyreCurve {
   /** B of the normalised curve: tan(π / 2C) puts the peak at s = 1 when E = 0. */
   readonly stiffX: number;
   readonly stiffY: number;
+  readonly muX: number;
   readonly muY: number;
-  readonly muXRatio: number;
-  readonly loadSensitivity: number;
+  readonly loadSensitivityX: number;
+  readonly loadSensitivityY: number;
   readonly referenceLoad: number;
   readonly muMin: number;
 }
@@ -38,9 +41,10 @@ export function createTyreCurve(p: TyreParams): TyreCurve {
     shapeY: p.shapeY,
     stiffX: Math.tan(Math.PI / (2 * p.shapeX)),
     stiffY: Math.tan(Math.PI / (2 * p.shapeY)),
+    muX: p.muX,
     muY: p.muY,
-    muXRatio: p.muXRatio,
-    loadSensitivity: p.loadSensitivity,
+    loadSensitivityX: p.loadSensitivityX,
+    loadSensitivityY: p.loadSensitivityY,
     referenceLoad: p.referenceLoad,
     muMin: p.muMin,
   };
@@ -48,7 +52,13 @@ export function createTyreCurve(p: TyreParams): TyreCurve {
 
 /** Peak lateral friction coefficient at load `fz` (linear load sensitivity, floored). */
 export function lateralMu(curve: TyreCurve, fz: number): number {
-  const mu = curve.muY + curve.loadSensitivity * (fz - curve.referenceLoad);
+  const mu = curve.muY + curve.loadSensitivityY * (fz - curve.referenceLoad);
+  return mu > curve.muMin ? mu : curve.muMin;
+}
+
+/** Peak longitudinal friction coefficient at load `fz` (linear load sensitivity, floored). */
+export function longitudinalMu(curve: TyreCurve, fz: number): number {
+  const mu = curve.muX + curve.loadSensitivityX * (fz - curve.referenceLoad);
   return mu > curve.muMin ? mu : curve.muMin;
 }
 
@@ -84,9 +94,8 @@ export function tyreForce(
     out.dy = 0;
     return out;
   }
-  const muY = lateralMu(curve, fz) * grip;
-  const dy = muY * fz;
-  const dx = muY * curve.muXRatio * fz;
+  const dy = lateralMu(curve, fz) * grip * fz;
+  const dx = longitudinalMu(curve, fz) * grip * fz;
   const sx = kappa / curve.peakSlipRatio;
   const sy = tanAlpha / curve.peakSlipTan;
   const s = Math.sqrt(sx * sx + sy * sy);

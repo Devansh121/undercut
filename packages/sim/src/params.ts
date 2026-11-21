@@ -61,11 +61,12 @@ export interface TyreParams {
    * deceleration (4.7 g, [21][47]) with the hardware-derived brakes, it comes out at 1.80.
    */
   muY: number;
-  /** Peak longitudinal friction as a share of lateral. Doc 1.2: 0.9 ([44] 0.89–0.91). */
-  muXRatio: number;
-  /** d(mu)/d(Fz), 1/N. Doc 1.2: −5e-5 ([44]). */
-  loadSensitivity: number;
-  /** Reference load for `muY`, N. Doc 1.2: 3 kN. */
+  /** Peak longitudinal friction at the reference load. Doc 1.2: 0.9 × μy ([44] 0.89–0.91). */
+  muX: number;
+  /** d(mu)/d(Fz) of each, 1/N. Doc 1.2: −5e-5 ([44]) for μy, the same share for μx. */
+  loadSensitivityY: number;
+  loadSensitivityX: number;
+  /** Reference load for `muY` and `muX`, N. Doc 1.2: 3 kN. */
   referenceLoad: number;
   /** Floor on the load-sensitive friction so very high loads stay physical. Estimate. */
   muMin: number;
@@ -373,8 +374,9 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
     verticalStiffness: 300e3,
     verticalDamping: 7000,
     muY: 1.8,
-    muXRatio: 0.9,
-    loadSensitivity: -5e-5,
+    muX: 1.62,
+    loadSensitivityY: -5e-5,
+    loadSensitivityX: -4.5e-5,
     referenceLoad: 3000,
     muMin: 0.9,
     peakSlipRatio: 0.1,

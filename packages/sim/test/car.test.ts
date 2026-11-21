@@ -18,6 +18,7 @@ import {
   engineFullLoadTorque,
   fuelFlow,
   lateralMu,
+  longitudinalMu,
   radToRpm,
   restoreCar,
   rpmToRad,
@@ -443,7 +444,7 @@ describe('tyre force limit at low speed', () => {
     const fz = car.load[i]!;
     if (fz <= 0) return 0;
     const dy = lateralMu(curve, fz) * fz * car.gripScale[i]!;
-    const dx = dy * curve.muXRatio;
+    const dx = longitudinalMu(curve, fz) * fz * car.gripScale[i]!;
     return (car.forceX[i]! / dx) ** 2 + (car.forceY[i]! / dy) ** 2;
   };
 
