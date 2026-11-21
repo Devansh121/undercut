@@ -125,6 +125,11 @@ export interface RaceViewOptions {
    * models replace the world's procedural stand-ins kind by kind. Absent or invalid: stand-ins.
    */
   propCatalog?: unknown;
+  /**
+   * 'lite' places the Lite preset's small subset of the world (every kind, few instances) on
+   * any preset: for software-WebGL tests of other things than the world.
+   */
+  worldDetail?: 'preset' | 'lite';
 }
 
 /** Everything the view needs for one frame, already interpolated by the game loop. */
@@ -319,7 +324,11 @@ export class RaceView {
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions, assets: SessionAssets) {
     this.canvas = canvas;
     // The preset as this GPU can run it (no renderable half float: the direct path).
-    this.quality = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
+    const preset = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
+    this.quality =
+      options.worldDetail === 'lite'
+        ? Object.freeze({ ...preset, world: QUALITY.lite.world })
+        : preset;
     this.track = options.track;
     this.assets = assets;
     this.fleetLiveries = options.fleetLiveries ?? [];

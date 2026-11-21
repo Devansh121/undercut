@@ -170,6 +170,11 @@ function toneMapParam(): ToneMap {
   return t === 'aces' || t === 'agx' ? t : 'neutral';
 }
 
+/** `?world=lite`: Lite's small subset of the world on any preset (software-WebGL tests). */
+function worldDetailParam(): 'preset' | 'lite' {
+  return new URLSearchParams(window.location.search).get('world') === 'lite' ? 'lite' : 'preset';
+}
+
 function racingLineOffsets(count: number): Float64Array | null {
   const raw = monzaLine as { count: number; offsetTenthMm: number[] };
   if (raw.count !== count) return null;
@@ -264,6 +269,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           brands: brandsData.brands,
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
+          worldDetail: worldDetailParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
           compound: compoundLook('medium'),
           timeOfDay: tod,

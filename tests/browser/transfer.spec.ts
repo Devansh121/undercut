@@ -43,7 +43,7 @@ test('the budget inventory matches the requests of a real first race, byte for b
       })(),
     );
   });
-  await page.goto('/?quality=mobile&debug=1');
+  await page.goto('/?quality=mobile&debug=1&world=lite');
   await page.getByRole('button', { name: /Start/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.waitForTimeout(1500);
