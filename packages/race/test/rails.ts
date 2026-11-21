@@ -230,3 +230,116 @@ export function ofType<T extends RaceEvent['type']>(
 ): Extract<RaceEvent, { type: T }>[] {
   return events.filter((e): e is Extract<RaceEvent, { type: T }> => e.type === type);
 }
+
+/**
+ * Exact positions for adversarial scenarios: each car's race distance (from the timing line,
+ * as the timer counts it) is a function of time once the race is under way; before that it sits
+ * on its grid slot (or wherever `before` puts it). Speeds are the analytic derivative.
+ */
+export class ManualRace {
+  readonly control: RaceControl;
+  readonly circuit: CircuitInfo;
+  readonly log: RaceEvent[] = [];
+  readonly facts: CarFacts[];
+  time = 0;
+  /** Distance functions of time since lights out (or the green); set them once it is known. */
+  dist: ((t: number) => number)[];
+  wheelsOff: ((t: number) => number)[];
+  inPit: ((t: number) => { s: number; d: number } | null)[];
+
+  constructor(
+    session: SessionSpec,
+    n: number,
+    o: {
+      seed?: number;
+      rules?: Partial<RaceRules>;
+      circuit?: CircuitInfo;
+      teams?: number[];
+      human?: boolean[];
+    } = {},
+  ) {
+    this.circuit = o.circuit ?? RAIL_CIRCUIT;
+    const opts: RaceControlOptions = {
+      circuit: this.circuit,
+      session,
+      entrants: Array.from({ length: n }, (_, i) => ({
+        team: o.teams?.[i] ?? i,
+        ...(o.human?.[i] ? { human: true } : {}),
+      })),
+      seed: o.seed ?? 1,
+    };
+    if (o.rules) opts.rules = o.rules;
+    this.control = new RaceControl(opts);
+    const L = this.circuit.length;
+    const T = this.circuit.timingLine;
+    const grid = (i: number): number => {
+      const s = this.circuit.grid[i]!.s;
+      const d = forward(L, T, s);
+      return d > L / 2 ? d - L : d;
+    };
+    this.dist = Array.from({ length: n }, (_, i) => () => grid(i));
+    this.wheelsOff = Array.from({ length: n }, () => () => 0);
+    this.inPit = Array.from({ length: n }, () => () => null);
+    this.facts = Array.from({ length: n }, () => createFacts());
+    this.write(0);
+  }
+
+  /** Time since the green (lights out in a race), or 0 before it. */
+  private since(t: number): number {
+    const g = this.control.lightsOutAt ?? this.control.greenTime;
+    return g === null ? 0 : Math.max(0, t - g);
+  }
+
+  private write(t: number): void {
+    const L = this.circuit.length;
+    const T = this.circuit.timingLine;
+    const u = this.since(t);
+    for (let i = 0; i < this.facts.length; i++) {
+      const f = this.facts[i]!;
+      const d = this.dist[i]!(u);
+      const h = 1e-4;
+      f.s = (((T + d) % L) + L) % L;
+      f.d = 0;
+      f.speed = (this.dist[i]!(u + h) - this.dist[i]!(Math.max(0, u - h))) / (u > h ? 2 * h : h);
+      f.wheelsOff = this.wheelsOff[i]!(u);
+      const p = this.inPit[i]!(u);
+      f.inPitLane = p !== null;
+      f.pitS = p ? p.s : Number.NaN;
+      f.pitD = p ? p.d : Number.NaN;
+    }
+  }
+
+  step(): RaceEvent[] {
+    this.time += STEP;
+    this.write(this.time);
+    const e = this.control.tick(this.time, this.facts);
+    this.log.push(...e);
+    return e;
+  }
+
+  /** Run until lights out (race) and return its time. */
+  toGreen(): number {
+    for (
+      let k = 0;
+      k < 240 * 20 && this.control.lightsOutAt === null && this.control.greenTime === null;
+      k++
+    )
+      this.step();
+    return (this.control.lightsOutAt ?? this.control.greenTime)!;
+  }
+
+  run(seconds: number, until?: () => boolean): void {
+    const n = Math.round(seconds / STEP);
+    for (let k = 0; k < n; k++) {
+      this.step();
+      if (until?.()) break;
+    }
+  }
+
+  /** Time since the green at the end of the tick that contains `u` (time since the green). */
+  tickEndAfter(u: number): number {
+    const g = (this.control.lightsOutAt ?? this.control.greenTime)!;
+    const k = Math.ceil((g + u) / STEP - 1e-9);
+    return k * STEP - g;
+  }
+}

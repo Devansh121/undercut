@@ -17,10 +17,22 @@ import {
   type TimingBests,
 } from './timing/lap-timer';
 import { GapTower, type TowerState } from './timing/tower';
+import type { TimingEvent } from './timing/lap-timer';
+
+/** Returned by a tick with nothing to report: shared and frozen, so a quiet tick allocates nothing. */
+const NO_EVENTS = Object.freeze([]) as unknown as RaceEvent[];
+
+// Kinds of crossing found inside a tick, applied in time order across all cars.
+const CX_LINE = 0;
+const CX_TRAP = 1;
+const CX_DETECT = 2;
+const CX_ZONE_END = 3;
 
 export interface EntrantRules {
   /** Team index: two cars of a team share a pit box. */
   team: number;
+  /** Driven by a person (never retired automatically in time trial or practice). */
+  human?: boolean;
   /** Compound fitted at the start. Default 'medium'. */
   compound?: string;
 }
@@ -126,7 +138,19 @@ export class RaceControl implements RaceCore {
   private fastestValue: { car: number; lap: number; time: number } | null = null;
   private speedTrapBestValue: number | null = null;
   private orderValue: number[];
-  private events: RaceEvent[] = [];
+  private readonly humans: boolean[];
+  private readonly events: RaceEvent[] = [];
+  private readonly timingBuf: TimingEvent[] = [];
+  /** Position index of each car at the start of the tick: the tie-break for simultaneous crossings. */
+  private readonly rank: Int32Array;
+  // The tick's crossings: time, car, kind, a (pending index or zone), b (speed), insertion order.
+  private cxTime: Float64Array = new Float64Array(64);
+  private cxB: Float64Array = new Float64Array(64);
+  private cxCar: Int32Array = new Int32Array(64);
+  private cxKind: Int32Array = new Int32Array(64);
+  private cxA: Int32Array = new Int32Array(64);
+  private cxIdx: Int32Array = new Int32Array(64);
+  private cxCount = 0;
 
   constructor(o: RaceControlOptions) {
     this.circuit = o.circuit;
@@ -185,8 +209,10 @@ export class RaceControl implements RaceCore {
       o.entrants.map((e) => e.team),
       o.circuit.pit.boxes.length,
     );
-    this.watchdog = new Watchdog(n, (car) => this.pit.held(car));
+    this.watchdog = new Watchdog(n, (car) => this.pit.held(car), this.rules.progressTime);
     this.orderValue = o.entrants.map((_, i) => i);
+    this.humans = o.entrants.map((e) => e.human === true);
+    this.rank = new Int32Array(n);
     const t0 = o.startTime ?? 0;
     this.timeValue = t0;
     this.prevTimeValue = t0;
@@ -267,6 +293,10 @@ export class RaceControl implements RaceCore {
       c.finishTime === null &&
       (this.phaseValue === 'green' || this.phaseValue === 'chequered')
     );
+  }
+
+  human(car: number): boolean {
+    return this.humans[car] === true;
   }
 
   unservedPenalty(car: number): number {
@@ -354,8 +384,39 @@ export class RaceControl implements RaceCore {
 
   /** The lap in progress stops counting (a reset to the track). Returns the events it caused. */
   invalidateLap(car: number, reason: 'reset' | 'limits'): RaceEvent[] {
-    this.events = [];
+    this.events.length = 0;
     this.invalidate(car, reason);
+    return this.flush();
+  }
+
+  /**
+   * The car was put somewhere else between ticks (a reset to the track, a restart, a teleport):
+   * its facts and timing jump to the new position without crossing any line (lines moved over
+   * are skipped and the lap stops counting, see `LapTimer.reposition`), and the watchdog
+   * starts afresh for it. With `revive`, in time trial and practice a retired car is back in the
+   * session (a retirement in qualifying or a race is final).
+   */
+  reposition(car: number, facts: CarFacts, revive = false): RaceEvent[] {
+    this.events.length = 0;
+    copyFacts(facts, this.facts[car]!);
+    copyFacts(facts, this.prevFacts[car]!);
+    const timer = this.timers[car]!;
+    const wasValid = timer.running && timer.valid;
+    if (timer.reposition(facts.s, this.timeValue) && wasValid) {
+      this.emit({ type: 'invalidated', t: this.timeValue, car, lap: timer.lap, reason: 'reset' });
+    }
+    const c = this.cars[car]!;
+    if (timer.running) {
+      c.dist = timer.distance;
+      c.prevDist = c.dist;
+    }
+    this.watchdog.resetCar(this, car);
+    const kind = this.strategy.kind;
+    if (revive && c.status === 'dnf' && (kind === 'timeTrial' || kind === 'practice')) {
+      c.status = 'running';
+      c.reason = null;
+      this.emit({ type: 'rejoined', t: this.timeValue, car });
+    }
     return this.flush();
   }
 
@@ -365,7 +426,7 @@ export class RaceControl implements RaceCore {
   }
 
   retireCar(car: number, reason: string): RaceEvent[] {
-    this.events = [];
+    this.events.length = 0;
     this.retire(car, reason);
     return this.flush();
   }
@@ -379,7 +440,7 @@ export class RaceControl implements RaceCore {
 
   /** One fixed step: `time` is the sim time at its end; `facts` one per car, in car order. */
   tick(time: number, facts: readonly CarFacts[]): RaceEvent[] {
-    this.events = [];
+    this.events.length = 0;
     if (facts.length !== this.cars.length) throw new RangeError('one CarFacts per car');
     this.prevTimeValue = this.timeValue;
     this.timeValue = time;
@@ -409,8 +470,9 @@ export class RaceControl implements RaceCore {
   }
 
   private flush(): RaceEvent[] {
-    const out = this.events;
-    this.events = [];
+    if (this.events.length === 0) return NO_EVENTS;
+    const out = this.events.slice();
+    this.events.length = 0;
     return out;
   }
 
@@ -426,7 +488,8 @@ export class RaceControl implements RaceCore {
     const t = this.timeValue;
     const L = this.circuit.length;
     const r = this.rules;
-    for (let i = 0; i < this.cars.length; i++) {
+    for (let k = 0; k < this.cars.length; k++) {
+      const i = this.orderValue[k]!;
       const c = this.cars[i]!;
       const s = this.facts[i]!.s;
       c.prevDist = c.dist;
@@ -458,54 +521,163 @@ export class RaceControl implements RaceCore {
     return true;
   }
 
+  /**
+   * Timing lines, the speed trap and DRS detection, in time order across the field. Each car's
+   * crossings inside the tick are found first (with interpolated times), then all of them are
+   * applied in order of time; simultaneous crossings by position at the start of the tick, then
+   * in the order the car made them. So the chequered flag, finishing, DRS gaps and session bests
+   * never depend on car numbers.
+   */
   private stepTiming(justStarted: boolean): void {
     const pre = this.phaseValue === 'grid' || this.phaseValue === 'lights';
     if (pre || justStarted) return;
+    const n = this.cars.length;
     const L = this.circuit.length;
-    const race = this.strategy.classifyBy === 'distance';
-    for (let i = 0; i < this.cars.length; i++) {
+    const zones = this.circuit.drsZones;
+    const t0 = this.prevTimeValue;
+    const dt = this.timeValue - t0;
+    this.cxCount = 0;
+    for (let k = 0; k < n; k++) this.rank[this.orderValue[k]!] = k;
+    for (let k = 0; k < n; k++) {
+      const i = this.orderValue[k]!;
       const c = this.cars[i]!;
       const timer = this.timers[i]!;
       c.prevDist = c.dist;
       if (c.status !== 'running' || c.finishTime !== null) continue;
       const p = this.prevFacts[i]!;
       const f = this.facts[i]!;
-      const evs = timer.update(p.s, f.s, this.prevTimeValue, this.timeValue);
+      const m = timer.scan(p.s, f.s, t0, this.timeValue);
+      for (let j = 0; j < m; j++) this.addCrossing(timer.pendingTime(j), i, CX_LINE, j, 0);
       c.dist = timer.distance;
-      for (const e of evs) {
-        this.emit({ ...e, t: this.timeValue, car: i });
-        if (e.type === 'lapStart') {
-          this.limits.onLine(this, i);
-          if (this.phaseValue === 'chequered') this.finish(i, e.time);
-        } else if (e.type === 'lap') {
-          this.limits.onLine(this, i);
-          const r = e.result;
-          if (r.valid && r.personalBest) {
-            c.bestAt = e.at;
-            c.bestLapNumber = r.lap;
-          }
-          if (r.valid && (this.fastestValue === null || r.time < this.fastestValue.time)) {
-            this.fastestValue = { car: i, lap: r.lap, time: r.time };
-            this.emit({ type: 'fastestLap', t: this.timeValue, car: i, lap: r.lap, time: r.time });
-          }
-          this.onLapLine(i, r.lap, e.at);
-        }
+      const trap = crossingFraction(L, p.s, f.s, this.circuit.speedTrap);
+      if (trap !== null && (timer.running || m > 0)) {
+        this.addCrossing(t0 + trap * dt, i, CX_TRAP, 0, p.speed + trap * (f.speed - p.speed));
       }
-      if (race && timer.running)
-        this.tower.update(i, c.prevDist, c.dist, this.prevTimeValue, this.timeValue);
-      const frac = crossingFraction(L, p.s, f.s, this.circuit.speedTrap);
-      if (frac !== null && timer.running) {
-        const speed = p.speed + frac * (f.speed - p.speed);
-        const best = this.speedTrapBestValue === null || speed > this.speedTrapBestValue;
-        if (best) this.speedTrapBestValue = speed;
-        if (c.speedTrapBest === null || speed > c.speedTrapBest) c.speedTrapBest = speed;
-        this.emit({ type: 'speedTrap', t: this.timeValue, car: i, speed, best });
+      const live = this.phaseValue === 'green' || this.phaseValue === 'chequered';
+      for (let z = 0; z < zones.length; z++) {
+        const zone = zones[z]!;
+        const end = crossingFraction(L, p.s, f.s, zone.end);
+        if (end !== null) this.addCrossing(t0 + end * dt, i, CX_ZONE_END, z, 0);
+        if (!live || f.inPitLane || p.inPitLane) continue;
+        const det = crossingFraction(L, p.s, f.s, zone.detection);
+        if (det !== null) this.addCrossing(t0 + det * dt, i, CX_DETECT, z, 0);
+      }
+    }
+    this.sortCrossings();
+    for (let q = 0; q < this.cxCount; q++) {
+      const x = this.cxIdx[q]!;
+      const car = this.cxCar[x]!;
+      const c = this.cars[car]!;
+      if (c.status !== 'running' || c.finishTime !== null) continue;
+      const kind = this.cxKind[x]!;
+      if (kind === CX_LINE) this.applyLine(car);
+      else if (kind === CX_TRAP) this.applyTrap(car, this.cxB[x]!);
+      else if (kind === CX_DETECT) this.drs.onDetection(this, car, this.cxA[x]!, this.cxTime[x]!);
+      else this.drs.onZoneEnd(car, this.cxA[x]!);
+    }
+    if (this.strategy.classifyBy === 'distance') {
+      for (let k = 0; k < n; k++) {
+        const i = this.orderValue[k]!;
+        const c = this.cars[i]!;
+        if (this.timers[i]!.running) this.tower.update(i, c.prevDist, c.dist, t0, this.timeValue);
       }
     }
   }
 
+  private addCrossing(t: number, car: number, kind: number, a: number, b: number): void {
+    if (this.cxCount >= this.cxTime.length) {
+      const m = this.cxTime.length * 2;
+      const f = (x: Float64Array): Float64Array => {
+        const y = new Float64Array(m);
+        y.set(x);
+        return y;
+      };
+      const g = (x: Int32Array): Int32Array => {
+        const y = new Int32Array(m);
+        y.set(x);
+        return y;
+      };
+      this.cxTime = f(this.cxTime);
+      this.cxB = f(this.cxB);
+      this.cxCar = g(this.cxCar);
+      this.cxKind = g(this.cxKind);
+      this.cxA = g(this.cxA);
+      this.cxIdx = g(this.cxIdx);
+    }
+    const k = this.cxCount++;
+    this.cxTime[k] = t;
+    this.cxCar[k] = car;
+    this.cxKind[k] = kind;
+    this.cxA[k] = a;
+    this.cxB[k] = b;
+    this.cxIdx[k] = k;
+  }
+
+  /** Stable insertion sort of the crossings by time, then the car's position at the tick's start. */
+  private sortCrossings(): void {
+    const idx = this.cxIdx;
+    for (let i = 1; i < this.cxCount; i++) {
+      const x = idx[i]!;
+      const tx = this.cxTime[x]!;
+      const rx = this.rank[this.cxCar[x]!]!;
+      let j = i - 1;
+      while (j >= 0) {
+        const y = idx[j]!;
+        const ty = this.cxTime[y]!;
+        if (ty < tx || (ty === tx && this.rank[this.cxCar[y]!]! <= rx)) break;
+        idx[j + 1] = y;
+        j--;
+      }
+      idx[j + 1] = x;
+    }
+  }
+
+  private applyLine(car: number): void {
+    const timer = this.timers[car]!;
+    const buf = this.timingBuf;
+    buf.length = 0;
+    timer.applyNext(buf);
+    const c = this.cars[car]!;
+    for (let k = 0; k < buf.length; k++) {
+      const e = buf[k]!;
+      this.emit({ ...e, t: this.timeValue, car });
+      if (e.type === 'lapStart') {
+        this.limits.onLine(this, car);
+        if (this.phaseValue === 'chequered') this.finish(car, e.time, timer.appliedDistance);
+      } else if (e.type === 'lap') {
+        this.limits.onLine(this, car);
+        const r = e.result;
+        if (r.valid && r.personalBest) {
+          c.bestAt = e.at;
+          c.bestLapNumber = r.lap;
+        }
+        if (r.valid && (this.fastestValue === null || r.time < this.fastestValue.time)) {
+          this.fastestValue = { car, lap: r.lap, time: r.time };
+          this.emit({ type: 'fastestLap', t: this.timeValue, car, lap: r.lap, time: r.time });
+        }
+        if (
+          this.strategy.drs === 'race' &&
+          this.phaseValue === 'green' &&
+          this.rank[car] === 0 &&
+          r.lap + 1 >= this.rules.drsEnableLap
+        ) {
+          this.drs.enable(this);
+        }
+        this.onLapLine(car, r.lap, e.at, timer.appliedDistance);
+      }
+    }
+  }
+
+  private applyTrap(car: number, speed: number): void {
+    const c = this.cars[car]!;
+    const best = this.speedTrapBestValue === null || speed > this.speedTrapBestValue;
+    if (best) this.speedTrapBestValue = speed;
+    if (c.speedTrapBest === null || speed > c.speedTrapBest) c.speedTrapBest = speed;
+    this.emit({ type: 'speedTrap', t: this.timeValue, car, speed, best });
+  }
+
   /** A car completed lap `lap` at sim time `at`: the chequered flag, and finishing under it. */
-  private onLapLine(car: number, lap: number, at: number): void {
+  private onLapLine(car: number, lap: number, at: number, dist: number): void {
     const s = this.strategy;
     if (this.phaseValue === 'green' && s.laps !== null) {
       const byLaps = lap >= s.laps;
@@ -513,10 +685,10 @@ export class RaceControl implements RaceCore {
         s.timeLimit !== null &&
         this.lightsOutValue !== null &&
         at - this.lightsOutValue >= s.timeLimit &&
-        this.orderValue[0] === car;
+        this.rank[car] === 0;
       if (byLaps || byTime) this.showChequered();
     }
-    if (this.phaseValue === 'chequered') this.finish(car, at);
+    if (this.phaseValue === 'chequered') this.finish(car, at, dist);
   }
 
   private showChequered(): void {
@@ -526,11 +698,13 @@ export class RaceControl implements RaceCore {
     this.setPhase('chequered');
   }
 
-  private finish(car: number, at: number): void {
+  /** The car takes the flag at sim time `at`, at race distance `dist` (the line's, not the tick's). */
+  private finish(car: number, at: number, dist: number): void {
     const c = this.cars[car]!;
     if (c.status !== 'running' || c.finishTime !== null) return;
+    this.limits.atFinish(this, car, dist);
     c.finishTime = at;
-    c.finishDist = c.dist;
+    c.finishDist = dist;
     c.finishLaps = this.timers[car]!.lapsCompleted;
     c.finishOrder = ++this.finishCount;
     c.status = 'finished';
@@ -549,56 +723,32 @@ export class RaceControl implements RaceCore {
     if (s.duration === null || this.phaseValue !== 'green' || this.greenAt === null) return;
     if (this.timeValue < this.greenAt + s.duration) return;
     this.showChequered();
-    for (let i = 0; i < this.cars.length; i++) {
-      if (this.facts[i]!.inPitLane) this.finish(i, this.timeValue);
+    for (let k = 0; k < this.cars.length; k++) {
+      const i = this.orderValue[k]!;
+      if (this.facts[i]!.inPitLane) this.finish(i, this.timeValue, this.cars[i]!.dist);
     }
   }
 
+  /**
+   * The live classification: a stable insertion sort of last tick's order (cars rarely change
+   * places, so it is nearly linear and allocation-free). A complete tie keeps the previous order;
+   * the order before the first tick is the entry order.
+   */
   private stepPositions(): void {
     const n = this.cars.length;
-    const order = this.orderValue.slice();
-    if (this.strategy.classifyBy === 'distance') {
-      const key = (i: number): number => {
-        const c = this.cars[i]!;
-        return c.finishDist ?? c.dist;
-      };
-      const out = (i: number): number => {
-        const st = this.cars[i]!.status;
-        return st === 'dnf' || st === 'dsq' ? 1 : 0;
-      };
-      order.sort((a, b) => {
-        const g = out(a) - out(b);
-        if (g !== 0) return g;
-        const d = key(b) - key(a);
-        if (d !== 0) return d;
-        const fa = this.cars[a]!.finishTime;
-        const fb = this.cars[b]!.finishTime;
-        if (fa !== null && fb !== null && fa !== fb) return fa - fb;
-        if (fa !== null && fb === null) return -1;
-        if (fb !== null && fa === null) return 1;
-        return a - b;
-      });
-    } else {
-      order.sort((a, b) => {
-        const ba = this.timers[a]!.bestLap;
-        const bb = this.timers[b]!.bestLap;
-        if (ba !== null && bb !== null && ba !== bb) return ba - bb;
-        if (ba !== null && bb === null) return -1;
-        if (bb !== null && ba === null) return 1;
-        if (ba !== null && bb !== null) {
-          const ta = this.cars[a]!.bestAt ?? 0;
-          const tb = this.cars[b]!.bestAt ?? 0;
-          if (ta !== tb) return ta - tb;
-        }
-        const la = this.timers[a]!.lapsCompleted;
-        const lb = this.timers[b]!.lapsCompleted;
-        if (la !== lb) return lb - la;
-        return a - b;
-      });
+    const o = this.orderValue;
+    for (let i = 1; i < n; i++) {
+      const x = o[i]!;
+      let j = i - 1;
+      while (j >= 0 && this.compare(o[j]!, x) > 0) {
+        o[j + 1] = o[j]!;
+        j--;
+      }
+      o[j + 1] = x;
     }
     const live = this.phaseValue === 'green' || this.phaseValue === 'chequered';
     for (let k = 0; k < n; k++) {
-      const car = order[k]!;
+      const car = o[k]!;
       const c = this.cars[car]!;
       const pos = k + 1;
       if (c.position !== pos) {
@@ -607,13 +757,58 @@ export class RaceControl implements RaceCore {
         c.position = pos;
       }
     }
-    this.orderValue = order;
   }
 
+  /** Negative when car a is ahead of car b, positive when behind, 0 for a complete tie. */
+  private compare(a: number, b: number): number {
+    const ca = this.cars[a]!;
+    const cb = this.cars[b]!;
+    if (this.strategy.classifyBy === 'distance') {
+      const oa = ca.status === 'dnf' || ca.status === 'dsq' ? 1 : 0;
+      const ob = cb.status === 'dnf' || cb.status === 'dsq' ? 1 : 0;
+      if (oa !== ob) return oa - ob;
+      const da = ca.finishDist ?? ca.dist;
+      const db = cb.finishDist ?? cb.dist;
+      if (da !== db) return db - da;
+      const fa = ca.finishTime;
+      const fb = cb.finishTime;
+      if (fa !== null && fb !== null) return fa - fb;
+      if (fa !== null) return -1;
+      if (fb !== null) return 1;
+      return 0;
+    }
+    const ba = this.timers[a]!.bestLap;
+    const bb = this.timers[b]!.bestLap;
+    if (ba !== null && bb !== null && ba !== bb) return ba - bb;
+    if (ba !== null && bb === null) return -1;
+    if (bb !== null && ba === null) return 1;
+    if (ba !== null && bb !== null) {
+      const ta = ca.bestAt ?? 0;
+      const tb = cb.bestAt ?? 0;
+      if (ta !== tb) return ta - tb;
+    }
+    return this.timers[b]!.lapsCompleted - this.timers[a]!.lapsCompleted;
+  }
+
+  /**
+   * The session ends once no car is still running (everyone finished or retired, in any session
+   * type, flag or not), or `finishTimeout` after the chequered flag.
+   */
   private stepEnd(): void {
-    if (this.phaseValue !== 'chequered' || this.chequeredAt === null) return;
-    const allDone = this.cars.every((c) => c.status !== 'running' || c.finishTime !== null);
-    if (allDone || this.timeValue >= this.chequeredAt + this.rules.finishTimeout) {
+    if (this.phaseValue === 'finished' || !this.seen) return;
+    let running = false;
+    for (let i = 0; i < this.cars.length; i++) {
+      const c = this.cars[i]!;
+      if (c.status === 'running' && c.finishTime === null) {
+        running = true;
+        break;
+      }
+    }
+    const timedOut =
+      this.phaseValue === 'chequered' &&
+      this.chequeredAt !== null &&
+      this.timeValue >= this.chequeredAt + this.rules.finishTimeout;
+    if (!running || timedOut) {
       this.setPhase('finished');
       this.emit({ type: 'sessionEnd', t: this.timeValue });
     }

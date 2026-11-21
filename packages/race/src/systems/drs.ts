@@ -1,6 +1,5 @@
 import type { ControlInput } from '@undercut/sim';
 import { inRange, type RaceCore, type RaceSystem } from '../core';
-import { crossingFraction } from '../timing/lap-timer';
 
 /**
  * DRS rules. The sim moves the flap; this decides when it may open.
@@ -8,8 +7,9 @@ import { crossingFraction } from '../timing/lap-timer';
  * - Practice, qualifying and time trial: free inside the zones (activation to end).
  * - Race: race control enables DRS when the leader starts lap `drsEnableLap`. A car that
  *   crosses a zone's detection line less than `drsGap` behind the car that crossed it before
- *   (any car, lapped or not; times interpolated inside the tick, like the timing lines) may use
- *   that zone, from its activation line to its end.
+ *   (any car, lapped or not; times interpolated inside the tick and processed in time order
+ *   across the field, like the timing lines) may use that zone, from its activation line to
+ *   its end.
  * - Never in the pit lane, never in a zone touching a yellow sector.
  * - The flap closes when the driver brakes or lifts, and stays shut until the request is
  *   released (a fresh press reopens it while still allowed).
@@ -22,18 +22,22 @@ interface DrsCar {
 
 export interface DrsState {
   enabled: boolean;
-  last: ({ car: number; time: number } | null)[];
+  /** Per zone, the car that crossed its detection line last (-1: none yet) and when. */
+  lastCar: number[];
+  lastTime: number[];
   cars: DrsCar[];
 }
 
 export class DrsSystem implements RaceSystem<DrsState> {
   private enabled = false;
-  private last: ({ car: number; time: number } | null)[];
+  private lastCar: number[];
+  private lastTime: Float64Array;
   private cars: DrsCar[];
   private readonly yellowBetween: (from: number, to: number) => boolean;
 
   constructor(cars: number, zones: number, yellowBetween: (from: number, to: number) => boolean) {
-    this.last = Array.from({ length: zones }, () => null);
+    this.lastCar = new Array<number>(zones).fill(-1);
+    this.lastTime = new Float64Array(zones);
     this.cars = Array.from({ length: cars }, () => ({
       eligible: -1,
       latched: false,
@@ -69,43 +73,46 @@ export class DrsSystem implements RaceSystem<DrsState> {
     return input.drs && c.allowed && !c.latched;
   }
 
+  /** Race control enables DRS (the leader started the enable lap). */
+  enable(core: RaceCore): void {
+    if (this.enabled) return;
+    this.enabled = true;
+    core.emit({ type: 'drsEnabled', t: core.time, enabled: true });
+  }
+
+  /**
+   * A car crossed zone `z`'s detection line at `at`. Called in time order across the field, so
+   * the car before it at the line is the one that crossed it last; the gap is never negative.
+   */
+  onDetection(core: RaceCore, car: number, z: number, at: number): void {
+    const c = this.cars[car]!;
+    if (core.strategy.drs === 'race') {
+      const prev = this.lastCar[z]!;
+      const gap = prev >= 0 && prev !== car ? at - this.lastTime[z]! : Infinity;
+      if (this.enabled && gap >= 0 && gap < core.rules.drsGap) {
+        c.eligible = z;
+        core.emit({ type: 'drsEligible', t: core.time, car, zone: z, gap });
+      } else if (c.eligible === z) c.eligible = -1;
+    }
+    this.lastCar[z] = car;
+    this.lastTime[z] = at;
+  }
+
+  /** A car passed zone `z`'s end: its eligibility for that zone is spent. */
+  onZoneEnd(car: number, z: number): void {
+    const c = this.cars[car]!;
+    if (c.eligible === z) c.eligible = -1;
+  }
+
+  /** Whether each car's flap may open where it is now. Detection is fed by the core in time order. */
   tick(core: RaceCore): void {
-    const { circuit, strategy, rules } = core;
+    const { circuit, strategy } = core;
     const L = circuit.length;
     const zones = circuit.drsZones;
     const race = strategy.drs === 'race';
-    if (race && !this.enabled && core.phase === 'green' && core.order.length > 0) {
-      const leader = core.order[0]!;
-      if (core.timers[leader]!.lap >= rules.drsEnableLap) {
-        this.enabled = true;
-        core.emit({ type: 'drsEnabled', t: core.time, enabled: true });
-      }
-    }
-    const dt = core.time - core.prevTime;
     for (let i = 0; i < this.cars.length; i++) {
       const c = this.cars[i]!;
       const f = core.facts[i]!;
-      const p = core.prevFacts[i]!;
-      const racing = core.racing(i);
-      for (let z = 0; z < zones.length; z++) {
-        const zone = zones[z]!;
-        if (racing && crossingFraction(L, p.s, f.s, zone.end) !== null && c.eligible === z) {
-          c.eligible = -1;
-        }
-        if (!racing || f.inPitLane || p.inPitLane) continue;
-        const frac = crossingFraction(L, p.s, f.s, zone.detection);
-        if (frac === null) continue;
-        const at = core.prevTime + frac * dt;
-        if (race) {
-          const prev = this.last[z];
-          const gap = prev && prev.car !== i ? at - prev.time : Infinity;
-          if (this.enabled && gap < rules.drsGap) {
-            c.eligible = z;
-            core.emit({ type: 'drsEligible', t: core.time, car: i, zone: z, gap });
-          } else if (c.eligible === z) c.eligible = -1;
-        }
-        this.last[z] = { car: i, time: at };
-      }
       let zoneHere = -1;
       for (let z = 0; z < zones.length; z++) {
         const zone = zones[z]!;
@@ -126,14 +133,16 @@ export class DrsSystem implements RaceSystem<DrsState> {
   getState(): DrsState {
     return {
       enabled: this.enabled,
-      last: this.last.map((l) => (l ? { ...l } : null)),
+      lastCar: this.lastCar.slice(),
+      lastTime: Array.from(this.lastTime),
       cars: this.cars.map((c) => ({ ...c })),
     };
   }
 
   setState(s: DrsState): void {
     this.enabled = s.enabled;
-    this.last = s.last.map((l) => (l ? { ...l } : null));
+    this.lastCar = s.lastCar.slice();
+    this.lastTime = Float64Array.from(s.lastTime);
     this.cars = s.cars.map((c) => ({ ...c }));
   }
 }

@@ -78,6 +78,8 @@ export interface RaceCore {
   racing(car: number): boolean;
   /** Unserved penalty time, s. */
   unservedPenalty(car: number): number;
+  /** The car is driven by a person. */
+  human(car: number): boolean;
 }
 
 /** A rules system: runs once per tick over the core, owns its own serialisable state. */

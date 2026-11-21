@@ -58,8 +58,9 @@ export interface SessionResult {
  * The classification of a session (final once it has ended):
  *
  * - Race: finishers, ordered by laps and then total time (from lights out to the flag plus
- *   unserved time penalties). A car still running at the end is classified as a finisher if it
- *   completed `classifiedShare` of the winner's laps, else not classified. Then retirements by
+ *   unserved time penalties). A car is classified as a finisher only if it completed
+ *   `classifiedShare` of the winner's laps, whether or not it took the flag; else it is not
+ *   classified. Then retirements by
  *   distance, then disqualifications. A finisher that broke the two-compound rule (when it
  *   applies) is disqualified. Points by `POINTS_TABLE` for classified finishers.
  * - Timed sessions: by best valid lap, then laps.
@@ -95,11 +96,11 @@ export function buildResult(
     );
     const need = Math.ceil(control.rules.classifiedShare * winnerLaps);
     for (const r of rows) {
+      // Taking the flag is not enough: a car needs `classifiedShare` of the winner's laps.
       if (r.c.status === 'dnf' || r.c.status === 'dsq') r.status = r.c.status;
-      else if (r.c.finishTime !== null) r.status = 'finished';
       else if (winnerLaps > 0 && r.laps >= need) {
         r.status = 'finished';
-        r.total = null;
+        if (r.c.finishTime === null) r.total = null;
       } else {
         r.status = 'notClassified';
         r.reason = 'not classified';

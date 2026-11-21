@@ -14,7 +14,8 @@ import { SERVICE_TIMES } from '../rules';
  * - Between the speed-limit lines the car must not exceed the limit (plus a small tolerance):
  *   a time penalty in a race, a warning otherwise, once per visit.
  * - A stop is the car at rest within its team's box. Unserved time penalties are served first,
- *   stationary, then the service actions run for their service time (data) plus a seeded
+ *   stationary (a penalty awarded during the hold is not part of it: it stays outstanding for
+ *   the next stop or the finish), then the service actions run for their service time (data) plus a seeded
  *   spread. A team-mate already in service makes the second car wait (stacking).
  * - Release waits until no car is coming down the lane within `releaseClearBehind` of the box
  *   (unsafe-release avoidance).
@@ -41,6 +42,8 @@ interface PitCar {
   wasIn: boolean;
   box: number;
   penaltyServed: number;
+  /** Indices (into the car's penalty list) of the penalties being served in this hold. */
+  serving: number[];
 }
 
 export interface PitState {
@@ -70,6 +73,7 @@ export class PitSystem implements RaceSystem<PitState> {
       wasIn: false,
       box: boxes > 0 ? team % boxes : 0,
       penaltyServed: 0,
+      serving: [],
     }));
   }
 
@@ -119,7 +123,8 @@ export class PitSystem implements RaceSystem<PitState> {
   tick(core: RaceCore): void {
     const { rules, circuit } = core;
     const pit = circuit.pit;
-    for (let i = 0; i < this.cars.length; i++) {
+    for (let k = 0; k < this.cars.length; k++) {
+      const i = core.order[k]!;
       const c = this.cars[i]!;
       const f = core.facts[i]!;
       const car = core.cars[i]!;
@@ -157,7 +162,9 @@ export class PitSystem implements RaceSystem<PitState> {
           break;
         case 'penalty':
           if (t >= c.until) {
-            for (const p of car.penalties) if (!p.served) p.served = true;
+            // Only the penalties this hold was for: one awarded during it stays outstanding.
+            for (const k of c.serving) car.penalties[k]!.served = true;
+            c.serving = [];
             core.emit({ type: 'penaltyServed', t, car: i, seconds: c.penaltyServed });
             this.serviceOrQueue(core, i, c);
           }
@@ -215,6 +222,10 @@ export class PitSystem implements RaceSystem<PitState> {
   private afterStop(core: RaceCore, i: number, c: PitCar): void {
     const owed = core.strategy.penalties ? core.unservedPenalty(i) : 0;
     if (owed > 0) {
+      c.serving = [];
+      core.cars[i]!.penalties.forEach((p, k) => {
+        if (!p.served) c.serving.push(k);
+      });
       c.phase = 'penalty';
       c.until = core.time + owed;
       c.penaltyServed = owed;
@@ -255,10 +266,20 @@ export class PitSystem implements RaceSystem<PitState> {
   }
 
   getState(): PitState {
-    return { cars: this.cars.map((c) => ({ ...c, actions: c.actions.map((a) => ({ ...a })) })) };
+    return {
+      cars: this.cars.map((c) => ({
+        ...c,
+        actions: c.actions.map((a) => ({ ...a })),
+        serving: c.serving.slice(),
+      })),
+    };
   }
 
   setState(s: PitState): void {
-    this.cars = s.cars.map((c) => ({ ...c, actions: c.actions.map((a) => ({ ...a })) }));
+    this.cars = s.cars.map((c) => ({
+      ...c,
+      actions: c.actions.map((a) => ({ ...a })),
+      serving: c.serving.slice(),
+    }));
   }
 }

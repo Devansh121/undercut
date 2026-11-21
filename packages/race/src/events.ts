@@ -91,6 +91,8 @@ export type RaceEvent =
     }
   | { type: 'finish'; t: number; car: number; position: number; laps: number }
   | { type: 'retired'; t: number; car: number; reason: string }
+  /** A retired car is back in the session (time trial and practice, after a reset). */
+  | { type: 'rejoined'; t: number; car: number }
   | { type: 'anomaly'; t: number; car: number; kind: AnomalyKind; on: boolean; duration: number }
   | { type: 'sessionEnd'; t: number };
 

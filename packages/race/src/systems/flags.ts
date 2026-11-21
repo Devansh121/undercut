@@ -10,8 +10,8 @@ import { forward, type RaceCore, type RaceSystem } from '../core';
  * flag stays until `yellowClearTime` after the cause has gone. DRS is disabled in a zone that
  * touches a yellow sector; passing a car inside one is a warning (no penalty yet).
  *
- * Blue (race): shown to a car when a car about to lap it is within `blueGap` behind, measured
- * at the timing tower's mini-sectors. The lapped car has `blueWindow` to let it by, or it gets
+ * Blue (race): shown to a car when a car about to lap it (one lap up or more) is within
+ * `blueGap` behind, measured at the timing tower's mini-sectors. The lapped car has `blueWindow` to let it by, or it gets
  * `bluePenalty`. Drivers read the flag through the session.
  */
 interface BlueState {
@@ -89,8 +89,10 @@ export class FlagSystem implements RaceSystem<FlagsState> {
     if (!live) return;
     this.greenAt ??= core.lightsOutAt ?? core.prevTime;
     const graceOver = core.time > this.greenAt + START_GRACE;
+    const n = core.cars.length;
     // ---- Yellow ----
-    for (let i = 0; i < core.cars.length; i++) {
+    for (let q = 0; q < n; q++) {
+      const i = core.order[q]!;
       const f = core.facts[i]!;
       const car = core.cars[i]!;
       const slow =
@@ -120,10 +122,12 @@ export class FlagSystem implements RaceSystem<FlagsState> {
       }
     }
     // Passing under yellow: a warning for now.
-    for (let i = 0; i < core.cars.length; i++) {
+    for (let q = 0; q < n; q++) {
+      const i = core.order[q]!;
       if (!core.racing(i) || core.facts[i]!.inPitLane || !this.yellowAt(core.facts[i]!.s)) continue;
       const me = core.cars[i]!;
-      for (let j = 0; j < core.cars.length; j++) {
+      for (let r = 0; r < n; r++) {
+        const j = core.order[r]!;
         if (j === i || !core.racing(j) || core.facts[j]!.inPitLane) continue;
         const other = core.cars[j]!;
         if (me.prevDist < other.prevDist && me.dist > other.dist) {
@@ -135,19 +139,27 @@ export class FlagSystem implements RaceSystem<FlagsState> {
     if (!core.strategy.blueFlags) return;
     const L = this.length;
     const tower = core.tower;
-    for (let x = 0; x < core.cars.length; x++) {
+    for (let q = 0; q < n; q++) {
+      const x = core.order[q]!;
       const cur = this.blue[x] ?? null;
       let by = -1;
       let best = Infinity;
       if (core.racing(x) && !core.facts[x]!.inPitLane) {
         const dx = core.cars[x]!.dist;
-        for (let y = 0; y < core.cars.length; y++) {
+        for (let r = 0; r < n; r++) {
+          const y = core.order[r]!;
           if (y === x || !core.racing(y) || core.facts[y]!.inPitLane) continue;
-          const dy = core.cars[y]!.dist;
-          if (!(dy > dx + L / 2 && dy < dx + L)) continue;
+          // Y is about to lap X when it is behind X on the road (the part of a lap it is ahead
+          // by is over half a lap), however many laps it is up already.
+          const diff = core.cars[y]!.dist - dx;
+          if (diff <= L / 2) continue;
+          const part = diff - Math.floor(diff / L) * L;
+          if (part <= L / 2) continue;
+          const laps = Math.ceil(diff / L);
           const ky = tower.lastBoundary(y);
           if (ky === null) continue;
-          const tx = tower.timeAt(x, ky - tower.count);
+          // The point Y has just reached, where X was `laps` laps of boundaries earlier.
+          const tx = tower.timeAt(x, ky - laps * tower.count);
           const ty = tower.timeAt(y, ky);
           if (tx === null || ty === null) continue;
           const gap = ty - tx;

@@ -94,6 +94,9 @@ export function lapDelta(length: number, from: number, to: number): number {
   return f > length / 2 ? f - length : f;
 }
 
+const START = 0;
+const LINE = 1;
+
 function emptyBests(count: number): TimingBests {
   return { lap: null, sectors: Array.from({ length: count }, () => null) };
 }
@@ -143,6 +146,13 @@ export class LapTimer {
   private sectorClasses: DeltaClass[] = [];
   private validValue = true;
   private lastLapValue: number | null = null;
+  // Crossings found by the last scan, waiting to be applied.
+  private pendT: Float64Array = new Float64Array(8);
+  private pendD: Float64Array = new Float64Array(8);
+  private pendK: Float64Array = new Float64Array(8);
+  private pendCount = 0;
+  private pendNext = 0;
+  private appliedDist = 0;
 
   /**
    * `record`: stored all-time bests to compare against (copied). `shared`: an overall-bests
@@ -272,17 +282,35 @@ export class LapTimer {
       this.sectorValue++;
   }
 
-  /** One tick: the car moved from prevS at prevT to curS at curT. */
+  /**
+   * One tick: the car moved from prevS at prevT to curS at curT. Finds and applies every line
+   * crossing at once (one car on its own). A multi-car session uses `scan` and `applyNext` so
+   * that crossings of all cars are applied in time order.
+   */
   update(prevS: number, curS: number, prevT: number, curT: number): TimingEvent[] {
     const events: TimingEvent[] = [];
+    const n = this.scan(prevS, curS, prevT, curT);
+    for (let k = 0; k < n; k++) this.applyNext(events);
+    return events;
+  }
+
+  /**
+   * Advance the car's distance over one tick and find the lines it crossed, in order, with
+   * their interpolated times (`pendingTime`) and race distances (`pendingDistance`). Nothing is
+   * classified until each crossing is applied with `applyNext`; every crossing found must be
+   * applied before the next scan. Allocation-free.
+   */
+  scan(prevS: number, curS: number, prevT: number, curT: number): number {
     const { length } = this.lines;
     const t0 = this.lines.sectors[0] as number;
+    this.pendCount = 0;
+    this.pendNext = 0;
     if (!this.synced) {
       this.synced = true;
       this.lastS = prevS;
       this.dist = forward(length, t0, prevS) - length;
     } else if (prevS !== this.lastS) {
-      // The car was moved between ticks: carry the distance, cross nothing.
+      // The car was moved between ticks without `reposition`: carry the distance, cross nothing.
       this.dist += lapDelta(length, this.lastS, prevS);
     }
     this.lastS = curS;
@@ -291,29 +319,115 @@ export class LapTimer {
     this.dist = before + moved;
 
     let from = before;
+    let sector = this.sectorValue;
+    let base = this.lapBase;
     if (!this.runningValue) {
       const f = crossingFraction(length, prevS, curS, t0);
-      if (f === null) return events;
-      const t = prevT + f * (curT - prevT);
+      if (f === null) return 0;
       // Re-anchor: the line is distance 0 of lap 1.
+      this.push(prevT + f * (curT - prevT), 0, START);
       from = 0;
       this.dist = forward(length, t0, curS);
       if (this.dist >= length / 2) this.dist -= length;
-      this.beginLap(t, 1, 0);
-      events.push({ type: 'lapStart', lap: 1, time: t });
-      if (this.dist <= 0) return events;
+      sector = 0;
+      base = 0;
+      if (this.dist <= 0) return this.pendCount;
     }
     // Every line from the car's next one up to its distance now, in order.
     const to = this.dist;
+    // Where the car was at the start of the tick in the same distance frame (the frame moves
+    // when lap 1 starts inside this tick).
+    const origin = to - moved;
+    const span = moved;
+    const last = this.lineDist.length - 1;
     for (let guard = 0; guard < 64; guard++) {
-      const line = this.lapBase + this.lineDist[this.sectorValue]!;
+      const line = base + this.lineDist[sector]!;
       if (!(line > from && line <= to)) break;
-      const f = (line - before) / (to - before);
-      const t = prevT + Math.min(1, Math.max(0, f)) * (curT - prevT);
-      this.crossLine(t, events);
+      const f = span > 0 ? (line - origin) / span : 1;
+      this.push(prevT + Math.min(1, Math.max(0, f)) * (curT - prevT), line, LINE);
       from = line;
+      if (sector === last) {
+        sector = 0;
+        base += length;
+      } else sector += 1;
     }
-    return events;
+    return this.pendCount;
+  }
+
+  private push(t: number, dist: number, kind: number): void {
+    if (this.pendCount >= this.pendT.length) {
+      const grow = (a: Float64Array): Float64Array => {
+        const b = new Float64Array(a.length * 2);
+        b.set(a);
+        return b;
+      };
+      this.pendT = grow(this.pendT);
+      this.pendD = grow(this.pendD);
+      this.pendK = grow(this.pendK);
+    }
+    this.pendT[this.pendCount] = t;
+    this.pendD[this.pendCount] = dist;
+    this.pendK[this.pendCount] = kind;
+    this.pendCount += 1;
+  }
+
+  /** Interpolated time of the k-th crossing found by the last scan. */
+  pendingTime(k: number): number {
+    return this.pendT[k]!;
+  }
+
+  /** Race distance of the k-th crossing found by the last scan (the line's own distance). */
+  pendingDistance(k: number): number {
+    return this.pendD[k]!;
+  }
+
+  /** Race distance of the crossing applied last. */
+  get appliedDistance(): number {
+    return this.appliedDist;
+  }
+
+  /** Apply the next crossing found by the last scan, adding its timing events to `out`. */
+  applyNext(out: TimingEvent[]): void {
+    const k = this.pendNext;
+    if (k >= this.pendCount) throw new Error('no crossing pending');
+    this.pendNext += 1;
+    const t = this.pendT[k]!;
+    this.appliedDist = this.pendD[k]!;
+    if (this.pendK[k] === START) {
+      this.beginLap(t, 1, 0);
+      out.push({ type: 'lapStart', lap: 1, time: t });
+    } else {
+      this.crossLine(t, out);
+    }
+  }
+
+  /**
+   * The car was put somewhere else at sim time `time` (a reset, a restart, a teleport): carry
+   * the distance to the new position without crossing anything. Lines it was moved over are not
+   * crossed: they are skipped, and the lap in progress no longer counts (jumping over the
+   * timing line starts the next lap there, already invalid, with no lap result). Returns true
+   * when lines were skipped.
+   */
+  reposition(s: number, time: number): boolean {
+    if (!this.synced) return false;
+    const delta = lapDelta(this.lines.length, this.lastS, s);
+    this.dist += delta;
+    this.lastS = s;
+    if (!this.runningValue || delta <= 0) return false;
+    const last = this.lineDist.length - 1;
+    let skipped = false;
+    for (let guard = 0; guard < 64; guard++) {
+      if (this.lapBase + this.lineDist[this.sectorValue]! > this.dist) break;
+      skipped = true;
+      if (this.sectorValue === last) {
+        this.beginLap(time, this.lapValue + 1, this.lapBase + this.lines.length);
+      } else {
+        this.sectorValue += 1;
+        this.sectorStart = time;
+      }
+    }
+    if (skipped) this.validValue = false;
+    return skipped;
   }
 
   private crossLine(t: number, events: TimingEvent[]): void {

@@ -11,7 +11,8 @@ import { inRange, type RaceCore, type RaceSystem } from '../core';
  *   white flag), the fourth is a time penalty, and the count repeats (7th black and white, 8th
  *   penalty, ...). An excursion that gains a place must give it back within `giveBackWindow`,
  *   or it costs `cutPenalty`. A place counts as gained off track if it is taken while the car
- *   is off or within `cutTrailTime` after it rejoins. Lasting time gained without a place
+ *   is off or within `cutTrailTime` after it rejoins. A place still owed when the car takes the
+ *   flag is penalised there, before the classification. Lasting time gained without a place
  *   changing is covered by the lap invalidation and the strike count, not judged separately.
  *
  * The reading is the car at the end of each tick. When a timing line falls inside the same tick
@@ -59,7 +60,8 @@ export class LimitsSystem implements RaceSystem<LimitsState> {
   /** Before the timing lines: invalidate, count strikes. */
   tick(core: RaceCore): void {
     const { rules, strategy, circuit } = core;
-    for (let i = 0; i < this.cars.length; i++) {
+    for (let k = 0; k < this.cars.length; k++) {
+      const i = core.order[k]!;
       const c = this.cars[i]!;
       const f = core.facts[i]!;
       const active =
@@ -109,10 +111,39 @@ export class LimitsSystem implements RaceSystem<LimitsState> {
     }
   }
 
+  /**
+   * The car takes the flag at race distance `dist`: every place it still owes to a car behind
+   * it on the road (not finished, still running) is settled now, as a penalty, before the
+   * classification. A place taken in this very tick while off track counts too.
+   */
+  atFinish(core: RaceCore, car: number, dist: number): void {
+    if (core.strategy.limits !== 'race') return;
+    const c = this.cars[car]!;
+    const me = core.cars[car]!;
+    if (c.cutUntil !== null) {
+      for (let k = 0; k < core.order.length; k++) {
+        const j = core.order[k]!;
+        if (j === car || !core.racing(j) || core.facts[j]!.inPitLane) continue;
+        const other = core.cars[j]!;
+        if (me.prevDist < other.prevDist && dist > other.dist && !c.owed.some((o) => o.car === j)) {
+          c.owed.push({ car: j, deadline: core.time });
+        }
+      }
+    }
+    for (const o of c.owed) {
+      const other = core.cars[o.car]!;
+      if (other.status === 'running' && other.finishTime === null && other.dist < dist) {
+        core.penalise(car, 'leavingTrack', core.rules.cutPenalty);
+      }
+    }
+    c.owed = [];
+  }
+
   /** After positions: places gained off track, owed back or penalised. */
   afterPositions(core: RaceCore): void {
     if (core.strategy.limits !== 'race') return;
-    for (let i = 0; i < this.cars.length; i++) {
+    for (let k = 0; k < this.cars.length; k++) {
+      const i = core.order[k]!;
       const c = this.cars[i]!;
       const me = core.cars[i]!;
       if (me.status !== 'running') {
@@ -120,7 +151,8 @@ export class LimitsSystem implements RaceSystem<LimitsState> {
         continue;
       }
       if (c.cutUntil !== null && core.racing(i)) {
-        for (let j = 0; j < this.cars.length; j++) {
+        for (let q = 0; q < this.cars.length; q++) {
+          const j = core.order[q]!;
           if (j === i || !core.racing(j) || core.facts[j]!.inPitLane) continue;
           const other = core.cars[j]!;
           if (me.prevDist < other.prevDist && me.dist > other.dist) {
