@@ -4,6 +4,7 @@ import {
   validateTrackData,
   type BarrierType,
   type CornerData,
+  type EnvironmentData,
   type RunoffKind,
   type Run,
   type Side,
@@ -206,6 +207,13 @@ export class Track {
   /** Start s of each sector; the first is 0. */
   readonly sectors: Float64Array;
   readonly speedTrap: number;
+  /**
+   * s of the timing (control) line, from which published lap and sector times run. Carried as
+   * data: lap timing in the game still runs from s = 0.
+   */
+  readonly timingLine: number;
+  /** Place and event facts for rendering and physics; null for migrated format 2 files. */
+  readonly environment: EnvironmentData | null;
   readonly drsZones: readonly DrsZone[];
   readonly gridSlots: readonly Pose[];
   /** On the centreline at the start/finish line, facing the direction of travel. */
@@ -237,6 +245,8 @@ export class Track {
     const n = data.sampleCount;
     this.lap = new TrackPath(c.x, c.y, c.z, data.length, true);
     this.lineWidth = data.lineWidth;
+    this.timingLine = data.timingLine.s;
+    this.environment = data.environment;
     this.bank = Float64Array.from(c.bank);
     this.tanBank = this.bank.map(Math.tan);
     this.halfWidth = [Float64Array.from(c.halfWidthLeft), Float64Array.from(c.halfWidthRight)];

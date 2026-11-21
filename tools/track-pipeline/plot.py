@@ -5,8 +5,8 @@ Usage:
   python3 tools/track-pipeline/plot.py <circuit> [--out DIR] [--svg]
   npm run track:plot -- <circuit>
 
-Reads packages/track/data/<circuit>.json and writes PNG images to docs/evidence/m1-track/ (SVG
-too with --svg): the whole plan, close-ups of the corner groups, the pit lane and grid, and the
+Reads packages/track/data/<circuit>.json and writes PNG images to docs/evidence/m4-tracks/
+(Monza: docs/evidence/m1-track/; SVG too with --svg): the whole plan, close-ups of the corner groups, the pit lane and grid, and the
 elevation and curvature profiles. PNG conversion uses ImageMagick `convert` when it is installed.
 Lateral offsets use the same frame as packages/track: positions linear between samples,
 left normals from central differences.
@@ -232,7 +232,8 @@ def draw_plan(tr, svg, i0, i1, detail):
                 run.append(tr.at(j, sgn * sd["barrier"][j % tr.n]))
     # Pit-lane garage line.
     w0, w1 = (int(round(v / pstep)) for v in p["garageWall"])
-    svg.line([tr.pit_at(j, -pr[j] - 0.5) for j in range(w0, w1 + 1)], BARRIER["concrete"], 2)
+    gs = 1 if p["side"] == "left" else -1  # garages on the pit lane's side away from the lap
+    svg.line([tr.pit_at(j, gs * ((pl if gs > 0 else pr)[j] + 0.5)) for j in range(w0, w1 + 1)], BARRIER["concrete"], 2)
     # Timing lines.
     t = data["timing"]
     lines = [(0, "#ffffff", "S/F")]
@@ -343,7 +344,8 @@ def main(argv):
         print(__doc__)
         return 2
     cid = argv[1]
-    out_dir = argv[argv.index("--out") + 1] if "--out" in argv else os.path.join(ROOT, "docs", "evidence", "m1-track")
+    default_dir = "m1-track" if cid == "monza" else "m4-tracks"
+    out_dir = argv[argv.index("--out") + 1] if "--out" in argv else os.path.join(ROOT, "docs", "evidence", default_dir)
     keep_svg = "--svg" in argv
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(ROOT, "packages", "track", "data", cid + ".json")) as f:
@@ -353,7 +355,7 @@ def main(argv):
 
     # Whole plan.
     x0, z0, x1, z1 = bounds(tr.pts + tr.pit, 120)
-    svg = Svg(x0, z0, x1, z1, 0.75, "%s: plan, %.0f m, clockwise from the start/finish line (north up)" % (name, tr.L))
+    svg = Svg(x0, z0, x1, z1, 0.75, "%s: plan, %.0f m, %s from the start/finish line (north up)" % (name, tr.L, data["direction"]))
     draw_plan(tr, svg, 0, tr.n, False)
     write(svg.finish(LEGEND), os.path.join(out_dir, cid + "-plan"), keep_svg)
 
@@ -391,9 +393,9 @@ def main(argv):
     write(profile_svg(tr, title, hs, "m", lambda v: "%.0f" % v, marks), os.path.join(out_dir, cid + "-elevation"), keep_svg)
     kappa = geom.curvature(tr.pts, True)
     geo_step = data["source"]["smoothedLength"] / tr.n
-    found, ks = corner_rule.detect(kappa, geo_step)
+    found, ks = corner_rule.detect(kappa, geo_step, data["source"].get("cornerRule"))
     band = [(c[2] * tr.step, c[3] * tr.step, "#3d3a1e") for c in found]
-    title = "%s: signed curvature (1/m, left positive), smoothed %.0f m; shaded: %d corners found by the curvature rule" % (name, corner_rule.SMOOTH_SIGMA_M, len(found))
+    title = "%s: signed curvature (1/m, left positive), smoothed %.0f m; shaded: %d corners found by the curvature rule" % (name, (data["source"].get("cornerRule") or corner_rule.DEFAULT_RULE)["smoothSigma"], len(found))
     write(profile_svg(tr, title, ks, "1/m", lambda v: "%.3f" % v, marks, zero=True, band=band), os.path.join(out_dir, cid + "-curvature"), keep_svg)
     return 0
 

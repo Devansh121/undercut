@@ -6,10 +6,15 @@
  * Lateral zone tables are run-length encoded as `[firstSample, value]` pairs: a value holds from
  * its sample to the next pair's sample (and the last one to the end of the lap). Offsets are
  * metres from the centreline, measured outward on that side.
+ *
+ * Format history: 2 added kerb tapers; 3 added the timing line (`timingLine`) and the circuit's
+ * environment (`environment`). Format 2 files are migrated on load (`migrateTrackData`).
  */
 
 export const TRACK_FORMAT = 'undercut-track';
-export const TRACK_FORMAT_VERSION = 2;
+export const TRACK_FORMAT_VERSION = 3;
+/** Oldest format `validateTrackData` still reads, by migrating it. */
+export const OLDEST_TRACK_FORMAT_VERSION = 2;
 
 export type Side = 'left' | 'right';
 export type RunoffKind = 'asphalt' | 'grass' | 'gravel';
@@ -83,6 +88,53 @@ export interface PitData {
   garageWall: readonly [number, number];
 }
 
+/**
+ * The timing (control) line: lap and sector times run from it. It need not be the start line
+ * (s = 0), which is where the grid and the lights are.
+ */
+export interface TimingLineData {
+  s: number;
+  /** Plus or minus, metres along s; null when unknown (migrated format 2 files). */
+  uncertainty: number | null;
+  source: string;
+}
+
+/** Floodlight masts as data: mapped positions, or a rule for placing them. */
+export interface FloodlightData {
+  mapped: boolean;
+  /** Mapped mast positions on the lap; empty when not mapped. */
+  masts: readonly TrackPoint[];
+  /**
+   * Placement rule when not mapped: a mast every `spacing` metres along each side, the right
+   * side offset by `stagger`, `setback` metres behind the barrier, `height` metres tall.
+   */
+  rule: { spacing: number; stagger: number; setback: number; height: number } | null;
+}
+
+/** Facts about the place and the event that rendering and physics read (SI units). */
+export interface EnvironmentData {
+  /** WGS84 position of the circuit (the world origin). */
+  latitude: number;
+  longitude: number;
+  /** World yaw of true north (0 faces +X, positive turns left): pi / 2, north is -Z. */
+  northYaw: number;
+  /** Mean height of the lap above EGM2008, metres. */
+  altitude: number;
+  /** Typical race air temperature (K) and pressure (Pa). */
+  airTemperature: number;
+  airPressure: number;
+  /** IANA time zone and its offset from UTC on race day, seconds. */
+  timeZone: string;
+  utcOffset: number;
+  /** A representative race date, YYYY-MM-DD, for the sun's path. */
+  raceDate: string;
+  /** Usual local start times, seconds after local midnight. */
+  sessions: { qualifying: number; race: number };
+  lighting: 'daylight' | 'floodlit';
+  floodlights: FloodlightData | null;
+  notes: string;
+}
+
 export interface TrackData {
   format: typeof TRACK_FORMAT;
   version: typeof TRACK_FORMAT_VERSION;
@@ -95,6 +147,8 @@ export interface TrackData {
   sampleCount: number;
   /** WGS84 origin of the world frame and the height (EGM2008) of world y = 0. */
   origin: { lat: number; lon: number; datum: number };
+  /** The circuit's environment; null for migrated format 2 files. */
+  environment: EnvironmentData | null;
   /** Provenance: sources, fetch records, scale factor, licence and attribution. */
   source: {
     pipelineVersion: string;
@@ -118,6 +172,7 @@ export interface TrackData {
   sides: { left: SideData; right: SideData };
   corners: readonly CornerData[];
   timing: { sectors: readonly number[]; speedTrap: number; drs: readonly DrsZoneData[] };
+  timingLine: TimingLineData;
   grid: readonly TrackPoint[];
   pit: PitData;
 }
@@ -301,13 +356,124 @@ function signedArea(xs: readonly number[], zs: readonly number[]): number {
 const isRunoff = (x: unknown): x is RunoffKind => RUNOFF_KINDS.includes(x as RunoffKind);
 const isBarrier = (x: unknown): x is BarrierType => BARRIER_TYPES.includes(x as BarrierType);
 
+/** Keys format 3 added; a format 2 file must not have them. */
+const FORMAT_3_KEYS = ['timingLine', 'environment'] as const;
+
+/**
+ * Returns a format 3 copy of a format 2 file (the input is not changed). Format 2 recorded no
+ * timing line and no environment: the timing line goes on the start line with an unknown
+ * uncertainty, and the environment stays empty. Anything else is returned as it is, for
+ * `validateTrackData` to judge.
+ */
+export function migrateTrackData(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
+  const o = raw as Obj;
+  if (o.version !== 2 || FORMAT_3_KEYS.some((k) => k in o)) return raw;
+  return {
+    ...o,
+    version: 3,
+    environment: null,
+    timingLine: {
+      s: 0,
+      uncertainty: null,
+      source:
+        'Migrated from track format 2, which recorded no timing line: the start line is assumed.',
+    },
+  };
+}
+
+const RACE_DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+function checkEnvironment(
+  c: Checker,
+  v: unknown,
+  inLap: (v: unknown, path: string) => number,
+): void {
+  const path = 'track.environment';
+  if (v === null) return;
+  const e = c.obj(v, path, [
+    'latitude',
+    'longitude',
+    'northYaw',
+    'altitude',
+    'airTemperature',
+    'airPressure',
+    'timeZone',
+    'utcOffset',
+    'raceDate',
+    'sessions',
+    'lighting',
+    'floodlights',
+    'notes',
+  ]);
+  if (!e) return;
+  c.num(e.latitude, `${path}.latitude`, -90, 90);
+  c.num(e.longitude, `${path}.longitude`, -180, 180);
+  c.num(e.northYaw, `${path}.northYaw`, -Math.PI, Math.PI);
+  c.num(e.altitude, `${path}.altitude`, -500, 9000);
+  c.num(e.airTemperature, `${path}.airTemperature`, 223.15, 333.15);
+  c.num(e.airPressure, `${path}.airPressure`, 50000, 110000);
+  c.str(e.timeZone, `${path}.timeZone`);
+  c.num(e.utcOffset, `${path}.utcOffset`, -14 * 3600, 14 * 3600);
+  if (typeof e.raceDate !== 'string' || !RACE_DATE.test(e.raceDate))
+    c.fail(`${path}.raceDate`, 'expected a date as YYYY-MM-DD');
+  const sessions = c.obj(e.sessions, `${path}.sessions`, ['qualifying', 'race']);
+  if (sessions) {
+    for (const k of ['qualifying', 'race']) c.num(sessions[k], `${path}.sessions.${k}`, 0, 86399);
+  }
+  const lighting = c.oneOf(e.lighting, `${path}.lighting`, ['daylight', 'floodlit']);
+  c.str(e.notes, `${path}.notes`);
+  if (e.floodlights === null) {
+    if (lighting === 'floodlit')
+      c.fail(`${path}.floodlights`, 'a floodlit circuit needs floodlights (masts or a rule)');
+    return;
+  }
+  const f = c.obj(e.floodlights, `${path}.floodlights`, ['mapped', 'masts', 'rule']);
+  if (!f) return;
+  if (typeof f.mapped !== 'boolean') c.fail(`${path}.floodlights.mapped`, 'expected a boolean');
+  if (!Array.isArray(f.masts)) c.fail(`${path}.floodlights.masts`, 'expected an array');
+  else {
+    f.masts.forEach((m: unknown, i) => {
+      const o = c.obj(m, `${path}.floodlights.masts[${i}]`, ['s', 'd']);
+      if (!o) return;
+      inLap(o.s, `${path}.floodlights.masts[${i}].s`);
+      c.num(o.d, `${path}.floodlights.masts[${i}].d`, -500, 500);
+    });
+    if (f.mapped === true && f.masts.length === 0)
+      c.fail(`${path}.floodlights.masts`, 'mapped floodlights need at least one mast');
+  }
+  if (f.rule === null) {
+    if (f.mapped !== true)
+      c.fail(`${path}.floodlights.rule`, 'unmapped floodlights need a placement rule');
+  } else {
+    const r = c.obj(f.rule, `${path}.floodlights.rule`, [
+      'spacing',
+      'stagger',
+      'setback',
+      'height',
+    ]);
+    if (r) {
+      const spacing = c.num(r.spacing, `${path}.floodlights.rule.spacing`, 5, 500);
+      c.num(r.stagger, `${path}.floodlights.rule.stagger`, 0, spacing);
+      c.num(r.setback, `${path}.floodlights.rule.setback`, 0, 50);
+      c.num(r.height, `${path}.floodlights.rule.height`, 2, 100);
+    }
+  }
+}
+
 /**
  * Checks that `raw` is a complete, internally consistent track file and returns it typed.
+ * Format 2 files are migrated first (`migrateTrackData`); the input is never changed.
  * Throws `TrackDataError` listing every problem found. Unknown keys are rejected, except inside
  * `source`, which carries free-form provenance.
  */
-export function validateTrackData(raw: unknown): TrackData {
+export function validateTrackData(input: unknown): TrackData {
   const c = new Checker();
+  const raw = migrateTrackData(input);
+  if (raw !== null && typeof raw === 'object' && (raw as Obj).version === 2) {
+    for (const k of FORMAT_3_KEYS)
+      if (k in (raw as Obj)) c.fail(`track.${k}`, 'not part of format 2: set version to 3');
+  }
   const top = c.obj(raw, 'track', [
     'format',
     'version',
@@ -318,6 +484,7 @@ export function validateTrackData(raw: unknown): TrackData {
     'length',
     'sampleCount',
     'origin',
+    'environment',
     'source',
     'centreline',
     'lineWidth',
@@ -325,6 +492,7 @@ export function validateTrackData(raw: unknown): TrackData {
     'sides',
     'corners',
     'timing',
+    'timingLine',
     'grid',
     'pit',
   ]);
@@ -348,6 +516,7 @@ export function validateTrackData(raw: unknown): TrackData {
     c.num(origin.lon, 'track.origin.lon', -180, 180);
     c.num(origin.datum, 'track.origin.datum', -500, 9000);
   }
+  checkEnvironment(c, top.environment, inLap);
   const source = c.obj(
     top.source,
     'track.source',
@@ -494,6 +663,14 @@ export function validateTrackData(raw: unknown): TrackData {
           inLap(o[k], `track.timing.drs[${i}].${k}`);
       });
     }
+  }
+
+  const tl = c.obj(top.timingLine, 'track.timingLine', ['s', 'uncertainty', 'source']);
+  if (tl) {
+    if (typeof tl.s === 'number' && tl.s === L) c.fail('track.timingLine.s', `must be below ${L}`);
+    else inLap(tl.s, 'track.timingLine.s');
+    if (tl.uncertainty !== null) c.num(tl.uncertainty, 'track.timingLine.uncertainty', 0, L / 2);
+    c.str(tl.source, 'track.timingLine.source');
   }
 
   if (!Array.isArray(top.grid) || top.grid.length === 0)

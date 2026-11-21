@@ -27,9 +27,9 @@ sys.path.insert(0, HERE)
 from lib import authored, centreline, corners, elevation, geo, geom, inputs, osmfeatures  # noqa: E402
 from lib.writer import dumps  # noqa: E402
 
-PIPELINE_VERSION = "1.1.0"
+PIPELINE_VERSION = "1.2.0"
 FORMAT = "undercut-track"
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 OSM_ATTRIBUTION = (
     "© OpenStreetMap contributors. Data available under the Open Database License 1.0, "
@@ -69,6 +69,66 @@ def match_corners(cfg, detected, step):
             "direction": c["direction"],
         }
     return out
+
+
+def bridge_spans(cfg, data, frame, pts, step):
+    """Lap spans (geometric s) of the OSM bridge ways listed in the elevation table."""
+    nodes = {e["id"]: (e["lat"], e["lon"]) for e in data["elements"] if e["type"] == "node"}
+    ways = {e["id"]: e for e in data["elements"] if e["type"] == "way"}
+    S = [i * step for i in range(len(pts) + 1)]
+    out = []
+    for b in cfg["elevation"].get("bridges", []):
+        w = ways[b["way"]]
+        ends = [geom.project_closed(frame.to_xz(*nodes[n]), pts, S)[0] for n in (w["nodes"][0], w["nodes"][-1])]
+        total = len(pts) * step
+        a, c = ends
+        if (c - a) % total > total / 2:
+            a, c = c, a
+        out.append((a, c, b["crown"]))
+    return out
+
+
+def way_tags_lookup(cl, layout, L):
+    """For lap s, the tags of the OSM way the loop follows there (from the research chaining)."""
+    ways = {e["id"]: e for e in layout["elements"] if e["type"] == "way"}
+    k = L / cl["length_m"]
+    segs = [(a * k, b * k, ways[w].get("tags", {})) for a, b, w, _ in cl["segments"]]
+
+    def at(s):
+        for a, b, tags in segs:
+            if a <= s <= b or (a > b and (s >= a or s <= b)):
+                return tags
+        return {}
+
+    return at
+
+
+def isa_pressure(altitude):
+    """ISA pressure at an altitude (Pa), as packages/sim's airDensity computes it."""
+    return 101325 * (1 - 2.25577e-5 * altitude) ** 5.25588
+
+
+def environment(cfg, lat0, lon0, heights):
+    e = cfg["environment"]
+    altitude = sum(heights) / len(heights)
+    fl = e.get("floodlights")
+    return {
+        "latitude": lat0,
+        "longitude": lon0,
+        # World frame: +X east, +Z south, so true north is -Z, yaw +pi/2 (yaw 0 faces +X, positive
+        # turns left). The frame is the tangent plane at the origin, so grid north is true north there.
+        "northYaw": math.pi / 2,
+        "altitude": altitude,
+        "airTemperature": e["airTemperature"],
+        "airPressure": isa_pressure(altitude),
+        "timeZone": e["timeZone"],
+        "utcOffset": e["utcOffset"],
+        "raceDate": e["raceDate"],
+        "sessions": e["sessions"],
+        "lighting": e["lighting"],
+        "floodlights": None if fl is None else {"mapped": fl["mapped"], "masts": fl.get("masts", []), "rule": fl.get("rule")},
+        "notes": e["note"],
+    }
 
 
 def interp_closed(values, s, step):
@@ -143,16 +203,19 @@ def build_pit(cfg, data, frame, lap, pts, heights, s_scaled):
     }
 
 
-def pit_offsets(lap, pit, pts):
-    """For each lap sample, the pit centre's lateral offset and its near-side half-width, or None."""
+def pit_offsets(lap, pit, pts, side):
+    """For each lap sample, the pit centre's lateral offset and its near- and far-side half-widths, or None."""
+    # The pit lane runs the same way as the lap, so its side facing the lap is the opposite one:
+    # a pit lane on the lap's right faces it with its left side, and the reverse.
+    near_k = 0 if side == "right" else 1
     out = [None] * lap.count
     pp = pit["pts"]
     S = [i * lap.step / lap.scale for i in range(lap.count)] + [lap.count * lap.step / lap.scale]
     for j, p in enumerate(pp):
         sg, d, _ = geom.project_closed(p, pts, S)
         i = lap.index(sg * lap.scale)
-        near = pit["widths"][j][0]  # the pit's left side faces the lap (pit lane is on the lap's right)
-        far = pit["widths"][j][1]
+        near = pit["widths"][j][near_k]
+        far = pit["widths"][j][1 - near_k]
         cur = out[i]
         if cur is None or abs(d) < abs(cur[0]):
             out[i] = (d, near, far)
@@ -169,6 +232,8 @@ def pit_offsets(lap, pit, pts):
 def zones(cfg, lap, pts, kappa, widths, kerb, gravel_polys, barrier_lines, pit_off):
     rc, bc = cfg["runoff"], cfg["barriers"]
     normals = authored.normals_from(pts)
+    # Millimetre-rounded, as the file stores them and the runtime reads them.
+    path_kappa = authored.path_curvature([(round(x, 3), round(z, 3)) for x, z in pts])
     res = {}
     report = {}
     for side, sgn in (("left", 1), ("right", -1)):
@@ -196,6 +261,9 @@ def zones(cfg, lap, pts, kappa, widths, kerb, gravel_polys, barrier_lines, pit_o
         steady = [m[i] is not None and m[i - 1] is not None and abs(m[i][0] - m[i - 1][0]) < 1.0 for i in range(lap.count)]
         steady = authored.clean_runs(steady, 15)
         m = [m[i] if steady[i] else None for i in range(lap.count)]
+        # A circuit may read a mapped barrier kind as another type (Spa: fences stand on guard rails).
+        remap = bc.get("mappedTypes", {})
+        m = [None if x is None else (x[0], remap.get(x[1], x[1])) for x in m]
         # Barrier offsets: authored offset, else mapped, else the default rule.
         off = []
         typ = []
@@ -219,6 +287,8 @@ def zones(cfg, lap, pts, kappa, widths, kerb, gravel_polys, barrier_lines, pit_o
                 if "offset" in item:
                     off[i] = item["offset"]
                     source[i] = "authored"
+        if bc.get("minTypeRun"):
+            typ = authored.merge_short_runs(typ, int(round(bc["minTypeRun"] / lap.step)))
         off = authored.slope_limit(off, 0.5 * lap.step)
         # Pit side: the pit wall stands halfway between the track edge and the pit lane; where
         # the two surfaces are too close for a wall, the barrier moves behind the pit lane.
@@ -247,6 +317,15 @@ def zones(cfg, lap, pts, kappa, widths, kerb, gravel_polys, barrier_lines, pit_o
                     source[i] = source[i] + "+capped"
         # Taper away from capped stretches so the barrier never sweeps across a chicane.
         off = authored.taper_down(off, 0.5 * lap.step, [x.startswith("pit") for x in source])
+        # Nothing, not even a barrier placed behind the pit lane, may stand where the frame folds:
+        # with `clampToFrame`, no barrier goes beyond the frame limit the runtime computes.
+        # (Monza's file predates this rule; it is left as built.)
+        if bc.get("clampToFrame"):
+            flim = authored.frame_limit(path_kappa, sgn, lap.step)
+            for i in range(lap.count):
+                if off[i] > flim[i]:
+                    off[i] = flim[i]
+                    source[i] = source[i] + "+frame"
         for i in range(lap.count):
             if off[i] < edge[i] + 1.0:
                 raise SystemExit("%s barrier at s=%.0f is %.1f m from the centreline, inside the kerb" % (side, i * lap.step, off[i]))
@@ -301,23 +380,28 @@ def main(argv):
     L = cfg["officialLength"]
     n = len(pts)
     step = L / n
-    detected, _ = corners.detect(kappa, step / quality["scale"])
+    rule = corners.rule_for(cfg)
+    detected, _ = corners.detect(kappa, step / quality["scale"], rule)
     lap = authored.Lap(L, n, match_corners(cfg, detected, step))
     lap.scale = quality["scale"]
     log("centreline: %d samples, OSM %.1f m, smoothed %.1f m (%.3f %%), scale %.6f" % (
         n, quality["osmLength"], quality["smoothedLength"], quality["lengthChangePct"], quality["scale"]))
     # 6. Elevation.
     dem, dem_rec = inputs.dem_tile(lat0, lon0, offline)
-    raw_h, h = elevation.profile(pts, frame, dem, cfg, step / quality["scale"])
+    spans = bridge_spans(cfg, layout, frame, pts, step / quality["scale"])
+    raw_h, h = elevation.profile(pts, frame, dem, cfg, step / quality["scale"], spans)
     datum = math.floor(min(h))
     log("elevation: %.1f to %.1f m, range %.1f m (published %.1f)" % (min(h), max(h), max(h) - min(h), cfg["elevation"]["publishedRange"]))
     # 7-8. Width and banking.
-    widths = authored.periodic_keys(lap, cfg["widths"]["keys"])
+    if "lanes" in cfg["widths"]:
+        widths = authored.lane_widths(lap, cfg, way_tags_lookup(cl, layout, L))
+    else:
+        widths = authored.periodic_keys(lap, cfg["widths"]["keys"])
     bank = authored.banking(lap, cfg)
     # 9. Pit lane, kerbs, run-off, barriers.
     pit = build_pit(cfg, layout, frame, lap, pts, h, None)
     lap.pit = {"entry_s": pit["entry_s"], "exit_s": pit["exit_s"]}
-    pit_off = pit_offsets(lap, pit, pts)
+    pit_off = pit_offsets(lap, pit, pts, cfg["pit"]["side"])
     kerb = authored.kerbs(lap, cfg)
     # The garage-side wall runs where the pit lane is clear of the track by the wall's gap.
     pside = 0 if cfg["pit"]["side"] == "left" else 1
@@ -326,7 +410,7 @@ def main(argv):
         sj = pit["main_s"][j]
         i = lap.index(sj)
         edge = widths[i][pside] + authored.kerb_width(cfg, kerb[cfg["pit"]["side"]][i])
-        sep.append(abs(d) - pit["widths"][j][0] - edge >= 2.0)
+        sep.append(abs(d) - pit["widths"][j][1 - pside] - edge >= 2.0)
     pstep = pit["length"] / (len(sep) - 1)
     first = sep.index(True)
     last = len(sep) - 1 - sep[::-1].index(True)
@@ -336,14 +420,18 @@ def main(argv):
     log("zones: %s" % json.dumps(zone_report))
     # 10. Timing and rules metadata.
     t = cfg["timing"]
+    if "line" in cfg["timingLine"]["at"]:
+        raise SystemExit("the timing line cannot be placed relative to itself")
+    lap.timing_line = lap.resolve(cfg["timingLine"]["at"])
     sectors = [0.0] + [lap.resolve(r) for r in t["sectors"]]
     drs = []
     apexes = sorted((c["first_s"], num) for num, c in lap.corners.items())
     for z in t["drs"]:
         act = lap.resolve(z["activation"])
-        # The zone runs to the start of the next corner.
-        nxt = min(apexes, key=lambda a: lap.forward(act, a[0]))
-        drs.append({"detection": lap.resolve(z["detection"]), "activation": act, "end": nxt[0]})
+        # The zone runs to the start of the next corner, or of the corner the table names (a
+        # flat-out kink inside a zone is not where it ends).
+        end = lap.resolve(z["end"]) if "end" in z else min(apexes, key=lambda a: lap.forward(act, a[0]))[0]
+        drs.append({"detection": lap.resolve(z["detection"]), "activation": act, "end": end})
     grid = authored.grid_slots(lap, cfg)
 
     data = {
@@ -356,6 +444,7 @@ def main(argv):
         "length": L,
         "sampleCount": n,
         "origin": {"lat": lat0, "lon": lon0, "datum": datum},
+        "environment": environment(cfg, lat0, lon0, h),
         "source": {
             "pipelineVersion": PIPELINE_VERSION,
             "scale": quality["scale"],
@@ -372,7 +461,12 @@ def main(argv):
                 "record": dem_rec,
                 "filter": "opening %s m, moving average %s m, Gaussian sigma %s m" % (
                     cfg["elevation"].get("openWindow") or 0, cfg["elevation"]["average"], cfg["elevation"]["gradeSigma"]),
+                **({"bridges": [
+                    {"way": b["way"], "from": lap.wrap(sp[0] * quality["scale"]), "to": lap.wrap(sp[1] * quality["scale"]), "crown": b["crown"]}
+                    for b, sp in zip(cfg["elevation"]["bridges"], spans)
+                ]} if cfg["elevation"].get("bridges") else {}),
             },
+            "cornerRule": rule,
             "licence": "ODbL-1.0",
             "attribution": [OSM_ATTRIBUTION, DEM_ATTRIBUTION, DEM_LIABILITY],
             "estimates": "Widths, banking, kerbs, run-off kinds nearest the track, barrier types and offsets not mapped in OpenStreetMap, pit-lane widths, limit lines, boxes and grid slots are authored estimates.",
@@ -395,6 +489,11 @@ def main(argv):
             for num, c in sorted(lap.corners.items())
         ],
         "timing": {"sectors": sectors, "speedTrap": lap.resolve(t["speedTrap"]), "drs": drs},
+        "timingLine": {
+            "s": lap.timing_line,
+            "uncertainty": cfg["timingLine"]["uncertainty"],
+            "source": cfg["timingLine"]["source"],
+        },
         "grid": grid,
         "pit": {
             "side": cfg["pit"]["side"],
