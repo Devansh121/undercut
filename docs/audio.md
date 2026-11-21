@@ -174,9 +174,13 @@ The added generators are individually metered before view and bus gains:
 - `grass` and `gravel`: soft low rumble and swish versus impulsive stone noise and tub resonances;
   replace asphalt noise according to wheel contact shares. Kerb repetition is speed / 0.25 m.
 - `drs`: one mechanical knock per flap transition; open DRS reduces wind about 3 dB.
-- `impact`: severity-driven body thump and debris burst, once per event serial. `AudioInputs`
-  exposes speed and serial for collision telemetry; neither barrier nor car contact telemetry
-  exists on this PR's base yet. No collision is inferred from ordinary braking.
+- `impact`: severity-driven body thump and debris burst, once per event serial. Barrier
+  impacts are wired: the sim's per-step `wallImpactSpeed` is kept as the hardest strike of each
+  frame (`FrameResult.wallImpact`, since it resets every 240 Hz step and a 60 Hz frame would
+  miss most of them), and `ImpactEvents` turns it into speed and serial; strikes within 80 ms
+  merge into one impact unless twice as hard. Car-to-car contact impulses are not in the sim
+  yet; they feed `ImpactEvents` the same way when they land. No collision is inferred from
+  ordinary braking.
 
 Existing limiter, spool-lag turbo, deploy/harvest whine, floor strikes and shift cut remain.
 All acoustic levels, resonances and view paths are sound-design estimates; mechanical power-unit

@@ -11,7 +11,7 @@ import {
 } from '@undercut/sim';
 import { LEFT, createGround } from '@undercut/track';
 import { describe, expect, it } from 'vitest';
-import { KERB_RIDGE_SPACING, toAudioCarState } from '../src/game/audio-map';
+import { ImpactEvents, KERB_RIDGE_SPACING, toAudioCarState } from '../src/game/audio-map';
 import { AUDIO_DEFAULTS, AudioSettingsStore } from '../src/game/audio-settings';
 import { DriveSession } from '../src/game/session';
 import { loadMonza } from './fixtures';
@@ -22,6 +22,50 @@ function carAt(speed: number) {
   const state = createCarState(params, { speed });
   return { state, telemetry: readCarTelemetry(state, createCarTelemetry()) };
 }
+
+describe('ImpactEvents', () => {
+  it('turns per-frame barrier impact speeds into distinct impact events', () => {
+    const e = new ImpactEvents();
+    const dt = 1 / 60;
+    e.observe(0, dt);
+    expect(e.serial).toBe(0);
+    // A touch below 0.3 m/s is not an impact.
+    e.observe(0.2, dt);
+    expect(e.serial).toBe(0);
+    e.observe(6, dt);
+    expect(e.serial).toBe(1);
+    expect(e.speed).toBe(6);
+    // Corners following within 80 ms belong to the same impact unless twice as hard.
+    e.observe(2, dt);
+    expect(e.serial).toBe(1);
+    e.observe(13, dt);
+    expect(e.serial).toBe(2);
+    expect(e.speed).toBe(13);
+    for (let i = 0; i < 6; i++) e.observe(0, dt);
+    e.observe(3, dt);
+    expect(e.serial).toBe(3);
+    expect(e.speed).toBe(3);
+  });
+
+  it('feeds the audio state through the impact fields', () => {
+    const { state, telemetry } = carAt(40);
+    const e = new ImpactEvents();
+    e.observe(9, 1 / 60);
+    const a = toAudioCarState(
+      {
+        state,
+        telemetry,
+        pitLimiter: false,
+        kerbRoughness: 0,
+        impactSpeed: e.speed,
+        impactSerial: e.serial,
+      },
+      defaultCarState(),
+    );
+    expect(a.impactSpeed).toBe(9);
+    expect(a.impactSerial).toBe(1);
+  });
+});
 
 describe('toAudioCarState', () => {
   it('preserves lock-up sign, DRS and collision event identity', () => {

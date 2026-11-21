@@ -1,4 +1,4 @@
-import type { AudioCarState } from '@undercut/audio';
+import { IMPACT_MIN_SPEED, type AudioCarState } from '@undercut/audio';
 import {
   computeMass,
   createSurfaceHint,
@@ -22,10 +22,38 @@ const BOOST_LOW_RPM = 6000;
 const BOOST_HIGH_RPM = 10500;
 const RAD_TO_RPM = 60 / (2 * Math.PI);
 
+/** Corner strikes this close together are one impact unless the later one is twice as hard. */
+const IMPACT_MERGE_TIME = 0.08;
+
+/**
+ * Turns the hardest barrier impact speed of each frame (`FrameResult.wallImpact`) into impact
+ * events for the audio state: `serial` changes once per impact and `speed` is its normal speed.
+ * A car glancing along a barrier strikes with one corner and then the other, and keeps touching
+ * while it slides; those strikes merge into one impact unless one is twice as hard as the last.
+ * Car-to-car contact impulses can be fed here the same way once the sim reports them.
+ */
+export class ImpactEvents {
+  serial = 0;
+  speed = 0;
+  private sinceContact = Number.POSITIVE_INFINITY;
+
+  /** One frame of `dt` seconds whose hardest impact was `normalSpeed` m/s (0 for none). */
+  observe(normalSpeed: number, dt: number): void {
+    this.sinceContact += dt;
+    if (!(normalSpeed >= IMPACT_MIN_SPEED)) return;
+    if (this.sinceContact >= IMPACT_MERGE_TIME || normalSpeed >= 2 * this.speed) {
+      // Kept inside the audio state's supported range; any change is a new impact.
+      this.serial = (this.serial + 1) % 1_000_000;
+      this.speed = normalSpeed;
+    }
+    this.sinceContact = 0;
+  }
+}
+
 export interface AudioInputs {
   state: CarState;
   surface?: SurfaceSampler;
-  /** Event seam until collision telemetry is available. */
+  /** Latest impact (`ImpactEvents`): normal speed, m/s, and the serial that marks a new one. */
   impactSpeed?: number;
   impactSerial?: number;
   telemetry: CarTelemetry;
