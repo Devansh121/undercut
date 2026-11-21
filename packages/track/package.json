@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Track data model and loaders.",
+  "description": "Track data, the (s, d) frame, the surface sampler and track meshes.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./data/*.json": "./data/*.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@undercut/core": "0.0.0"
+    "@undercut/core": "0.0.0",
+    "@undercut/sim": "0.0.0"
   }
 }
