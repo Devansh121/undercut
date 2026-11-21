@@ -31,12 +31,25 @@ Vite dev server with hot reload, plus the rooms service behind the same `/rooms`
 | `npm run test:physics` | Physics validation suite (`packages/sim/validation/`) |
 | `npm run test:rooms` | Protocol and room tests against the local Workers runtime, plus server start and stop checks |
 | `npm run build` | Production build plus bundle and asset budget check |
+| `npm run deploy:check` | Build, stage static assets, and verify the Cloudflare bundle (`wrangler deploy --dry-run`) |
+| `npm run test:deploy` | Composed Cloudflare Worker (static client + `/rooms`) tests on the local Workers runtime |
 | `npm run test:browser` | Playwright, desktop 1440×900 and landscape phone 844×390 (build first) |
 | `npm run shots -- monza` | Screenshot stations on the real GPU into `artifacts/screenshots/<sha>/` (build first; `--lap`, `--perf`) |
 | `npm run check:assets` | Asset licence check against `assets/MANIFEST.json` |
 | `npm run check:secrets` | Secret scan with gitleaks (Linux x64) |
 
 Run `npx playwright install chromium` once before the browser tests.
+
+## Deploy
+
+Deploys as one Cloudflare Worker (`wrangler.jsonc`) serving the built client and `/rooms` on the same origin, within the Workers Free plan:
+
+```sh
+npx wrangler login
+npm run deploy
+```
+
+Full steps, rollback, takedown, Free plan limits and abuse guards are in `docs/DEPLOY.md`.
 
 ## Layout
 
