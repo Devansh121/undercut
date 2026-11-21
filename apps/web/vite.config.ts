@@ -93,7 +93,25 @@ export default defineConfig({
   server: {
     // Same-origin /rooms, as in production; the rooms service runs on the Workers runtime.
     proxy: {
-      '/rooms': { target: `http://127.0.0.1:${roomsPort}`, ws: true },
+      '/rooms': {
+        target: `http://127.0.0.1:${roomsPort}`,
+        ws: true,
+        // The rooms service limits rooms and sockets per client address, read from
+        // cf-connecting-ip as the Cloudflare edge sets it. Set it from the socket here
+        // too, replacing anything the client sent (as tools/serve/static.mjs does).
+        configure: (proxy) => {
+          const fromSocket = (
+            proxyReq: { setHeader(name: string, value: string): void },
+            req: { socket: { remoteAddress?: string | undefined } },
+          ) => {
+            const address = req.socket.remoteAddress ?? '';
+            proxyReq.setHeader('cf-connecting-ip', address);
+            proxyReq.setHeader('x-forwarded-for', address);
+          };
+          proxy.on('proxyReq', fromSocket);
+          proxy.on('proxyReqWs', fromSocket);
+        },
+      },
     },
   },
 });

@@ -11,13 +11,8 @@ export function resolveRoomsUrl(pageUrl: string, override: string | null | undef
   return url.href.replace(/\/+$/, '');
 }
 
-/** WebSocket URL for one room under a rooms base URL. */
-export function roomSocketUrl(roomsUrl: string, roomId: string): string {
-  const url = new URL(`${roomsUrl.replace(/\/+$/, '')}/${encodeURIComponent(roomId)}`);
-  if (url.protocol === 'https:') url.protocol = 'wss:';
-  else if (url.protocol === 'http:') url.protocol = 'ws:';
-  return url.href;
-}
+// A room's WebSocket URL comes from @undercut/protocol (`roomSocketUrl`, or `roomsApi`'s
+// `socketUrl`), which knows the service's paths: `<rooms URL>/<code>/ws`.
 
 /** The rooms URL for this page: a saved setting, else the build-time value, else same-origin. */
 export function roomsUrl(): string {

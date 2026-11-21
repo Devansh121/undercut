@@ -48,12 +48,16 @@ function signalGroup(pgid, signal) {
  * process group (wrangler runs detached so workerd goes with it) and resolves only
  * once that group is gone. Install signal handlers that call `stop()` before `start()`.
  *
- * @param {{ port: number, log?: (text: string) => void, quiet?: boolean }} options
+ * `vars` are passed to the Worker as environment variables (tests use them to shorten
+ * room timings); the normal run passes none.
+ *
+ * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
  */
 export function createRoomsService({
   port,
   log = (text) => void process.stdout.write(text),
   quiet = false,
+  vars = {},
 }) {
   const url = `http://127.0.0.1:${port}`;
   const cancel = new AbortController();
@@ -89,6 +93,7 @@ export function createRoomsService({
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
+        ...Object.entries(vars).flatMap(([key, value]) => ['--var', `${key}:${value}`]),
       ],
       {
         cwd: REPO_ROOT,
