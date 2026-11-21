@@ -201,3 +201,15 @@ scrub, wind/DRS, and whether the onboard high frequencies become tiring. Use `lo
 same-RPM tone, and the new layer tests for off-road surfaces and collisions (a clean reference
 lap does not exercise gravel or impacts). A human still needs to judge realism, balance and
 phone/headphone playback; objective gates cannot award the audio scorecard rating.
+
+Reference evidence from this pass (48 kHz stereo, 84.97 s, 1343 steady windows per view):
+
+| View | LUFS | dBTP | Pitch error median / max | DC | Core speed |
+| --- | --- | --- | --- | --- | --- |
+| Cockpit | −17.1 | −6.48 | 0.024 / 0.348 % | 3.43e-7 | 19.8× real time |
+| Trackside | −19.0 | −9.43 | 0.015 / 0.323 % | 1.76e-7 | 18.1× real time |
+
+The core cost is about 5–6% of one CPU core for this one-car render on the loaded laptop,
+excluding analysis and file writing; this is not a mobile AudioWorklet CPU measurement. Both
+views pass the gates and block-size hash comparison. Silent layers are `null` in the JSON
+(the JSON representation of −infinity dBFS).
