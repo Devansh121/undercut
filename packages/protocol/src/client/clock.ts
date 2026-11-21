@@ -2,7 +2,8 @@
  * Server clock estimate from ping/pong round trips (the NTP idea): for a ping sent at
  * local time t0, answered with server time S and received at t1, the offset is
  * S - (t0 + t1) / 2 with an error of at most (t1 - t0) / 2. The estimate is the median
- * offset of the fastest third of recent samples, whose error bound is smallest.
+ * offset of the fastest third of recent samples, whose error bound is smallest. The
+ * server's clock has whole milliseconds, which adds up to 1 ms to the bound.
  */
 
 export interface ClockSample {
@@ -13,7 +14,15 @@ export interface ClockSample {
 export class ClockSync {
   private samples: ClockSample[] = [];
 
-  constructor(private readonly keep = 16) {}
+  /**
+   * @param keep samples kept
+   * @param serverResolutionMs resolution of the server's clock: the Workers runtime's
+   *   `Date.now()` has whole milliseconds, so a server stamp can be up to 1 ms early.
+   */
+  constructor(
+    private readonly keep = 16,
+    private readonly serverResolutionMs = 1,
+  ) {}
 
   /** Add one round trip: local send time, server time in the reply, local receive time. */
   add(sentLocal: number, serverTime: number, receivedLocal: number): void {
@@ -44,10 +53,13 @@ export class ClockSync {
       : ((offsets[mid - 1] as number) + (offsets[mid] as number)) / 2;
   }
 
-  /** Bound on the offset error: half the fastest round trip used, ms. */
+  /**
+   * Bound on the offset error, ms: half the slowest round trip among the samples used,
+   * plus the server clock's resolution.
+   */
   get error(): number | null {
     if (this.samples.length === 0) return null;
-    return Math.max(...this.best().map((s) => s.rtt)) / 2;
+    return Math.max(...this.best().map((s) => s.rtt)) / 2 + this.serverResolutionMs;
   }
 
   /** Median round-trip time of recent samples, ms. */

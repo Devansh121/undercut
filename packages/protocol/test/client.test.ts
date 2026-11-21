@@ -173,7 +173,8 @@ describe('ClockSync', () => {
     const c = new ClockSync();
     c.add(100, 5_000_150, 200);
     expect(c.offset).toBe(5_000_000);
-    expect(c.error).toBe(50);
+    // Half the round trip, plus the server clock's 1 ms resolution.
+    expect(c.error).toBe(51);
     expect(c.serverTime(300)).toBe(5_000_300);
     expect(c.localTime(5_000_300)).toBe(300);
   });
@@ -183,7 +184,20 @@ describe('ClockSync', () => {
     for (let i = 0; i < 9; i++) c.add(i * 1000, 1_000_000 + i * 1000 + 20, i * 1000 + 40);
     c.add(20_000, 1_000_000 + 20_000 + 400, 20_000 + 450); // 450 ms RTT, asymmetric
     expect(c.offset).toBe(1_000_000);
-    expect(c.error).toBe(20);
+    expect(c.error).toBe(21);
+  });
+
+  it('bounds the error even when the server clock only has whole milliseconds', () => {
+    // A fast loopback round trip (0.4 ms) and a server stamp truncated to the ms below:
+    // half the round trip alone would claim 0.2 ms, but truncation costs 0.35 ms.
+    const trueOffset = 1_000_000.15;
+    const c = new ClockSync();
+    for (let i = 0; i < 8; i++) {
+      const t0 = 100 + i * 10;
+      const serverAt = Math.floor(t0 + 0.2 + trueOffset);
+      c.add(t0, serverAt, t0 + 0.4);
+    }
+    expect(Math.abs((c.offset as number) - trueOffset)).toBeLessThanOrEqual(c.error as number);
   });
 
   it('has no estimate before a sample and ignores nonsense', () => {
