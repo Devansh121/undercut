@@ -1,0 +1,41 @@
+{
+  "shots": [
+    "docs/evidence/m2-ui/launch-1440x900.png",
+    "docs/evidence/m2-ui/hub-1440x900.png",
+    "docs/evidence/m2-ui/hub-notice-1440x900.png",
+    "docs/evidence/m2-ui/circuits-1440x900.png",
+    "docs/evidence/m2-ui/ui-gallery-1440x900.png",
+    "docs/evidence/m2-ui/hub-1280x720.png",
+    "docs/evidence/m2-ui/launch-844x390.png",
+    "docs/evidence/m2-ui/hub-844x390.png",
+    "docs/evidence/m2-ui/hub-settings-dialog-844x390.png",
+    "docs/evidence/m2-ui/circuits-844x390.png",
+    "docs/evidence/m2-ui/hud-drive-1440x900.png",
+    "docs/evidence/m2-ui/hud-invalid-1440x900.png",
+    "docs/evidence/m2-ui/pause-1440x900.png",
+    "docs/evidence/m2-ui/hud-drive-844x390.png",
+    "docs/evidence/m2-ui/pause-844x390.png"
+  ],
+  "hudBench": {
+    "viewport": "1440x900",
+    "quality": "high",
+    "vsync": false,
+    "hudOn": {
+      "frames": 2802,
+      "meanMs": 2.145,
+      "medianMs": 1.6,
+      "p95Ms": 4.3,
+      "p99Ms": 17.6
+    },
+    "hudOff": {
+      "frames": 2738,
+      "meanMs": 2.193,
+      "medianMs": 1.5,
+      "p95Ms": 4.9,
+      "p99Ms": 18.2
+    },
+    "deltaMeanMs": -0.048,
+    "deltaMedianMs": 0.1
+  },
+  "errors": []
+}

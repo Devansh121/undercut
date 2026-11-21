@@ -458,6 +458,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
+  let invalidReason: string = S.hud.trackLimits;
   function onEvents(events: readonly SessionEvent[]): void {
     for (const e of events) {
       log.push(e);
@@ -466,6 +467,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         case 'lap':
           results.show(e.result);
           lastLap = { time: e.result.time, cls: e.result.class };
+          invalidReason = S.hud.trackLimits;
           break;
         case 'record':
           void records.save(e.circuit, e.update).then(() => {
@@ -474,18 +476,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           });
           break;
         case 'invalidated':
-          say(
-            {
-              tag: S.hud.lapInvalid,
-              text: e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits,
-              tone: 'invalid',
-            },
-            3,
-          );
+          invalidReason = e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits;
           break;
         case 'reset':
           view.snapCamera();
-          if (e.reason === 'restart') results.hide();
+          if (e.reason === 'restart') {
+            results.hide();
+            invalidReason = S.hud.trackLimits;
+          }
           break;
         default:
           break;
@@ -542,7 +540,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let clock = 0;
   let handle = 0;
   let lookBack = false;
-  let lastHudDevice: DeviceKind | null = null;
+  let lastHudDevice: DeviceKind = input.activeDevice;
+  setGlyphContext(lastHudDevice, input.profile.bindings);
   const hudState: HudState = {
     circuit: track.name,
     lengthKm: (track.length / 1000).toFixed(3),
@@ -553,6 +552,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     lap: 0,
     running: false,
     valid: true,
+    invalidReason: S.hud.trackLimits,
     lapTime: 0,
     liveDelta: null,
     sectors: [
@@ -600,10 +600,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
-      if (f.device !== lastHudDevice) {
-        lastHudDevice = f.device;
-        setGlyphContext(f.device, input.profile.bindings);
-      }
       for (const e of f.events) {
         if (e.type !== 'action') continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
@@ -612,9 +608,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       lookBack = false;
     }
 
-    if (session.device !== lastHudDevice) {
-      lastHudDevice = session.device;
-      setGlyphContext(session.device, input.profile.bindings);
+    if (input.activeDevice !== lastHudDevice) {
+      lastHudDevice = input.activeDevice;
+      setGlyphContext(lastHudDevice, input.profile.bindings);
     }
 
     const playing = session.phase === 'running';
@@ -665,6 +661,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       h.lap = timer.lap;
       h.running = timer.running;
       h.valid = timer.valid;
+      h.invalidReason = invalidReason;
       h.lapTime = session.lapTimeAt(renderTime);
       h.liveDelta = session.liveDelta();
       const done = timer.currentSectors;

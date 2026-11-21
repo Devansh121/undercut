@@ -43,6 +43,7 @@ export interface HudState {
   lap: number;
   running: boolean;
   valid: boolean;
+  invalidReason?: string;
   lapTime: number;
   liveDelta: number | null;
   sectors: HudSectorState[];
@@ -91,6 +92,7 @@ export class Hud {
   private readonly msgTag: Text;
   private readonly msgText: Text;
   private readonly invalidEl: HTMLElement;
+  private readonly invalidReason: Text;
   private readonly wrongWayEl: HTMLElement;
   private readonly stoppedEl: HTMLElement;
   private readonly dot: SVGCircleElement;
@@ -151,7 +153,9 @@ export class Hud {
     const sw = el('div', 'hud-flag__sw');
     sw.append(icon('flag'));
     const ftxt = el('div', 'hud-flag__txt');
-    ftxt.append(el('strong', '', S.hud.lapInvalid), el('span', '', S.hud.trackLimits));
+    const reasonEl = el('span', '', S.hud.trackLimits);
+    this.invalidReason = new Text(reasonEl);
+    ftxt.append(el('strong', '', S.hud.lapInvalid), reasonEl);
     this.invalidEl.append(sw, ftxt);
     this.invalidEl.dataset.testid = 'lap-invalid';
 
@@ -411,6 +415,7 @@ export class Hud {
     setData(this.drsEl, 'state', h.drs);
 
     setClass(this.invalidEl, 'is-on', h.running && !h.valid);
+    if (h.running && !h.valid) this.invalidReason.set(h.invalidReason ?? S.hud.trackLimits);
     setClass(this.wrongWayEl, 'is-on', h.wrongWay);
     setClass(this.stoppedEl, 'is-on', !h.wrongWay && h.stopped);
     if (h.message) {

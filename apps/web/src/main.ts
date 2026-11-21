@@ -77,6 +77,7 @@ function today(): string {
 
 // ---- Menus
 const shell = new Shell(app);
+shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
   action: (a, native) => shell.handle(a, native),
   device: (d) => {
