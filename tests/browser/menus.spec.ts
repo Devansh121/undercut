@@ -1,6 +1,41 @@
-import type { Page } from '@playwright/test';
-import { expect, test } from './base';
+import type { BrowserContext, Page } from '@playwright/test';
+import { expect, test as base } from './base';
 import { openMenu, watchProblems } from './helpers';
+
+/**
+ * One browser context per worker for the menu tests (set up under its own fixture timeout, as
+ * the drive tests share their session), and a fresh page in it for each test with the page's
+ * storage cleared first, so every test starts from the defaults as with a new context. On a
+ * busy CI runner a new context made right after a software-WebGL test closed its own can take
+ * tens of seconds; these DOM-only tests should not pay that inside their own time.
+ */
+const test = base.extend<object, { menuContext: BrowserContext }>({
+  menuContext: [
+    async ({ browser }, use, workerInfo) => {
+      const u = workerInfo.project.use;
+      const context = await browser.newContext({
+        viewport: u.viewport ?? null,
+        deviceScaleFactor: u.deviceScaleFactor ?? 1,
+        isMobile: u.isMobile ?? false,
+        hasTouch: u.hasTouch ?? false,
+        baseURL: u.baseURL ?? `http://127.0.0.1:${process.env.TEST_PORT ?? 4173}`,
+      });
+      await use(context);
+      await context.close();
+    },
+    { scope: 'worker', timeout: 90_000 },
+  ],
+  page: async ({ menuContext }, use) => {
+    const page = await menuContext.newPage();
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await use(page);
+    await page.close();
+  },
+});
 
 /**
  * The menus with each input device alone: keyboard only, an injected gamepad only, touch only.
