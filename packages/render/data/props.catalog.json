@@ -594,22 +594,22 @@
           "file": "assets/props/crew-mechanic-standing_high.glb",
           "maxDistance": 80,
           "triangleBudget": 30000,
-          "triangles": 5242,
-          "bytes": 64848
+          "triangles": 5306,
+          "bytes": 65340
         },
         {
           "file": "assets/props/crew-mechanic-standing_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 456,
-          "bytes": 13948
+          "bytes": 13944
         },
         {
           "file": "assets/props/crew-mechanic-standing_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 456,
-          "bytes": 13924
+          "bytes": 13948
         }
       ],
       "bounds": {
@@ -632,15 +632,15 @@
           "file": "assets/props/crew-mechanic-crouched_high.glb",
           "maxDistance": 80,
           "triangleBudget": 30000,
-          "triangles": 5274,
-          "bytes": 67568
+          "triangles": 5338,
+          "bytes": 68232
         },
         {
           "file": "assets/props/crew-mechanic-crouched_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 456,
-          "bytes": 13528
+          "bytes": 13500
         },
         {
           "file": "assets/props/crew-mechanic-crouched_far.glb",
@@ -670,8 +670,8 @@
           "file": "assets/props/crew-engineer-standing_high.glb",
           "maxDistance": 80,
           "triangleBudget": 30000,
-          "triangles": 7011,
-          "bytes": 87176
+          "triangles": 7075,
+          "bytes": 87708
         },
         {
           "file": "assets/props/crew-engineer-standing_mobile.glb",
@@ -685,7 +685,7 @@
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 468,
-          "bytes": 15456
+          "bytes": 15452
         }
       ],
       "bounds": {
@@ -708,8 +708,8 @@
           "file": "assets/props/crew-engineer-seated_high.glb",
           "maxDistance": 80,
           "triangleBudget": 30000,
-          "triangles": 6965,
-          "bytes": 87924
+          "triangles": 7029,
+          "bytes": 88512
         },
         {
           "file": "assets/props/crew-engineer-seated_mobile.glb",
@@ -723,7 +723,7 @@
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 468,
-          "bytes": 15652
+          "bytes": 15648
         }
       ],
       "bounds": {
@@ -753,7 +753,7 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 732,
-          "bytes": 19244
+          "bytes": 19236
         },
         {
           "file": "assets/props/crowd-seated-0_mobile.glb",
@@ -789,7 +789,7 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 732,
-          "bytes": 19168
+          "bytes": 19136
         },
         {
           "file": "assets/props/crowd-seated-1_mobile.glb",
@@ -803,7 +803,7 @@
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 368,
-          "bytes": 13084
+          "bytes": 13096
         }
       ],
       "bounds": {
@@ -825,7 +825,7 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 732,
-          "bytes": 19168
+          "bytes": 19156
         },
         {
           "file": "assets/props/crowd-seated-2_mobile.glb",
@@ -839,7 +839,7 @@
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 368,
-          "bytes": 12784
+          "bytes": 12780
         }
       ],
       "bounds": {
@@ -861,21 +861,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 732,
-          "bytes": 19148
+          "bytes": 19168
         },
         {
           "file": "assets/props/crowd-standing-0_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 368,
-          "bytes": 13120
+          "bytes": 13124
         },
         {
           "file": "assets/props/crowd-standing-0_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 368,
-          "bytes": 13088
+          "bytes": 13116
         }
       ],
       "bounds": {
@@ -897,21 +897,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 732,
-          "bytes": 19068
+          "bytes": 19096
         },
         {
           "file": "assets/props/crowd-standing-1_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 368,
-          "bytes": 13048
+          "bytes": 13016
         },
         {
           "file": "assets/props/crowd-standing-1_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 368,
-          "bytes": 13104
+          "bytes": 13048
         }
       ],
       "bounds": {
@@ -940,14 +940,14 @@
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 368,
-          "bytes": 13000
+          "bytes": 12996
         },
         {
           "file": "assets/props/crowd-standing-2_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 368,
-          "bytes": 12972
+          "bytes": 13004
         }
       ],
       "bounds": {
@@ -1369,5 +1369,5 @@
       "materials": ["concrete", "dark-steel", "galvanised", "glazing", "rubber"]
     }
   ],
-  "totalBytes": 2397208
+  "totalBytes": 2399444
 }

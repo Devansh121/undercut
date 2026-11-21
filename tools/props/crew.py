@@ -67,8 +67,9 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
                 (.06,.11,.156,0),(.10,.102,.146,0)]
     elif crouched:
         # Crouched: the rump pushes back and down behind the hip line instead of a narrowing bowl.
-        hips = [(-.16,.03,.06,-.03),(-.14,.07,.125,-.03),(-.10,.094,.15,-.022),(-.05,.105,.156,-.01),
-                (0,.108,.155,0),(.06,.11,.156,0),(.10,.102,.146,0)]
+        # the underside rounds off over a long run into the thighs: no ledge under the rump
+        hips = [(-.24,.012,.02,-.01),(-.215,.04,.07,-.015),(-.18,.065,.11,-.02),(-.14,.085,.135,-.022),
+                (-.10,.097,.15,-.02),(-.05,.105,.156,-.01),(0,.108,.155,0),(.06,.11,.156,0),(.10,.102,.146,0)]
     else:
         # Standing: the thigh tops form the seat; the hips stay inside them below the waist.
         hips = [(-.13,.012,.02,0),(-.10,.05,.08,0),(-.05,.085,.13,0),(0,.104,.152,0),(.06,.11,.156,0),

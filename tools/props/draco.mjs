@@ -19,7 +19,7 @@ function attribute(decoder, mesh, id) {
 }
 
 /**
- * Decode every Draco primitive of a GLB: `[{ material, POSITION, NORMAL, TEXCOORD_0, ... }]`,
+ * Decode every Draco primitive of a GLB: `[{ material, indices, POSITION, NORMAL, ... }]`,
  * each attribute as `{ values, size }`, in the mesh's local frame.
  */
 export function decodeGlb(file) {
@@ -42,6 +42,11 @@ export function decodeGlb(file) {
       const entry = { material: gltf.materials[primitive.material].name };
       for (const [name, id] of Object.entries(extension.attributes))
         entry[name] = attribute(decoder, mesh, id);
+      const count = mesh.num_faces() * 3;
+      const ptr = draco._malloc(count * 4);
+      decoder.GetTrianglesUInt32Array(mesh, count * 4, ptr);
+      entry.indices = Array.from(new Uint32Array(draco.HEAPU32.buffer, ptr, count));
+      draco._free(ptr);
       out.push(entry);
     } finally {
       draco.destroy(mesh);

@@ -1,9 +1,9 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1330564,
-    "triangles": 119710,
-    "draw_calls": 38,
+    "bytes": 1398684,
+    "triangles": 118654,
+    "draw_calls": 39,
     "nodes": {
       "body": {
         "triangles": 74750,
@@ -28,7 +28,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 3240,
+        "triangles": 1512,
         "primitives": 1,
         "materials": [
           "paint"
@@ -53,14 +53,15 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 2066,
-        "primitives": 5,
+        "triangles": 2738,
+        "primitives": 6,
         "materials": [
           "carbon",
           "dark",
           "display",
           "paint",
-          "metal_dark"
+          "metal_dark",
+          "glove"
         ],
         "morph_targets": 0
       },
@@ -219,9 +220,9 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 624232,
-    "triangles": 39970,
-    "draw_calls": 24,
+    "bytes": 650200,
+    "triangles": 39730,
+    "draw_calls": 25,
     "nodes": {
       "body": {
         "triangles": 21826,
@@ -242,7 +243,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 920,
+        "triangles": 440,
         "primitives": 1,
         "materials": [
           "paint"
@@ -267,12 +268,13 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 1002,
-        "primitives": 3,
+        "triangles": 1242,
+        "primitives": 4,
         "materials": [
           "carbon",
           "dark",
-          "display"
+          "display",
+          "glove"
         ],
         "morph_targets": 0
       },
@@ -423,8 +425,8 @@
   },
   "far": {
     "file": "car_far.glb",
-    "bytes": 190784,
-    "triangles": 10392,
+    "bytes": 195916,
+    "triangles": 10296,
     "draw_calls": 11,
     "nodes": {
       "body": {
@@ -438,7 +440,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 312,
+        "triangles": 216,
         "primitives": 1,
         "materials": [
           "paint"
@@ -560,38 +562,38 @@
   },
   "masks": {
     "aldermoor.png": {
-      "bytes": 39470
+      "bytes": 39496
     },
     "brevik.png": {
-      "bytes": 27327
+      "bytes": 27356
     },
     "calder.png": {
-      "bytes": 50258
+      "bytes": 50288
     },
     "index.json": {
       "bytes": 2060
     },
     "kestrel.png": {
-      "bytes": 30138
+      "bytes": 30167
     },
     "meridian.png": {
-      "bytes": 32864
+      "bytes": 32890
     },
     "norrland.png": {
-      "bytes": 50935
+      "bytes": 50964
     },
     "orrin.png": {
-      "bytes": 42703
+      "bytes": 42733
     },
     "quillon.png": {
-      "bytes": 38887
+      "bytes": 38915
     },
     "sable.png": {
-      "bytes": 58164
+      "bytes": 58192
     },
     "terraluce.png": {
-      "bytes": 24244
+      "bytes": 24276
     }
   },
-  "total_bytes": 2542630
+  "total_bytes": 2642137
 }

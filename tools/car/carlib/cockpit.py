@@ -499,22 +499,6 @@ def build_driver(mesh_paint, mesh_dark, q):
     mesh_dark.merge(hn)
 
 
-def build_gloves(q, hand_y=0.150):
-    """Gloved hands round the steering-wheel grips, in the wheel's own frame (built facing +X)."""
-    m = Mesh()
-    n = q.n(12, 6)
-    for side in (1, -1):
-        rows = []
-        for k in range(6):
-            t = k / 5
-            z = lerp(-0.045, 0.040, t)
-            r = 0.036 * math.sin(math.pi * min(1.0, 0.12 + 0.88 * t)) ** 0.5 + 0.004
-            rows.append([Vector((-0.020 + r * 0.95 * math.cos(2 * math.pi * i / n), side * hand_y + r * 0.85 * math.sin(2 * math.pi * i / n), z))
-                         for i in range(n)])
-        loft(m, rows, "paint_edge", closed=True, cap0=True, cap1=True)
-    return m
-
-
 def build_halo_mounts(mesh_paint, q):
     """Fairings over the halo's three mounting points."""
     m = Mesh()
