@@ -73,20 +73,12 @@ button {
   align-content: end;
   padding: 0 var(--safe-r) 10vh var(--safe-l);
   overflow: hidden;
+  /* The vermilion stripe field is a background layer, so nothing overflows the stage. */
   background:
     linear-gradient(180deg, rgba(11, 12, 14, 0) 30%, var(--c-ink-0) 92%),
+    repeating-linear-gradient(108deg, rgba(255, 90, 31, 0.16) 0 6px, transparent 6px 26px) right
+      12vh / 62vw 52vh no-repeat,
     linear-gradient(100deg, #23272d 0%, #15181c 55%, #0f1114 100%);
-}
-
-.launch__stripe {
-  position: absolute;
-  right: -10vw;
-  top: 12vh;
-  width: 70vw;
-  height: 52vh;
-  transform: skewX(-18deg);
-  background: repeating-linear-gradient(90deg, rgba(255, 90, 31, 0.9) 0 6px, transparent 6px 26px);
-  opacity: 0.18;
 }
 
 .launch__title {
@@ -1197,4 +1189,9 @@ button {
   .hud.is-limiter .hud-revs i.on {
     animation: none;
   }
+}
+
+/* The touch overlay steps aside while the pause menu is open. */
+[data-paused] .ut-touch {
+  display: none;
 }

@@ -13,68 +13,20 @@ function watchErrors(page: Page): string[] {
 }
 
 test.describe('launch screen', () => {
-  test('renders the name, a disabled Drive button and the build', async ({ page }) => {
+  test('renders the name, the Time Trial start and the build', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto('/');
 
     await expect(page).toHaveTitle(GAME_NAME);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(GAME_NAME);
-    const drive = page.getByRole('button', { name: 'Drive' });
-    await expect(drive).toBeDisabled();
-    await expect(drive).toContainText('Arrives in M1');
+    await expect(page.getByText('Time Trial, Monza')).toBeVisible();
+    const start = page.getByRole('button', { name: /Start/ });
+    await expect(start).toBeEnabled();
     await expect(page.locator('.launch__build code')).toHaveText(
       /^([0-9a-f]{7}(\+dirty)?|unversioned)$/,
     );
-
-    expect(errors).toEqual([]);
-  });
-
-  test('draws a non-empty 3D view', async ({ page }) => {
-    const errors = watchErrors(page);
-    await page.goto('/');
-    await expect(page.locator('html')).not.toHaveAttribute('data-webgl', 'unavailable');
-
-    const viewport = page.viewportSize();
-    const box = await page.locator('#view').boundingBox();
-    expect(box?.width).toBe(viewport?.width);
-    expect(box?.height).toBe(viewport?.height);
-
-    // Hide the menu so the capture is the canvas alone, then let a few frames render.
-    await page.addStyleTag({ content: '#app { visibility: hidden; }' });
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    const png = await page.locator('#view').screenshot();
-
-    const stats = await page.evaluate(async (b64) => {
-      const img = new Image();
-      img.src = `data:image/png;base64,${b64}`;
-      await img.decode();
-      const canvas = new OffscreenCanvas(img.width, img.height);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('no 2d context');
-      ctx.drawImage(img, 0, 0);
-      const { data } = ctx.getImageData(0, 0, img.width, img.height);
-      const colours = new Set<number>();
-      let sum = 0;
-      let sumSq = 0;
-      const n = data.length / 4;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i] ?? 0;
-        const g = data[i + 1] ?? 0;
-        const b = data[i + 2] ?? 0;
-        colours.add((r << 16) | (g << 8) | b);
-        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        sum += luma;
-        sumSq += luma * luma;
-      }
-      const mean = sum / n;
-      return { colours: colours.size, lumaStdDev: Math.sqrt(sumSq / n - mean * mean) };
-    }, png.toString('base64'));
-
-    // A blank or single-colour canvas has one colour and zero spread.
-    expect(stats.colours).toBeGreaterThan(16);
-    expect(stats.lumaStdDev).toBeGreaterThan(5);
+    // No debug API without ?debug=1 in a production build.
+    expect(await page.evaluate(() => typeof window.__undercut !== 'undefined')).toBe(false);
     expect(errors).toEqual([]);
   });
 

@@ -119,7 +119,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   const input = o.input;
   const human = new InputControlSource(input);
-  const scripted = new ScriptedControlSource();
+  const scripted = new ScriptedControlSource(input);
   const pilot = new AutopilotControlSource(
     input,
     new KeyboardAutopilot(track, params),

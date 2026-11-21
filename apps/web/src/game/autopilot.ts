@@ -198,12 +198,21 @@ export class AutopilotControlSource implements ControlSource {
   }
 }
 
-/** A fixed ControlInput set by a test or tool through the debug API. */
+/**
+ * A fixed ControlInput set by a test or tool through the debug API. The player's devices are
+ * still sampled for one-shot actions (pause, camera, reset), so a scripted drive can be paused
+ * from the keyboard like any other.
+ */
 export class ScriptedControlSource implements ControlSource {
-  private readonly frame: DriverFrame;
+  private readonly frame: {
+    control: DriverFrame['control'];
+    device: DriverFrame['device'];
+    lookBack: boolean;
+    events: DriverFrame['events'];
+  };
   private pendingShift: -1 | 0 | 1 = 0;
 
-  constructor(device: DriverFrame['device'] = 'keyboard') {
+  constructor(private readonly input: InputSystem | null = null) {
     this.frame = {
       control: {
         steer: 0,
@@ -214,7 +223,7 @@ export class ScriptedControlSource implements ControlSource {
         overtake: false,
         pitLimiter: false,
       },
-      device,
+      device: 'keyboard',
       lookBack: false,
       events: [],
     };
@@ -227,9 +236,14 @@ export class ScriptedControlSource implements ControlSource {
     if (gearShift) this.pendingShift = gearShift;
   }
 
-  sample(): DriverFrame {
-    (this.frame.control as { gearShift: -1 | 0 | 1 }).gearShift = this.pendingShift;
+  sample(dt: number, speed: number): DriverFrame {
+    this.frame.control.gearShift = this.pendingShift;
     this.pendingShift = 0;
+    if (this.input) {
+      const live = this.input.sample(dt, speed);
+      this.frame.events = live.events;
+      this.frame.lookBack = live.lookBack;
+    }
     return this.frame;
   }
 }

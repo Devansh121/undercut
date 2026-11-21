@@ -24,7 +24,6 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   screen.setAttribute('aria-labelledby', 'launch-title');
 
   const stage = el('div', 'launch__stage');
-  stage.append(el('div', 'launch__stripe'));
   const title = el('h1', 'launch__title', GAME_NAME);
   title.id = 'launch-title';
   stage.append(
