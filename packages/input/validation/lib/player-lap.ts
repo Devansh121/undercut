@@ -1,4 +1,10 @@
-import { buildPlan, racingLineOffsets, type EnvelopeScale, type DrivingPlan } from '@undercut/ai';
+import {
+  DRIVING_LINE_SCALE,
+  buildPlan,
+  racingLineOffsets,
+  type DrivingPlan,
+  type EnvelopeScale,
+} from '@undercut/ai';
 import {
   SurfaceKind,
   addCar,
@@ -35,14 +41,10 @@ export const ROLLING_START_SPEED = 150 / 3.6;
 export const ROLLING_START_RUN_UP = 160;
 
 /**
- * The newcomer's plan: the shipped racing line with speeds from less of the envelope than the
- * reference driver uses. What a player who knows the circuit a little aims for.
+ * The newcomer's plan: the driving line's (the shipped racing line with speeds from less of the
+ * envelope than the reference driver uses). What a player who knows the circuit a little aims for.
  */
-export const NEWCOMER_SCALE: Readonly<EnvelopeScale> = Object.freeze({
-  lateral: 0.9,
-  brake: 0.8,
-  traction: 0.9,
-});
+export const NEWCOMER_SCALE: Readonly<EnvelopeScale> = DRIVING_LINE_SCALE;
 
 /** A spin: body sideslip past `SPIN_SIDESLIP`, or the car pointing more than 90° off the road. */
 export const SPIN_SIDESLIP = (30 * Math.PI) / 180;

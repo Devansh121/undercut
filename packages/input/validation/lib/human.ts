@@ -1,5 +1,5 @@
 import { createRng, type Rng } from '@undercut/core';
-import { Phase, type DrivingPlan } from '@undercut/ai';
+import { LineCue, Phase, type DrivingPlan } from '@undercut/ai';
 import type { CarState } from '@undercut/sim';
 import { createPathPoint, type Track } from '@undercut/track';
 import type { DeviceKind } from '../../src/actions';
@@ -19,6 +19,46 @@ import { steerHelpScale } from '../../src/driver-aids';
  *
  * Pure and seeded; allocation-free per tick.
  */
+/**
+ * How the human steers. Following the line is anticipatory: a driver reads the road ahead
+ * (preview) and steers for the bend before it arrives, so the visual-motor delay does not sit
+ * inside that loop (preview tracking, as in the human-control literature since McRuer's
+ * crossover model). What the delay does hold back is every response to something unexpected:
+ * catching a slide and every pedal decision. The line law itself is the reference driver's
+ * shape (curvature preview, lateral and heading feedback, yaw-rate damping) with softer gains.
+ */
+export interface SteerGains {
+  /** Lateral-error response, rad/s: `omegaSpeed / v` held in [omegaMin, omegaMax]. */
+  omegaSpeed: number;
+  omegaMin: number;
+  omegaMax: number;
+  damping: number;
+  /** How far ahead the road's curvature is read, s. */
+  preview: number;
+  /** Yaw-rate damping, steer per (rad/s) per (1/v). */
+  yawKp: number;
+  /**
+   * Catching a slide, after the reaction delay: road-wheel angle toward the slide per radian
+   * of sideslip past `slideSeen` rad (the nose visibly swinging away from the direction of travel).
+   */
+  counterSteer: number;
+  slideSeen: number;
+}
+
+export const HUMAN_STEER: Readonly<SteerGains> = Object.freeze({
+  omegaSpeed: 80,
+  omegaMin: 1.6,
+  omegaMax: 3,
+  damping: 1,
+  preview: 0.15,
+  yawKp: 6,
+  counterSteer: 1,
+  slideSeen: (3 * Math.PI) / 180,
+});
+
+/** Nobody holds a line to the centimetre: lateral error under this goes uncorrected, m. */
+const LINE_SLACK = 0.5;
+
 export interface HumanTraits {
   /** Visual-motor delay, s: drawn once per run from [min, max]. */
   reaction: readonly [number, number];
@@ -43,6 +83,7 @@ export interface HumanTraits {
    * amber and floors it on green (the disciplined driver; errors off).
    */
   feet: 'clumsy' | 'marks';
+  steer: SteerGains;
 }
 
 /** The player the owner described: keyboard, late on everything, a bit ragged. */
@@ -58,6 +99,7 @@ export const CLUMSY: Readonly<HumanTraits> = Object.freeze({
   kerbChance: 0.35,
   kerbCut: [0.4, 1.0] as const,
   feet: 'clumsy',
+  steer: HUMAN_STEER,
 });
 
 /** Brakes at the marks, flat out at the exit mark, no extra mistakes. Same hands and eyes. */
@@ -69,29 +111,11 @@ export const DISCIPLINED: Readonly<HumanTraits> = Object.freeze({
   feet: 'marks',
 });
 
-/** The three things the disciplined driver reads off the driving line. */
-export type LineCue = 'throttle' | 'lift' | 'brake';
-
 /** What the disciplined driver sees: the driving line's cue at the car's position and speed. */
 export interface CueSource {
   cueAt(s: number, speed: number): LineCue;
 }
 
-/** Steering law gains (the human's, softer than the reference driver's). */
-const OMEGA_SPEED = 80;
-const OMEGA_MIN = 1.6;
-const OMEGA_MAX = 3;
-const DAMPING = 1;
-const PREVIEW = 0.15;
-const YAW_KP = 6;
-/**
- * Catching a slide: a player sees the nose swing away from where the car is going and steers
- * toward the slide, late (the reaction delay) and by eye: road-wheel angle per radian of
- * sideslip past `SLIDE_SEEN`.
- */
-const COUNTER_STEER = 1;
-const SLIDE_SEEN = (3 * Math.PI) / 180;
-/** Felt steer is compared with the wanted steer at most this far apart before a key goes down. */
 const RING = 256;
 
 const TWO_PI = 2 * Math.PI;
@@ -131,7 +155,7 @@ export class Human {
   private readonly track: Track;
   private readonly rng: Rng;
   private readonly delayTicks: number;
-  private readonly wantSteer = new Float64Array(RING);
+  private readonly seenSlide = new Float64Array(RING);
   private readonly wantThrottle = new Uint8Array(RING);
   private readonly wantBrake = new Uint8Array(RING);
   private head = 0;
@@ -221,20 +245,21 @@ export class Human {
     const lineD = line.d[i]! + (line.d[j]! - line.d[i]!) * f + cut;
     const heading = line.heading[i]! + wrapAngle(line.heading[j]! - line.heading[i]!) * f;
     const course = Math.atan2(car.vy, Math.max(car.vx, 0.5));
-    const worldCourse = car.yaw + course;
-    const e = q.d - lineD;
-    const ePsi = wrapAngle(worldCourse - heading);
-    const kAhead = sample(line.curvature, track, s + v * (PREVIEW + this.reaction), n);
-    const w = Math.max(OMEGA_MIN, Math.min(OMEGA_MAX, OMEGA_SPEED / v));
-    let corr = -(w * w * e) / (v * v) - (2 * DAMPING * w * Math.sin(ePsi)) / v;
+    const miss = q.d - lineD;
+    const e = Math.sign(miss) * Math.max(0, Math.abs(miss) - LINE_SLACK);
+    const ePsi = wrapAngle(car.yaw + course - heading);
+    const g = t.steer;
+    const kAhead = sample(line.curvature, track, s + v * g.preview, n);
+    const w = Math.max(g.omegaMin, Math.min(g.omegaMax, g.omegaSpeed / v));
+    let corr = -(w * w * e) / (v * v) - (2 * g.damping * w * Math.sin(ePsi)) / v;
     corr = Math.max(-0.05, Math.min(0.05, corr));
     const kCmd = kAhead + corr;
     const p = car.model.params;
-    const slide = Math.max(0, Math.abs(course) - SLIDE_SEEN);
-    const want =
-      (p.geometry.wheelbase * kCmd) / p.geometry.maxSteerAngle +
-      (YAW_KP * (v * kCmd - car.yawRate)) / v +
-      (Math.sign(course) * COUNTER_STEER * slide) / p.geometry.maxSteerAngle;
+    const maxSteer = p.geometry.maxSteerAngle;
+    const lineSteer =
+      (p.geometry.wheelbase * kCmd) / maxSteer + (g.yawKp * (v * kCmd - car.yawRate)) / v;
+    const slide = Math.max(0, Math.abs(course) - g.slideSeen);
+    const catchSteer = (Math.sign(course) * g.counterSteer * slide) / maxSteer;
 
     // ---- What the feet want ----
     let brakeWant = 0;
@@ -242,8 +267,8 @@ export class Human {
     const vPlan = (at: number): number => sample(prof.v, track, at, n);
     if (t.feet === 'marks' && o.cues) {
       const cue = o.cues.cueAt(s, v);
-      brakeWant = cue === 'brake' ? 1 : 0;
-      throttleWant = cue === 'throttle' ? 1 : 0;
+      brakeWant = cue === LineCue.Brake ? 1 : 0;
+      throttleWant = cue === LineCue.Throttle ? 1 : 0;
     } else {
       // Brake when faster than the plan wants a little further on (late) or back (early).
       const target = vPlan(s - cp.late);
@@ -272,16 +297,16 @@ export class Human {
       throttleWant = 0;
     }
 
-    // ---- Through the delay ----
+    // ---- Through the delay: reactions only ----
     const h = this.head;
-    this.wantSteer[h] = want;
+    this.seenSlide[h] = catchSteer;
     this.wantThrottle[h] = throttleWant;
     this.wantBrake[h] = brakeWant;
     this.head = (h + 1) % RING;
     const d = (h - this.delayTicks + RING) % RING;
-    const steerNow = this.wantSteer[d]!;
     const throttleNow = this.wantThrottle[d]!;
     const brakeNow = this.wantBrake[d]!;
+    const steerNow = lineSteer + this.seenSlide[d]!;
 
     // ---- Hands ----
     if (o.device === 'keyboard') {
