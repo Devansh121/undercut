@@ -23,7 +23,17 @@
     "grainVignette": true,
     "grain": 0.005,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.75 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.75 },
+    "world": {
+      "treeDensity": 1,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": true,
+      "crowd": 0.85,
+      "coverResolution": 1.5,
+      "treeNear": 260,
+      "treeFar": 4500
+    }
   },
   "high": {
     "label": "High",
@@ -48,7 +58,17 @@
     "grainVignette": true,
     "grain": 0.004,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.7 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.7 },
+    "world": {
+      "treeDensity": 1,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": true,
+      "crowd": 0.8,
+      "coverResolution": 2,
+      "treeNear": 220,
+      "treeFar": 4000
+    }
   },
   "medium": {
     "label": "Medium",
@@ -73,7 +93,17 @@
     "grainVignette": true,
     "grain": 0.003,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.65 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.65 },
+    "world": {
+      "treeDensity": 0.7,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": false,
+      "crowd": 0.6,
+      "coverResolution": 2,
+      "treeNear": 160,
+      "treeFar": 3000
+    }
   },
   "mobile": {
     "label": "Mobile",
@@ -98,7 +128,17 @@
     "grainVignette": false,
     "grain": 0,
     "speedBlur": false,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.6 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.6 },
+    "world": {
+      "treeDensity": 0.35,
+      "treeTile": 256,
+      "terrain": "mobile",
+      "wind": false,
+      "crowd": 0.3,
+      "coverResolution": 4,
+      "treeNear": 120,
+      "treeFar": 2000
+    }
   },
   "lite": {
     "label": "Lite",
@@ -123,6 +163,16 @@
     "grainVignette": false,
     "grain": 0,
     "speedBlur": false,
-    "dynamicResolution": { "targetMs": 0, "min": 1 }
+    "dynamicResolution": { "targetMs": 0, "min": 1 },
+    "world": {
+      "treeDensity": 0.03,
+      "treeTile": 128,
+      "terrain": "mobile",
+      "wind": false,
+      "crowd": 0.02,
+      "coverResolution": 8,
+      "treeNear": 60,
+      "treeFar": 800
+    }
   }
 }

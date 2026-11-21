@@ -36,6 +36,7 @@ import {
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
+import monzaDressing from '@undercut/render/data/monza.dressing.json?url';
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
@@ -240,6 +241,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          dressingUrl: monzaDressing,
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
