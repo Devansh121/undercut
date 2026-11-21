@@ -182,11 +182,40 @@ describe('contexts', () => {
     input.setContext('menu');
     input.keyboard.keyDown('ArrowUp');
     input.keyboard.keyDown('Enter');
-    input.keyboard.keyDown('KeyE');
+    input.keyboard.keyDown('KeyF');
+    input.keyboard.keyDown('KeyL');
     const frame = input.sample(0.5, 0);
     expect(actions(frame.events)).toEqual(['menuUp', 'menuAccept']);
     expect(frame.control.throttle).toBe(0);
     expect(frame.control.gearShift).toBe(0);
+    expect(frame.control.drs).toBe(false);
+  });
+
+  it('switches menu tabs with Q and E or the shoulder buttons, and gears only while driving', () => {
+    const { input, pads } = setup();
+    pads.connect();
+    input.setContext('menu');
+    input.keyboard.keyDown('KeyQ');
+    input.keyboard.keyDown('KeyE');
+    let frame = input.sample(DT, 0);
+    expect(actions(frame.events)).toEqual(['menuTabPrev', 'menuTabNext']);
+    expect(frame.control.gearShift).toBe(0);
+    input.keyboard.keyUp('KeyQ');
+    input.keyboard.keyUp('KeyE');
+    pads.button(5, 1);
+    frame = input.sample(DT, 0);
+    expect(actions(frame.events)).toEqual(['menuTabNext']);
+    pads.button(5, 0);
+    pads.button(4, 1);
+    frame = input.sample(DT, 0);
+    expect(actions(frame.events)).toEqual(['menuTabPrev']);
+    pads.button(4, 0);
+    input.sample(DT, 0);
+    input.setContext('driving');
+    input.keyboard.keyDown('KeyE');
+    frame = input.sample(DT, 0);
+    expect(actions(frame.events)).toEqual([]);
+    expect(frame.control.gearShift).toBe(1);
   });
 });
 
