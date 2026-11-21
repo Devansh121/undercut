@@ -434,8 +434,8 @@ export class RaceDriver implements Driver {
     // Lateral room beside them. When there is none for this car, the car further back gives
     // way: drop the rearmost car from the bands until there is room; a car dropped that is ahead
     // of this one is one to fall in behind (followed like a car ahead).
-    let lo = oMin;
-    let hi = oMax;
+    let lo: number;
+    let hi: number;
     let yieldTo: TrafficCar | null = null;
     let yieldDs = Number.POSITIVE_INFINITY;
     let skipBelow = Number.NEGATIVE_INFINITY;
