@@ -6,3 +6,5 @@ export * from './targets';
 export * from './measure';
 export * from './catalogue';
 export * from './bench';
+export * from './kerbs';
+export * from './modes';

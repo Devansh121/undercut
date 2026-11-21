@@ -7,20 +7,31 @@
 /**
  * How far the braked wheels are past locking up, as slip ratio beyond what the driver accepts
  * (negative: margin left). The loaded wheel of an axle is held at the tyre's peak slip. A
- * lightly loaded wheel (the inside one when braking into a turn) carries little and may slip
- * further, up to three times the peak as its load falls below the other wheel's, but never to
- * a full lock: a locked front tyre stops steering the car.
+ * lightly loaded front wheel (the inside one when braking into a turn) carries little and may
+ * slip further, up to three times the peak as its load falls below the other wheel's, but never
+ * to a full lock: a locked front tyre stops steering the car. A rear wheel gets no such
+ * allowance: one that locks while light (over a kerb on the way in) is still locked when its
+ * load comes back, and a sliding rear takes the car round. With slip angles given, the threshold
+ * follows each tyre's combined slip: it shrinks to the friction ellipse's longitudinal room, and
+ * the light inside front's extra allowance fades out as it starts to turn.
  */
 export function lockExcess(
   slipRatio: ArrayLike<number>,
   load: ArrayLike<number>,
   peak: number,
+  slipTan?: ArrayLike<number>,
+  peakTan = 1,
 ): number {
   let excess = -Infinity;
   for (let k = 0; k < 4; k++) {
     const other = load[k ^ 1]!;
     const own = Math.max(load[k]!, 1);
-    const allow = peak * Math.min(3, Math.max(1, Math.sqrt(other / own)));
+    // Sideways slip as a share of the peak: a tyre already turning has less left to brake with
+    // (the friction ellipse), and a light inside front that is turning gets no extra allowance.
+    const sy = slipTan ? Math.min(1, Math.abs(slipTan[k]!) / peakTan) : 0;
+    const turning = Math.max(0, 1 - sy / 0.5);
+    const light = k < 2 ? Math.min(3, Math.max(1, Math.sqrt(other / own))) : 1;
+    const allow = peak * (1 + (light - 1) * turning) * Math.sqrt(Math.max(0.1, 1 - sy * sy));
     excess = Math.max(excess, -slipRatio[k]! - allow);
   }
   return excess;

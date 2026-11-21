@@ -6,6 +6,7 @@ import {
   createCarTelemetry,
   createWorld,
   readCarTelemetry,
+  SurfaceKind,
   setErsMode,
   stepWorld,
   type AeroTrim,
@@ -14,8 +15,10 @@ import {
   type MassState,
   type WorldCar,
 } from '@undercut/sim';
-import { LEFT, RIGHT, TrackSurface, createPathPoint, type Track } from '@undercut/track';
+import { TrackSurface, createGround, createPathPoint, type Track } from '@undercut/track';
 import type { Driver } from '../../src/driver/driver';
+import { wheelOff, type LegalCorridorOptions } from '../../src/line/limits';
+import { referenceCorridor } from '../../src/reference-setup';
 import type { DrivingPlan } from '../../src/profile/plan';
 
 /** The game's sim step (ADR 0007). */
@@ -120,10 +123,15 @@ export interface LapRecord {
   finish: number;
   maxSpeed: number;
   corners: CornerRecord[];
-  /** Most wheels beyond the track edge at once (centre of the wheel past the white line). */
+  /** Most wheels off at once (tyre wholly past the white line, `line/limits.ts`). */
   maxWheelsOff: number;
   /** Ticks with all four wheels off. */
   allOffTicks: number;
+  /**
+   * Tyre samples on grass or gravel: each tick, each wheel's centre and its tyre's two edges
+   * (at the tread's half width either side) are read; this counts those on grass or gravel.
+   */
+  grassSamples: number;
   maxLateralError: number;
   rmsLateralError: number;
   maxSideslipDeg: number;
@@ -171,10 +179,40 @@ class WheelLimits {
       const x = st.x + bx * c - by * sn;
       const z = st.z - bx * sn - by * c;
       const q = this.track.project(x, z, this.hints[i]!, this.q);
-      const side = q.d >= 0 ? LEFT : RIGHT;
-      if (Math.abs(q.d) > this.track.halfWidthAt(q.s, side)) off++;
+      // The track-limit rule the racing line is planned to (`line/limits.ts`): a wheel is off
+      // when its tyre is wholly past the white line.
+      if (wheelOff(this.track, q.s, q.d)) off++;
     }
     return off;
+  }
+  private readonly g = createGround();
+  private readonly eh = Array.from({ length: 12 }, () => ({ index: -1 }));
+  private footprint: LegalCorridorOptions = referenceCorridor(createCarParams('low'));
+  /** Use this car's tyre widths for `onGrass` (the corridor's footprint). */
+  forCar(params: CarParams): this {
+    this.footprint = referenceCorridor(params);
+    return this;
+  }
+  /** Tyre samples (centre and both tread edges of each wheel) on grass or gravel now. */
+  onGrass(car: WorldCar): number {
+    const st = car.state;
+    const m = computeMass(st.model, st.fuelMass, this.mass);
+    const c = Math.cos(st.yaw);
+    const sn = Math.sin(st.yaw);
+    let n = 0;
+    for (let i = 0; i < 4; i++) {
+      const bx = i < 2 ? m.a : -m.b;
+      const half = this.footprint.wheels[i]!.halfWidth;
+      for (let e = -1; e <= 1; e++) {
+        const by = st.model.wheelLeft[i]! + e * half;
+        const x = st.x + bx * c - by * sn;
+        const z = st.z - bx * sn - by * c;
+        const q = this.track.project(x, z, this.eh[3 * i + e + 1]!, this.q);
+        const k = this.track.ground(q.s, q.d, this.g).kind;
+        if (k === SurfaceKind.Grass || k === SurfaceKind.Gravel) n++;
+      }
+    }
+    return n;
   }
 }
 
@@ -212,7 +250,7 @@ export function runLaps(o: LapRunOptions): LapRunResult {
   const driver = o.driver(params);
   setErsMode(car.state, driver.ersMode);
   const tel: CarTelemetry = createCarTelemetry();
-  const limits = new WheelLimits(track);
+  const limits = new WheelLimits(track).forCar(params);
   const q = createPathPoint();
   const hint = { index: -1 };
   const recordEvery = o.recordEvery ?? 0;
@@ -257,6 +295,7 @@ export function runLaps(o: LapRunOptions): LapRunResult {
       corners: [],
       maxWheelsOff: 0,
       allOffTicks: 0,
+      grassSamples: 0,
       maxLateralError: 0,
       rmsLateralError: 0,
       maxSideslipDeg: 0,
@@ -340,6 +379,7 @@ export function runLaps(o: LapRunOptions): LapRunResult {
       lastWheelsOff = off;
       cur.maxWheelsOff = Math.max(cur.maxWheelsOff, off);
       if (off === 4) cur.allOffTicks++;
+      cur.grassSamples += limits.onGrass(car);
       cur.maxSideslipDeg = Math.max(cur.maxSideslipDeg, Math.abs(beta));
       if (diag) {
         const e = Math.abs(diag.lateralError ?? 0);

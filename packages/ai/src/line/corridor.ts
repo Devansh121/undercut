@@ -1,4 +1,5 @@
 import { LEFT, RIGHT, type Track } from '@undercut/track';
+import { buildLegalCorridor, type LegalCorridorOptions } from './limits';
 
 /**
  * Where the car's centre may run: per centreline sample, the lowest and highest lateral offset
@@ -7,13 +8,22 @@ import { LEFT, RIGHT, type Track } from '@undercut/track';
  * that far onto it. Inside a bend the (s, d) frame folds short of the centre of curvature, so
  * the corridor never reaches past the track's frame limit either.
  */
-export interface CorridorOptions {
+export interface FixedCorridorOptions {
+  rule?: undefined;
   /** Wheel-centre half track of the car, m (the wider axle). */
   halfTrack: number;
   /** Distance kept between the wheel centre and the track edge or kerb allowance, m. */
   margin: number;
   /** Per kerb profile name, how far the wheel centre may go onto the kerb, m. Absent: not used. */
   kerbUse: Readonly<Record<string, number>>;
+}
+
+/** Either the fixed-margin corridor (whole car inside the lines) or the legal one (`limits.ts`). */
+export type CorridorOptions = FixedCorridorOptions | LegalCorridorOptions;
+
+/** Wheel-centre half track the corridor was built for (for the grip under the wheels). */
+export function corridorHalfTrack(o: CorridorOptions): number {
+  return o.rule === 'four-wheels' ? Math.max(...o.wheels.map((w) => Math.abs(w.y))) : o.halfTrack;
 }
 
 export interface Corridor {
@@ -24,6 +34,7 @@ export interface Corridor {
 }
 
 export function buildCorridor(track: Track, options: CorridorOptions): Corridor {
+  if (options.rule === 'four-wheels') return buildLegalCorridor(track, options);
   const n = track.lap.count;
   const lo = new Float64Array(n);
   const hi = new Float64Array(n);

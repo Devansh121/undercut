@@ -56,7 +56,7 @@ function writeReport(lib, report) {
   return files;
 }
 
-function bench(lib, options) {
+async function bench(lib, options) {
   const seconds = Number(options.seconds ?? 300);
   const results = [];
   for (const cars of [1, 20]) {
@@ -79,11 +79,26 @@ function bench(lib, options) {
         `(one step of all ${cars} car(s): ${((wall / (simSeconds * 240)) * 1e3).toFixed(3)} ms)`,
     );
   }
+  // The representative track workload: cars on the Monza surface driven round the racing line
+  // by the reference driver (packages/ai/validation/lib/bench.ts), timing the world steps only.
+  const ai = await loadAiLib();
+  const trackSeconds = Number(options['track-seconds'] ?? 30);
+  const track = [];
+  for (const cars of [1, 20]) {
+    ai.trackBenchWorkload(cars, 2, () => performance.now()); // warm up
+    const r = ai.trackBenchWorkload(cars, trackSeconds, () => performance.now());
+    track.push(r);
+    console.log(
+      `${String(cars).padStart(2)} car(s) on the Monza surface (reference driver): ` +
+        `${r.msPerTick.toFixed(3)} ms per 240 Hz tick for all cars ` +
+        `(${(1000 / 240 / r.msPerTick).toFixed(1)}× real time for the field)`,
+    );
+  }
   fs.mkdirSync(outDir, { recursive: true });
   const file = path.join(outDir, 'bench.json');
   fs.writeFileSync(
     file,
-    JSON.stringify({ node: process.version, step: '1/240 s', results }, null, 2) + '\n',
+    JSON.stringify({ node: process.version, step: '1/240 s', results, track }, null, 2) + '\n',
   );
   console.log(`wrote ${path.relative(root, file)}`);
 }
@@ -167,7 +182,7 @@ if (name === 'list' || options.help) {
     `  ${'calibrate'.padEnd(15)} every target, the Monza lap and corner speeds for a candidate car (--set file.json, --line rebuild)`,
   );
 } else if (name === 'bench') {
-  bench(lib, options);
+  await bench(lib, options);
 } else {
   const todo = name === 'all' ? names : [name];
   let failures = 0;
