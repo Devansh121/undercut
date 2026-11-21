@@ -16,6 +16,19 @@ test('Quick Race: grid, lights, moving field and player result', async ({ page }
   });
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
+  // A reset in a race parks the car stopped at the edge, off the racing line, not on it in
+  // front of the field.
+  const parked = await page.evaluate(() => {
+    const u = window.__undercut!;
+    u.resetToTrack();
+    return { d: Number(u.state().d), speed: Number(u.telemetry().speed) };
+  });
+  expect(Math.abs(parked.d)).toBeGreaterThan(3);
+  expect(Math.abs(parked.speed)).toBeLessThan(1);
+  // The pause menu restarts the race, not a lap.
+  await page.evaluate(() => window.__undercut!.pause());
+  await expect(page.locator('.pause__action[data-action="restart"]')).toHaveText('Restart race');
+  await page.evaluate(() => window.__undercut!.resume());
   await page.waitForFunction(() => !!window.__undercut!.state().raceResult, null, {
     timeout: 120_000,
   });
