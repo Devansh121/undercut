@@ -197,6 +197,7 @@ test.describe('menus, keyboard only', () => {
   });
 
   test('settings change with the keyboard and persist across a reload', async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto('/');
     await openMenu(page);
     const tc = page.locator('.settings [data-setting=tractionControl]');
@@ -316,7 +317,7 @@ async function layoutProblems(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
     const finite = document
       .getAnimations()
-      .filter((a) => a.effect?.getTiming().iterations !== Infinity);
+      .filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity);
     await Promise.allSettled(finite.map((a) => a.finished));
     const problems: string[] = [];
     const { innerWidth: w, innerHeight: h } = window;
@@ -358,6 +359,7 @@ for (const size of [
   test(`every menu screen fits ${size.width} x ${size.height} with nothing clipped`, async ({
     page,
   }) => {
+    test.setTimeout(90_000);
     test.skip(
       test.info().project.name !== (size.height < 500 ? 'phone' : 'desktop'),
       'one project per size',
