@@ -509,14 +509,23 @@ function assistRun(
   applyAssists(settings, memory, h.car, driver, STEP, h.input);
 }
 
+/** Assist checks start from a corner at this share of the car's own lateral limit. */
+export const ASSIST_CORNER_FRACTION = 0.85;
+
+/** Sustained lateral limit in g for the assist checks' car and speed (50 kg fuel). */
+function limitAt(o: RunOptions, trim: AeroTrim, speed: number): number {
+  return lateralLimit({ ...paramsOf(o), trim, speed, fuel: 50 }).maxLatG;
+}
+
 /**
- * Full throttle out of a slow corner (80 km/h, about 1.8 g) with the wheel held still, with
- * and without traction control.
+ * Full throttle out of a slow corner (80 km/h, at 85 % of the car's lateral limit there) with
+ * the wheel held still, with and without traction control.
  */
 export function throttleOutOfSlowCorner(
   o: RunOptions & { tractionControl: number },
 ): AssistCheckResult {
   const speed = 80 * KMH;
+  const latG = ASSIST_CORNER_FRACTION * limitAt(o, 'high', speed);
   const h = new Harness({
     trim: 'high',
     fuel: 50,
@@ -526,7 +535,7 @@ export function throttleOutOfSlowCorner(
     ...paramsOf(o),
   });
   const hold = new SpeedHold(speed);
-  const steer = new YawRateSteer((1.8 * G) / speed);
+  const steer = new YawRateSteer((latG * G) / speed);
   while (h.time < 2) {
     hold.tick(h);
     steer.tick(h);
@@ -555,9 +564,13 @@ export function throttleOutOfSlowCorner(
   return r;
 }
 
-/** Full brake while turning (200 km/h, about 3 g) with the wheel held, with and without ABS. */
+/**
+ * Full brake while turning (200 km/h, at 85 % of the car's lateral limit there) with the wheel
+ * held, with and without ABS.
+ */
 export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckResult {
   const speed = 200 * KMH;
+  const latG = ASSIST_CORNER_FRACTION * limitAt(o, 'medium', speed);
   const h = new Harness({
     trim: 'medium',
     fuel: 50,
@@ -567,7 +580,7 @@ export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckR
     ...paramsOf(o),
   });
   const hold = new SpeedHold(speed);
-  const steer = new YawRateSteer((3 * G) / speed);
+  const steer = new YawRateSteer((latG * G) / speed);
   while (h.time < 2) {
     hold.tick(h);
     steer.tick(h);
@@ -591,6 +604,52 @@ export function brakeWhileTurning(o: RunOptions & { abs: number }): AssistCheckR
     maxSideslipDeg: maxBeta / DEG,
     spun: maxBeta > 20 * DEG,
     endSpeedKmh: h.car.vx * 3.6,
+  };
+  if (h.trace) r.trace = h.trace;
+  return r;
+}
+
+export interface AbsStopResult {
+  abs: number;
+  minSlip: number;
+  distance: number;
+  spun: boolean;
+  trace?: Trace;
+}
+
+/** Full pedal in a straight line from 300 to 100 km/h, high-downforce trim, with ABS 0–3. */
+export function absStraightStop(o: RunOptions & { abs: number }): AbsStopResult {
+  const h = new Harness({
+    trim: 'high',
+    fuel: 50,
+    speed: 300 * KMH,
+    ersMode: ErsMode.Balanced,
+    ersStore: 2e6,
+    recordEvery: harnessRecord(o),
+    ...paramsOf(o),
+  });
+  const hold = new SpeedHold(300 * KMH, 2, 4, 0.9);
+  while (h.time < 0.5) {
+    hold.tick(h);
+    h.step();
+  }
+  const driver: ControlInput = { ...NEUTRAL_INPUT, brake: 1 };
+  const settings = { tractionControl: 0, abs: o.abs, autoGears: true };
+  const memory = createAssistState();
+  const start = h.car.distance;
+  let minSlip = 0;
+  let maxBeta = 0;
+  while (h.time < 6 && h.car.vx > 100 * KMH) {
+    assistRun(h, settings, driver, memory);
+    h.step();
+    for (let i = 0; i < 4; i++) minSlip = Math.min(minSlip, h.car.slipRatio[i]!);
+    maxBeta = Math.max(maxBeta, Math.abs(Math.atan2(h.car.vy, Math.max(Math.abs(h.car.vx), 1))));
+  }
+  const r: AbsStopResult = {
+    abs: o.abs,
+    minSlip,
+    distance: h.car.distance - start,
+    spun: maxBeta > 20 * DEG,
   };
   if (h.trace) r.trace = h.trace;
   return r;

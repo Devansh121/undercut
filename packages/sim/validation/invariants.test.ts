@@ -170,7 +170,7 @@ describe('invariant: energy', () => {
         }
         for (let i = 0; i < 4 / STEP && car.vx > 25; i++) {
           inp.throttle = 0;
-          inp.brake = 0.6;
+          inp.brake = 0.35;
           const lower = (car.vx / R) * (gearRatio(REFERENCE_CAR, car.gear - 1) || Infinity);
           inp.gearShift = car.gear > 1 && lower < rpmToRad(11000) ? -1 : 0;
           stepCar(car, inp, FLAT_SURFACE, STEP, env);

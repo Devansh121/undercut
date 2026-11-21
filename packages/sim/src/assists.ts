@@ -30,7 +30,7 @@ export const NO_ASSISTS: Readonly<AssistSettings> = Object.freeze({
  */
 const TC_LIMIT = [Infinity, 1.25, 1.1, 0.95] as const;
 const ABS_LIMIT = [Infinity, 1.25, 1.1, 0.95] as const;
-const ABS_REAR_FACTOR = 0.85;
+const ABS_REAR_FACTOR = 0.65;
 /** Integrator rates: pedal scale lost per second per unit of excess slip, and regained per s. */
 const TC_GAIN = 150;
 const TC_RECOVER = 3;

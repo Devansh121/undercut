@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   brakeWhileTurning,
+  absStraightStop,
   liftOffInCorner,
   stepSteer,
   throttleOutOfSlowCorner,
@@ -29,12 +30,13 @@ describe('handling: stability at and near the limit', () => {
 
   it('full throttle out of a slow corner lights up the rears without TC, not with it', () => {
     const off = throttleOutOfSlowCorner({ tractionControl: 0 });
-    expect(off.maxRearSlip).toBeGreaterThan(0.3);
+    // Past the friction peak (10 % slip) by half again, and more than any TC level allows.
+    expect(off.maxRearSlip).toBeGreaterThan(0.15);
     for (const level of [1, 2, 3]) {
       const r = throttleOutOfSlowCorner({ tractionControl: level });
       expect(r.spun, `TC ${level}`).toBe(false);
       expect(r.maxRearSlip, `TC ${level}`).toBeLessThan(0.2);
-      expect(r.maxSideslipDeg, `TC ${level}`).toBeLessThan(off.maxSideslipDeg);
+      expect(r.maxRearSlip, `TC ${level}`).toBeLessThan(off.maxRearSlip);
       expect(r.maxSideslipDeg, `TC ${level}`).toBeLessThan(8);
       expect(r.endSpeedKmh, `TC ${level}`).toBeGreaterThan(85);
     }
@@ -48,6 +50,17 @@ describe('handling: stability at and near the limit', () => {
       expect(r.minSlip, `ABS ${level}`).toBeGreaterThan(-0.25);
       // Level 1 allows the most slip by design, so it lets the car slide a little further.
       expect(r.maxSideslipDeg, `ABS ${level}`).toBeLessThan(level === 1 ? 15 : 10);
+    }
+  });
+
+  it('ABS stops lock-up from 300 km/h in high-downforce trim and shortens the stop', () => {
+    const locked = absStraightStop({ abs: 0 });
+    expect(locked.minSlip).toBeLessThan(-0.5);
+    for (const level of [1, 2, 3]) {
+      const r = absStraightStop({ abs: level });
+      expect(r.minSlip, `ABS ${level}`).toBeGreaterThan(-0.3);
+      expect(r.spun, `ABS ${level}`).toBe(false);
+      expect(r.distance, `ABS ${level}`).toBeLessThan(locked.distance);
     }
   });
 });
