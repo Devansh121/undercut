@@ -41,9 +41,11 @@ export const GROUND_STEP_RISE = 0.15;
 /**
  * Penetration beyond any physical deflection, m: a wheel this far past its bottoming depth, or
  * a floor this far into the ground. The car is lifted out and its velocity into the ground
- * removed (an inelastic rim or floor strike). Normal driving uses at most 33 mm of tyre
- * compression and never puts the floor below the ground, so neither rule acts there; the drive
- * fuzz on the real circuits asserts it (`CarState.contactLifts`).
+ * removed (an inelastic rim or floor strike). The racing line never gets there (at most 33 mm
+ * of tyre compression; the floor never touches). Off it, a raised kerb taken at speed can bottom
+ * a tyre and put the floor's edge into the kerb, which is a real strike and is resolved here;
+ * the drive fuzz on the real circuits asserts that strikes happen only with a wheel on a kerb
+ * (`CarState.contactLifts`).
  */
 export const CONTACT_LIFT_MARGIN = 0.05;
 export const FLOOR_LIFT_DEPTH = 0.05;

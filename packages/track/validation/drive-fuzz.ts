@@ -1,14 +1,19 @@
 import { createRng } from '@undercut/core';
 import {
+  SurfaceKind,
   addCar,
   bodyCorners,
   checkCarInvariants,
+  computeMass,
   createCarParams,
+  createSurfaceSample,
   createWallSample,
   createWorld,
   invariantLimits,
   stepWorld,
   type AeroTrim,
+  type CarState,
+  type MassState,
 } from '@undercut/sim';
 import { createVec3 } from '../src/path';
 import { TrackSurface } from '../src/surface';
@@ -25,9 +30,15 @@ export interface FuzzResult {
   /** Barrier contacts (steps with a corner touching) and the hardest impact, m/s. */
   wallSteps: number;
   maxImpact: number;
-  /** The contact's last line of defence: must stay zero on a continuous track. */
+  /** The contact's last line of defence against a step in the ground: zero on a real track. */
   groundSteps: number;
-  contactLifts: number;
+  /**
+   * Floor or rim strikes the contact resolved inelastically (see `liftOutOfGround`), split by
+   * whether a wheel was on a kerb at the time. A raised kerb can bottom a tyre and put the
+   * floor's edge into it; anywhere else a strike would mean the ground is wrong.
+   */
+  kerbStrikes: number;
+  otherStrikes: number;
   /** Highest floor above the ground, m, and the sim time driven. */
   maxRide: number;
   seconds: number;
@@ -72,7 +83,8 @@ export function driveFuzz(track: Track, seed: number, seconds: number): FuzzResu
     wallSteps: 0,
     maxImpact: 0,
     groundSteps: 0,
-    contactLifts: 0,
+    kerbStrikes: 0,
+    otherStrikes: 0,
     maxRide: 0,
     seconds,
   };
@@ -90,7 +102,12 @@ export function driveFuzz(track: Track, seed: number, seconds: number): FuzzResu
     const st = car.state;
     const rpm = (st.engineSpeed * 60) / (2 * Math.PI);
     inp.gearShift = rpm > 11500 && st.gear < 8 ? 1 : rpm < 7000 && st.gear > 1 ? -1 : 0;
+    const strikes = st.contactLifts;
     stepWorld(world);
+    if (st.contactLifts !== strikes) {
+      if (wheelOnKerb(surface, st)) r.kerbStrikes++;
+      else r.otherStrikes++;
+    }
     const why = checkCarInvariants(st, limits);
     if (why !== null) r.failure = `t=${(k * STEP).toFixed(3)} s: ${why}`;
     bodyCorners(st, corners);
@@ -103,6 +120,21 @@ export function driveFuzz(track: Track, seed: number, seconds: number): FuzzResu
     r.maxRide = Math.max(r.maxRide, st.rideHeightFront, st.rideHeightRear);
   }
   r.groundSteps = car.state.groundSteps;
-  r.contactLifts = car.state.contactLifts;
   return r;
+}
+
+const mass: MassState = { total: 0, sprung: 0, a: 0, b: 0, sprungA: 0, sprungB: 0, yawInertia: 0 };
+const kerbSample = createSurfaceSample();
+
+function wheelOnKerb(surface: TrackSurface, st: CarState): boolean {
+  const m = computeMass(st.model, st.fuelMass, mass);
+  const c = Math.cos(st.yaw);
+  const sn = Math.sin(st.yaw);
+  for (let i = 0; i < 4; i++) {
+    const bx = i < 2 ? m.a : -m.b;
+    const by = st.model.wheelLeft[i]!;
+    surface.sample(st.x + bx * c - by * sn, st.z - bx * sn - by * c, { index: -1 }, kerbSample);
+    if (kerbSample.kind === SurfaceKind.Kerb) return true;
+  }
+  return false;
 }

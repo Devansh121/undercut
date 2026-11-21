@@ -17,8 +17,9 @@ describe('random driving at Monza', () => {
       expect(r.failure).toBeNull();
       // Contact runs every substep; a corner ends a step under one substep's travel past a face.
       expect(r.deepest).toBeLessThan(0.1);
+      // The ground never steps; a floor or rim strike only ever happens on a kerb.
       expect(r.groundSteps).toBe(0);
-      expect(r.contactLifts).toBe(0);
+      expect(r.otherStrikes).toBe(0);
       contacts += r.wallSteps;
     });
   }

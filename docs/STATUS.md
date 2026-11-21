@@ -18,6 +18,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 - HUD on the design tokens: speed, gear, rev lights, lap time with live delta, sector times, last and best, ERS store and lap allowance, DRS state, minimap with the car and ghost, lap-invalid flag and message slot; results strip at each lap; pause menu with resume, restart lap, reset to track, camera, assists and volume. The steering wheel's display shows gear, speed and rev lights in the cockpit view; on a phone the chase cameras frame the car above the driver cluster. Lays out at 1440×900 and 844×390 with safe-area insets.
 - Engine and road sound from `packages/audio`: the engine is created on the first gesture (the Start click or a first key or touch), follows the car every frame and suspends on pause, tab hide and quit; master, engine and effects volume sliders in the pause menu are saved with the settings.
 - `window.__undercut` debug API with `?debug=1` (see `apps/web/src/debug.ts`), a keyboard-only autopilot used to prove a full lap, and `npm run shots -- monza` (screenshot stations on the real GPU, `tools/screenshots/`).
+- Off-track fix: barriers stop cars. A car that leaves the track now hits the barrier, scrubs speed and slides along it, and the impact speed is reported for damage and audio later. The pit lane stays drivable with the pit wall between it and the track. The ground inside the barriers no longer steps (a lap-projection bug left a 2.7 m step at the first chicane), and the vehicle model survives bad ground anyway: tyre and floor forces saturate, the suspension has stops, and a step in the ground lifts the car instead of launching it. A reusable pose checker (`checkCarInvariants`) backs fuzz suites on an adversarial surface and on Monza, and the game resets the car if it ever fails (ADR 0008, physics-validation section 7.7).
 - M0 foundation: npm workspaces, TypeScript strict, Vite client, rooms service on the local Workers runtime, CI with eight required checks, the one-command run.
 - The launch screen shows the name, a Drive button (not live until M1) and the build hash over a placeholder 3D view.
 - M5 rooms service and protocol: private rooms by invite code on the local Workers runtime, with the server owning the clock, grid, start lights, phases, timing checks and results; protocol v2 with binary car snapshots; a client library with clock sync, reconnect and remote-car interpolation; host migration with AI handover. Headless and soak-tested; the lobby and in-race UI come next. See `docs/netcode.md`.
@@ -36,6 +37,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Physics: the reference driver laps Monza in 1:29.9; the real pole lap is 1:18.8 and the M1 band is 1:14.9 to 1:22.7. The car is short of cornering grip. Calibration is in progress; the gap is recorded in `docs/physics-validation.md` section 7 and pinned by a test, not hidden.
 - Look: the car, the bare circuit and the procedural textures are interim. The real car model and the dressed circuit are M2.
 - Sound: measured, never heard. The listening queue is in `docs/audio.md`.
+- Barrier contact is minimal: the body is a box against a line, every barrier type has the same restitution and friction, and there is no damage, no wheel-to-barrier contact and no car-to-car contact (M3b). The renderer draws a gap where a barrier offset jumps (the pit wall's two ends); the sim closes it with a slanted face.
+- When a lap is invalidated the HUD can show two identical "Lap invalid" messages stacked (seen in the off-track screenshot); not looked into.
 
 ## Decided for you
 
@@ -95,6 +98,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Online rooms: a host whose own car has finished or retired is still watched while its AI race, and only snapshots count as signs of life (a hidden tab keeps pinging but stops driving).
 - Online rooms: at most 32 sockets per room, 16 not yet joined, 4 not yet joined per address, admitted at 5 per second after a burst of 30; refused upgrades get HTTP 429.
 - Car snapshots: the top two bits of the flags byte carry a teleport counter (the unused `finished` flag was dropped to make room), so the record stays 56 bytes.
+
+- Off-track fix: the barrier contact is an impulse at the body's footprint corners (restitution 0.1, friction 0.5, one value for every barrier type) rather than a spring, so it stays stable at any closing speed. The step and lift rules in the vehicle model act at position level, a hard limit by design, documented and asserted never to act in normal driving. The invariant limits allow 0.5 m of airborne floor height above static; the Monza fuzz peaks at 0.28 m. The pit wall blocks from both sides by giving it the thickness of the verge between the lane and the lap's barrier line, rather than by remembering which side a car came from.
+- The in-game safety net counts its resets in `__undercut.state().safetyResets`; there is no on-screen debug overlay to put it in.
 
 ## Optional, needs you
 

@@ -338,6 +338,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference driver |
 | Monza reference lap 85.539 s against the M1 band 74.852–82.732 s (section 7.6) | 2.81 s outside M1, 4.38 s outside M4 | Not reachable inside the documented parameter ranges with this line: with μy and the low-trim ClA both at the top of their ranges (2.2 and 4.2) and the line rebuilt, the lap is 83.847 s. Section 7.6 measures what is left: the reference driver's planning margin and driving (1.76 s), and a line that keeps the whole car 0.3 m inside the white lines and off the kerbs. Letting the car's centre go to 0.76 m past the line, which the track-limit rule allows (no wheel needs to stay inside, only one), is worth 0.95 s in the plan, but the driven lap spins (next task) |
+| Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0008) |
 | Kerb disturbance not understood (section 7.6) | The line keeps off the kerbs | Open question: the kerb profile rises 35 mm over 0.12 m across the kerb, with a 3–4 m taper along it, and the vertical tyre model applies its 7 kN·s/m damping directly to the point-sampled ground-height rate with no envelopment, so a wheel crossing that rise at 5 m/s laterally sees about 10 kN of damping force. That may exaggerate kerb strikes; it is not yet measured against anything |
 
 ## 6. Sources
@@ -834,3 +835,42 @@ top speed 344.0 km/h with DRS closed and 353.6 km/h open.
 - No downforce gain from the tow, and the driver never uses more than 97 % of the envelope.
 - The racing line is computed on the OpenStreetMap-derived centreline and authored widths
   (track-data.md); local width or curvature errors there show up as line choices.
+
+### 7.7 Pose invariants and barrier contact
+
+Added after the owner found a car thrown hundreds of metres up beyond the barrier at Monza (ADR
+0008). `checkCarInvariants` in `packages/sim/src/invariants.ts` is the one checker; the game runs
+it on the player's car every tick, and the suites below call it every step.
+
+**Limits, reference car, low trim** (medium and high differ only by their static ride height):
+
+| Invariant | Limit | Derivation |
+|---|---|---|
+| Every state number | finite | |
+| Floor height above the ground under each axle | −0.100 to 0.644 m | Top: static rear ride height 0.065 m, plus the tyre's full bottoming deflection 0.079 m (wheels unloaded), plus 0.5 m of airborne allowance (about four times the tallest kerb face, 0.13 m). Bottom: twice the depth at which the contact lifts the floor out (50 mm) |
+| Pitch relative to the plane through the four contact heights | ±0.207 rad | Relative pitch is exactly (front − rear floor height) / wheelbase, so it follows from the floor-height span over 3.6 m |
+| Roll relative to that plane | ±0.531 rad | The floor-height span across the floor's 1.4 m width |
+| Wheel centre above the ground under it | 0.181 to 1.004 m | Bottom: free radius 0.36 m less the bottoming deflection and the plank allowance. Top: free radius plus the highest floor |
+| Tyre bottoming deflection, force ceiling | 0.079 m, 23.7 kN | 60 % of the 18-inch tyre's 0.131 m sidewall; × 300 kN/m. Reference lap peak 11.5 kN and 32.5 mm. A floor skid's ceiling is four times this |
+| Bump and droop stops | 40 mm of spring travel either way, 5 MN/m | Reference lap: at most 16 mm of compression, never extended |
+
+A surface that declares steps (`surfaceStep`) widens the height limits by the step and the angle
+limits through them: 2.644 m, ±1.318 rad pitch and ±3.388 rad roll for 2 m steps.
+
+**Coverage.**
+
+| Suite | Runs | Result |
+|---|---|---|
+| Adversarial surface (`packages/sim/validation/adversarial-surface.test.ts`, CI): cells 4–16 m with heights ±1 m (steps to 2 m), normals tilted up to 20°, grip 0.2–1.2, drag ×1–10, random inputs held up to 1 s | 6 seeds × 30 s, plus determinism | All in bounds; bit-identical repeat. A 40-seed sweep: no failures, highest floor 2.25 m against 2.65 |
+| Random driving on Monza (`packages/track/validation/drive-fuzz.test.ts`, CI): random start round the lap and across the track, random steer, throttle and brake held 0.1–3 s | 10 seeds × 180 s (30 min) | All in bounds; deepest body corner 5 µm past a face at the end of a step; hardest barrier impact 62.4 m/s; highest floor 0.281 m; the ground-step rule never acted; floor or rim strikes only with a wheel on a kerb |
+| The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | Same assertions. The first soak run found two floor strikes on the first chicane's sausage kerbs (seeds 1078 in the soak and 10 in CI after a change); with the skid ceiling at one tyre load the floor could not lift the car off the kerb, so the ceiling is now four tyre loads, and strikes on kerbs are counted, not failed |
+| The owner's run (`packages/track/test/offtrack.test.ts`) | 40 s with barriers, and 40 s with the barriers taken away | Bounded both ways; with barriers the car stops at the left barrier before the first chicane and never meets a step |
+| Pit lane (`packages/track/validation/pit-lane.test.ts`) | Entry to exit at 20 m/s | No barrier contact |
+| Ground a car can reach (`packages/track/test/ground-continuity.test.ts`) | Every point inside the barriers plus 0.5 m, and the pit lane, on a 1 m × 0.5 m lattice with 0.25 m probes | No step larger than the steepest kerb flank allows (0.34 m per 0.35 m probe). Before the projection fix: 2.73 m at the first chicane |
+
+Random driving spends about 70 % of its time touching a barrier (an undriven car ends up against
+one), so the coverage of free running is thinner than the hours suggest.
+
+**Reference lap.** 85.53912289 s before and after, bit for bit; the physics suite and the AI
+artefact fingerprints are unchanged.
+

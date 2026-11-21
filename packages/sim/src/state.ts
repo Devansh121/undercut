@@ -98,9 +98,10 @@ export class CarState {
   externalForceZ = 0;
   externalTorque = 0;
   /**
-   * Diagnostics of the contact's last line of defence (see `liftOutOfGround` in step.ts): how
-   * many substeps met a step in the ground, and how many lifted the car out of a penetration no
-   * deflection explains. Both stay zero in normal driving on a continuous track.
+   * Contact diagnostics (see `liftOutOfGround` in step.ts). `groundSteps`: substeps that met a
+   * step in the ground, the last line of defence, which never acts on a continuous track.
+   * `contactLifts`: floor or rim strikes resolved inelastically; zero on the racing line, and off
+   * it only on raised kerbs taken hard.
    */
   groundSteps = 0;
   contactLifts = 0;

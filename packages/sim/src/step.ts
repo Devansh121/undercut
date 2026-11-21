@@ -37,6 +37,13 @@ const IDLE_GAIN = 10;
 /** Pit limiter: 80 km/h ([2] Art. 34.7, doc 4.5), throttle gain per m/s below it. */
 const PIT_LIMIT = 80 / 3.6;
 const PIT_GAIN = 0.5;
+/**
+ * A floor skid's force ceiling as a multiple of a tyre's bottoming load. The skids and the floor
+ * are far stronger than a tyre, and a sausage kerb under the floor's edge must be able to lift
+ * the car at speed; the ceiling only stops a step's ground rate becoming an impulse through the
+ * plank damping. Never reached on the racing line (the floor does not touch the ground there).
+ */
+const SKID_FORCE_SCALE = 4;
 
 /** ERS deployment per mode: power, the throttle it needs, and the speed it stops at. */
 const ERS_MODES = [
@@ -310,7 +317,7 @@ function substep(
     if (n <= 0) continue;
     // Like a tyre, a skid passes a bounded load: a ground step under the floor must not become
     // an impulse through the damping term.
-    if (n > model.tyreForceMax) n = model.tyreForceMax;
+    if (n > SKID_FORCE_SCALE * model.tyreForceMax) n = SKID_FORCE_SCALE * model.tyreForceMax;
     skidHeave += n;
     skidPitch += n * xb;
     skidRoll += n * yl;

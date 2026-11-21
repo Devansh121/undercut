@@ -34,16 +34,17 @@ export interface InvariantOptions {
 }
 
 /**
- * How far the body may rise above its static ride height before it is climbing rather than
- * hopping, m. A car leaves the ground off a sausage kerb: the tyre's saturated force can give a
- * corner at most about 3 m/s of vertical speed over the kerb flank, which carries the body
- * v²/2g ≈ 0.45 m up. Rounded up to 0.5 m. The Monza drive fuzz peaks well below it (report in
- * docs/physics-validation.md).
+ * How far the body may rise above its static ride height (plus fully unloaded tyres) before it
+ * is climbing rather than hopping, m. A car does leave the ground off a kerb; the tallest kerb
+ * face on the shipped circuits is 0.13 m, and this allows about four times that. Random driving
+ * on Monza, barrier strikes included, peaks at 0.28 m of floor height (docs/physics-validation.md,
+ * section 7.7), so anything near the limit is a body being thrown, not a kerb strike.
  */
 export const AIRBORNE_ALLOWANCE = 0.5;
 /**
- * How far the floor may sink below the ground, m: the plank's deflection at four saturated tyre
- * loads shared by two skid pairs (4 × 24 kN / 2 MN/m ≈ 0.05 m), doubled for landing overshoot.
+ * How far the floor may sink below the ground, m: twice FLOOR_LIFT_DEPTH, the depth at which the
+ * contact lifts the car out. A skid's force saturates at the tyre's bottoming load at 24 mm of
+ * plank deflection, well inside it.
  */
 export const PLANK_ALLOWANCE = 0.1;
 

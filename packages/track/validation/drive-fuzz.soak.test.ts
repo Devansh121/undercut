@@ -11,8 +11,9 @@ describe('random driving at Monza, nightly', () => {
       const r = driveFuzz(track, seed, 600);
       expect(r.failure).toBeNull();
       expect(r.deepest).toBeLessThan(0.1);
+      // The ground never steps; a floor or rim strike only ever happens on a kerb.
       expect(r.groundSteps).toBe(0);
-      expect(r.contactLifts).toBe(0);
+      expect(r.otherStrikes).toBe(0);
     });
   }
 });
