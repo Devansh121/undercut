@@ -1,5 +1,5 @@
 // Calibration harness: `npm run telemetry -- calibrate [--set candidate.json] [--line rebuild]
-// [--only targets|lap] [--out name.json]`.
+// [--only targets|lap] [--out name.json] [--drs2 <s>] [--laps n --fuel kg]`.
 //
 // One command that judges a candidate car against everything the calibration looks at: the 32
 // component targets of docs/physics-validation.md section 2 (the physics suite's measurements),
@@ -154,7 +154,12 @@ function measureLap(m, options, clock) {
   const { lap, ai } = m;
   const setup = lap.MONZA;
   const params = lap.carFor(setup);
-  const track = setup.track();
+  // --drs2 <s>: zone 2's activation moved (a labelled measurement; the track file is unchanged).
+  const track = options.drs2
+    ? lap.withDrsActivation(setup.track(), 1, Number(options.drs2))
+    : setup.track();
+  if (options.drs2)
+    console.log(`DRS zone 2 activation overridden to s = ${options.drs2} m (measurement only)`);
   const t0 = clock();
   const report = ai.measureEnvelope({ params, airDensity: setup.airDensity, fuel: setup.fuel });
   const envelope = JSON.parse(JSON.stringify(report.envelope));
@@ -174,7 +179,7 @@ function measureLap(m, options, clock) {
     plan,
     trim: setup.trim,
     airDensity: setup.airDensity,
-    fuel: setup.fuel,
+    fuel: Number(options.fuel ?? setup.fuel),
     laps: Number(options.laps ?? 1),
     recordEvery: Number(options.every ?? 0),
     stops: { 1: [lap.MONZA_PUBLISHED.t1.v1, lap.MONZA_PUBLISHED.t1.v2] },

@@ -9,7 +9,7 @@ import { MONZA, referenceLap } from '../lib/index';
  */
 const LAPS = 10;
 const FUEL = MONZA.fuel + 2.2 * (LAPS + 1);
-/** Largest spread of the ten lap times accepted, s. Measured when written: 0.244 s. */
+/** Largest spread of the ten lap times accepted, s. Measured: 0.244 s first, 0.440 s now. */
 const MAX_SPREAD = 0.5;
 
 describe('soak: ten consecutive reference laps, Monza', () => {

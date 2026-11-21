@@ -356,7 +356,7 @@ const BRAKING_TIME =
   "Hypothesis, not established: Brembo's stop times may include the trail-off and turn-in " +
   'into the corner, which the scripted stop (at the limit to v2; its pedal ceiling is an ' +
   'assumed estimate that barely acts) does not reproduce. Every published time at the ' +
-  'medium and high-downforce circuits comes out short.';
+  'medium and high-downforce circuits, and Monza T1 2025, comes out short.';
 const DOWNFORCE_BRAKING =
   'In medium and high-downforce trim the car stops shorter than published. Competing ' +
   'explanations, not separated: more downforce lost under braking pitch than the modelled ' +
@@ -369,26 +369,21 @@ const DOWNFORCE_PEAK =
   'loss under braking pitch beyond the modelled floor stall, front-limited braking as load ' +
   "moves forward, the drivers' pedal build-up and the published peak's filtering, or a " +
   'tyre more load-sensitive than the cited sets.';
-const MONZA_2023 =
-  'The 2023 figure (5.2 g) stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner ' +
-  'and speed; the model gives about 4.7–4.8 g for all three.';
 const POUHON =
   'Flat constant-speed sweep in Spa air; the 5.7 g figure is a single secondary source for a ' +
   'downhill double-apex corner, with no trace, filter or duration.';
 
 export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
-  'monza-t1-2023-peak': { measured: 4.754, reason: MONZA_2023 },
-  'spa-t5-2025-distance': { measured: 77.28, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2025-time': { measured: 1.135, reason: BRAKING_TIME },
-  'spa-t5-2024-distance': { measured: 78.48, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2024-time': { measured: 1.196, reason: BRAKING_TIME },
-  'spa-t5-2024-peak': { measured: 5.054, reason: DOWNFORCE_PEAK },
-  'singapore-t7-2025-distance': { measured: 83.13, reason: DOWNFORCE_BRAKING },
-  'singapore-t7-2025-time': { measured: 1.447, reason: BRAKING_TIME },
-  'singapore-t7-2025-peak': { measured: 5.403, reason: DOWNFORCE_PEAK },
-  'singapore-t14-2024-time': { measured: 1.808, reason: BRAKING_TIME },
-  'singapore-t14-2024-peak': { measured: 5.065, reason: DOWNFORCE_PEAK },
-  'lateral-pouhon': { measured: 4.594, reason: POUHON },
+  'monza-t1-2025-time': { measured: 2.3795, reason: BRAKING_TIME },
+  'spa-t5-2025-distance': { measured: 78.92, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2025-time': { measured: 1.157, reason: BRAKING_TIME },
+  'spa-t5-2024-distance': { measured: 80.46, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2024-time': { measured: 1.226, reason: BRAKING_TIME },
+  'spa-t5-2024-peak': { measured: 4.952, reason: DOWNFORCE_PEAK },
+  'singapore-t7-2025-distance': { measured: 84.86, reason: DOWNFORCE_BRAKING },
+  'singapore-t7-2025-time': { measured: 1.474, reason: BRAKING_TIME },
+  'singapore-t14-2024-time': { measured: 1.843, reason: BRAKING_TIME },
+  'lateral-pouhon': { measured: 4.536, reason: POUHON },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';
