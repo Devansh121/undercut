@@ -113,7 +113,10 @@ No published figures exist for this era; the cars run very stiff to control floo
 | Pitch | about 4–5 Hz | Follows from the heave stiffness and wheelbase. |
 | Roll stiffness distribution | 55–60 % front | Stable mid-corner balance with a 45 % front weight share. |
 | Tyre vertical stiffness | 250–300 kN/m per tyre | Typical for 18-inch racing tyres at about 1.6 bar running pressure. |
-| Damping ratio | 0.3–0.5 heave, 0.6–0.8 roll | Usual racing ranges. |
+| Damping ratio | 0.3–0.5 heave, 0.6–0.8 roll | Usual racing ranges. In the model most of it comes from the tyre carcass (see below). |
+| Contact patch | 0.32 m wide front, 0.40 m rear, 0.15 m long | **Estimate**: about 0.88 of the tread width ([1] Art. 10.8.1) and a typical loaded length. The tyre deflects against the ground averaged over the patch, so short features (a kerb's first rise) are spread over the patch's width. |
+
+Where the damping sits. With wheel rates five times the tyre's stiffness, a damper on suspension travel cannot damp the body modes much: a Zener (standard linear solid) bound gives at most ζ ≈ (k∞ − k0) / (4√(k0 k∞)), with k0 the springs and tyres in series and k∞ the tyre alone, so ζ ≤ 0.05 front and 0.10 rear for 1.5 / 0.6 MN/m against 300 kN/m, and no choice inside this section's ranges (tyre 250–300 kN/m, heave 5–7 Hz) reaches 0.3. The model therefore has corner dampers on suspension travel (they damp wheel hop) and carries the body damping as carcass damping on the tyre's own deflection rate, 7 kN·s/m; that damping acts on the patch-averaged ground and grows from nothing at first touch to its full value at 3 mm of deflection (section 7.3).
 | Static ride height (floor reference) | front 20–30 mm, rear 60–80 mm | Shape only. Tune against the bottoming and ride-height sensitivity above. |
 
 ## 2. Validation targets
@@ -337,8 +340,8 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.3 and 78.5 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.05 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference driver |
-| Monza reference lap 85.539 s against the M1 band 74.852–82.732 s (section 7.6) | 2.81 s outside M1, 4.38 s outside M4 | Not reachable inside the documented parameter ranges with this line: with μy and the low-trim ClA both at the top of their ranges (2.2 and 4.2) and the line rebuilt, the lap is 83.847 s. Section 7.6 measures what is left: the reference driver's planning margin and driving (1.76 s), and a line that keeps the whole car 0.3 m inside the white lines and off the kerbs. Letting the car's centre go to 0.76 m past the line, which the track-limit rule allows (no wheel needs to stay inside, only one), is worth 0.95 s in the plan, but the driven lap spins (next task) |
-| Kerb disturbance not understood (section 7.6) | The line keeps off the kerbs | Open question: the kerb profile rises 35 mm over 0.12 m across the kerb, with a 3–4 m taper along it, and the vertical tyre model applies its 7 kN·s/m damping directly to the point-sampled ground-height rate with no envelopment, so a wheel crossing that rise at 5 m/s laterally sees about 10 kN of damping force. That may exaggerate kerb strikes; it is not yet measured against anything |
+| Monza reference lap 84.257 s against the M1 band 74.852–82.732 s (section 7.6) | 1.53 s outside M1, 3.10 s outside M4 | Not reachable by driving: on the legal corridor the full-envelope profile is 82.979 s, 0.25 s outside the band at 100 % of the measured limits. The driver loses 0.58 s to its own plan (T1 entry, Ascari exit, Parabolica) and plans at 98/95/98 % (0.70 s). The rest is the car and the track as modelled (4.19 s against the pole lap); with the legal corridor the medium-speed corners point at the car's lateral grip at 150–215 km/h, 5–15 % short of the practice speeds at Lesmo 2 and Ascari (7.6) |
+| Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
 
 ## 6. Sources
 
@@ -439,7 +442,7 @@ selection check, or withheld validation.
 | Pouhon, medium trim, 281 km/h, Spa air (2.5) | 5.7 ± 0.7 | 4.14, gap | 4.59 | validation | gap |
 | Parabolica exit, low trim, 270 km/h, Monza air | 3.5–4.0 ± 0.6 | 3.62 | 4.08 | validation | pass |
 | Slow corner 85 km/h, low / medium / high trim | 2.0–2.3 ± 0.4 | 1.81 / 1.82 / 1.85 | 2.15 / 2.18 / 2.24 | fit / validation / validation | pass |
-| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.539 s | selection | gap |
+| Monza reference lap, low trim, qualifying fuel, reference driver (2.1; 7.6) | 74.852–82.732 s (M1) | 90.137 s, gap | 85.539 s (84.257 s after the lap-band changes, 7.6) | selection | gap |
 | Monza speed trap on that lap, DRS open, no tow (2.2) | 348 ± 6 | 347.3 | 347.4 | validation | pass |
 
 Of the 32 component targets, 20 are in band and 12 are recorded gaps (section 5), against 17 and
@@ -538,6 +541,34 @@ How the tests run (unchanged from section 2 unless noted):
 | Floor height at 300 km/h, 50 kg fuel, front / rear axle: low / medium / high trim | 12.4 / 42.6; 10.9 / 43.7; 9.4 / 45.2 mm (unchanged: on a straight the tyres do not set it, and at the reference height the floor share changes nothing) |
 | Cost: one car, one core, Node 20.19 | 540–800× real time (ADR 0007) |
 
+**Kerb crossings and the contact model** (`npm run telemetry -- kerbs`; data in
+`docs/evidence/m1-lap-band/kerb-crossings.csv`, plot `kerb-crossings.png`). The car runs across
+the track file's kerb profiles at a fixed speed and lateral speed, holding its heading, on a
+straight edge with the kerb on its left (the profiles of `monza.json`: flat 35 mm over 0.12 m,
+rising to 50 mm, dropping to the verge at 1.35–1.5 m; exit 20 mm over 0.10 m to 30 mm, dropping
+at 2.3–2.5 m; chicane as flat, then an 80 mm sausage from 1.6 m). Before, the tyre followed the
+ground at one point under the wheel centre; after, it deflects against the ground averaged over
+its contact patch, and its carcass damping grows from nothing at first touch:
+
+| Crossing | Largest carcass damping (before → after) | Largest load step in one tick | Plank contact | Front-left load range |
+|---|---|---|---|---|
+| flat, 200 km/h, 5 m/s across | 7.9 → 3.0 kN | 8.7 → 1.7 kN | 6.6 kN → none | 0–11.3 → 0–6.1 kN |
+| exit, 200 km/h, 3 m/s | 3.0 → 0.7 kN | 3.9 → 0.7 kN | none | 0.3–6.3 → 1.2–4.2 kN |
+| exit, 250 km/h, 5 m/s | 5.9 → 1.9 kN | 6.9 → 1.6 kN | none | 0–9.3 → 0.3–5.7 kN, no wheel lift (was 0.046 s) |
+| chicane (over the sausage), 120 km/h, 4 m/s | 12.4 → 6.0 kN | 13.3 → 7.0 kN | 7.5 kN → none | still lifts a wheel 0.17 s |
+
+The damping stays under the closed-form bound for a ramp spread over the patch width,
+1.1 · c · v_lateral · rise / width (asserted for the flat and exit cases). A wheel still leaves the
+ground for about 0.1–0.2 s when it runs off a kerb's outer edge (a 50 mm drop to the verge) or
+over the sausage: with springs about five times stiffer than the tyres and about 1 mm of static
+spring compression the wheel cannot follow a 50 mm drop until the body rolls toward it, which is
+what a stiff ground-effect car does. The racing line never goes there (7.6).
+
+Body modes by free decay, fitted (`freeDecay` in the validation library; unchanged by the
+contact patch): heave 5.5 Hz ζ 0.33, pitch 7.6 Hz ζ 0.49, roll 9.0 Hz ζ 0.596. Roll sits at the
+lower edge of section 1.6's 0.6–0.8, as it did before; the earlier table's roll figure (7.3 Hz,
+0.60) was read by a different method.
+
 **Handling with more grip.** The tyre's curve shape is unchanged: the force peaks at 10 % slip
 ratio and at a slip angle of 5.1° (tan α = 0.09) at every load, and falls away progressively
 after it. At 3 kN, lateral: 1.95 at 2.5°, 2.15 at the 5.1° peak, 2.11 at 8°, 2.07 at 10°, 2.01
@@ -599,9 +630,9 @@ New estimates the sheet did not cover (all in `packages/sim/src/params.ts` with 
   stay the fitted values. Ground effect is weighted 70 % to the front ride height.
 - Tyre vertical damping 7 kN·s/m: with springs five times stiffer than the tyres the corner
   dampers barely act on the body modes (free decay gave ζ ≈ 0.05), so the damping that holds
-  section 1.6's ratios is lumped at the tyre (carcass plus the inerter and heave damper of a real
-  car). It acts on the point-sampled ground height with no tyre envelopment (an open question at
-  kerbs, section 5).
+  section 1.6's ratios is carried as carcass damping on the tyre's deflection rate (section 1.6
+  shows a suspension-travel damper cannot reach them with these rates). Since the lap-band work it
+  acts on the patch-averaged ground and grows in from first touch (below).
 - Load transfer: the sprung CoG height follows from the whole car's (0.30 m) and the unsprung
   masses at the wheel centres; the sprung share goes through the springs, the unsprung inertia
   straight to the tyres, so the total is h·ΣF.
@@ -613,6 +644,13 @@ New estimates the sheet did not cover (all in `packages/sim/src/params.ts` with 
   braked corner keeps rear lateral grip.
 - With no grip (a wheel on a zero-grip surface) the low-speed carcass damping passes no force;
   before, a division by the zero friction limit left that force unbounded.
+- Contact patch (M1 lap band): the tyre's ground is the mean height over a 5 × 2 grid across a
+  0.32 / 0.40 m wide, 0.15 m long patch (front / rear); on plane ground the centre and two edge
+  probes stand in for the grid, which they equal there. Grip and rolling drag are the patch's
+  mean. The carcass damping grows linearly from zero at first touch to its full value at 3 mm of
+  deflection (static deflection is 7–9 mm). Cost: one car on the Monza surface about 155–165×
+  real time with the patch against about 245× with point contact (same machine, interleaved
+  runs); flat-ground bench 290–360×.
 
 ### 7.4 What the data say about the tyre and the floor
 
@@ -665,23 +703,67 @@ two.
 
 The reference driver (`packages/ai`) drives the committed Monza surface in the section 2.1
 conditions: low trim exactly as the game builds the car (`createCarParams('low')`, `createWorld`
-with the track's surface, `addCar`), 10 kg of fuel, 25 °C at 180 m, DRS in the zones, full ERS.
-It produces only the `ControlInput` a player's devices produce. It drives one out-lap, saving the
-MGU-K so the store is full at the line as in qualifying, then the timed lap, timed from the
-**control line** (below). Measured with `npm run telemetry -- lap` (and `-- calibrate`);
-asserted by `packages/ai/validation/reference-lap.test.ts` in the physics job (one lap) and by
-the nightly soak (ten consecutive laps). The racing line and envelope were rebuilt for the
-calibrated car (`npm run ai:build`).
+with the track's surface, `addCar`), 10 kg of fuel, 25 °C at 180 m, DRS in the zones, full ERS,
+no assists (traction control and ABS off, as on the real car). It produces only the
+`ControlInput` a player's devices produce. It drives one out-lap, saving the MGU-K so the store
+is full at the line as in qualifying, then the timed lap, timed from the **control line**
+(below). Measured with `npm run telemetry -- lap` (and `-- calibrate`); asserted by
+`packages/ai/validation/reference-lap.test.ts` in the physics job (one lap) and by the nightly
+soak (ten consecutive laps). "Before" is the car and line after the calibration (PR #14);
+"after" adds the contact patch, the legal corridor and the driver changes below.
 
 | Quantity | Before | After | Target or reference |
 |---|---|---|---|
-| Lap | 90.137 s | **85.539 s** | 1:18.792 (+6.747 s, +8.6 %); M1 band 74.852–82.732 s: outside by 2.807 s; M4 band 76.428–81.156 s: outside by 4.383 s |
-| Speed trap (412 m, 212 m before T1) | 347.3 km/h | 347.4 km/h | 348 ± 6 (median 348.3), pass |
-| Control line | 308.9 km/h | 312.3 km/h | fastest 320.7 published |
-| MGU-K deployed from the store / harvested | 3.08 / 1.52 MJ | 3.22 / 1.35 MJ | ≤ 4 / ≤ 2 MJ per lap |
-| Track limits | at most one wheel past a white line | at most two wheel centres past a white line, never four | rule: never all four wheels beyond the edges |
-| Stability | sideslip ≤ 4.4°, no spin | sideslip ≤ 5.1°, no spin | |
-| Ten consecutive laps (34 kg start, getting lighter) | 90.281–90.509 s, spread 0.228 s | 85.921–86.314 s, spread 0.393 s, all clean, sideslip ≤ 5.6° | nightly soak: spread ≤ 0.5 s |
+| Lap | 85.539 s | **84.257 s** | 1:18.792 (+5.465 s, +6.9 %); M1 band 74.852–82.732 s: outside by 1.525 s; M4 band 76.428–81.156 s: outside by 3.101 s |
+| Driver's speed profile / full-envelope profile on the same line | 84.764 / 83.781 s | 83.674 / 82.979 s | |
+| Speed trap (412 m, 212 m before T1) | 347.4 km/h | 347.4 km/h | 348 ± 6 (median 348.3), pass |
+| Control line | 312.3 km/h | 311.9 km/h | fastest 320.7 published |
+| MGU-K deployed from the store / harvested | 3.22 / 1.35 MJ | 3.21 / 1.27 MJ | ≤ 4 / ≤ 2 MJ per lap |
+| Track limits (four-wheel rule, tyre wholly past the line) | at most two wheels off | at most two wheels off, never four | rule: never all four wheels wholly beyond the edges |
+| Stability | sideslip ≤ 5.1°, no spin | sideslip ≤ 8.3°, no spin | |
+| Ten consecutive laps (34 kg start, getting lighter) | 85.921–86.314 s, spread 0.393 s | 84.675–85.040 s, spread 0.364 s, all clean | nightly soak: spread ≤ 0.5 s |
+
+**The legal corridor** (`packages/ai/src/line/limits.ts`). Track limits have one definition for
+planning and for judging: a wheel is off when its tyre is wholly past the white line (its centre
+more than a half tread, 0.18 m, beyond it, the game's own rule in `apps/web`), and a lap is
+invalid when all four are off at once. The lap runner counts wheels off by exactly that rule (it
+used to count a wheel off as soon as its centre crossed the line). The racing line's corridor is
+the set of car-centre offsets that keep that true with margin:
+
+- the rule's side: the innermost wheel, never further out than d − 0.78·cos 10° (narrower half
+  track, a 10° heading error allowed for), may reach the line plus a half tread, less a 0.3 m
+  allowance for the driver's tracking error;
+- the ground's side: the outer tyre's edge (wider half track 0.81 m plus 0.23 m) stays on ground
+  that carries it, less 0.2 m: the track, a kerb up to its crest (where its profile starts to drop
+  to the verge, or where a sausage starts; never over either), or asphalt run-off; grass and
+  gravel are forbidden;
+- and the track frame's own limit, as before.
+
+Inside it nothing is forbidden: the speed profile reads the surface grip under the wheels (kerb
+0.9, asphalt run-off 0.95, doc 4.4), so a kerb costs what its grip costs. Forbidding the flat
+kerbs outright (tried) made both the plan (84.40 s) and the driven lap (85.24 s) slower, so the
+kerbs stay usable. The old corridor kept every wheel centre 0.3 m inside the white line, the
+whole car on the track.
+
+**Driver changes** (`packages/ai/src/driver/reference.ts`, `feel.ts`; the car is unchanged by
+them, and the driver uses no assist):
+
+- Countersteer: beyond the sideslip it accepts (3.4°), the driver adds road-wheel angle toward
+  the slide, one radian per radian of extra sideslip, holds its yaw integrator, and comes off the
+  brake (12 per radian beyond the limit). Before, the wider line spun the car at the Parabolica
+  entry when the inside rear unloaded over the apex kerb under trail braking.
+- Corner entry: the lock threshold follows each tyre's combined slip. It shrinks to the friction
+  ellipse's longitudinal room (√(1 − s_y²) of the peak, s_y the slip angle as a share of its
+  peak), the light inside front's extra allowance fades out as it starts to turn, and a light rear
+  gets none (a rear that locks while unloaded over a kerb is still locked when its load returns).
+  The envelope rig uses the same feel, so the plan expects what the driver does.
+- Lock and wheelspin recovery: the pedal is eased at 150 (was 400) per second per unit of slip
+  past the threshold, so one lock spike at turn-in no longer drops the pedal to nothing (it did
+  at T1, overshooting by 15–20 km/h); throttle comes back at 10 per second after wheelspin (was
+  3), so a short spin on an exit kerb does not cost the whole exit.
+- Planning fractions: 98 % of the lateral and traction limits, 95 % of braking (were 97/95/97).
+  98/95/98 and 98/96/98 hold ten clean laps; 99/96/99 is slower (84.37 s) and 98/96/98 a hair
+  slower than 98/95/98. At 97/95/97 on this line the lap is 84.32 s.
 
 **Timing origin.** The track file's s = 0 is the OpenStreetMap start node, at the start line.
 The FIA circuit map [4] draws the start line and the control (timing) line apart on the main
@@ -700,121 +782,78 @@ timed from the control line every sector is slower.
 
 | Sector (from the control line) | Before | After | After, speed profile | Pole lap 2025 | Session best | After − pole |
 |---|---|---|---|---|---|---|
-| S1 (5472.5 → 1609.3 m, 1930 m) | 28.922 | 27.981 | 27.673 | 26.262 | 26.181 | +1.719 (+6.5 %) |
-| S2 (1609.3 → 3433.6 m, 1824 m) | 30.925 | 29.123 | 28.984 | 26.483 | 26.340 | +2.640 (+10.0 %) |
-| S3 (3433.6 → 5472.5 m, 2039 m) | 30.290 | 28.435 | 28.108 | 26.047 | 26.047 | +2.388 (+9.2 %) |
+| S1 (5472.5 → 1609.3 m, 1930 m) | 27.981 | 27.692 | 27.580 | 26.262 | 26.181 | +1.430 (+5.4 %) |
+| S2 (1609.3 → 3433.6 m, 1824 m) | 29.123 | 28.306 | 28.270 | 26.483 | 26.340 | +1.823 (+6.9 %) |
+| S3 (3433.6 → 5472.5 m, 2039 m) | 28.435 | 28.258 | 27.824 | 26.047 | 26.047 | +2.211 (+8.5 %) |
 
-| Corner | Min speed before | Min speed after | Speed profile after | Braking into it (after) | Reference minimum (2.6) |
-|---|---|---|---|---|---|
-| T1 Rettifilo | 63.0 | 69.2 | 68.9 | from 348 km/h, 180 m, 3.79 s to the minimum; 337→89 km/h takes 151 m, 2.77 s (published 129 m, 2.75 s) | 75–85, estimate |
-| T2 Rettifilo | 62.2 | 69.1 | 72.1 | 30 m | 75–85, estimate |
-| T3 Biassono | 163.8 | 177.6 | 184.3 | lift only | — |
-| T4 Roggia | 95.7 | 106.8 | 103.7 | from 333 km/h, 157 m, 2.90 s (published 107 m, 2.02 s, speeds not published) | 110–120, estimate |
-| T5 Roggia | 105.8 | 117.2 | 117.6 | 20 m | 115–125, estimate |
-| T6 Lesmo 1 | 141.7 | 157.2 | 157.9 | from 257 km/h, 119 m, 2.19 s | 175–190, estimate |
-| T7 Lesmo 2 | 139.1 | 156.1 | 156.2 | from 256 km/h, 110 m, 2.02 s | 177–184, practice [54] |
-| T8 Ascari entry | 139.7 | 158.7 | 158.4 | from 344 km/h, 161 m, 2.53 s | 176–190, practice [54][55] |
-| T9 Ascari | 157.7 | 178.8 | 177.5 | — | — |
-| T10 Ascari exit | 183.6 | 211.4 | 211.1 | — | — |
-| T11 Parabolica | 150.8 | 167.5 | 174.4 | from 336 km/h, 221 m, 3.65 s | 200–215, estimate |
-
-**What the line asks of the car.** Per corner: the line's tightest radius, the driven minimum
-speed, the lateral acceleration that speed implies on that radius, and the car's measured
-sustained lateral limit at that speed on flat ground at 1 g (the envelope; printed by
-`npm run telemetry -- lap`). Implied above the limit means grip the flat sweep does not show
-(banking, a compression, or a minimum speed and a minimum radius that do not coincide); below it,
-margin left at that corner on this line.
-
-| Corner | Line min radius (m) | Driven min speed (km/h) | Implied lateral (g) | Measured flat limit at that speed (g) |
-|---|---|---|---|---|
-| T1 Rettifilo | 18.7 | 69.2 | 2.01 | 2.03 |
-| T2 Rettifilo | 20.7 | 69.1 | 1.82 | 2.03 |
-| T3 Biassono | 278.7 | 177.6 | 0.89 | 2.93 |
-| T4 Roggia | 38.5 | 106.8 | 2.33 | 2.31 |
-| T5 Roggia | 46.3 | 117.2 | 2.33 | 2.39 |
-| T6 Lesmo 1 | 74.1 | 157.2 | 2.63 | 2.73 |
-| T7 Lesmo 2 | 67.2 | 156.1 | 2.85 | 2.72 |
-| T8 Ascari entry | 70.9 | 158.7 | 2.79 | 2.75 |
-| T9 Ascari | 101.0 | 178.8 | 2.49 | 2.95 |
-| T10 Ascari exit | 106.5 | 211.4 | 3.30 | 3.31 |
-| T11 Parabolica | 79.2 | 167.5 | 2.79 | 2.83 |
-
-**Reference speeds on this line.** The same radii against the reference minimum speeds of
-section 2.6: the lateral acceleration each reference speed would need on this line's radius, the
-calibrated car's flat limit at that speed, and the radius a car would need at that speed at its
-limit and at 3.5 g (the top of what cars of this class pull in these corners, by the estimate
-this task started from):
-
-| Corner | Line radius (m) | Reference speed (km/h) | Needed on this radius (g) | Car's limit at that speed (g) | Radius at the car's limit (m) | Radius at 3.5 g (m) |
+| Corner | Line min radius before → after (m) | Min speed before → after (km/h) | Speed profile after | Implied lateral after (g) | Car's flat limit there (g) | Reference minimum (2.6) |
 |---|---|---|---|---|---|---|
-| T1 | 18.7 | 75–85 | 2.37–3.04 | 2.08–2.15 | 21–26 | 13–16 |
-| T4 | 38.5 | 110–120 | 2.47–2.94 | 2.33–2.41 | 41–47 | 27–32 |
-| T6 Lesmo 1 | 74.1 | 175–190 | 3.25–3.83 | 2.91–3.06 | 83–93 | 69–81 |
-| T7 Lesmo 2 | 67.2 | 177–184 (practice) | 3.67–3.96 | 2.93–3.00 | 84–89 | 70–76 |
-| T8 Ascari | 70.9 | 176–190 (practice) | 3.44–4.01 | 2.92–3.06 | 84–93 | 70–81 |
-| T11 Parabolica | 79.2 | 200–215 | 3.97–4.59 | 3.17–3.35 | 99–109 | 90–104 |
+| T1 Rettifilo | 18.7 → 19.0 | 69.2 → 83.7 | 69.8 | 2.90 | 2.14 | 75–85, estimate |
+| T2 Rettifilo | 20.7 → 21.2 | 69.1 → 66.3 | 73.2 | 1.63 | 2.01 | 75–85, estimate |
+| T3 Biassono | 278.7 → 264.1 | 177.6 → 174.7 | 181.7 | 0.91 | 2.90 | — |
+| T4 Roggia | 38.5 → 45.2 | 106.8 → 123.7 | 113.9 | 2.67 | 2.44 | 110–120, estimate |
+| T5 Roggia | 46.3 → 52.1 | 117.2 → 127.4 | 126.8 | 2.46 | 2.47 | 115–125, estimate |
+| T6 Lesmo 1 | 74.1 → 77.0 | 157.2 → 162.8 | 164.8 | 2.71 | 2.79 | 175–190, estimate |
+| T7 Lesmo 2 | 67.2 → 78.2 | 156.1 → 170.7 | 170.9 | 2.93 | 2.86 | 177–184, practice [54] |
+| T8 Ascari entry | 70.9 → 78.5 | 158.7 → 170.0 | 167.8 | 2.90 | 2.86 | 176–190, practice [54][55] |
+| T9 Ascari | 101.0 → 99.5 | 178.8 → 182.6 | 181.2 | 2.64 | 2.98 | — |
+| T10 Ascari exit | 106.5 → 118.1 | 211.4 → 209.1 | 220.6 | 2.91 | 3.28 | — |
+| T11 Parabolica | 79.2 → 82.8 | 167.5 → 170.0 | 174.5 | 2.75 | 2.86 | 200–215, estimate |
 
-This does not show that the track is too tight: the line's radii are set by the corridor the
-reference line is allowed, and that corridor is narrower than the rules. It keeps every wheel
-centre 0.3 m inside the white line, so the whole 2.0 m car stays inside the track, while the
-track-limit rule (the real one, and this game's) only invalidates a lap when all four wheels are
-beyond the line. Letting the car's centre go to 0.76 m past the line (the inner wheels then just
-inside it), with the car and centreline unchanged and the line rebuilt, opens Lesmo 2 from
-67.3 to 82.0 m and Ascari from 70.9 to 90.0 m, raises their planned minima from 156 and 158 to
-177 and 184 km/h (inside the practice figures), and takes the planned lap from 84.759 to
-83.806 s; the reference driver spins on that line. Radii in the slow chicanes barely move (T1
-18.7 → 19.7 m), and there the car itself is short of the reference speeds (2.1–2.4 g against up
-to 3.0 g needed). Whether the centreline and authored widths are also tight can only be judged
-once the line uses the corridor the rules allow; nothing in `packages/track/data/monza.json` is
-changed here. Using that corridor, and making the driven lap hold on it, is the next task.
+Implied above the flat limit means the minimum speed and the minimum radius do not coincide (at
+T1 the car runs in too fast and wide of the line's apex, below) or the ground helps.
 
-Plots: `docs/evidence/m1-ai/monza-low-line.png` (the line over the plan, speed as colour),
-close-ups `monza-low-line-t*.png`, and `monza-low-speed.png` (target speed along the lap with the
-driven lap over it), from the first version of the car (`npm run ai:plot` redraws them).
+**Reference speeds on the legal line.** The reference speeds of section 2.6 on this line's radii,
+the lateral acceleration they need, the car's flat limit at those speeds, and the radius the car
+would need at its limit:
 
-**Where the 6.7 s go.** What is measured, and what is not separated:
+| Corner | Line radius (m) | Reference speed (km/h) | Needed on this radius (g) | Car's limit at that speed (g) | Radius at the car's limit (m) |
+|---|---|---|---|---|---|
+| T1 | 19.0 | 75–85 | 2.33–2.99 | 2.08–2.15 | 21–26 |
+| T4 | 45.2 | 110–120 | 2.11–2.51 | 2.33–2.41 | 41–47 |
+| T6 Lesmo 1 | 77.0 | 175–190 | 3.13–3.69 | 2.91–3.06 | 83–93 |
+| T7 Lesmo 2 | 78.2 | 177–184 (practice) | 3.15–3.41 | 2.93–3.00 | 84–89 |
+| T8 Ascari | 78.5 | 176–190 (practice) | 3.10–3.62 | 2.92–3.06 | 84–93 |
+| T11 Parabolica | 82.8 | 200–215 | 3.80–4.39 | 3.17–3.35 | 99–109 |
 
-1. *Driving* (0.78 s): the driven lap (85.539 s) against the driver's own speed profile on the
-   same line (84.764 s): 0.31 s in S1, 0.14 s in S2 and 0.33 s in S3. Most of S3's is the
-   Parabolica, which the driver takes 7 km/h under its plan (167.5 against 174.4 km/h): braking
-   in from 336 km/h while turning, the lightly loaded inside front locks first under the fixed
-   57 % bias and the driver eases the pedal and runs wide.
-2. *Planning margin* (0.98 s): the driver plans with 97 % of the lateral and traction limits and
-   95 % of the braking limit; at the full measured envelope the profile on the same line is
-   83.781 s.
-3. *Corridor and kerbs* (in the plan): at the full envelope the re-optimised reference line is
-   83.803 s; with no margin 83.542 s (0.26 s); with the kerbs allowed as well (flat 1.0 m, exit
-   1.5 m, chicane 1.0 m) 82.953 s (another 0.59 s). At the driver's 97 % / 95 %, the corridor
-   the rules allow (above) is worth 0.95 s by itself. None of these is driven cleanly yet.
-4. *Residual*: car and track geometry together, not separated, until the line uses the corridor
-   the rules allow.
+With the corridor the rule allows, the medium-speed corners open up (Lesmo 2 67 → 78 m, Ascari
+71 → 79 m) and the Roggia chicane is now taken faster than its reference. What is left at Lesmo
+2 and Ascari is the car: at the published practice speeds this line needs 3.1–3.6 g, and the car
+manages 2.9–3.06 g there, 5–15 % short; no track-geometry error is needed to explain it. At the
+Parabolica the reference speed is an estimate and the shortfall larger. The slow chicanes (T1,
+T2) are where the driver loses most against its own plan (below), not the car.
 
-*Sensitivities* (driven lap, committed line unless noted): low-trim ClA at the top of its range
-(4.2 m²) 84.257 s; μy at the top of its range (2.2) 85.088 s; both 83.784 s, and 83.847 s with
-the line rebuilt for that car (full-envelope plan 82.172 s). Inside the documented ranges and on
-this corridor the M1 band is not reachable, and nothing here forces it.
+Plots: `docs/evidence/m1-ai/monza-low-line.png` and the related close-ups are from the first
+version of the car and line (`npm run ai:plot` redraws them); `docs/evidence/m1-lap-band/` has
+the kerb-crossing traces.
 
-**Kerbs, an open question.** The reference line keeps off the kerbs because in this model a
-kerb unsettles the car at the limit. Two different things were run together in the earlier
-explanation: across the kerb the profile rises 35 mm over its first 0.12 m (the transverse
-section the wheel climbs when it runs onto the kerb sideways), while along the kerb its ends
-taper in over 3–4 m. The vertical tyre model applies its 7 kN·s/m damping directly to the rate of
-the point-sampled ground height, with no envelopment over the contact patch, so a wheel crossing
-the transverse rise at 5 m/s of lateral speed sees a 1.46 m/s ground rate and about 10 kN of
-damping force on top of the spring. That can exaggerate what a kerb does to the car. It has not
-been measured against anything, and it is not changed here.
+**Where the 5.5 s go.** Against the pole lap (78.792 s):
+
+| Item | s | How measured |
+|---|---|---|
+| Driving | 0.58 | Driven lap 84.257 s against the driver's own profile on the same line 83.674 s: 0.11 s in S1, 0.04 s in S2, 0.43 s in S3. The biggest single losses: T1, where a lock at turn-in still costs pedal and the car runs in at 84 km/h against a planned 70 and loses the T2 exit (66 against 73 km/h); the Ascari exit (209 against 221 km/h), where the inside rear goes light over the apex kerb under power; the Parabolica (170 against 175 km/h). |
+| Planning margin | 0.70 | The driver plans at 98/95/98 % of the measured envelope; the full-envelope profile on the same line is 82.979 s. Higher fractions are slower (99/96/99: 84.37 s). |
+| Car and track as modelled | 4.19 | The full-envelope profile on the legal line, 82.979 s, against the pole lap. This is what a driver at exactly the measured limits of this car, on this track's centreline and widths, under the four-wheel rule and on usable surfaces only, would do. It is not split further: the corner table above puts the medium and fast corners on the car's lateral grip at 150–215 km/h (5–15 % short of the practice speeds at Lesmo 2 and Ascari), and the straights are right (trap in band). DRS on the main straight opening about 320 m late (track file) is in here too. |
+
+Even a perfect driver at 100 % of the measured envelope would be 0.25 s outside the M1 band on
+this line, so the band is not reachable by driving: it needs the car (lateral grip at 150–215
+km/h, the gap section 5 records for Pouhon points the same way) or evidence that the modelled
+track is tighter than the real one beyond what the corridor already gives. Nothing here forces
+it. The M4 band is 3.10 s away.
+
+**Kerbs and the player.** The contact patch is what a player feels too: a kerb strike now loads
+a wheel about half as hard (flat kerb at 200 km/h and 5 m/s across: peak carcass damping 7.9 →
+3.0 kN, no plank strike), and an exit kerb at 250 km/h no longer lifts a wheel. The game's kerb
+rumble is unaffected: it comes from the surface's roughness and kind, which the game samples
+itself (`apps/web/src/game/session.ts`); the sim's surface samples keep both.
 
 **Envelope.** Measured by driving the vehicle model (`packages/ai/src/envelope/measure.ts`, 1094 s
-of driving, about 1 s of wall time), cached in `packages/ai/data/monza-low.envelope.json`:
-constant-speed lateral sweeps at 60–340 km/h, threshold stops from above top speed, and
-full-throttle runs with wheelspin held at the tyre's peak, DRS closed and open, MGU-K on and off,
-each at 0.8, 1.0 and 1.2 g of normal load (gravity scaled: what a crest or compression does), and
-braking in a held turn for the shape of the combined limit (exponent 1.65, from 1.80). It agrees
-with the physics suite's own manoeuvres (lateral at 200 km/h within 2 %, top speed within
-1 km/h; both asserted). At load 1, in g: lateral 1.97 / 2.26 / 2.58 / 2.96 / 3.41 / 3.94 / 4.55 at
-60 / 100 / 140 / 180 / 220 / 260 / 300 km/h; braking (tyres alone) 1.42 / 1.67 / 2.04 / 2.58 /
-3.05 / 3.59 / 4.12 at the same speeds; traction 1.16 / 1.24 / 1.42 / 1.69 / 2.02 at 60–220 km/h;
-top speed 344.0 km/h with DRS closed and 353.6 km/h open.
+of driving, about 1–2 s of wall time), cached in `packages/ai/data/monza-low.envelope.json`:
+constant-speed lateral sweeps at 60–340 km/h, threshold stops from above top speed (with the
+driver's combined-slip lock feel), and full-throttle runs with wheelspin held at the tyre's peak,
+DRS closed and open, MGU-K on and off, each at 0.8, 1.0 and 1.2 g of normal load, and braking in
+a held turn for the shape of the combined limit (exponent 1.62). It agrees with the physics
+suite's own manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both asserted).
 
 **What flatters the car in this measurement**
 
@@ -825,12 +864,10 @@ top speed 344.0 km/h with DRS closed and 353.6 km/h open.
 
 **What handicaps it**
 
-- The line keeps the whole car 0.3 m inside the white lines, where the rule allows the car's
-  centre well past them, and keeps off the kerbs (above).
-- DRS on the main straight opens about 320 m later than the map allows (track file, above).
 - The fixed 57 % brake bias and no ABS: braking while turning in, the lightly loaded inside front
-  locks first, and the driver eases the pedal to keep it turning (the Parabolica, above). A real
-  driver adjusts bias per corner.
-- No downforce gain from the tow, and the driver never uses more than 97 % of the envelope.
+  locks first (T1, the Parabolica). A real driver adjusts bias per corner; no source was found for
+  how the real cars' brake migration is set, so the bias stays fixed.
+- DRS on the main straight opens about 320 m later than the map allows (track file, above).
+- No downforce gain from the tow, and the driver never uses more than 98 % of the envelope.
 - The racing line is computed on the OpenStreetMap-derived centreline and authored widths
-  (track-data.md); local width or curvature errors there show up as line choices.
+  (track-data.md), and the authored run-off kinds decide where the corridor may use run-off.

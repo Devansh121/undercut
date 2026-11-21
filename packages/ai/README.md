@@ -8,7 +8,9 @@ player drives; drivers follow them and produce only a `ControlInput`. No speed o
 1. **Envelope** (`src/envelope/`): drive the car through quasi-steady manoeuvres on flat ground
    (lateral sweeps, threshold stops, full-throttle runs, braking in a turn; at 0.8, 1 and 1.2 g of
    normal load) and tabulate what it can do against speed. About 1 s.
-2. **Line** (`src/line/`): the track corridor (white lines, half track, margin, optional kerb use),
+2. **Line** (`src/line/`): the corridor (the legal one of `limits.ts`: the four-wheel track-limit
+   rule with the car's footprint and allowances, tyres only on track, kerbs up to their crest and
+   asphalt run-off; or the older fixed-margin one),
    the minimum-curvature line (a box-constrained QP on a cyclic pentadiagonal Hessian, a few
    Gauss–Newton steps), then lap-time refinement with smooth C² bumps and the speed profile in the
    loop. About 14 s.
