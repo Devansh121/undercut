@@ -59,6 +59,22 @@ export {
 } from './state';
 export { FL, FR, RL, RR, createCarModel, type CarModel } from './model';
 export {
+  CAR_FRICTION,
+  CAR_HALF_WIDTH,
+  CAR_NOSE,
+  CAR_RESTITUTION,
+  CAR_TAIL,
+  CONTACT_PASSES,
+  CONTACT_SLOP,
+  carFootprint,
+  carOverlap,
+  createCarContacts,
+  resolveCarContacts,
+  type CarContacts,
+  type CarFootprint,
+  type ContactBody,
+} from './car-contact';
+export {
   PATCH_ACROSS,
   PATCH_ALONG,
   PATCH_HINTS,
