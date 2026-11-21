@@ -44,7 +44,7 @@ const catalog = await (await fetch('/packages/render/data/props.catalog.json')).
 window.catalog = catalog;
 let active = [];
 const at = new T.Vector3();
-function frame(prop, angle, aspect) {
+function frame(prop, angle, aspect, elevation = 0.48) {
   const b = prop.bounds;
   at.set((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
   const size = b.max.map((v, i) => v - b.min[i]);
@@ -56,7 +56,9 @@ function frame(prop, angle, aspect) {
   camera.position
     .copy(at)
     .add(
-      new T.Vector3(Math.cos(angle), 0.48, Math.sin(angle)).normalize().multiplyScalar(distance),
+      new T.Vector3(Math.cos(angle), elevation, Math.sin(angle))
+        .normalize()
+        .multiplyScalar(distance),
     );
   camera.lookAt(at);
   camera.updateProjectionMatrix();
@@ -101,6 +103,16 @@ window.inspect = async (id, mode) => {
         frame(prop, Math.PI / 4 + (col * Math.PI) / 2, 0.8);
         renderer.render(scene, camera);
       }
+  } else if (mode === 'close') {
+    // High LOD only, front three-quarter and back three-quarter, near eye height.
+    active[0].visible = true;
+    active[1].visible = false;
+    for (let col = 0; col < 2; col++) {
+      renderer.setViewport(col * 800, 0, 800, 1000);
+      renderer.setScissor(col * 800, 0, 800, 1000);
+      frame(prop, -Math.PI / 5 + col * Math.PI, 0.8, 0.18);
+      renderer.render(scene, camera);
+    }
   } else {
     active[0].visible = true;
     active[1].visible = false;
