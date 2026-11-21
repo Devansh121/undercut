@@ -108,7 +108,33 @@ describe('power unit', () => {
     run(car, input({ throttle: 1 }), 1);
     expect(radToRpm(car.engineSpeed)).toBeLessThan(12400);
     expect(radToRpm(car.engineSpeed)).toBeGreaterThan(10500);
-    expect(50 - car.fuelMass).toBeCloseTo(100 / 3600, 3);
+    // Never above the regulated 100 kg/h, and within 0.1 % of it at full load.
+    const burnt = 50 - car.fuelMass;
+    expect(burnt).toBeLessThanOrEqual(100 / 3600 + 1e-12);
+    expect(burnt).toBeGreaterThan((100 / 3600) * 0.999);
+  });
+
+  it('never burns more than the regulated flow at any engine speed', () => {
+    for (const [speed, gear] of [
+      [30, 3],
+      [45, 4],
+      [55, 5],
+    ] as const) {
+      const car = createCarState(REFERENCE_CAR, { speed, gear, fuel: 50 });
+      let previous = car.fuelMass;
+      for (let i = 0; i < 240; i++) {
+        stepCar(car, input({ throttle: 1 }), FLAT_SURFACE, DT, env);
+        const limit = fuelFlow(REFERENCE_CAR.engine, radToRpm(car.engineSpeed) + 200);
+        expect((previous - car.fuelMass) / DT).toBeLessThanOrEqual(limit + 1e-12);
+        previous = car.fuelMass;
+      }
+    }
+  });
+
+  it('burns only idle fuel at rest with the throttle closed', () => {
+    const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+    run(car, input(), 10);
+    expect(50 - car.fuelMass).toBeCloseTo(REFERENCE_CAR.engine.idleFlow * 10, 9);
   });
 
   it('shifts up in the doc shift time and refuses an over-revving downshift', () => {

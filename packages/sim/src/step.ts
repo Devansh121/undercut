@@ -415,9 +415,11 @@ function stepPowertrain(s: CarState, throttle: number, brake: number, h: number)
   if (s.fuelMass <= 0 && te > 0) te = 0;
   const icePower = te > 0 ? te * we : 0;
 
-  // Fuel at the regulated flow for the power produced.
+  // Fuel: idle consumption blended into the demand, never above the regulated flow.
   if (s.fuelMass > 0) {
-    const burn = thr * fuelFlow(eng, N) + eng.idleFlow;
+    const limit = fuelFlow(eng, N);
+    const demand = eng.idleFlow + thr * (limit - eng.idleFlow);
+    const burn = demand < limit ? demand : limit;
     s.fuelMass = Math.max(0, s.fuelMass - burn * h);
   }
 
