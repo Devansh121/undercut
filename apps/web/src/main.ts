@@ -64,6 +64,7 @@ function showLaunch(): void {
   launch = mountLaunchScreen(app as HTMLElement, {
     buildHash: __BUILD_HASH__,
     record: null,
+    controls: { bindings: () => input.profile.bindings, device: () => input.activeDevice },
     onStart: () => {
       // The Start click is the gesture that may start audio.
       audio.gesture();
@@ -82,6 +83,7 @@ function showLaunch(): void {
       // A focused button already clicks on Enter; gamepads need the accept passed on.
       const native = f.device === 'keyboard' && document.activeElement?.tagName === 'BUTTON';
       if (e.type === 'action' && e.action === 'menuAccept' && !native) launch?.start();
+      if (e.type === 'action' && e.action === 'menuBack' && f.device !== 'keyboard') launch?.back();
     }
     menuHandle = requestAnimationFrame(poll);
   };

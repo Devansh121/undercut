@@ -40,6 +40,7 @@ import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
 import { Hud, type HudMessage, type HudState } from './ui/hud';
+import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 
@@ -255,6 +256,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
+    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
   );
   o.host.replaceChildren(hud.root, results.root, pause.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
@@ -286,7 +288,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message = m;
     messageLeft = seconds;
   };
-  if (!records.persistent)
+  if (takeFirstStartHint())
+    say(
+      {
+        tag: 'Controls',
+        text: controlsHint(input.profile.bindings, input.activeDevice),
+        tone: 'info',
+      },
+      6,
+    );
+  else if (!records.persistent)
     say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
@@ -414,8 +425,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const f = input.sample(dt, 0);
       for (const e of f.events) {
         if (e.type !== 'action') continue;
+        if (pause.navigate(e.action)) continue;
         if (e.action === 'pause' || e.action === 'menuBack') resume();
-        else pause.navigate(e.action);
       }
       lookBack = false;
     }
