@@ -50,7 +50,9 @@ describe('leaving, reconnecting and host migration', () => {
     await joined(a, b);
     b.client.leave();
     await until('one member', () => a.client.room?.members.length === 1);
-    expect(b.client.status).toBe('closed');
+    // The room tells the others before the leaver's own socket has finished closing.
+    await until('b closed', () => b.client.status === 'closed');
+    expect(b.last('closed')).toMatchObject({ code: 4000 });
     const c = later(new Recorder(code, 'Cy'));
     await joined(c);
     expect(c.client.seat).toBe(1);
