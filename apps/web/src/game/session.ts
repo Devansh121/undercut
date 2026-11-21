@@ -46,6 +46,10 @@ import type { CircuitRecord, RecordUpdate } from './records';
 
 export type { WheelsOffCounter } from '@undercut/race';
 
+/** A spin: sideslip past this, rad; over once back under `SPIN_OVER`. */
+const SPIN_SIDESLIP = (30 * Math.PI) / 180;
+const SPIN_OVER = (10 * Math.PI) / 180;
+
 /** Sim step: 240 Hz (ADR 0007). */
 export const SIM_STEP = 1 / 240;
 /** Time-trial fuel load, kg: a light qualifying-style load, topped up at every line crossing. */
@@ -124,6 +128,8 @@ export class DriveSession {
   private readonly poseLimits: InvariantLimits;
   private safetyResetsValue = 0;
   private wallHitsValue = 0;
+  private spinsValue = 0;
+  private spinning = false;
 
   constructor(options: DriveSessionOptions) {
     this.track = options.track;
@@ -177,6 +183,14 @@ export class DriveSession {
   /** Steps on which the car struck a barrier (moving into it) since the session began. */
   get wallHits(): number {
     return this.wallHitsValue;
+  }
+
+  /**
+   * Spins since the session began: body sideslip past 30° above 8 m/s, counted once until
+   * the car is pointing along its path again (under 10°).
+   */
+  get spins(): number {
+    return this.spinsValue;
   }
 
   /** The player's input for this tick, with the device's assists, written into the car. */
@@ -335,6 +349,7 @@ export class DriveSession {
       return events;
     }
     if (this.car.state.wallImpactSpeed > 0) this.wallHitsValue++;
+    this.countSpin();
     if (this.timer.running && this.recorder.recording) {
       this.recorder.sample(
         this.timer.currentLapTime(this.world.time),
@@ -343,6 +358,15 @@ export class DriveSession {
       );
     }
     return events;
+  }
+
+  private countSpin(): void {
+    const st = this.car.state;
+    const beta = Math.abs(Math.atan2(st.vy, Math.max(Math.abs(st.vx), 1)));
+    if (!this.spinning && beta > SPIN_SIDESLIP && Math.hypot(st.vx, st.vy) > 8) {
+      this.spinning = true;
+      this.spinsValue++;
+    } else if (this.spinning && beta < SPIN_OVER) this.spinning = false;
   }
 
   /**

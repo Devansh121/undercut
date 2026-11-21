@@ -55,6 +55,7 @@ import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
   InputControlSource,
+  CLUMSY_PILOT,
   KeyboardAutopilot,
   ScriptedControlSource,
 } from './game/autopilot';
@@ -199,6 +200,8 @@ export interface DriveHandle {
   /** Hold a scripted ControlInput (null: back to the player's devices). */
   drive(control: Partial<ControlInput> | null): void;
   autopilot(on: boolean): void;
+  /** The clumsy keyboard autopilot with mistakes from `seed` (drivability tests). */
+  clumsyPilot(seed: number): void;
   events(): SessionEvent[];
   hudText(): Record<string, string>;
   quit(): void;
@@ -831,11 +834,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     o.onQuit();
   }
 
-  let source: 'human' | 'script' | 'pilot' = 'human';
+  let source: 'human' | 'script' | 'pilot' | 'clumsy' = 'human';
+  let clumsy: AutopilotControlSource | null = null;
   const setSource = (next: typeof source): void => {
     if (source === 'pilot' && next !== 'pilot') pilot.release();
+    if (source === 'clumsy' && next !== 'clumsy') clumsy?.release();
     source = next;
-    loop.setSource(next === 'human' ? human : next === 'script' ? scripted : pilot);
+    loop.setSource(
+      next === 'human'
+        ? human
+        : next === 'script'
+          ? scripted
+          : next === 'clumsy' && clumsy
+            ? clumsy
+            : pilot,
+    );
   };
 
   return {
@@ -886,6 +899,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       }
     },
     autopilot: (on) => setSource(on ? 'pilot' : 'human'),
+    clumsyPilot: (seed) => {
+      if (source === 'clumsy') setSource('human');
+      clumsy = new AutopilotControlSource(
+        input,
+        new KeyboardAutopilot(track, params, { ...CLUMSY_PILOT, clumsy: { seed } }),
+        () => session.car.state,
+      );
+      setSource('clumsy');
+    },
     events: () => log.slice(),
     hudText: () => {
       const q = (id: string): string =>

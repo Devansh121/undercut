@@ -7,6 +7,8 @@ interface UndercutDebugApi {
   setTimeScale(scale: number): void;
   drive(control: Record<string, number | boolean> | null): void;
   autopilot(on: boolean): void;
+  /** The keyboard autopilot as a clumsy player, mistakes seeded. */
+  clumsyPilot(seed: number): void;
   camera(name?: string): string;
   pause(): void;
   resume(): void;

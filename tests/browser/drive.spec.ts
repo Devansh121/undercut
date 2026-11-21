@@ -459,7 +459,7 @@ test.describe('drive', () => {
     await page.keyboard.press('Escape');
     const menu = page.locator('[data-testid=pause-menu]');
     await expect(menu).toBeVisible();
-    for (const id of ['tc', 'abs', 'stability', 'gears', 'steering']) {
+    for (const id of ['tc', 'abs', 'stability', 'braking', 'gears', 'steering']) {
       const row = menu.locator(`[data-setting=${id}]`);
       await expect(row).toBeVisible();
       await expect(row.locator('.pause__help')).not.toBeEmpty();
@@ -474,36 +474,27 @@ test.describe('drive', () => {
     expect(problems).toEqual([]);
   });
 
-  test('completes a keyboard lap without spinning on the default assists', async ({
+  test('a clumsy keyboard lap on the default assists completes without a spin', async ({
     drive: { page, problems },
   }) => {
+    // The keyboard autopilot as a clumsy player (late and early braking, flooring the throttle
+    // before the exits, slow feet), through the real key events, shaping and assists. The same
+    // seed spins with the stability assist off (apps/web/test/clumsy-lap.test.ts).
+    const before = (await state(page)).spins as number;
     await page.evaluate(() => {
-      const u = window.__undercut;
-      u?.teleport(5400, 0, 250);
-      u?.autopilot(true);
-      u?.setTimeScale(8);
+      window.__undercut?.clumsyPilot(3);
+      window.__undercut?.setTimeScale(8);
     });
-    let maxRearSlipDeg = 0;
     let lastLap: number | null = null;
-    const deadline = Date.now() + 50_000;
-    while (Date.now() < deadline) {
-      const sample = await page.evaluate(() => {
-        const st = window.__undercut?.state() as { lastLap?: number | null };
-        const tel = window.__undercut?.telemetry() as { speed: number; slipAngle: number[] };
-        const rear = Math.max(Math.abs(tel.slipAngle[2] ?? 0), Math.abs(tel.slipAngle[3] ?? 0));
-        return { lastLap: st.lastLap ?? null, speed: tel.speed, rearDeg: (rear * 180) / Math.PI };
-      });
-      if (sample.speed > 8) maxRearSlipDeg = Math.max(maxRearSlipDeg, sample.rearDeg);
-      if (sample.lastLap !== null) {
-        lastLap = sample.lastLap;
-        break;
-      }
-      await page.waitForTimeout(100);
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline && lastLap === null) {
+      lastLap = ((await state(page)).lastLap as number | null | undefined) ?? null;
+      if (lastLap === null) await page.waitForTimeout(200);
     }
+    const after = await state(page);
     expect(lastLap).not.toBeNull();
-    expect(lastLap as number).toBeGreaterThan(84);
-    expect(lastLap as number).toBeLessThan(140);
-    expect(maxRearSlipDeg).toBeLessThan(30);
+    expect((after.spins as number) - before).toBe(0);
+    expect(after.safetyResets).toBe(0);
     expect(problems).toEqual([]);
   });
 });
