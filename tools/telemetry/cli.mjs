@@ -115,7 +115,7 @@ async function lap(options) {
   if (result.spun) console.log('The car spun; no lap completed.');
   const summary = { circuit: setup.id, trim: setup.trim, fuel, laps: [], traces: [] };
   result.laps.forEach((l, k) => {
-    const report = ai.monzaLapReport(l, plan);
+    const report = ai.monzaLapReport(l, plan, setup.controlLine);
     console.log(`\nLap ${k + 1}\n${ai.formatLapReport(report)}`);
     summary.laps.push(report);
   });

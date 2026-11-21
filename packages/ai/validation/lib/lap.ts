@@ -73,7 +73,16 @@ export interface LapRunOptions {
   fuel: number;
   /** Number of timed laps after the lead-in. */
   laps: number;
-  /** Lead-in before the timing line, m of centreline (flying start, on the main straight). Default 400. */
+  /**
+   * Centreline s of the timing (control) line that laps, sectors and the ERS lap are measured
+   * from. Default 0, the track's s origin. A circuit's control line need not be at s = 0: see
+   * `CircuitSetup.controlLine`.
+   */
+  timingLine?: number;
+  /**
+   * Run-up before the timing line, m of centreline. Default: a full out-lap (`defaultLeadIn`),
+   * so the timed lap begins with the car's own exit from the last corner.
+   */
   leadIn?: number;
   /** Record a trace row every `recordEvery` ticks (0 = none). */
   recordEvery?: number;
@@ -104,8 +113,10 @@ export interface CornerRecord {
 export interface LapRecord {
   time: number;
   sectors: number[];
-  /** Speed at the speed trap and at the timing line, km/h. */
+  /** Speed at the speed trap, km/h. */
   trap: number;
+  /** Speed crossing the timing line at the start and at the end of this lap, km/h. */
+  start: number;
   finish: number;
   maxSpeed: number;
   corners: CornerRecord[];
@@ -171,7 +182,8 @@ class WheelLimits {
  * A flying lap (or several): the car is built exactly as the game builds it (`createWorld`
  * with the track's surface, `addCar` with the trim's parameters) and placed on the racing line
  * `leadIn` metres before the timing line at the plan's speed. The driver's input is the only
- * thing that reaches the car. Timing crossings are interpolated between ticks.
+ * thing that reaches the car. Timing crossings are interpolated between ticks; laps, sectors and
+ * the ERS lap run from `timingLine`.
  */
 export function runLaps(o: LapRunOptions): LapRunResult {
   const track = o.track;
@@ -184,8 +196,9 @@ export function runLaps(o: LapRunOptions): LapRunResult {
     surface,
     environment: { airDensity: o.airDensity },
   });
-  const leadIn = o.leadIn ?? 400;
-  const s0 = track.wrap(-leadIn);
+  const timing = track.wrap(o.timingLine ?? 0);
+  const leadIn = o.leadIn ?? defaultLeadIn(track, timing);
+  const s0 = track.wrap(timing - leadIn);
   const n = plan.line.count;
   const i0 = Math.round(s0 / track.lap.step) % n;
   const car = addCar(world, params, {
@@ -238,6 +251,7 @@ export function runLaps(o: LapRunOptions): LapRunResult {
       time: 0,
       sectors: [],
       trap: 0,
+      start: 0,
       finish: 0,
       maxSpeed: 0,
       corners: [],
@@ -280,22 +294,24 @@ export function runLaps(o: LapRunOptions): LapRunResult {
     };
 
     // Timing line.
-    if (track.crossed(prevS, s, 0)) {
-      const tc = interp(0);
+    if (track.crossed(prevS, s, timing)) {
+      const tc = interp(timing);
+      const vc = interpV(timing);
       if (lapIndex >= 0) {
         sectors.push(tc - sectorStart);
+        cur.finish = vc;
         cur.time = tc - lapStart;
         cur.sectors = sectors;
         cur.deployMJ = (st.ersDeployLap - deploy0) / 1e6;
         cur.harvestMJ = (st.ersHarvestLap - harvest0) / 1e6;
         cur.fuelUsed = fuel0 - st.fuelMass;
         cur.rmsLateralError = Math.sqrt(errSq / Math.max(errN, 1));
-        cur.corners = cornerRecords(track, rs, rv, rt, rb, o.stops ?? {});
+        cur.corners = cornerRecords(track, timing, rs, rv, rt, rb, o.stops ?? {});
         laps.push(cur);
       }
       lapIndex++;
       cur = newLap();
-      cur.finish = interpV(0);
+      cur.start = vc;
       lapStart = tc;
       sectorStart = tc;
       sectors = [];
@@ -331,7 +347,8 @@ export function runLaps(o: LapRunOptions): LapRunResult {
         errSq += e * e;
         errN++;
       }
-      rs.push(s);
+      // s unwrapped from the timing line, so a lap's record never jumps back at s = 0.
+      rs.push(timing + track.forwardDistance(timing, s));
       rv.push(v * 3.6);
       rt.push(t);
       rb.push(st.brakeApplied);
@@ -397,18 +414,24 @@ export function runLaps(o: LapRunOptions): LapRunResult {
  */
 function cornerRecords(
   track: Track,
+  origin: number,
   rs: readonly number[],
   rv: readonly number[],
   rt: readonly number[],
   rb: readonly number[],
   stops: Readonly<Record<number, readonly [number, number]>>,
 ): CornerRecord[] {
+  const unwrap = (x: number): number => origin + track.forwardDistance(origin, x);
   return track.corners.map((c, ci) => {
+    const start = unwrap(c.start);
+    const end = start + track.forwardDistance(c.start, c.end);
     // Never walk back past the previous corner: its braking is its own.
-    const floor = ci > 0 ? track.corners[ci - 1]!.end : -Infinity;
+    const prev = ci > 0 ? track.corners[ci - 1]! : track.corners[track.corners.length - 1]!;
+    const prevEnd = unwrap(prev.end);
+    const floor = prevEnd < start ? prevEnd : -Infinity;
     let mi = -1;
     for (let k = 0; k < rs.length; k++) {
-      if (rs[k]! >= c.start && rs[k]! <= c.end && (mi < 0 || rv[k]! < rv[mi]!)) mi = k;
+      if (rs[k]! >= start && rs[k]! <= end && (mi < 0 || rv[k]! < rv[mi]!)) mi = k;
     }
     const rec: CornerRecord = {
       number: c.number,
@@ -455,4 +478,21 @@ function cornerRecords(
     }
     return rec;
   });
+}
+
+/**
+ * Default run-up: one full out-lap from the timing line (moved past the end of a corner if the
+ * line lies in one), so the timed lap starts from the car's own exit of the last corner with the
+ * energy store and every other state as a lap leaves them. Shorter run-ups placed the car at the
+ * profile's speed with a full store a few hundred metres before a braking zone, which is not a
+ * state a flying lap reaches.
+ */
+export function defaultLeadIn(track: Track, timing: number): number {
+  let start = timing;
+  for (const c of track.corners) {
+    const into = track.forwardDistance(c.start, start);
+    const span = track.forwardDistance(c.start, c.end);
+    if (into <= span) start = track.wrap(c.end + 20);
+  }
+  return track.length - track.forwardDistance(timing, start);
 }

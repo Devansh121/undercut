@@ -51,7 +51,7 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'monza-lap-m1': {
-    measured: 89.926,
+    measured: 90.137,
     reason:
       'The car is slow in the medium-speed corners: sustained lateral grip at 150–250 km/h is ' +
       '2.3–3.2 g in low trim (doc 7.2), where the corner speeds of a pole lap need about 3.5–4 g. ' +

@@ -19,9 +19,9 @@ export interface ReferenceLapRun {
 }
 
 /**
- * The reference driver on the committed racing line, in the doc 2.1 conditions: flying start
- * 400 m before the line (the run-up is the end of the out-lap, so the MGU-K may deploy on it),
- * then `laps` timed laps.
+ * The reference driver on the committed racing line, in the doc 2.1 conditions: one out-lap on
+ * which the MGU-K is saved (a full store at the line, as in qualifying), then `laps` timed laps
+ * from the circuit's control line.
  */
 export function referenceLap(setup: CircuitSetup, o: ReferenceLapOptions = {}): ReferenceLapRun {
   const track = setup.track();
@@ -37,9 +37,10 @@ export function referenceLap(setup: CircuitSetup, o: ReferenceLapOptions = {}): 
     laps: o.laps ?? 1,
     recordEvery: o.recordEvery ?? 0,
     stops: { 1: [MONZA_PUBLISHED.t1.v1, MONZA_PUBLISHED.t1.v2] },
+    timingLine: setup.controlLine,
     ...(o.clock ? { clock: o.clock } : {}),
     driver: (params) =>
-      createReferenceDriver({ track, line, envelope, params, deployBeforeLine: true }),
+      createReferenceDriver({ track, line, envelope, params, deployBeforeLine: false }),
   });
   return { result, plan };
 }
@@ -66,6 +67,22 @@ export interface CornerRow {
   published: string;
 }
 
+/**
+ * What the line asks of the car at each corner: the line's tightest radius, the driven minimum
+ * speed, the lateral acceleration that speed implies on that radius (v²/R), and the car's
+ * measured sustained lateral limit at that speed on flat ground at 1 g (the envelope). Implied
+ * above the limit means grip the flat sweep does not show (banking, a compression, kerb or a
+ * minimum speed and minimum radius that do not coincide); below it, margin left on this line.
+ */
+export interface CornerGeometryRow {
+  number: number;
+  name: string;
+  minRadius: number;
+  minSpeed: number;
+  impliedG: number;
+  limitG: number;
+}
+
 export interface LapReport {
   lap: number;
   plan: number;
@@ -83,6 +100,7 @@ export interface LapReport {
   finish: number;
   sectors: SectorRow[];
   corners: CornerRow[];
+  geometry: CornerGeometryRow[];
   deployMJ: number;
   harvestMJ: number;
   maxWheelsOff: number;
@@ -91,14 +109,20 @@ export interface LapReport {
   maxSideslipDeg: number;
 }
 
-function planSectorTimes(plan: DrivingPlan): number[] {
+/** Planned sector times, measured from the timing line like the driven ones. */
+function planSectorTimes(plan: DrivingPlan, timing: number): number[] {
+  const track = plan.track;
   const t = plan.profile.time;
-  const step = plan.track.lap.step;
-  const at = (s: number): number => t[Math.round(s / step) % t.length]!;
-  const lines = Array.from(plan.track.sectors);
-  return lines.map((s, k) =>
-    k + 1 < lines.length ? at(lines[k + 1]!) - at(s) : plan.profile.lapTime - at(s),
-  );
+  const lap = plan.profile.lapTime;
+  const step = track.lap.step;
+  const at = (s: number): number => t[Math.round(track.wrap(s) / step) % t.length]!;
+  // Elapsed planned time from the timing line to s, in [0, lap).
+  const el = (s: number): number => (((at(s) - at(timing)) % lap) + lap) % lap;
+  const lines = Array.from(track.sectors)
+    .slice(1)
+    .sort((a, b) => track.forwardDistance(timing, a) - track.forwardDistance(timing, b));
+  const marks = [0, ...lines.map(el), lap];
+  return marks.slice(1).map((m, k) => m - marks[k]!);
 }
 
 function planCornerMin(plan: DrivingPlan, start: number, end: number): number {
@@ -111,11 +135,11 @@ function planCornerMin(plan: DrivingPlan, start: number, end: number): number {
   return m * 3.6;
 }
 
-export function monzaLapReport(lap: LapRecord, plan: DrivingPlan): LapReport {
+export function monzaLapReport(lap: LapRecord, plan: DrivingPlan, timing = 0): LapReport {
   const m1 = [LAP_TARGETS['monza-lap-m1']!.low, LAP_TARGETS['monza-lap-m1']!.high] as const;
   const out = (x: number, [lo, hi]: readonly [number, number]): number =>
     x < lo ? lo - x : x > hi ? x - hi : 0;
-  const planSectors = planSectorTimes(plan);
+  const planSectors = planSectorTimes(plan, timing);
   const pub = MONZA_PUBLISHED;
   const sectors = lap.sectors.map((t, k) => ({
     sector: k + 1,
@@ -146,7 +170,28 @@ export function monzaLapReport(lap: LapRecord, plan: DrivingPlan): LapReport {
       published,
     };
   });
+  const G = 9.80665;
+  const step = plan.track.lap.step;
+  const n = plan.line.count;
+  const geometry = lap.corners.map((c, k) => {
+    const cd = plan.track.corners[k]!;
+    let kmax = 0;
+    const i0 = Math.round(cd.start / step);
+    const i1 = i0 + Math.round(plan.track.forwardDistance(cd.start, cd.end) / step);
+    for (let i = i0; i <= i1; i++) kmax = Math.max(kmax, Math.abs(plan.line.curvature[i % n]!));
+    const v = c.minSpeed / 3.6;
+    const radius = 1 / kmax;
+    return {
+      number: c.number,
+      name: c.name,
+      minRadius: radius,
+      minSpeed: c.minSpeed,
+      impliedG: (v * v) / radius / G,
+      limitG: plan.model.lateral(v, 1) / G,
+    };
+  });
   return {
+    geometry,
     lap: lap.time,
     plan: plan.profile.lapTime,
     reference: MONZA_REFERENCE_LAP,
@@ -212,6 +257,17 @@ export function formatLapReport(r: LapReport): string {
     lines.push(
       `| T${c.number} ${c.name} | ${fixed1(c.minSpeed)} | ${fixed1(c.planMin)} | ${braked ? fixed1(c.entrySpeed) : '—'} | ` +
         `${braked ? fixed1(c.brakeDistance) : '—'} | ${braked ? c.brakeTime.toFixed(2) : '—'} | ${c.published || '—'} |`,
+    );
+  }
+  lines.push('');
+  lines.push(
+    '| Corner | Line min radius (m) | Driven min speed (km/h) | Implied lateral (g) | Measured flat limit at that speed (g) |',
+  );
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const g of r.geometry) {
+    lines.push(
+      `| T${g.number} ${g.name} | ${fixed1(g.minRadius)} | ${fixed1(g.minSpeed)} | ` +
+        `${g.impliedG.toFixed(2)} | ${g.limitG.toFixed(2)} |`,
     );
   }
   return lines.join('\n');

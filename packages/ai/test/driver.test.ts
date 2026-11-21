@@ -19,7 +19,11 @@ const track = new Track(syntheticTrackData({ straight: 500, radius: 70 }));
 const corridor = buildCorridor(track, { halfTrack: 0.81, margin: 0.3, kerbUse: {} });
 const offsets = minimumCurvatureLine(track, corridor).d;
 
-function drive(skill: DriverSkill, laps = 2) {
+function drive(
+  skill: DriverSkill,
+  laps = 2,
+  extra: { timingLine?: number; recordEvery?: number } = {},
+) {
   const plan = buildPlan(track, offsets, envelope, { scale: skill.envelope });
   const inputs: number[][] = [];
   const result = runLaps({
@@ -29,7 +33,7 @@ function drive(skill: DriverSkill, laps = 2) {
     airDensity: rho,
     fuel: 20,
     laps,
-    leadIn: 200,
+    ...extra,
     driver: (p) => {
       const d = new ReferenceDriver({ plan, params: p, skill, deployBeforeLine: true });
       const wrapped = Object.create(d) as ReferenceDriver;
@@ -90,5 +94,53 @@ describe('reference driver', () => {
     expect(a.spun).toBe(false);
     expect(a.laps[0]!.time).toBeGreaterThan(run.result.laps[0]!.time);
     expect(b.laps[0]!.time).toBe(a.laps[0]!.time);
+  });
+});
+
+describe('lap timing', () => {
+  // Speed at the n-th crossing of `line`, interpolated in s between trace rows like the runner.
+  function crossingSpeeds(rows: number[][], length: number, line: number): number[] {
+    const out: number[] = [];
+    for (let k = 1; k < rows.length; k++) {
+      const s0 = rows[k - 1]![2]!;
+      const s1 = rows[k]![2]!;
+      const moved = (((s1 - s0) % length) + length) % length;
+      const to = (((line - s0) % length) + length) % length;
+      if (moved > 0 && moved < length / 2 && to > 0 && to <= moved) {
+        const f = to / moved;
+        out.push(rows[k - 1]![6]! + (rows[k]![6]! - rows[k - 1]![6]!) * f);
+      }
+    }
+    return out;
+  }
+
+  it('publishes each lap’s own finishing speed, not the speed it started with', () => {
+    // A driver with seeded errors, so consecutive line crossings differ in speed.
+    const noisy: DriverSkill = { ...REFERENCE_SKILL, pedalNoise: 0.05, steerNoise: 0.002, seed: 3 };
+    const { result } = drive(noisy, 3, { recordEvery: 1 });
+    const crossings = crossingSpeeds(result.trace!.rows, track.length, 0);
+    expect(crossings.length).toBeGreaterThanOrEqual(4);
+    const laps = result.laps;
+    for (let k = 0; k < laps.length; k++) {
+      expect(laps[k]!.start).toBeCloseTo(crossings[k]!, 6);
+      expect(laps[k]!.finish).toBeCloseTo(crossings[k + 1]!, 6);
+      if (k + 1 < laps.length) expect(laps[k]!.finish).toBe(laps[k + 1]!.start);
+    }
+    // The crossings differ, so publishing the start speed as the finish would fail above.
+    for (const lap of laps) expect(Math.abs(lap.finish - lap.start)).toBeGreaterThan(0.01);
+  });
+
+  it('times laps and sectors from a timing line away from s = 0', () => {
+    const line = 0.25 * track.length;
+    const { result } = drive(REFERENCE_SKILL, 2, { timingLine: line, recordEvery: 1 });
+    const crossings = crossingSpeeds(result.trace!.rows, track.length, line);
+    const lap = result.laps[1]!;
+    expect(lap.finish).toBeCloseTo(crossings[2]!, 6);
+    // Sectors run from the timing line through the sector lines back to it.
+    expect(lap.sectors).toHaveLength(track.sectors.length);
+    expect(lap.sectors.reduce((a, b) => a + b, 0)).toBeCloseTo(lap.time, 6);
+    // Same car, same lap, different line: the lap times agree closely.
+    const zero = drive(REFERENCE_SKILL, 2).result.laps[1]!;
+    expect(Math.abs(lap.time - zero.time)).toBeLessThan(0.3);
   });
 });
