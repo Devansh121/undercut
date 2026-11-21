@@ -617,3 +617,43 @@ test('the living interface gallery renders tokens, icons, glyphs and components'
   await expect(page.locator('[data-testid=gallery-dialog]')).toBeHidden();
   expect(problems).toEqual([]);
 });
+
+test('the timing tower reorders from a scripted sequence of standings', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/ui-gallery.html');
+  const card = page.locator('[data-testid=gallery-tower]');
+  const rows = card.locator('.hud-tower__row');
+  const read = () =>
+    rows.evaluateAll((lis) =>
+      lis.map((li) => ({
+        car: (li as HTMLElement).dataset.car,
+        pos: li.querySelector('.hud-tower__pos')?.textContent,
+        value: li.querySelector('.hud-tower__time')?.textContent,
+        player: li.classList.contains('is-player'),
+        fastest: li.classList.contains('is-fastest'),
+        moved: (li as HTMLElement).style.transform,
+      })),
+    );
+  const order = async () => (await read()).map((r) => r.car).join('');
+  expect(await order()).toBe('abcdef');
+  await expect(card.locator('.hud-tower__lap')).toContainText('12');
+  // Lap 13: C passes B, the player passes E, E pits; C sets the fastest lap; a yellow.
+  await card.locator('[data-action=tower-next]').click();
+  expect(await order()).toBe('acbdfe');
+  let now = await read();
+  expect(now.map((r) => r.pos)).toEqual(['1', '2', '3', '4', '5', '6']);
+  expect(now.find((r) => r.car === 'e')?.value).toBe('Pit');
+  expect(now.find((r) => r.car === 'c')?.fastest).toBe(true);
+  expect(now.find((r) => r.car === 'f')?.player).toBe(true);
+  await expect(card.locator('.hud-tower__status')).toHaveAttribute('data-flag', 'yellow');
+  // Lap 14: the player up to third and fastest; rows settle with no leftover offset.
+  await card.locator('[data-action=tower-next]').click();
+  expect(await order()).toBe('acfbde');
+  now = await read();
+  expect(now.find((r) => r.car === 'f')?.pos).toBe('3');
+  expect(now.filter((r) => r.fastest).map((r) => r.car)).toEqual(['f']);
+  expect(now.every((r) => r.moved === '')).toBe(true);
+  // One node per car throughout: nothing was rebuilt.
+  expect(await rows.count()).toBe(6);
+});

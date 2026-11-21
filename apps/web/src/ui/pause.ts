@@ -17,6 +17,9 @@ export interface PauseSetting<T extends string | number = string | number> {
   choices: Choice<T>[];
   get(): T;
   set(value: T): void;
+  /** Not available right now (steering help on a keyboard); `hint` says why. */
+  disabled?: () => boolean;
+  hint?: string;
 }
 
 /** A 0–1 level shown as a percentage, adjusted in tenths. */
@@ -60,7 +63,7 @@ export class PauseMenu {
   private readonly focusables: HTMLElement[] = [];
   private readonly rows = new Map<
     string,
-    { setting: PauseSetting; buttons: HTMLButtonElement[] }
+    { setting: PauseSetting; buttons: HTMLButtonElement[]; hint: HTMLElement | null }
   >();
   private readonly sliders = new Map<
     string,
@@ -127,6 +130,11 @@ export class PauseMenu {
       const row = el('div', 'pause__setting');
       row.dataset.setting = setting.id;
       const name = el('span', 'pause__key', setting.label);
+      const hint = setting.hint ? el('small', 'pause__hint', setting.hint) : null;
+      if (hint) {
+        hint.hidden = true;
+        name.append(hint);
+      }
       const seg = el('div', 'seg');
       seg.setAttribute('role', 'radiogroup');
       seg.setAttribute('aria-label', setting.label);
@@ -146,7 +154,7 @@ export class PauseMenu {
       this.focusables.push(buttons[0] as HTMLButtonElement);
       row.append(name, seg);
       grid.append(row);
-      this.rows.set(setting.id, { setting, buttons });
+      this.rows.set(setting.id, { setting, buttons, hint });
     }
 
     for (const slider of sliders) {
@@ -233,13 +241,16 @@ export class PauseMenu {
       input.style.setProperty('--v', `${v * 100}%`);
       output.textContent = `${Math.round(v * 100)}%`;
     }
-    for (const { setting, buttons } of this.rows.values()) {
+    for (const { setting, buttons, hint } of this.rows.values()) {
       const current = String(setting.get());
+      const disabled = setting.disabled?.() ?? false;
       for (const b of buttons) {
         const on = b.dataset.value === current;
         b.classList.toggle('is-on', on);
         b.setAttribute('aria-checked', String(on));
+        b.disabled = disabled;
       }
+      if (hint) hint.hidden = !disabled;
     }
   }
 
@@ -272,7 +283,13 @@ export class PauseMenu {
         );
         const step = action === 'menuDown' ? 1 : -1;
         const n = this.focusables.length;
-        this.focusIndex = ((index < 0 ? 0 : index) + step + n) % n;
+        // Skip what cannot take focus now (a disabled setting).
+        let next = index < 0 ? 0 : index;
+        for (let k = 0; k < n; k++) {
+          next = (next + step + n) % n;
+          if (!(this.focusables[next] as HTMLButtonElement).disabled) break;
+        }
+        this.focusIndex = next;
         this.focus();
         return true;
       }
@@ -288,6 +305,7 @@ export class PauseMenu {
         }
         const row = rowOf(active);
         if (!row) return false;
+        if (row.setting.disabled?.()) return true;
         const values = row.setting.choices.map((c) => c.value);
         const i = values.findIndex((v) => String(v) === String(row.setting.get()));
         const next =

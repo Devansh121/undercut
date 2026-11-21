@@ -168,3 +168,22 @@
   justify-content: space-between;
   font-size: var(--fs-12);
 }
+
+/* The game stylesheet locks the page for the 3D view; the gallery scrolls. */
+html,
+body {
+  overflow: auto;
+}
+
+.gallery .hud-tower {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  flex: none;
+}
+
+.gallery__tower {
+  align-items: flex-start;
+  gap: var(--sp-6);
+}

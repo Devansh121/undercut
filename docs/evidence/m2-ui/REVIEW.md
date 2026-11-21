@@ -45,6 +45,13 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 9. **Tower footer wrapped "Singapore Marina Bay" onto two lines (`hud-drive-1440x900.png`)**
    - The map already names the circuit, so the tower's footer now shows only the ghost: "On track" or "After a valid lap".
 
+10. **Review of PR #30 (four blocking findings)**
+    - Time of day went stale after a circuit change (Spa showed "Afternoon" while the chip said Overcast): both settings panels now rebuild whenever the circuit or the device changes. Test: `time of day follows the circuit` in `tests/browser/menus.spec.ts`.
+    - Phone touch targets under 44 px: buttons, segments, the switch (now a 48 x 44 button with the track drawn inside), Change circuit, Controls, drivers and every pause-menu control are 44 px or more at 844 x 390; the ten-team grid becomes one team at a time with previous and next, and the car image is back on the phone (`hub-844x390.png`). The phone layout sweep and a pause-menu test assert it.
+    - "SPA- / FRANCORCH / AMPS": names break only between words or after a hyphen, and a name with a long word steps down a size (`hub-spa-1440x900.png`). The layout sweep now checks every heading word sits on one line, at all three circuits.
+    - Online Rooms no longer shows a team picker that does nothing: one line says the room assigns cars by seat (`hub-online-1440x900.png`).
+    - Also: focus moves to the selected mode when a shoulder-button mode switch hides the focused control; pause-menu labels match the menu (Medium, Anti-lock brakes, Automatic) and Steering help is disabled there for the keyboard as in the menu; "Not yet available" tags on the three race modes; HUD update no longer allocates arrays per frame; no sticky hover after a tap on touch screens.
+
 ## HUD frame-time benchmark
 
 Measured at `1440×900`, `high` quality preset, with vsync and frame-rate cap disabled (`--disable-gpu-vsync --disable-frame-rate-limit`), driving Monza on autopilot with the HUD visible vs hidden via `window.__undercut.setHudVisible` (`docs/evidence/m2-ui/report.json`):

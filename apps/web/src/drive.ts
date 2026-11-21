@@ -404,11 +404,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     quit: () => quit(),
     ...(ext?.quitLabel ? { quitLabel: ext.quitLabel } : {}),
   };
+  // The same labels as the main menu's session settings.
   const levels = [
-    { value: 0, label: 'Off' },
-    { value: 1, label: 'Low' },
-    { value: 2, label: 'Med' },
-    { value: 3, label: 'High' },
+    { value: 0, label: S.setup.levels.off },
+    { value: 1, label: S.setup.levels.low },
+    { value: 2, label: S.setup.levels.medium },
+    { value: 3, label: S.setup.levels.high },
   ];
   const pause = new PauseMenu(
     actions,
@@ -442,10 +443,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'abs',
-        label: 'ABS',
+        label: S.setup.abs,
         choices: [
-          { value: 0, label: 'Off' },
-          { value: 2, label: 'On' },
+          { value: 0, label: S.setup.off },
+          { value: 2, label: S.setup.on },
         ],
         get: () => (session.assists.abs > 0 ? 2 : 0),
         set: (v) => setAssist('abs', Number(v)),
@@ -454,8 +455,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         id: 'gears',
         label: S.setup.gears,
         choices: [
-          { value: 'auto', label: 'Auto' },
-          { value: 'manual', label: 'Manual' },
+          { value: 'auto', label: S.setup.gearChoices.auto },
+          { value: 'manual', label: S.setup.gearChoices.manual },
         ],
         get: () => (session.assists.autoGears ? 'auto' : 'manual'),
         set: (v) => setAssist('autoGears', v === 'auto'),
@@ -464,6 +465,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         id: 'steering',
         label: S.setup.steering,
         choices: levels,
+        // The keyboard shapes its own steering; as in the main menu, the help is for sticks and touch.
+        disabled: () => session.device === 'keyboard',
+        hint: S.setup.steeringKeyboard,
         get: () => session.assists.steering,
         set: (v) => setAssist('steering', Number(v)),
       },

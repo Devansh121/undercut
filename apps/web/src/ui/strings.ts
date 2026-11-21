@@ -91,6 +91,7 @@ export const S = {
     onlineBody:
       'Create a room and share its invite, or join one with a room code. Up to eight drivers race at Monza on equal cars; the host sets the laps and which assists are allowed.',
     unavailable: 'Not in this build yet',
+    notYet: 'Not yet available',
   },
 
   circuit: {

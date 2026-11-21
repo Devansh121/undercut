@@ -219,7 +219,9 @@ body {
 
 .hud-tower__row {
   display: grid;
-  grid-template-columns: 20px 3px minmax(0, 1fr) auto;
+  grid-template-columns: 20px 3px minmax(0, 1fr) auto auto;
+  /* Rows slide to a new place (FLIP from tower.ts); reduced motion makes it instant. */
+  transition: transform var(--t-base) var(--ease-out);
   align-items: center;
   gap: var(--sp-2);
   height: 28px;
@@ -237,7 +239,81 @@ body {
 .hud-tower__bar {
   height: 14px;
   border-radius: 1px;
-  background: var(--hud-team, var(--c-brand));
+  background: var(--row-team, var(--hud-team, var(--c-brand)));
+}
+
+.hud-tower__total {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--c-text-3);
+}
+
+.hud-tower__time[data-tone='overall'] {
+  color: var(--c-time-overall);
+}
+
+.hud-tower__time[data-tone='personal'] {
+  color: var(--c-time-personal);
+}
+
+.hud-tower__tyre {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-1);
+  box-shadow: inset 0 0 0 1.5px var(--compound, var(--c-text-3));
+  font-family: var(--font-num);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--compound, var(--c-text-2));
+}
+
+.hud-tower__row.is-fastest .hud-tower__code::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 1px;
+  background: var(--c-time-overall);
+  vertical-align: 2px;
+}
+
+.hud-tower__status[data-flag='yellow'] {
+  background: rgba(246, 201, 14, 0.18);
+}
+
+.hud-tower__status[data-flag='yellow'] .hud-tower__flag {
+  background: var(--c-flag-yellow);
+}
+
+.hud-tower__status[data-flag='red'] {
+  background: rgba(229, 56, 59, 0.2);
+}
+
+.hud-tower__status[data-flag='red'] .hud-tower__flag {
+  background: var(--c-flag-red);
+}
+
+.hud-tower__status[data-flag='blue'] .hud-tower__flag {
+  background: var(--c-flag-blue);
+}
+
+.hud-tower__status[data-flag='chequered'] {
+  background: var(--c-ink-3);
+}
+
+.hud-tower__status[data-flag='chequered'] .hud-tower__flag {
+  background: repeating-conic-gradient(var(--c-text-1) 0 25%, var(--c-ink-0) 0 50%) 0 0 / 6px 6px;
+}
+
+.hud-tower__status[data-flag='neutral'] {
+  background: var(--c-ink-2);
+}
+
+.hud-tower__status[data-flag='neutral'] .hud-tower__flag {
+  background: var(--c-text-3);
 }
 
 .hud-tower__code {
@@ -273,7 +349,11 @@ body {
 }
 
 .hud-tower__row.is-record .hud-tower__bar {
-  background: repeating-linear-gradient(180deg, var(--c-time-overall) 0 3px, transparent 3px 5px);
+  background: repeating-linear-gradient(
+    180deg,
+    var(--row-team, var(--c-time-overall)) 0 3px,
+    transparent 3px 5px
+  );
 }
 
 .hud-tower__row.is-record .hud-tower__code {
@@ -1110,6 +1190,13 @@ body {
   box-shadow: inset 0 -1px 0 var(--c-line);
 }
 
+.pause__hint {
+  display: block;
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: var(--c-text-3);
+}
+
 .pause__key {
   font-size: var(--fs-14);
   font-weight: 550;
@@ -1195,7 +1282,7 @@ body {
     font-size: var(--fs-10);
   }
   .hud-tower__row {
-    grid-template-columns: 14px 3px minmax(0, 1fr) auto;
+    grid-template-columns: 14px 3px minmax(0, 1fr) auto auto;
     gap: 6px;
     height: 22px;
     padding: 0 var(--sp-2) 0 4px;

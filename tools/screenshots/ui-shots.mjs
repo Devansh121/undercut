@@ -135,6 +135,24 @@ async function captureMenus(browser, report) {
     await settle(page);
     report.shots.push(await shot(page, 'circuits-1440x900'));
 
+    // Each circuit on the main menu (long names, the Time Trial only mark), and online rooms.
+    for (const c of ['spa', 'singapore']) {
+      if (c !== 'spa') {
+        await page.click('[data-action=change-circuit]');
+        await page.waitForSelector('html[data-screen="circuits"]');
+      }
+      await page.click(`.ccard[data-circuit=${c}]`);
+      await page.waitForSelector('html[data-screen="hub"]');
+      await settle(page);
+      report.shots.push(await shot(page, `hub-${c}-1440x900`));
+    }
+    await page.click('[data-action=mode-quickRace]');
+    await settle(page, 250);
+    report.shots.push(await shot(page, 'hub-race-singapore-1440x900'));
+    await page.click('[data-action=mode-online]');
+    await settle(page, 250);
+    report.shots.push(await shot(page, 'hub-online-1440x900'));
+
     await page.goto(`${base}/ui-gallery.html`);
     await settle(page);
     report.shots.push(await shot(page, 'ui-gallery-1440x900'));
@@ -181,6 +199,15 @@ async function captureMenus(browser, report) {
     await page.waitForSelector('html[data-screen="circuits"]');
     await settle(page);
     report.shots.push(await shot(page, 'circuits-844x390'));
+
+    await page.tap('.ccard[data-circuit=spa]');
+    await page.waitForSelector('html[data-screen="hub"]');
+    await page.tap('[data-action=mode-quickRace]');
+    await settle(page, 250);
+    report.shots.push(await shot(page, 'hub-race-spa-844x390'));
+    await page.tap('[data-action=mode-online]');
+    await settle(page, 250);
+    report.shots.push(await shot(page, 'hub-online-844x390'));
     await ctx.close();
   }
 }
@@ -287,6 +314,31 @@ async function captureHudAndPause(browser, report) {
   }
 }
 
+/** Time trial at Singapore, started through the menus: the HUD on another circuit. */
+async function captureSingaporeHud(browser, report) {
+  const base = `http://127.0.0.1:${PORT}`;
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`${base}/?debug=1&quality=high`);
+  await page.click('[data-action=press-start]');
+  await page.click('[data-action=change-circuit]');
+  await page.click('.ccard[data-circuit=singapore]');
+  await page.click('[data-action=start]');
+  await page.waitForFunction(
+    () => globalThis.document.documentElement.dataset.ready !== undefined,
+    {
+      timeout: 60_000,
+    },
+  );
+  await page.evaluate(() => globalThis.__undercut.drive({ throttle: 0.6, steer: 0 }));
+  await settle(page, 1500);
+  await page.evaluate(() => globalThis.__undercut.setTimeScale(0));
+  await settle(page, 400);
+  report.shots.push(await shot(page, 'hud-singapore-1440x900'));
+  await page.evaluate(() => globalThis.__undercut.quit());
+  await ctx.close();
+}
+
 async function benchmarkHud(report) {
   const base = `http://127.0.0.1:${PORT}`;
   const browser = await chromium.launch({
@@ -347,6 +399,7 @@ try {
   try {
     await captureMenus(browser, report);
     await captureHudAndPause(browser, report);
+    await captureSingaporeHud(browser, report);
   } finally {
     await browser.close();
   }

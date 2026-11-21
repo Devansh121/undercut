@@ -4,6 +4,7 @@ import type { MinimapPlan } from '../game/minimap';
 import { Text, el, icon, setClass, setData, svg } from './dom';
 import { glyph, refreshGlyphs } from './kit/glyph';
 import { S } from './strings';
+import { TimingTower, type TowerRow } from './hud/tower';
 
 export type SectorState = DeltaClass | 'run' | 'none';
 export type DrsState = 'off' | 'available' | 'open';
@@ -68,6 +69,11 @@ export interface HudState {
   others?: readonly { x: number; z: number; colour: string; opacity: number }[];
 }
 
+/** Shared empty list for sessions with no other cars on the map. */
+const NO_OTHERS: NonNullable<HudState['others']> = Object.freeze([]) as unknown as NonNullable<
+  HudState['others']
+>;
+
 const REV_COLOURS = ['g', 'g', 'g', 'g', 'g', 'r', 'r', 'r', 'r', 'r', 'b', 'b', 'b', 'b', 'b'];
 const WHEEL_POSITIONS = ['FL', 'FR', 'RL', 'RR'] as const;
 
@@ -89,7 +95,9 @@ export class Hud {
   private readonly drsEl: HTMLElement;
   private readonly deltaEl: HTMLElement;
   private readonly lastEl: HTMLElement;
-  private readonly ghostStatusEl: HTMLElement;
+  private readonly tower: TimingTower;
+  /** The tower's two rows, reused every frame. */
+  private readonly towerRows: [TowerRow, TowerRow];
   private readonly msgEl: HTMLElement;
   private readonly msgTag: Text;
   private readonly msgText: Text;
@@ -109,6 +117,9 @@ export class Hud {
   private lastGhostX = '';
   private lastGhostY = '';
   private lastGhostVis = false;
+  /** Reused for every map projection: update() allocates no arrays. */
+  private readonly xy: [number, number] = [0, 0];
+  private staticSet = false;
 
   /** `mode`: the tower's session label ("Time trial", "Online race"). */
   constructor(plan: MinimapPlan, identity?: HudIdentity, mode: string = S.hud.timeTrial) {
@@ -124,43 +135,30 @@ export class Hud {
       return node;
     };
 
-    // Timing tower (top left), broadcast style: lap counter, the flag state, then one row per
-    // car on the clock. In time trial that is the player and the record (the ghost's lap).
-    const session = el('section', 'hud-session hud-tower panel');
-    session.setAttribute('aria-label', S.hud.session);
-    session.dataset.testid = 'tower';
-    const sHead = el('header', 'hud-tower__head');
-    const lapCount = el('span', 'hud-tower__lap');
-    lapCount.append(el('span', 'hud-tower__lapword', S.hud.lap), txt('lap', el('b', 'num')));
-    sHead.append(lapCount, el('span', 'label', mode));
-    const status = el('div', 'hud-tower__status');
-    status.append(el('i', 'hud-tower__flag'), el('span', '', S.hud.greenFlag));
-    const rows = el('ol', 'hud-tower__rows');
-    const row = (
-      pos: string,
-      code: string,
-      cls: string,
-      key: string,
-      timeClass: string,
-    ): HTMLElement => {
-      const li = el('li', `hud-tower__row ${cls}`);
-      li.append(
-        el('span', 'hud-tower__pos num', pos),
-        el('i', 'hud-tower__bar'),
-        el('strong', 'hud-tower__code', code),
-        txt(key, el('b', `hud-tower__time num ${timeClass}`)),
-      );
-      return li;
-    };
-    rows.append(
-      row('1', identity?.driverCode ?? S.hud.you, 'is-player', 'towerBest', ''),
-      row('', S.hud.recordCode, 'is-record', 'record', 'hud-pb'),
-    );
-    const sFoot = el('footer', 'hud-tower__foot');
-    this.ghostStatusEl = txt('ghostStatus', el('span', 'hud-session__ghost'));
-    // The map names the circuit; the footer says whether the ghost of the record is out.
-    sFoot.append(el('span', 'label', S.hud.ghost), this.ghostStatusEl);
-    session.append(sHead, status, rows, sFoot);
+    // Timing tower (top left): in time trial, the player's best and the record (the ghost's lap).
+    const tower = new TimingTower({ label: mode });
+    this.tower = tower;
+    this.towerRows = [
+      {
+        id: 'player',
+        position: 1,
+        code: identity?.driverCode ?? S.hud.you,
+        teamColour: teamColour,
+        value: S.hud.noTime,
+        tone: 'empty',
+        player: true,
+      },
+      {
+        id: 'record',
+        position: null,
+        code: S.hud.recordCode,
+        teamColour: 'var(--c-time-overall)',
+        value: S.hud.noTime,
+        tone: 'empty',
+        reference: true,
+      },
+    ];
+    const session = tower.root;
 
     // Control and prompt slot (top centre).
     const control = el('div', 'hud-control');
@@ -380,17 +378,23 @@ export class Hud {
 
   update(h: HudState): void {
     const t = this.t;
-    t.circuit?.set(h.circuit);
-    t.mapName?.set(h.circuit);
-    t.mapLen?.set(`${h.lengthKm} ${S.circuit.km}`);
-    t.lap?.set(h.lap > 0 ? String(h.lap) : S.hud.outLapShort);
-    t.towerBest?.set(h.best === null ? S.hud.noTime : formatLapTime(h.best));
+    if (!this.staticSet) {
+      // Circuit name and length do not change during a session: written once.
+      this.staticSet = true;
+      t.mapName?.set(h.circuit);
+      t.mapLen?.set(`${h.lengthKm} ${S.circuit.km}`);
+    }
+    this.tower.setLap(h.lap > 0 ? h.lap : null);
+    const mine = this.towerRows[0];
+    const rec = this.towerRows[1];
+    mine.value = h.best === null ? S.hud.noTime : formatLapTime(h.best);
+    mine.tone = h.best === null ? 'empty' : '';
+    rec.value = h.record === null ? S.hud.noTime : formatLapTime(h.record);
+    rec.tone = h.record === null ? 'empty' : 'overall';
+    this.tower.update(this.towerRows);
+    // The map names the circuit; the footer says whether the ghost of the record is out.
+    this.tower.setFooter(S.hud.ghost, h.ghost ? S.hud.ghostOnTrack : S.hud.ghostOff, !h.ghost);
     t.lapNo?.set(h.lap > 0 ? S.hud.lapN(h.lap) : S.hud.outLap);
-    t.record?.set(h.record === null ? S.hud.noTime : formatLapTime(h.record));
-    t.ghostStatus?.set(h.ghost ? S.hud.ghostOnTrack : S.hud.ghostOff);
-    setClass(this.t.record?.node as HTMLElement, 'is-empty', h.record === null);
-    setClass(this.t.towerBest?.node as HTMLElement, 'is-empty', h.best === null);
-    setClass(this.ghostStatusEl, 'is-empty', !h.ghost);
     setClass(this.t.best?.node as HTMLElement, 'is-empty', h.best === null);
     setClass(this.lastEl, 'is-empty', h.last === null);
     t.lapTime?.set(h.running ? formatLapTime(h.lapTime) : formatLapTime(0));
@@ -451,7 +455,9 @@ export class Hud {
     }
     setClass(this.msgEl, 'is-on', h.message !== null);
 
-    const [x, y] = this.plan.project(h.carX, h.carZ);
+    this.plan.project(h.carX, h.carZ, this.xy);
+    const x = this.xy[0];
+    const y = this.xy[1];
     const cx = x.toFixed(1);
     const cy = y.toFixed(1);
     if (cx !== this.lastCarX) {
@@ -465,7 +471,9 @@ export class Hud {
 
     const ghostOn = h.ghostX !== null && h.ghostZ !== null;
     if (ghostOn) {
-      const [gx, gy] = this.plan.project(h.ghostX as number, h.ghostZ as number);
+      this.plan.project(h.ghostX as number, h.ghostZ as number, this.xy);
+      const gx = this.xy[0];
+      const gy = this.xy[1];
       const gxs = gx.toFixed(1);
       const gys = gy.toFixed(1);
       if (gxs !== this.lastGhostX) {
@@ -481,23 +489,24 @@ export class Hud {
       this.ghostDot.setAttribute('opacity', ghostOn ? '1' : '0');
       this.lastGhostVis = ghostOn;
     }
-    const others = h.others ?? [];
+    const others = h.others ?? NO_OTHERS;
     while (this.otherDots.length < others.length) {
       const dot = svg('circle', { r: 4, stroke: '#0b0c0e', 'stroke-width': 1.2 });
       this.othersLayer.append(dot);
       this.otherDots.push(dot);
     }
-    this.otherDots.forEach((dot, i) => {
+    for (let i = 0; i < this.otherDots.length; i++) {
+      const dot = this.otherDots[i] as SVGCircleElement;
       const o = others[i];
       if (!o) {
         dot.setAttribute('opacity', '0');
-        return;
+        continue;
       }
-      const [ox, oy] = this.plan.project(o.x, o.z);
-      dot.setAttribute('cx', ox.toFixed(1));
-      dot.setAttribute('cy', oy.toFixed(1));
+      this.plan.project(o.x, o.z, this.xy);
+      dot.setAttribute('cx', this.xy[0].toFixed(1));
+      dot.setAttribute('cy', this.xy[1].toFixed(1));
       dot.setAttribute('fill', o.colour);
       dot.setAttribute('opacity', o.opacity.toFixed(2));
-    });
+    }
   }
 }

@@ -605,6 +605,20 @@ button {
   white-space: nowrap;
 }
 
+.lrow__tag {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: var(--r-1);
+  font-size: var(--fs-10);
+  font-weight: 650;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  line-height: 1.4;
+  color: var(--c-text-2);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+}
+
 .lrow__desc {
   margin-top: 2px;
   font-size: var(--fs-12);
@@ -924,6 +938,31 @@ button {
   transition:
     opacity var(--t-quick) var(--ease-out),
     transform var(--t-quick) var(--ease-out);
+}
+
+/* Touch screens have no hover: a tapped control must not stay lit after the finger lifts. */
+@media (hover: none) {
+  .btn:hover {
+    background: var(--c-ink-2);
+  }
+  .btn--primary:hover {
+    background: var(--c-brand);
+  }
+  .btn--quiet:hover {
+    background: transparent;
+    color: var(--c-text-2);
+  }
+  .ibtn:hover {
+    background: transparent;
+    color: var(--c-text-2);
+  }
+  .seg__opt:not([aria-checked='true']):not(.is-on):hover {
+    background: transparent;
+    color: var(--c-text-3);
+  }
+  .lrow:not([aria-current='true']):hover {
+    background: var(--c-ink-1);
+  }
 }
 
 /* ================= Phone landscape ================= */

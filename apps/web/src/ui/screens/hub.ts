@@ -111,6 +111,7 @@ export class HubScreen implements Screen {
         desc: copy.desc,
         icon: MODE_ICON[m],
         action: `mode-${m}`,
+        ...(PLAYABLE.has(m) ? {} : { tag: S.notices.notYet }),
         onClick: () => this.selectMode(m),
       });
       row.setAttribute('role', 'listitem');
@@ -343,6 +344,16 @@ export class HubScreen implements Screen {
       });
     }
     this.render();
+    // A mode switch from the shoulder buttons can hide the focused control (a setting, the
+    // team grid online): focus moves to the selected mode instead of being lost.
+    const active = document.activeElement;
+    const lost =
+      !(active instanceof HTMLElement) ||
+      active === document.body ||
+      !this.root.contains(active) ||
+      active.closest('[hidden]') !== null ||
+      active.getClientRects().length === 0;
+    if (lost) this.modeRows.get(m)?.focus({ preventScroll: true });
   }
 
   /** Previous or next team (the phone's team switcher), wrapping round the grid. */

@@ -5,6 +5,7 @@
  */
 import '../../../../design/mock/tokens.css';
 import '../styles/kit.css';
+import '../styles.css';
 import './gallery.css';
 import { GAME_NAME } from '@undercut/core';
 import { defaultBindings, type ActionId, type DeviceKind } from '@undercut/input';
@@ -30,6 +31,7 @@ import {
 import { glyph, setGlyphContext } from '../ui/kit/glyph';
 import { ICON_KEYS, brandMark, icon } from '../ui/kit/icons';
 import { S } from '../ui/strings';
+import { TimingTower, type TowerRow } from '../ui/hud/tower';
 
 const host = document.getElementById('gallery');
 if (!(host instanceof HTMLElement)) throw new Error('ui-gallery.html is missing #gallery');
@@ -383,6 +385,90 @@ for (const k of ICON_KEYS) {
 }
 iconCard.body.append(iconGrid);
 
+// ---- Timing tower: a scripted sequence of standings, as the race screen will feed it
+const towerCard = card({ title: 'Timing tower', aside: 'Scripted standings' });
+towerCard.root.dataset.testid = 'gallery-tower';
+const tower = new TimingTower({ label: 'Race' });
+const car = (id: string, code: string, team: string): Omit<TowerRow, 'position' | 'value'> => ({
+  id,
+  code,
+  teamColour: TEAMS.find((t) => t.id === team)?.colours.tower ?? '#888',
+  compound: { code: 'M', colour: '#F2902F' },
+});
+const cars = {
+  a: car('a', 'VEL', 'kestrel'),
+  b: car('b', 'CAS', 'sable'),
+  c: car('c', 'HOL', 'norrland'),
+  d: car('d', 'COR', 'terraluce'),
+  e: car('e', 'ASH', 'aldermoor'),
+  f: { ...car('f', 'TAI', 'calder'), player: true },
+};
+type Step = {
+  lap: number;
+  flag: 'green' | 'yellow';
+  text: string;
+  order: (keyof typeof cars)[];
+  values: string[];
+  tones?: Record<string, TowerRow['tone']>;
+  fastest?: string;
+};
+const STEPS: Step[] = [
+  {
+    lap: 12,
+    flag: 'green',
+    text: 'Green flag',
+    order: ['a', 'b', 'c', 'd', 'e', 'f'],
+    values: ['Leader', '+1.204', '+0.512', '+2.880', '+0.391', '+0.844'],
+  },
+  {
+    lap: 13,
+    flag: 'yellow',
+    text: 'Yellow flag · Sector 2',
+    order: ['a', 'c', 'b', 'd', 'f', 'e'],
+    values: ['Leader', '+1.010', '+0.402', '+2.115', '+0.640', 'Pit'],
+    tones: { e: 'pit' },
+    fastest: 'c',
+  },
+  {
+    lap: 14,
+    flag: 'green',
+    text: 'Green flag',
+    order: ['a', 'c', 'f', 'b', 'd', 'e'],
+    values: ['Leader', '+0.988', '+0.733', '+0.120', '+1.904', '+9.402'],
+    fastest: 'f',
+  },
+];
+let step = 0;
+const showStep = (): void => {
+  const st = STEPS[step] as Step;
+  tower.setLap(st.lap, 53);
+  tower.setStatus(st.flag, st.text);
+  tower.update(
+    st.order.map((k, i) => ({
+      ...cars[k],
+      position: i + 1,
+      value: st.values[i] ?? '',
+      tone: st.tones?.[k] ?? '',
+      fastest: st.fastest === k,
+    })),
+  );
+  towerCard.root.dataset.step = String(step);
+};
+const towerRow = el('div', 'gallery__row gallery__tower');
+towerRow.append(
+  tower.root,
+  button({
+    label: 'Next standings',
+    action: 'tower-next',
+    onClick: () => {
+      step = (step + 1) % STEPS.length;
+      showStep();
+    },
+  }),
+);
+towerCard.body.append(towerRow);
+showStep();
+
 root.append(
   head,
   tokensCard.root,
@@ -390,6 +476,7 @@ root.append(
   typeCard.root,
   compGrid,
   glyphCard.root,
+  towerCard.root,
   iconCard.root,
   sampleDialog.root,
   toaster.root,

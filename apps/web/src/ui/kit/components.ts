@@ -271,6 +271,8 @@ export function listRow(o: {
   onClick?: () => void;
   action?: string;
   badge?: string;
+  /** A small status line under the title (e.g. "Not yet available"). */
+  tag?: string;
 }): HTMLButtonElement {
   const b = el('button', 'lrow');
   b.type = 'button';
@@ -285,6 +287,7 @@ export function listRow(o: {
   const title = el('span', 'lrow__title', o.title);
   if (o.badge) title.append(el('span', 'badge', o.badge));
   text.append(title);
+  if (o.tag) text.append(el('span', 'lrow__tag', o.tag));
   if (o.desc) text.append(el('span', 'lrow__desc', o.desc));
   b.append(text, icon('chevron', 'icon lrow__chev'));
   if (o.onClick) b.addEventListener('click', () => o.onClick?.());
