@@ -632,16 +632,8 @@
         "result": {
           "lap": 1,
           "time": 109.37591330953686,
-          "sectors": [
-            28.890526703616622,
-            38.47899216821803,
-            42.0063944377022
-          ],
-          "sectorClasses": [
-            "overall",
-            "overall",
-            "overall"
-          ],
+          "sectors": [28.890526703616622, 38.47899216821803, 42.0063944377022],
+          "sectorClasses": ["overall", "overall", "overall"],
           "valid": true,
           "class": "overall",
           "deltaToBest": null,
