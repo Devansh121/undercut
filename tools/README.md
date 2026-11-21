@@ -9,3 +9,4 @@
 | `telemetry/` | Telemetry runner (M1) |
 | `stations/` | Screenshot stations (M2) |
 | `pipeline/` | Asset pipeline (M1–M2) |
+| `research/` | OpenStreetMap and elevation survey scripts behind `docs/track-data.md` (Python, standard library) |
