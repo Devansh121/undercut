@@ -365,6 +365,39 @@ describe('chassis and suspension', () => {
     expect(turn.roll).toBeGreaterThan(0);
   });
 
+  // Whole-car equilibrium with aero and rolling resistance off: the overturning moment of the
+  // ground forces about the CoG height, h·ΣF, must come back as load transfer, all of it.
+  const noAero = createCarParams('medium', {
+    aero: { clA: 0, cdA: 0 },
+    tyre: { rollingResistance: 0 },
+  });
+  const h = noAero.mass.cgHeight;
+  const L = noAero.geometry.wheelbase;
+
+  it('transfers exactly ΣFx·h/L between the axles under braking', () => {
+    const rest = createCarState(noAero, { fuel: 50 });
+    const staticFront = rest.load[0]! + rest.load[1]!;
+    const car = createCarState(noAero, { speed: 40, gear: 5, fuel: 50 });
+    run(car, input({ brake: 0.3 }), 0.8);
+    const fx = 850 * car.accelX;
+    expect(fx).toBeLessThan(-8000);
+    const transfer = car.load[0]! + car.load[1]! - staticFront;
+    expect(transfer / ((-fx * h) / L)).toBeCloseTo(1, 2);
+  });
+
+  it('transfers exactly ΣFy·h across the car in a steady corner', () => {
+    const car = createCarState(noAero, { speed: 20, gear: 2, fuel: 50 });
+    for (let i = 0; i < 3 / DT; i++) {
+      const throttle = Math.min(1, Math.max(0, 0.3 + 0.5 * (20 - car.vx)));
+      stepCar(car, input({ steer: 0.3, throttle }), FLAT_SURFACE, DT, env);
+    }
+    const fy = 850 * car.accelY;
+    expect(fy).toBeGreaterThan(8000);
+    let moment = 0;
+    for (let i = 0; i < 4; i++) moment += car.load[i]! * car.model.wheelLeft[i]!;
+    expect(-moment / (fy * h)).toBeCloseTo(1, 2);
+  });
+
   it('compresses onto the springs as downforce builds', () => {
     const car = createCarState(REFERENCE_CAR, { speed: 30, gear: 4, fuel: 50 });
     const slow = car.rideHeightFront;

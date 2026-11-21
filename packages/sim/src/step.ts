@@ -42,6 +42,7 @@ const rollDrag = new Float64Array(4);
 const tyreZ = new Float64Array(4);
 const bodyZ = new Float64Array(4);
 const bodyX = new Float64Array(4);
+const unsprungZ = new Float64Array(4);
 const wheelX = new Float64Array(4);
 const aero = { front: 0, rear: 0, drag: 0 };
 
@@ -348,9 +349,15 @@ function substep(
   s.accelY = specificY;
 
   // ---- Sprung and unsprung vertical motion. ----
-  // Ground-level forces act below the sprung CoG: the sprung share of them pitches and rolls
-  // the body through the springs, so load transfer comes out of the suspension.
-  const arm = p.mass.cgHeight * (ms / m);
+  // The ground forces' overturning moment, h·ΣF about the whole car's CoG height, splits in
+  // two. The sprung mass, whose CoG sits at hs, takes its share through the links at the ground
+  // and so through the springs. The unsprung masses' inertia acts at the wheel centres and goes
+  // straight to the tyres. With hs = (m·h − mu·r) / ms the two add up to exactly h·ΣF.
+  const mu = m - ms;
+  const rw = p.tyre.rollingRadius;
+  const hs = (m * p.mass.cgHeight - mu * rw) / ms;
+  const linkX = (ms / m) * groundX - (mu / m) * (dragX + extX);
+  const linkY = (ms / m) * groundY - (mu / m) * extY;
   let heave = skidHeave - dfFront - dfRear;
   let pitchM = skidPitch - dfFront * mass.sprungA + dfRear * mass.sprungB;
   let rollM = skidRoll;
@@ -360,8 +367,18 @@ function substep(
     pitchM += f * bodyX[i]!;
     rollM += f * model.wheelLeft[i]!;
   }
-  pitchM += arm * groundX;
-  rollM += arm * groundY;
+  pitchM += hs * linkX;
+  rollM += hs * linkY;
+  // Unsprung inertia couples, as equal and opposite vertical forces on the wheels.
+  const pitchU = ((mu / m) * (groundX + dragX + extX) * rw) / p.geometry.wheelbase / 2;
+  const muFront = 2 * p.mass.unsprungFront;
+  const muRear = 2 * p.mass.unsprungRear;
+  const rollUF = ((muFront / m) * (groundY + extY) * rw) / p.geometry.trackFront;
+  const rollUR = ((muRear / m) * (groundY + extY) * rw) / p.geometry.trackRear;
+  unsprungZ[0] = pitchU + rollUF;
+  unsprungZ[1] = pitchU - rollUF;
+  unsprungZ[2] = -pitchU + rollUR;
+  unsprungZ[3] = -pitchU - rollUR;
   const heaveAcc = heave / ms - gNormal;
   s.heaveRate += h * heaveAcc;
   s.pitchRate += (h * pitchM) / p.mass.pitchInertia;
@@ -371,8 +388,8 @@ function substep(
   s.roll += h * s.rollRate;
   s.accelVertical = heaveAcc + gNormal;
   for (let i = 0; i < 4; i++) {
-    const mu = i < 2 ? p.mass.unsprungFront : p.mass.unsprungRear;
-    s.wheelVy[i] = s.wheelVy[i]! + h * ((tyreZ[i]! - bodyZ[i]!) / mu - gNormal);
+    const mw = i < 2 ? p.mass.unsprungFront : p.mass.unsprungRear;
+    s.wheelVy[i] = s.wheelVy[i]! + h * ((tyreZ[i]! - bodyZ[i]! + unsprungZ[i]!) / mw - gNormal);
     s.wheelY[i] = s.wheelY[i]! + h * s.wheelVy[i]!;
     let a = s.wheelAngle[i]! + h * s.wheelSpeed[i]!;
     if (a > Math.PI) a -= 2 * Math.PI;
