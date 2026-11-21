@@ -193,7 +193,16 @@ export class Room extends DurableObject<Env> {
       await this.ctx.storage.deleteAll();
       return;
     }
-    if (machine.takeDirty()) await this.ctx.storage.put(STATE_KEY, machine.state);
+    if (machine.takeDirty()) {
+      // The runtime holds outgoing messages until a write is confirmed (its output
+      // gate). On track that would stall every snapshot relay behind the disk, so
+      // writes there go out unconfirmed; lobby and results writes stay durable.
+      await this.ctx.storage.put(
+        STATE_KEY,
+        machine.state,
+        machine.durableWrites ? {} : { allowUnconfirmed: true },
+      );
+    }
     const next = machine.nextWakeAt();
     const now = Date.now();
     if (next === null) {

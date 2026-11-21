@@ -176,6 +176,16 @@ export class RoomMachine {
     return this.state.phase === 'closed';
   }
 
+  /**
+   * Must a state write be durable before anything else is sent? Yes in the lobby and
+   * results (and when closing), where the room promises to survive eviction. Not while
+   * cars are on track: there a write may be lost on eviction, which is better than
+   * holding every snapshot relay until the disk confirms it.
+   */
+  get durableWrites(): boolean {
+    return !SNAPSHOT_PHASES.has(this.state.phase);
+  }
+
   info(): RoomInfo {
     const humans = this.state.members.length;
     return {

@@ -977,3 +977,19 @@ describe('admission', () => {
     expect(h.all('c1', 'room').some((r) => r.room.phase === 'lights')).toBe(true);
   });
 });
+
+describe('persistence policy', () => {
+  it.each([
+    ['lobby', true],
+    ['grid', false],
+    ['formation', false],
+    ['lights', false],
+    ['racing', false],
+    ['finished', false],
+    ['results', true],
+  ] as const)('%s: state writes must be confirmed before messages go out: %s', (phase, durable) => {
+    // While cars are on track, holding every relay until a write is durable would
+    // stall snapshots behind the disk; persistence is only promised in lobby and results.
+    expect(inPhase(phase).h.machine.durableWrites).toBe(durable);
+  });
+});
