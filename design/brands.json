@@ -1,5 +1,5 @@
 {
-  "$comment": "Invented trackside brands. Every name, wordmark style and colour pairing is original and audited against real motorsport sponsors, tyre makers, watchmakers, airlines, oil companies, banks, beverage brands and tech companies.",
+  "$comment": "Invented trackside brands. Every name, wordmark style and colour pairing is original and audited against real motorsport sponsors, tyre makers, watchmakers, airlines, oil companies, banks, beverage brands and tech companies. Renamed after review for being too close to real companies or sponsors: SOLVANT, TELMARK, FINVEX, ALPENGRID and MARETTI; teal-on-dark schemes removed (close to a real title sponsor).",
   "version": 1,
   "brands": [
     {
@@ -15,14 +15,14 @@
       "id": "caldera",
       "name": "CALDERA",
       "sub": "GRID SYSTEMS",
-      "bg": "#0F3D42",
+      "bg": "#3B3832",
       "fg": "#F2F4EC",
       "accent": "#D4C64A",
       "style": "stripe"
     },
     {
-      "id": "solvant",
-      "name": "SOLVANT",
+      "id": "tervale",
+      "name": "TERVALE",
       "sub": "SYNTHETIC FLUIDS",
       "bg": "#13233A",
       "fg": "#F4F1EA",
@@ -93,8 +93,8 @@
       "style": "wing"
     },
     {
-      "id": "telmark",
-      "name": "TELMARK",
+      "id": "calmonde",
+      "name": "CALMONDE",
       "sub": "FIBRE NETWORK",
       "bg": "#3A1E44",
       "fg": "#F4F1F6",
@@ -129,17 +129,17 @@
       "style": "minimal"
     },
     {
-      "id": "finvex",
-      "name": "FINVEX",
+      "id": "velmoren",
+      "name": "VELMOREN",
       "sub": "CLEARING HOUSE",
-      "bg": "#12312B",
+      "bg": "#2A2A2E",
       "fg": "#F1F3EF",
-      "accent": "#5BB89E",
+      "accent": "#9DB04A",
       "style": "boxed"
     },
     {
-      "id": "alpengrid",
-      "name": "ALPENGRID",
+      "id": "glacerne",
+      "name": "GLACERNE",
       "sub": "HYDRO POWER",
       "bg": "#164266",
       "fg": "#F0F5F9",
@@ -159,9 +159,9 @@
       "id": "zentro",
       "name": "ZENTRO",
       "sub": "AUTOMATION",
-      "bg": "#191D24",
-      "fg": "#EDF2F2",
-      "accent": "#32B0A2",
+      "bg": "#E6E1D6",
+      "fg": "#1C1D21",
+      "accent": "#C8501E",
       "style": "chevron"
     },
     {
