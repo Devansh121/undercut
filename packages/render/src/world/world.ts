@@ -9,6 +9,7 @@ import {
 } from 'three';
 import type { MeshData, Track } from '@undercut/track';
 import { macroNoise, surfaceMaterial, type PbrSet } from '../materials/surface';
+import type { PropKitAssets } from '../props/catalog';
 import { boardMaterial, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
@@ -85,6 +86,12 @@ export interface CircuitWorldOptions {
   garageTeams?: readonly GarageTeam[] | undefined;
   /** Invented brands for trackside hoardings and bridge banners (from design/brands.json). */
   brands?: readonly BrandSpec[] | undefined;
+  /**
+   * Modelled props from the prop catalogue (packages/render/data/props.catalog.json). Each kind
+   * the kit has replaces its procedural stand-in at the same placements (ground-centre pivot,
+   * +Y up, +X front); kinds it lacks keep the stand-in.
+   */
+  propKit?: PropKitAssets | null;
 }
 
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
@@ -659,6 +666,7 @@ export class CircuitWorld {
       pitComplex: this.pitComplex,
       heightAt: this.heightAt,
       props,
+      propKit: o.propKit ?? null,
       brandAtlasTex: brandTex,
       signageAtlasTex: signTex,
       fenceTex,

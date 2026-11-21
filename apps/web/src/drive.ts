@@ -38,6 +38,17 @@ import brandsData from '../../../design/brands.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
 import monzaDressing from '@undercut/render/data/monza.dressing.json?url';
+
+/**
+ * The prop catalogue, when this build has one (packages/render/data/props.catalog.json, written by
+ * the prop kit's build). Globbed so its arrival is a data change: no file, procedural stand-ins.
+ */
+const propCatalog: unknown = Object.values(
+  import.meta.glob('../../../packages/render/data/props.catalog.json', {
+    eager: true,
+    import: 'default',
+  }),
+)[0];
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import { defaultCarState } from '@undercut/audio';
@@ -243,6 +254,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           car: carGeometry,
           racingLine: line,
           dressingUrl: monzaDressing,
+          propCatalog,
           garageTeams: teams.teams.map((t) => ({
             name: t.name,
             code: t.code,

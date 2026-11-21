@@ -44,6 +44,7 @@ import {
 } from './quality';
 import { GRASS_COLOUR, TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 import { isDressingFile, type DressingFile } from './world/dressing';
+import { PropKitAssets, isPropCatalog } from './props/catalog';
 import type { BrandSpec } from './world/brands';
 import type { GarageTeam } from './world/pit-building';
 import { CircuitWorld } from './world/world';
@@ -119,6 +120,11 @@ export interface RaceViewOptions {
   garageTeams?: readonly GarageTeam[];
   /** Invented brands for trackside hoardings and bridge banners. */
   brands?: readonly BrandSpec[];
+  /**
+   * The prop catalogue (packages/render/data/props.catalog.json) when the build has one: its
+   * models replace the world's procedural stand-ins kind by kind. Absent or invalid: stand-ins.
+   */
+  propCatalog?: unknown;
 }
 
 /** Everything the view needs for one frame, already interpolated by the game loop. */
@@ -177,6 +183,7 @@ export interface SessionAssets {
   sets: Record<TrackTextureId, PbrSet>;
   car: CarAssets;
   dressing: DressingFile | null;
+  propKit: PropKitAssets | null;
 }
 
 /**
@@ -280,12 +287,23 @@ export class RaceView {
           return d;
         })
       : Promise.resolve(null);
+    const kitP =
+      options.dressingUrl && isPropCatalog(options.propCatalog)
+        ? PropKitAssets.load(loader, options.propCatalog, q, options.dracoPath)
+        : Promise.resolve(null);
     // Settle all of them before deciding: a car that finishes after another file failed is
     // released here, never left behind.
-    const [skyR, setR, carR, dressingR] = await Promise.allSettled([skyP, setP, carP, dressingP]);
-    const failure = [skyR, setR, carR, dressingR].find((r) => r.status === 'rejected');
+    const [skyR, setR, carR, dressingR, kitR] = await Promise.allSettled([
+      skyP,
+      setP,
+      carP,
+      dressingP,
+      kitP,
+    ]);
+    const failure = [skyR, setR, carR, dressingR, kitR].find((r) => r.status === 'rejected');
     if (failure) {
       if (carR.status === 'fulfilled') carR.value.dispose();
+      if (kitR.status === 'fulfilled') kitR.value?.dispose();
       throw (failure as PromiseRejectedResult).reason;
     }
     const skyImage = (skyR as PromiseFulfilledResult<ImageBitmap>).value;
@@ -294,7 +312,8 @@ export class RaceView {
     const sets = {} as Record<TrackTextureId, PbrSet>;
     for (const [id, img] of setImages) sets[id] = pbrSet(img, img.sizeM, q.anisotropy);
     const dressing = (dressingR as PromiseFulfilledResult<DressingFile | null>).value;
-    return { index, sky: { meta: skyMeta, image: skyImage }, sets, car, dressing };
+    const propKit = (kitR as PromiseFulfilledResult<PropKitAssets | null>).value;
+    return { index, sky: { meta: skyMeta, image: skyImage }, sets, car, dressing, propKit };
   }
 
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions, assets: SessionAssets) {
@@ -341,6 +360,7 @@ export class RaceView {
           props: this.props,
           garageTeams: options.garageTeams,
           brands: options.brands,
+          propKit: assets.propKit,
         })
       : null;
     if (this.world) this.scene.add(this.world.group);
@@ -844,6 +864,7 @@ export class RaceView {
     this.environment.dispose();
     for (const s of Object.values(this.assets.sets)) disposeSet(s);
     this.assets.car.dispose();
+    this.assets.propKit?.dispose();
     this.scene.environment = null;
     this.scene.clear();
     this.renderer.renderLists.dispose();
