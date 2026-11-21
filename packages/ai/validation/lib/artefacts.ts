@@ -225,7 +225,11 @@ export function buildArtefacts(setup: CircuitSetup, clock: () => number): BuildR
   const track = setup.track();
   const config = referenceLineConfig(params);
   const line = buildRacingLine(track, envRead, config);
-  const plan = buildPlan(track, line.d, envRead, { scale: config.scale });
+  // Plan on the offsets as the file stores them (0.1 mm), so the shipped speeds are the ones a
+  // driver re-plans from the file: near a tight apex the rounding moves the curvature enough to
+  // change the planned speed by more than the file's cm/s.
+  const stored = Float64Array.from(line.d, (d) => Math.round(d * 1e4) / 1e4);
+  const plan = buildPlan(track, stored, envRead, { scale: config.scale });
   const t2 = clock();
   const data = encodeRacingLine(plan, {
     circuit: setup.id,

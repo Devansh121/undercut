@@ -60,10 +60,13 @@ export class LaunchDriver {
 }
 
 /**
- * The pedal profile for the published braking events, fixed once for all of them: full pedal
- * (still eased off whenever a wheel passes the threshold slip) until the speed is within the
- * last `fromFraction` of the drop from v1 to v2, then a cap falling linearly with speed to
- * `endPedal` at v2, as the driver trails off the brake into the corner. Not tuned per event.
+ * An assumed pedal ceiling for the published braking events, fixed once for all of them: no cap
+ * until the speed is within the last `fromFraction` of the drop from v1 to v2, then a cap
+ * falling linearly with speed to `endPedal` at v2. Both constants are unsupported estimates,
+ * not tuned per event, and the cap does not reproduce the published trail braking: the
+ * threshold controller already asks for less pedal than the cap as downforce falls, so removing
+ * it moves the seven events by at most 0.22 m and 0.006 s (measured). Brembo's distances and
+ * times include whatever trail-off the real drivers used; this profile does not model it.
  */
 export const TRAIL_OFF = Object.freeze({ fromFraction: 0.25, endPedal: 0.3 });
 

@@ -13,9 +13,16 @@ export interface Target {
   stated: string;
   /** Doc section and source numbers. */
   source: string;
-  /** True when a parameter was fitted to this quantity (it checks the fit, not the model). */
-  fit?: boolean;
+  /**
+   * How the calibration used this quantity (docs/physics-validation.md section 7, the three
+   * sets): `fit`, a parameter was solved for it, so it checks the fit, not the model;
+   * `selection`, it was looked at while choosing an estimate, so it is not independent;
+   * `validation`, withheld from every choice.
+   */
+  role: TargetRole;
 }
+
+export type TargetRole = 'fit' | 'selection' | 'validation';
 
 function band(value: number, tol: number): [number, number] {
   return [value - tol, value + tol];
@@ -32,18 +39,61 @@ function target(
   [low, high]: [number, number],
   stated: string,
   source: string,
-  fit = false,
 ): Target {
-  return fit
-    ? { id, label, unit, low, high, stated, source, fit }
-    : { id, label, unit, low, high, stated, source };
+  const fitted = FIT_TARGETS[id];
+  const selected = SELECTION_TARGETS[id];
+  if (fitted) {
+    return {
+      id,
+      label,
+      unit,
+      low,
+      high,
+      stated,
+      source: `${source}; fitted: ${fitted}`,
+      role: 'fit',
+    };
+  }
+  if (selected) {
+    return {
+      id,
+      label,
+      unit,
+      low,
+      high,
+      stated,
+      source: `${source}; used in selection: ${selected}`,
+      role: 'selection',
+    };
+  }
+  return { id, label, unit, low, high, stated, source, role: 'validation' };
 }
 
 /**
- * The one target a parameter was fitted to: the tyre's peak friction μy was fitted to the
- * Monza T1 2025 peak deceleration. It checks the fit, not the model; every other target checks.
+ * Direct fits: the targets a parameter was solved for, and what was solved. These check the
+ * fit, not the model (docs/physics-validation.md section 7).
  */
-export const FIT_TARGET = 'monza-t1-2025-peak';
+export const FIT_TARGETS: Readonly<Record<string, string>> = Object.freeze({
+  'accel-0-100': 'tyre μx at the reference load (with the Monza T1 2025 peak)',
+  'monza-t1-2025-peak': 'tyre μx at the reference load (with 0–100 km/h)',
+  'lateral-slow-low': 'tyre μy at the reference load',
+  'top-speed-low-drs': 'low-trim CdA',
+});
+
+/**
+ * Selection checks: targets looked at while choosing an estimate without being solved for, so
+ * they are not independent validation either. The cross-trim braking peaks chose the floor
+ * stall's height and loss (first version of the model) and were looked at when the load slopes
+ * were questioned; the Monza lap (packages/ai) was consulted when choosing the floor share.
+ */
+export const SELECTION_TARGETS: Readonly<Record<string, string>> = Object.freeze({
+  'monza-t1-2024-peak': 'floor stall settings (cross-trim braking peaks)',
+  'monza-t1-2023-peak': 'floor stall settings (cross-trim braking peaks)',
+  'spa-t5-2025-peak': 'floor stall settings (cross-trim braking peaks)',
+  'spa-t5-2024-peak': 'floor stall settings (cross-trim braking peaks)',
+  'singapore-t7-2025-peak': 'floor stall settings; an earlier fit of the longitudinal load slope',
+  'singapore-t14-2024-peak': 'floor stall settings (cross-trim braking peaks)',
+});
 
 /** Published braking events (doc 2.4) with both speeds known. */
 export interface BrakingEvent {
@@ -241,8 +291,7 @@ for (const e of BRAKING_EVENTS) {
       'g',
       band(e.peak, 0.4),
       `${e.peak} ± 0.4`,
-      `${e.id}-peak` === FIT_TARGET ? `doc 2.4 ${e.source}; μ fitted here` : `doc 2.4 ${e.source}`,
-      `${e.id}-peak` === FIT_TARGET,
+      `doc 2.4 ${e.source}`,
     ),
   );
 }
@@ -303,38 +352,43 @@ export interface KnownGap {
   reason: string;
 }
 
-const LOW_LOAD =
-  'Short of grip at low tyre load: with μy fitted at the high loads of the Monza T1 peak and ' +
-  "the doc's linear load sensitivity (−5e-5 per N, [44]), the launch and the low-speed end of " +
-  "the Monza stops lack grip. The data point to stronger load sensitivity than [44]'s.";
+const BRAKING_TIME =
+  "Hypothesis, not established: Brembo's stop times may include the trail-off and turn-in " +
+  'into the corner, which the scripted stop (at the limit to v2; its pedal ceiling is an ' +
+  'assumed estimate that barely acts) does not reproduce. Every published time at the ' +
+  'medium and high-downforce circuits comes out short.';
 const DOWNFORCE_BRAKING =
-  'In medium and high-downforce trim the car brakes harder at speed than published: its ' +
-  'tyre-limited deceleration rises with downforce, the published peaks barely do (Monza 4.7, ' +
-  'Spa 4.7, Singapore 4.9 g). The published distance and time also include a trail-off that ' +
-  'the fixed event pedal profile only approximates.';
+  'In medium and high-downforce trim the car stops shorter than published. Competing ' +
+  'explanations, not separated: more downforce lost under braking pitch than the modelled ' +
+  "floor stall, braking that becomes front-limited as load moves forward, the drivers' " +
+  'pedal build-up in the published events, or tyre load sensitivity stronger than the ' +
+  'cited sets. Spa and Singapore laps with lateral data would separate them.';
+const DOWNFORCE_PEAK =
+  'The high-downforce peak is above the published one with the tyre load slopes set from ' +
+  'the cited tyre data (not fitted to braking). Competing explanations, not separated: aero ' +
+  'loss under braking pitch beyond the modelled floor stall, front-limited braking as load ' +
+  "moves forward, the drivers' pedal build-up and the published peak's filtering, or a " +
+  'tyre more load-sensitive than the cited sets.';
 const MONZA_2023 =
   'The 2023 figure (5.2 g) stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner ' +
-  'and speed; the model gives about 4.7 g for all three.';
+  'and speed; the model gives about 4.7–4.8 g for all three.';
 const POUHON =
   'Flat constant-speed sweep in Spa air; the 5.7 g figure is a single secondary source for a ' +
-  'downhill double-apex corner. With μy fitted to braking, lateral grip at high load is lower.';
+  'downhill double-apex corner, with no trace, filter or duration.';
 
 export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
-  'accel-0-100': { measured: 3, reason: LOW_LOAD },
-  'accel-0-200': { measured: 5.629, reason: LOW_LOAD },
-  'monza-t1-2024-distance': { measured: 136.23, reason: LOW_LOAD },
-  'monza-t1-2023-distance': { measured: 139.24, reason: LOW_LOAD },
-  'monza-t1-2023-peak': { measured: 4.68, reason: MONZA_2023 },
-  'spa-t5-2025-distance': { measured: 81.88, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2025-time': { measured: 1.209, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2025-peak': { measured: 5.106, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2024-distance': { measured: 83.42, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2024-time': { measured: 1.279, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2024-peak': { measured: 5.066, reason: DOWNFORCE_BRAKING },
-  'singapore-t7-2025-time': { measured: 1.574, reason: DOWNFORCE_BRAKING },
-  'singapore-t7-2025-peak': { measured: 5.701, reason: DOWNFORCE_BRAKING },
-  'singapore-t14-2024-peak': { measured: 5.106, reason: DOWNFORCE_BRAKING },
-  'lateral-pouhon': { measured: 4.141, reason: POUHON },
+  'monza-t1-2023-peak': { measured: 4.754, reason: MONZA_2023 },
+  'spa-t5-2025-distance': { measured: 77.28, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2025-time': { measured: 1.135, reason: BRAKING_TIME },
+  'spa-t5-2024-distance': { measured: 78.48, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2024-time': { measured: 1.196, reason: BRAKING_TIME },
+  'spa-t5-2024-peak': { measured: 5.054, reason: DOWNFORCE_PEAK },
+  'singapore-t7-2025-distance': { measured: 83.13, reason: DOWNFORCE_BRAKING },
+  'singapore-t7-2025-time': { measured: 1.447, reason: BRAKING_TIME },
+  'singapore-t7-2025-peak': { measured: 5.403, reason: DOWNFORCE_PEAK },
+  'singapore-t14-2024-time': { measured: 1.808, reason: BRAKING_TIME },
+  'singapore-t14-2024-peak': { measured: 5.065, reason: DOWNFORCE_PEAK },
+  'lateral-pouhon': { measured: 4.594, reason: POUHON },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';

@@ -18,6 +18,7 @@ import {
   engineFullLoadTorque,
   fuelFlow,
   lateralMu,
+  longitudinalMu,
   radToRpm,
   restoreCar,
   rpmToRad,
@@ -70,7 +71,8 @@ describe('car parameters', () => {
   });
 
   it('builds each trim from the doc 1.4 table', () => {
-    expect(createCarParams('low').aero.cdA).toBe(1.15);
+    expect(createCarParams('low').aero.clA).toBe(3.6);
+    expect(createCarParams('low').aero.cdA).toBe(1.16); // inside 1.05–1.25, fitted to the trap
     expect(createCarParams('medium').aero.clA).toBe(4.6);
     expect(createCarParams('high').aero.balance).toBe(0.45);
     expect(createCarParams('high', { tyre: { muY: 1.9 } }).tyre.muY).toBe(1.9);
@@ -337,13 +339,50 @@ describe('aero', () => {
     }
     // Continuous: no step anywhere near the size of the stall loss itself.
     expect(biggestStep).toBeLessThan(0.05 * a.stallLoss * a.clA);
-    // Below the stall the floor loses `stallLoss` of what the height trend would give.
+    // Below the stall the floor, and only the floor, loses `stallLoss` of what the height trend
+    // would give it; the wings and bodywork keep theirs.
     const deep = a.stallHeight - a.leadingEdge * 0.03 - a.stallWidth - 0.001;
     const noStall = { ...a, stallLoss: 0 };
     aeroCoefficients(noStall, deep, deep + 0.03, 0, out);
     const trend = out.front + out.rear;
-    expect(total(deep) / trend).toBeCloseTo(1 - a.stallLoss, 9);
+    const wings = (1 - a.floorShare) * a.clA;
+    expect((total(deep) - wings) / (trend - wings)).toBeCloseTo(1 - a.stallLoss, 9);
     expect(edge(a.stallHeight - a.leadingEdge * 0.03)).toBeCloseTo(a.stallHeight, 9);
+  });
+
+  it('stalls no downforce when the floor makes none, and keeps drag and balance when stalled', () => {
+    const a = createCarParams('medium').aero;
+    const deep = a.stallHeight - a.leadingEdge * 0.03 - a.stallWidth - 0.001;
+    const noFloor = { ...a, floorShare: 0 };
+    const w = aeroCoefficients(noFloor, deep, deep + 0.03, 0, out);
+    expect(w.front + w.rear).toBeCloseTo(a.clA, 9);
+    // A stalled floor changes neither the drag nor where the downforce acts (doc 1.4).
+    const stalled = { ...aeroCoefficients(a, deep, deep + 0.03, 0, out) };
+    const clean = aeroCoefficients({ ...a, stallLoss: 0 }, deep, deep + 0.03, 0, {
+      front: 0,
+      rear: 0,
+      drag: 0,
+    });
+    expect(stalled.front + stalled.rear).toBeLessThan(clean.front + clean.rear);
+    expect(stalled.drag).toBe(clean.drag);
+    expect(stalled.front / (stalled.front + stalled.rear)).toBeCloseTo(
+      clean.front / (clean.front + clean.rear),
+      12,
+    );
+  });
+
+  it('moves only the floor share of the downforce and its drag with the floor height', () => {
+    const a = createCarParams('low').aero;
+    expect(a.floorShare).toBeGreaterThan(0);
+    expect(a.floorShare).toBeLessThan(1);
+    const allFloor = { ...a, floorShare: 1 };
+    const rake = a.referenceRake;
+    for (const front of [0.022, 0.026, 0.03, 0.036]) {
+      const f = { ...aeroCoefficients(a, front, front + rake, 0, out) };
+      const w = aeroCoefficients(allFloor, front, front + rake, 0, { front: 0, rear: 0, drag: 0 });
+      expect(f.front + f.rear - a.clA).toBeCloseTo(a.floorShare * (w.front + w.rear - a.clA), 9);
+      expect(f.drag - a.cdA).toBeCloseTo(a.floorShare * (w.drag - a.cdA), 9);
+    }
   });
 
   it('opens the DRS flap over its transient and closes it on the brake until released', () => {
@@ -443,7 +482,7 @@ describe('tyre force limit at low speed', () => {
     const fz = car.load[i]!;
     if (fz <= 0) return 0;
     const dy = lateralMu(curve, fz) * fz * car.gripScale[i]!;
-    const dx = dy * curve.muXRatio;
+    const dx = longitudinalMu(curve, fz) * fz * car.gripScale[i]!;
     return (car.forceX[i]! / dx) ** 2 + (car.forceY[i]! / dy) ** 2;
   };
 
@@ -465,6 +504,33 @@ describe('tyre force limit at low speed', () => {
         stepCar(car, input({ brake: 1 }), FLAT_SURFACE, 1 / 960, env);
         for (let i = 0; i < 4; i++) expect(ellipse(car, i)).toBeLessThanOrEqual(1 + 1e-9);
       }
+    });
+  }
+
+  // With no grip there is no friction to bound the low-speed carcass damping by: the tyre must
+  // pass no tangential force at all, in pure longitudinal, pure lateral and combined slip.
+  for (const [what, vx, vy] of [
+    ['pure longitudinal', 0.5, 0],
+    ['pure lateral', 0, 0.5],
+    ['combined', 0.5, 0.4],
+  ] as const) {
+    it(`passes no tyre force with zero grip, ${what} sliding at (${vx}, ${vy}) m/s`, () => {
+      const car = createCarState(REFERENCE_CAR, { fuel: 50 });
+      car.gripScale.fill(0);
+      car.vx = vx;
+      car.vy = vy;
+      car.wheelSpeed.fill(0);
+      for (let k = 0; k < 8; k++) {
+        stepCar(car, input({ brake: 1 }), FLAT_SURFACE, 1 / 960, env);
+        for (let i = 0; i < 4; i++) {
+          expect(car.load[i]!).toBeGreaterThan(0);
+          expect(Math.abs(car.forceX[i]!)).toBe(0);
+          expect(Math.abs(car.forceY[i]!)).toBe(0);
+        }
+      }
+      // Only aero drag acts (well under a newton at walking pace).
+      expect(car.vx).toBeCloseTo(vx, 4);
+      expect(car.vy).toBeCloseTo(vy, 4);
     });
   }
 });
