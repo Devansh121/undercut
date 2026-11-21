@@ -303,31 +303,38 @@ export interface KnownGap {
   reason: string;
 }
 
-const BRAKE_TORQUE =
-  'Friction-brake torque comes from the published peak brake power, which gives 28–30 kN at ' +
-  'all four events; with it the car peaks at 4.1–4.4 g, short of the published peaks.';
-const TRAIL_OFF =
-  'The published distance and time include the trail-off into the corner (Spa T5 2025 ' +
-  'averages 2.9 g over its 1.48 s while peaking at 4.7 g); a straight-line full stop to v2 is ' +
-  'shorter and quicker.';
+const LOW_LOAD =
+  'Short of grip at low tyre load: with μy fitted at the high loads of the Monza T1 peak and ' +
+  "the doc's linear load sensitivity (−5e-5 per N, [44]), the launch and the low-speed end of " +
+  "the Monza stops lack grip. The data point to stronger load sensitivity than [44]'s.";
+const DOWNFORCE_BRAKING =
+  'In medium and high-downforce trim the car brakes harder at speed than published: its ' +
+  'tyre-limited deceleration rises with downforce, the published peaks barely do (Monza 4.7, ' +
+  'Spa 4.7, Singapore 4.9 g). The published distance and time also include a trail-off that ' +
+  'the fixed event pedal profile only approximates.';
+const MONZA_2023 =
+  'The 2023 figure (5.2 g) stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner ' +
+  'and speed; the model gives about 4.7 g for all three.';
 const POUHON =
   'Flat constant-speed sweep in Spa air; the 5.7 g figure is a single secondary source for a ' +
-  'downhill double-apex corner.';
+  'downhill double-apex corner. With μy fitted to braking, lateral grip at high load is lower.';
 
 export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
-  'brake-peak-300': { measured: 4.083, reason: BRAKE_TORQUE },
-  'monza-t1-2025-peak': { measured: 4.24, reason: BRAKE_TORQUE },
-  'monza-t1-2023-peak': { measured: 4.227, reason: BRAKE_TORQUE },
-  'spa-t5-2025-distance': { measured: 77.09, reason: TRAIL_OFF },
-  'spa-t5-2025-time': { measured: 1.125, reason: TRAIL_OFF },
-  'spa-t5-2025-peak': { measured: 4.263, reason: BRAKE_TORQUE },
-  'spa-t5-2024-distance': { measured: 77.65, reason: TRAIL_OFF },
-  'spa-t5-2024-time': { measured: 1.175, reason: TRAIL_OFF },
-  'singapore-t7-2025-distance': { measured: 85.27, reason: TRAIL_OFF },
-  'singapore-t7-2025-time': { measured: 1.492, reason: TRAIL_OFF },
-  'singapore-t7-2025-peak': { measured: 4.346, reason: BRAKE_TORQUE },
-  'singapore-t14-2024-time': { measured: 1.875, reason: TRAIL_OFF },
-  'lateral-pouhon': { measured: 4.861, reason: POUHON },
+  'accel-0-100': { measured: 3, reason: LOW_LOAD },
+  'accel-0-200': { measured: 5.629, reason: LOW_LOAD },
+  'monza-t1-2024-distance': { measured: 136.23, reason: LOW_LOAD },
+  'monza-t1-2023-distance': { measured: 139.24, reason: LOW_LOAD },
+  'monza-t1-2023-peak': { measured: 4.68, reason: MONZA_2023 },
+  'spa-t5-2025-distance': { measured: 81.88, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2025-time': { measured: 1.209, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2025-peak': { measured: 5.106, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2024-distance': { measured: 83.42, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2024-time': { measured: 1.279, reason: DOWNFORCE_BRAKING },
+  'spa-t5-2024-peak': { measured: 5.066, reason: DOWNFORCE_BRAKING },
+  'singapore-t7-2025-time': { measured: 1.574, reason: DOWNFORCE_BRAKING },
+  'singapore-t7-2025-peak': { measured: 5.701, reason: DOWNFORCE_BRAKING },
+  'singapore-t14-2024-peak': { measured: 5.106, reason: DOWNFORCE_BRAKING },
+  'lateral-pouhon': { measured: 4.141, reason: POUHON },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';
