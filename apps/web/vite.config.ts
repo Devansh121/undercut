@@ -124,8 +124,9 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        // Diagnostic page for the input layer; linked from nowhere in the game.
+        // Diagnostic pages; linked from nowhere in the game.
         inputLab: fileURLToPath(new URL('./input-lab.html', import.meta.url)),
+        uiGallery: fileURLToPath(new URL('./ui-gallery.html', import.meta.url)),
       },
     },
   },

@@ -1,4 +1,3 @@
-/* global document */
 // Studio images of every team's car for the main menu's team card: the real car model in each
 // driver's livery, rendered by the car viewer (tools/car/preview) on the GPU and encoded as WebP.
 //
@@ -67,10 +66,10 @@ try {
         steer: '-6',
       });
       await page.goto(`${base}tools/car/preview/index.html?${q}`);
-      await page.waitForFunction(() => window.__ready === true, null, { timeout: 60_000 });
+      await page.waitForFunction(() => globalThis.__ready === true, null, { timeout: 60_000 });
       await page.waitForTimeout(150);
       const data = await page.evaluate(
-        (quality) => document.querySelector('canvas').toDataURL('image/webp', quality),
+        (quality) => globalThis.document.querySelector('canvas').toDataURL('image/webp', quality),
         QUALITY,
       );
       const bytes = Buffer.from(data.slice(data.indexOf(',') + 1), 'base64');

@@ -7,7 +7,8 @@
 // - JS: the JavaScript the game can load, as sent (the input lab and the unused copies of the
 //   Draco decoder that three.js's loader drags into the bundle are not counted).
 // - First-race transfer, per quality preset: what a player downloads from opening the page to the
-//   first frame of a race at Monza on that preset. The page, code, styles and fonts; the asset
+//   first frame of a race at Monza on that preset. The page, code, styles and fonts (and the menu's
+//   team car images, all of them, though the menu shows one at a time); the asset
 //   index; the sky and every track texture set at the preset's tiers
 //   (packages/render/src/presets.json, apps/web/dist/assets/index.json); the car levels of detail
 //   the preset loads and every livery mask (a full grid wears all of them); the Draco decoder.
@@ -77,13 +78,15 @@ function sent(rel) {
   return sentCache.has(rel) ? sentCache.get(rel) : null;
 }
 // Build outputs the game loads: everything outside assets/{tex,env,car,draco} and the asset index,
-// except source maps, the input lab and the bundler's unused Draco decoder copies.
+// except source maps, the diagnostic pages (input lab, UI gallery) and the bundler's unused Draco
+// decoder copies.
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
     !/^assets\/(tex|env|car|draco)\//.test(f) &&
     f !== 'assets/index.json' &&
     !/input-?lab/i.test(f) &&
+    !/ui-?gallery/i.test(f) &&
     !/^assets\/draco_(decoder|wasm_wrapper)-/.test(f),
 );
 const index = JSON.parse(fs.readFileSync(path.join(dist, 'assets/index.json'), 'utf8'));
@@ -105,7 +108,7 @@ for (const [name, q] of Object.entries(presets)) {
   for (const t of Object.values(index.textures))
     for (const f of Object.values(t[q.textureTier])) files.add(`assets/${f}`);
   for (const lod of new Set([...q.carLods, q.playerLod])) files.add(`assets/${CAR_FILES[lod]}`);
-  const groups = { code: 0, sky: 0, textures: 0, car: 0, draco: 0, other: 0 };
+  const groups = { code: 0, sky: 0, textures: 0, car: 0, draco: 0, menu: 0, other: 0 };
   let total = 0;
   const inventory = {};
   for (const f of files) {
@@ -124,9 +127,11 @@ for (const [name, q] of Object.entries(presets)) {
           ? 'car'
           : /assets\/draco\//.test(f)
             ? 'draco'
-            : code.includes(f)
-              ? 'code'
-              : 'other';
+            : /assets\/ui\//.test(f)
+              ? 'menu'
+              : code.includes(f)
+                ? 'code'
+                : 'other';
     groups[g] += n;
   }
   results.push({ name, total, groups, inventory });
