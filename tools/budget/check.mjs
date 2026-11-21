@@ -35,7 +35,6 @@ const CAR_FILES = {
   far: 'car/car_far.glb',
 };
 
-
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
