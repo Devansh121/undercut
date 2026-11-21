@@ -1,0 +1,733 @@
+{
+  "id": "singapore",
+  "name": "Singapore Marina Bay",
+  "country": "Singapore",
+  "direction": "anticlockwise",
+  "officialLength": 4927.0,
+  "referenceWidth": 9.0,
+  "osm": {
+    "relation": 421263,
+    "pitWay": 100484287,
+    "bbox": [1.283, 103.85, 1.3, 103.867]
+  },
+  "geometry": {
+    "note": "The circuit runs on public roads whose OpenStreetMap centrelines meet at sharp junction vertices; each vertex is rounded with a 12 m arc (estimate of a street corner's centreline radius) before the usual smoothing. Rounding the junctions shortens the loop by about 1 %, more than the 0.2 % allowed for smoothing alone.",
+    "denseStep": 0.5,
+    "filletRadius": 12.0,
+    "smoothSigma": 6.0,
+    "sampleStep": 2.0,
+    "maxLengthChangePct": 1.5,
+    "startHeadingDeg": [340, 360]
+  },
+  "cornerRule": {
+    "note": "The official numbering counts the turn 4 kink after the turn 3 hairpin and the three final lefts (turns 17 to 19) separately, which the default 150 m merge gap joins. A higher entry threshold and a 20 m merge gap find exactly the 19 official corners in order.",
+    "enter": 0.003333333,
+    "exit": 0.001666667,
+    "mergeGap": 20
+  },
+  "elevation": {
+    "note": "The opening filter removes buildings and canopy, and also the two bridges, because the surface model sees the water under them. Each bridge is put back as a deck straight between its abutment heights with a parabolic crown (estimates: 1.0 m on Fullerton Road, 1.5 m on Esplanade Drive).",
+    "openWindow": 400,
+    "average": 90,
+    "gradeSigma": 20,
+    "publishedRange": 5.3,
+    "rangeTolerance": 1.5,
+    "bridges": [
+      {
+        "way": 29377119,
+        "crown": 1.0
+      },
+      {
+        "way": 35037538,
+        "crown": 1.5
+      }
+    ]
+  },
+  "corners": [
+    {
+      "number": 1,
+      "name": "Republic Boulevard",
+      "direction": "left"
+    },
+    {
+      "number": 2,
+      "name": "Republic Boulevard",
+      "direction": "right"
+    },
+    {
+      "number": 3,
+      "name": "Republic Boulevard",
+      "direction": "left"
+    },
+    {
+      "number": 4,
+      "name": "Republic Boulevard",
+      "direction": "left"
+    },
+    {
+      "number": 5,
+      "name": "Raffles Boulevard",
+      "direction": "right"
+    },
+    {
+      "number": 6,
+      "name": "Raffles Boulevard",
+      "direction": "right"
+    },
+    {
+      "number": 7,
+      "name": "Nicoll Highway",
+      "direction": "left"
+    },
+    {
+      "number": 8,
+      "name": "Stamford Road",
+      "direction": "right"
+    },
+    {
+      "number": 9,
+      "name": "Saint Andrew's Road",
+      "direction": "left"
+    },
+    {
+      "number": 10,
+      "name": "Connaught Drive",
+      "direction": "left"
+    },
+    {
+      "number": 11,
+      "name": "Connaught Drive",
+      "direction": "right"
+    },
+    {
+      "number": 12,
+      "name": "Fullerton Road",
+      "direction": "left"
+    },
+    {
+      "number": 13,
+      "name": "Esplanade Drive",
+      "direction": "left"
+    },
+    {
+      "number": 14,
+      "name": "Esplanade",
+      "direction": "right"
+    },
+    {
+      "number": 15,
+      "name": "Raffles Avenue",
+      "direction": "left"
+    },
+    {
+      "number": 16,
+      "name": "Raffles Avenue",
+      "direction": "right"
+    },
+    {
+      "number": 17,
+      "name": "Marina Promenade",
+      "direction": "left"
+    },
+    {
+      "number": 18,
+      "name": "Marina Promenade",
+      "direction": "left"
+    },
+    {
+      "number": 19,
+      "name": "Marina Promenade",
+      "direction": "left"
+    }
+  ],
+  "timing": {
+    "note": "Offsets from the 2025 circuit map (docs/track-data.md section 4). A corner's position is its curvature apex, except for sector 1: the map's sector 1 tick lands 1 m from 150 m before the start of turn 7 but 25 m from 150 m before its apex, so the line is placed from the start. DRS zones 2 and 3 share a detection point. Zone 1 runs past the turn 6 kink to turn 7, and zone 3 past the turn 15 kink to turn 16, as the map draws them.",
+    "sectors": [
+      {
+        "corner": 7,
+        "offset": -150,
+        "at": "start"
+      },
+      {
+        "corner": 14,
+        "offset": -140
+      }
+    ],
+    "speedTrap": {
+      "corner": 1,
+      "offset": -150
+    },
+    "drs": [
+      {
+        "detection": {
+          "corner": 4
+        },
+        "activation": {
+          "corner": 5,
+          "offset": 48
+        },
+        "end": {
+          "corner": 7,
+          "at": "start"
+        }
+      },
+      {
+        "detection": {
+          "corner": 13,
+          "offset": -102
+        },
+        "activation": {
+          "corner": 13,
+          "offset": 78
+        }
+      },
+      {
+        "detection": {
+          "corner": 13,
+          "offset": -102
+        },
+        "activation": {
+          "corner": 14,
+          "offset": 100
+        },
+        "end": {
+          "corner": 16,
+          "at": "start"
+        }
+      },
+      {
+        "detection": {
+          "corner": 17,
+          "offset": 105
+        },
+        "activation": {
+          "corner": 19,
+          "at": "end"
+        }
+      }
+    ]
+  },
+  "timingLine": {
+    "note": "The control line, from which lap and sector times run. It is not the start line (s = 0, the OpenStreetMap start node).",
+    "at": {
+      "s": 4798.4
+    },
+    "uncertainty": 10.0,
+    "source": "FIA 2025 Singapore circuit map: the map's drawn track fitted to this centreline with tools/research/map_fit.py (similarity transform, median miss 2.7 m) and the control-line tick projected onto it; 128.6 m before the start line. Under the same fit the speed-trap, sector 1 and sector 2 ticks land 8.3, 0.8 and 9.0 m from their stored positions, hence +/- 10 m."
+  },
+  "environment": {
+    "note": "Raced at night under floodlights. Air temperature is an estimate of a typical race evening (October, equatorial). Pressure is the ISA value at the lap's mean altitude. Session times are the 2025 event's local start times. The floodlight masts are not mapped in OpenStreetMap (one tower and no lamps within the circuit's bounding box), so they are placed by rule (estimates): a mast every 40 m along each side, the two sides staggered by 20 m, 1 m behind the wall, 10 m tall.",
+    "timeZone": "Asia/Singapore",
+    "utcOffset": 28800,
+    "raceDate": "2025-10-05",
+    "sessions": {
+      "qualifying": 75600,
+      "race": 72000
+    },
+    "airTemperature": 303.15,
+    "lighting": "floodlit",
+    "floodlights": {
+      "mapped": false,
+      "rule": {
+        "spacing": 40.0,
+        "stagger": 20.0,
+        "setback": 1.0,
+        "height": 10.0
+      }
+    }
+  },
+  "grid": {
+    "note": "Estimates: pole 5 m behind the line on the right (the 2025 pit-lane drawing marks pole on the right-hand side), 8 m between slots, 2.8 m either side of the centreline.",
+    "slots": 20,
+    "poleS": -5.0,
+    "spacing": 8.0,
+    "lateral": 2.8,
+    "poleSide": "right"
+  },
+  "widths": {
+    "note": "Total width from the OpenStreetMap lanes tag of the road under each point, 3.2 m a lane, clipped to 9.5 to 15 m (the FIA reference width is 9 m); 12 m on the purpose-built raceway sections, which have no lanes tag; smoothed over 25 m. Estimates.",
+    "lanes": {
+      "laneWidth": 3.2,
+      "min": 9.5,
+      "max": 15.0,
+      "default": 12.0,
+      "smooth": 25.0
+    },
+    "overrides": [
+      {
+        "note": "The turn 13 hairpin: OpenStreetMap turns 138 degrees within 13 m here, so the centreline radius is about 8 m and the inside edge is kept 4.5 m from it (estimate).",
+        "from": {
+          "corner": 13,
+          "offset": -25
+        },
+        "to": {
+          "corner": 13,
+          "offset": 25
+        },
+        "left": 4.5,
+        "right": 6.0
+      }
+    ]
+  },
+  "banking": {
+    "note": "No banking: street crossfall is not modelled (estimate).",
+    "ramp": 30,
+    "corners": []
+  },
+  "kerbProfiles": [
+    {
+      "name": "flat",
+      "note": "Low painted kerb with a ramped inner edge. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.35, 0.05],
+        [1.5, 0]
+      ],
+      "high": null,
+      "taper": 3.0
+    },
+    {
+      "name": "exit",
+      "note": "Wide, very low exit kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.1, 0.02],
+        [2.3, 0.03],
+        [2.5, 0]
+      ],
+      "high": null,
+      "taper": 3.0
+    },
+    {
+      "name": "chicane",
+      "note": "Flat kerb followed by a raised sausage kerb. Height ramps up from nothing over the taper at each end of a run (estimate).",
+      "points": [
+        [0, 0],
+        [0.12, 0.035],
+        [1.4, 0.05],
+        [1.6, 0.05],
+        [1.75, 0.13],
+        [2.05, 0.13],
+        [2.2, 0]
+      ],
+      "high": [1.6, 2.2],
+      "taper": 4.0
+    }
+  ],
+  "kerbs": {
+    "note": "Estimates from the corner list: inside apex kerbs, outside exit kerbs, sausage kerbs at the turn 1 to 3 complex. Offsets in metres from the apex; side is inside or outside of the corner.",
+    "items": [
+      {
+        "corner": 1,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "chicane"
+      },
+      {
+        "corner": 2,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "chicane"
+      },
+      {
+        "corner": 3,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "chicane"
+      },
+      {
+        "corner": 4,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 5,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 6,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 7,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 8,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 9,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 10,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 11,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 12,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 13,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 14,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 15,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 16,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 17,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 18,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 19,
+        "side": "inside",
+        "from": -15,
+        "to": 12,
+        "profile": "flat"
+      },
+      {
+        "corner": 5,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 7,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 8,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 9,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 10,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 13,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 14,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 16,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      },
+      {
+        "corner": 19,
+        "side": "outside",
+        "from": 12,
+        "to": 45,
+        "profile": "exit"
+      }
+    ]
+  },
+  "runoff": {
+    "note": "Street circuit: the strip between the white line and the wall is road surface (asphalt). No mapped gravel is used. Escape roads are authored (estimates).",
+    "lineWidth": 0.2,
+    "maxScan": 0,
+    "minGravelLength": 20,
+    "default": "asphalt",
+    "items": [
+      {
+        "from": {
+          "corner": 1,
+          "offset": -60
+        },
+        "to": {
+          "corner": 2,
+          "offset": 30
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 7,
+          "offset": -70
+        },
+        "to": {
+          "corner": 7,
+          "offset": 10
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -50
+        },
+        "to": {
+          "corner": 8,
+          "offset": 10
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 10,
+          "offset": -50
+        },
+        "to": {
+          "corner": 10,
+          "offset": 10
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 13,
+          "offset": -60
+        },
+        "to": {
+          "corner": 13,
+          "offset": 5
+        },
+        "side": "right",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 14,
+          "offset": -70
+        },
+        "to": {
+          "corner": 14,
+          "offset": 10
+        },
+        "side": "left",
+        "kind": "asphalt"
+      },
+      {
+        "from": {
+          "corner": 16,
+          "offset": -50
+        },
+        "to": {
+          "corner": 16,
+          "offset": 10
+        },
+        "side": "left",
+        "kind": "asphalt"
+      }
+    ]
+  },
+  "barriers": {
+    "note": "Concrete walls close to the track edge on both sides (estimate: 1.5 m beyond the kerb or white line). OpenStreetMap walls and fences here belong to the city, not the circuit, so none are used. Escape roads at turns 1, 7, 8, 10, 13, 14 and 16 are authored, ending in tyre walls (estimates). On the pit side the pit wall stands halfway between the track edge and the pit lane.",
+    "maxScan": 0,
+    "minRunoff": 1.5,
+    "behindGravel": 3,
+    "default": "concrete",
+    "clampToFrame": true,
+    "items": [
+      {
+        "from": {
+          "corner": 1,
+          "offset": -60
+        },
+        "to": {
+          "corner": 2,
+          "offset": 30
+        },
+        "side": "right",
+        "type": "tyres",
+        "offset": 26
+      },
+      {
+        "from": {
+          "corner": 7,
+          "offset": -70
+        },
+        "to": {
+          "corner": 7,
+          "offset": 10
+        },
+        "side": "right",
+        "type": "tyres",
+        "offset": 24
+      },
+      {
+        "from": {
+          "corner": 8,
+          "offset": -50
+        },
+        "to": {
+          "corner": 8,
+          "offset": 10
+        },
+        "side": "left",
+        "type": "tyres",
+        "offset": 12
+      },
+      {
+        "from": {
+          "corner": 10,
+          "offset": -50
+        },
+        "to": {
+          "corner": 10,
+          "offset": 10
+        },
+        "side": "right",
+        "type": "tyres",
+        "offset": 18
+      },
+      {
+        "from": {
+          "corner": 13,
+          "offset": -60
+        },
+        "to": {
+          "corner": 13,
+          "offset": 5
+        },
+        "side": "right",
+        "type": "tyres",
+        "offset": 22
+      },
+      {
+        "from": {
+          "corner": 14,
+          "offset": -70
+        },
+        "to": {
+          "corner": 14,
+          "offset": 10
+        },
+        "side": "left",
+        "type": "tyres",
+        "offset": 18
+      },
+      {
+        "from": {
+          "corner": 16,
+          "offset": -50
+        },
+        "to": {
+          "corner": 16,
+          "offset": 10
+        },
+        "side": "left",
+        "type": "tyres",
+        "offset": 16
+      }
+    ]
+  },
+  "pit": {
+    "note": "Path from the OpenStreetMap pit-lane way. Widths, limit lines and boxes are estimates. The limit is 80 km/h from 2025.",
+    "side": "left",
+    "speedLimitKmh": 80,
+    "limitStart": 110,
+    "limitEndFromExit": 120,
+    "widths": [
+      [0, 2.5, 2.5],
+      [60, 3.5, 3.5],
+      [160, 9.0, 3.5],
+      [-160, 9.0, 3.5],
+      [-60, 3.5, 3.5],
+      [-1, 2.5, 2.5]
+    ],
+    "boxes": {
+      "count": 10,
+      "spacing": 20.0,
+      "lateral": 5.5
+    }
+  }
+}

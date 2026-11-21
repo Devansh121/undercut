@@ -37,6 +37,16 @@ The circuit files in `packages/track/data/` and `packages/render/data/` are data
 
 Heights produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.
 
+The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.
+
+| Circuit file | OpenStreetMap relation and pit-lane way | Copernicus GLO-30 tile |
+| --- | --- | --- |
+| `monza.json` | [284565](https://www.openstreetmap.org/relation/284565), way 38168747 | N45 E009 |
+| `spa.json` | [284560](https://www.openstreetmap.org/relation/284560), way 323851541 | N50 E005 |
+| `singapore.json` | [421263](https://www.openstreetmap.org/relation/421263), way 100484287 | N01 E103 |
+
+Timing-line positions were measured on the FIA's published 2025 circuit maps; the maps are not redistributed.
+
 ## Assets
 
 Every third-party asset is listed in [`assets/MANIFEST.json`](assets/MANIFEST.json) with its file, source URL, author, licence, changes and sha256.

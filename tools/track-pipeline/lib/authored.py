@@ -4,6 +4,9 @@ Positions in the tables are references, resolved here to s on the scaled lap:
   {"s": 12}                        12 m after the start/finish line
   {"corner": 4, "offset": -233}    233 m before the apex of turn 4
   {"pit": "entry", "offset": 40}   40 m after the point where the pit lane leaves the lap
+  {"corner": 7, "at": "start"}     where turn 7's curvature region begins ("end": where it ends)
+  {"line": "timing", "offset": 12} 12 m after the timing (control) line, which sources call the
+                                   finish line; s = 0 is the start line
 """
 import math
 
@@ -17,6 +20,7 @@ class Lap:
         self.step = length / count
         self.corners = corners  # number -> dict(apex_s, first_s, last_s, sign)
         self.pit = pit  # dict(entry_s, exit_s) once known
+        self.timing_line = None  # s of the timing line once known
 
     def wrap(self, s):
         return s % self.length
@@ -25,7 +29,12 @@ class Lap:
         if "s" in ref:
             return self.wrap(ref["s"] + ref.get("offset", 0.0))
         if "corner" in ref:
-            return self.wrap(self.corners[ref["corner"]]["apex_s"] + ref.get("offset", 0.0))
+            key = {"apex": "apex_s", "start": "first_s", "end": "last_s"}[ref.get("at", "apex")]
+            return self.wrap(self.corners[ref["corner"]][key] + ref.get("offset", 0.0))
+        if "line" in ref:
+            if ref["line"] != "timing" or self.timing_line is None:
+                raise SystemExit("unknown or unresolved line reference %r" % (ref,))
+            return self.wrap(self.timing_line + ref.get("offset", 0.0))
         if "pit" in ref:
             key = {"entry": "entry_s", "exit": "exit_s"}[ref["pit"]]
             return self.wrap(self.pit[key] + ref.get("offset", 0.0))
@@ -146,6 +155,33 @@ def clean_runs(flags, min_len):
     return out
 
 
+def merge_short_runs(values, min_len):
+    """Periodic: a run of equal values shorter than min_len samples takes its predecessor's value."""
+    v = list(values)
+    n = len(v)
+    if min_len <= 1 or len(set(v)) < 2:
+        return v
+    for _ in range(n):
+        # Runs as (start, length), starting the scan at a run boundary.
+        b = next(i for i in range(n) if v[i] != v[i - 1])
+        runs = []
+        i = 0
+        while i < n:
+            j = i
+            while j < n and v[(b + j) % n] == v[(b + i) % n]:
+                j += 1
+            runs.append((i, j - i))
+            i = j
+        short = [r for r in runs if r[1] < min_len]
+        if not short or len(runs) < 2:
+            return v
+        start, length = min(short, key=lambda r: (r[1], r[0]))
+        prev = v[(b + start - 1) % n]
+        for k in range(length):
+            v[(b + start + k) % n] = prev
+    return v
+
+
 def slope_limit(values, max_step):
     """Raises values so neighbours differ by at most max_step (periodic), keeping the larger."""
     v = list(values)
@@ -213,6 +249,69 @@ def local_max_curvature(kappa, sign, window):
     return [max(max(0.0, sign * kappa[(i + k) % n]) for k in range(-window, window + 1)) for i in range(n)]
 
 
+def path_curvature(pts):
+    """Curvature as packages/track's TrackPath computes it on a closed path: twice the turn
+    between neighbouring chords over their summed length, positive turning left."""
+    n = len(pts)
+    out = []
+    for i in range(n):
+        a, p, b = pts[i - 1], pts[i], pts[(i + 1) % n]
+        e0 = (p[0] - a[0], p[1] - a[1])
+        e1 = (b[0] - p[0], b[1] - p[1])
+        cross = e0[0] * e1[1] - e0[1] * e1[0]
+        dot = e0[0] * e1[0] + e0[1] * e1[1]
+        out.append(-math.atan2(cross, dot) * 2 / (math.hypot(*e0) + math.hypot(*e1)))
+    return out
+
+
+def frame_limit(kappa, sign, step):
+    """How far out the (s, d) frame stays one-to-one on one side, as packages/track computes it
+    (Track.frameLimit) from `path_curvature`: 0.95 of the tightest radius within 12 samples,
+    growing by at most 0.5 m per metre away from it."""
+    n = len(kappa)
+    lim = []
+    for i in range(n):
+        kmax = max(max(0.0, sign * kappa[(i + w) % n]) for w in range(-12, 13))
+        lim.append(0.95 / kmax if kmax > 0 else 1e6)
+    rise = 0.5 * step
+    for _ in range(2):
+        for m in range(1, 2 * n):
+            lim[m % n] = min(lim[m % n], lim[(m - 1) % n] + rise)
+        for m in range(2 * n - 2, -1, -1):
+            lim[m % n] = min(lim[m % n], lim[(m + 1) % n] + rise)
+    return lim
+
+
 def normals_from(pts):
     hs = geom.headings(pts, True)
     return [(math.sin(h), -math.cos(h)) for h in hs]
+
+
+def lane_widths(lap, cfg, way_tags_at):
+    """Half-widths from the OSM `lanes` tag of the road under each sample (street circuits).
+
+    Each side gets half of lanes x laneWidth, clipped to [min, max] total, with `default` where a
+    way has no lanes tag; the result is smoothed along the lap so it changes over tens of metres,
+    not at way boundaries. `overrides` then set authored widths over ranges, ramped in and out."""
+    w = cfg["widths"]["lanes"]
+    raw = []
+    for i in range(lap.count):
+        tags = way_tags_at(i * lap.step)
+        total = w["default"]
+        lanes = tags.get("lanes", "")
+        if lanes.isdigit():
+            total = int(lanes) * w["laneWidth"]
+        total = max(w["min"], min(w["max"], total))
+        raw.append(total / 2)
+    half = geom.smooth_closed(raw, w["smooth"] / lap.step)
+    out = [[h, h] for h in half]
+    ramp = w.get("ramp", 30.0)
+    for item in cfg["widths"].get("overrides", []):
+        a, b = lap.resolve(item["from"]), lap.resolve(item["to"])
+        span = lap.forward(a, b)
+        for i in lap.span(a - ramp, b + ramp):
+            u = lap.forward(a - ramp, i * lap.step)
+            t = smoothstep(u / ramp) * smoothstep((span + 2 * ramp - u) / ramp)
+            out[i][0] += (item["left"] - out[i][0]) * t
+            out[i][1] += (item["right"] - out[i][1]) * t
+    return [tuple(x) for x in out]

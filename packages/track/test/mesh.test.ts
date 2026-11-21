@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import raw from '../data/monza.json';
+import monza from '../data/monza.json';
+import singapore from '../data/singapore.json';
+import spa from '../data/spa.json';
 import {
   MESH_LOD,
   MeshSurface,
@@ -144,7 +146,13 @@ describe('track meshes on a synthetic stadium', () => {
   });
 });
 
-describe('track meshes on Monza', () => {
+// Every committed circuit; Spa's steep cross-falls and Singapore's walls at the edge are the
+// hard cases for the terrain and the barriers.
+describe.each([
+  ['Monza', monza],
+  ['Spa', spa],
+  ['Singapore', singapore],
+] as const)('track meshes on %s', (_name, raw) => {
   const track = Track.fromJSON(raw);
   const high = buildTrackMeshes(track, MESH_LOD.high);
   const mobile = buildTrackMeshes(track, MESH_LOD.mobile);
@@ -160,9 +168,13 @@ describe('track meshes on Monza', () => {
     expect(mobile.road.surface.length).toBeLessThan(high.road.surface.length / 2.5);
     expect(verts(mobile)).toBeLessThan(verts(high) / 2);
     expect(new Set(high.kerbs.surface)).toEqual(new Set([MeshSurface.Kerb, MeshSurface.KerbHigh]));
-    expect(new Set(high.barriers.surface)).toEqual(
-      new Set([MeshSurface.Armco, MeshSurface.Concrete, MeshSurface.Tyres, MeshSurface.Fence]),
-    );
+    const ids = {
+      armco: MeshSurface.Armco,
+      concrete: MeshSurface.Concrete,
+      tyres: MeshSurface.Tyres,
+      fence: MeshSurface.Fence,
+    };
+    expect(new Set(high.barriers.surface)).toEqual(new Set(track.barriers.map((b) => ids[b.type])));
   });
 
   it('keeps the terrain below every drivable surface and reaches well beyond the barriers', () => {

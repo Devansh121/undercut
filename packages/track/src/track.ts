@@ -4,12 +4,52 @@ import {
   validateTrackData,
   type BarrierType,
   type CornerData,
+  type EnvironmentData,
   type RunoffKind,
   type Run,
   type Side,
   type TrackData,
 } from './data';
 import { TrackPath, createPathPoint, createVec3, type PathPoint, type Vec3 } from './path';
+
+/**
+ * The pit lane's own ground: the lap's ground under the pit centreline, smoothed along the pit
+ * lane over this many metres (Gaussian sigma). Where the pit lane crosses the line midway between
+ * two legs of the lap (inside Spa's La Source), the lap's ground switches from one leg's
+ * cross-section to the other's and steps by their height difference; the pit lane must not.
+ */
+export const PIT_GROUND_SIGMA = 15;
+/** Beyond the pit lane's edges its ground blends back to the lap's over this band, metres. */
+export const PIT_GROUND_BAND = 2;
+
+/** Smoothstep on [0, 1], and 1 above. */
+function smoothUnit(t: number): number {
+  return t >= 1 ? 1 : t * t * (3 - 2 * t);
+}
+
+/** Gaussian smoothing of an open sequence, ends reflected about their values. */
+function smoothOpen(values: ArrayLike<number>, sigmaSamples: number): Float64Array {
+  const n = values.length;
+  const out = new Float64Array(n);
+  const half = Math.ceil(3 * sigmaSamples);
+  const at = (j: number): number =>
+    j < 0
+      ? 2 * values[0]! - values[Math.min(-j, n - 1)]!
+      : j >= n
+        ? 2 * values[n - 1]! - values[Math.max(2 * n - 2 - j, 0)]!
+        : values[j]!;
+  for (let i = 0; i < n; i++) {
+    let acc = 0;
+    let sum = 0;
+    for (let k = -half; k <= half; k++) {
+      const w = Math.exp(-0.5 * (k / sigmaSamples) ** 2);
+      acc += w * at(i + k);
+      sum += w;
+    }
+    out[i] = acc / sum;
+  }
+  return out;
+}
 
 /** Lateral fall of the ground beyond the track edge (drainage), metres per metre. */
 export const VERGE_FALL = 0.02;
@@ -206,6 +246,13 @@ export class Track {
   /** Start s of each sector; the first is 0. */
   readonly sectors: Float64Array;
   readonly speedTrap: number;
+  /**
+   * s of the timing (control) line, from which published lap and sector times run. Carried as
+   * data: lap timing in the game still runs from s = 0.
+   */
+  readonly timingLine: number;
+  /** Place and event facts for rendering and physics; null for migrated format 2 files. */
+  readonly environment: EnvironmentData | null;
   readonly drsZones: readonly DrsZone[];
   readonly gridSlots: readonly Pose[];
   /** On the centreline at the start/finish line, facing the direction of travel. */
@@ -221,6 +268,13 @@ export class Track {
   /** Per lap sample, a pit-path sample near it when the pit lane runs alongside, else -1. */
   readonly pitNear: Int32Array;
   readonly pitSide: SideIndex;
+  /** The pit lane's ground height per pit-path sample (see PIT_GROUND_SIGMA). */
+  readonly pitHeight: Float64Array;
+  private readonly pitPath: TrackPath;
+  private readonly pitHalfLeft: Float64Array;
+  private readonly pitHalfRight: Float64Array;
+  private readonly pitPoint = createPathPoint();
+  private readonly pitScratchHint = { index: -1 };
 
   private readonly tmp = createVec3();
 
@@ -237,6 +291,8 @@ export class Track {
     const n = data.sampleCount;
     this.lap = new TrackPath(c.x, c.y, c.z, data.length, true);
     this.lineWidth = data.lineWidth;
+    this.timingLine = data.timingLine.s;
+    this.environment = data.environment;
     this.bank = Float64Array.from(c.bank);
     this.tanBank = this.bank.map(Math.tan);
     this.halfWidth = [Float64Array.from(c.halfWidthLeft), Float64Array.from(c.halfWidthRight)];
@@ -311,6 +367,25 @@ export class Track {
     };
     this.gridSlots = data.grid.map((slot) => lapPose(slot.s, slot.d));
     this.startPose = lapPose(0, 0);
+
+    // Which lap samples have the pit lane alongside: project every pit sample onto the lap.
+    this.pitPath = new TrackPath(data.pit.x, data.pit.y, data.pit.z, data.pit.length, false);
+    this.pitHalfLeft = Float64Array.from(data.pit.halfWidthLeft);
+    this.pitHalfRight = Float64Array.from(data.pit.halfWidthRight);
+    this.pitNear = new Int32Array(n).fill(-1);
+    const pp = this.pitPath;
+    const q = createPathPoint();
+    const hint = { index: -1 };
+    const under = new Float64Array(pp.count);
+    for (let j = 0; j < pp.count; j++) {
+      this.lap.project(pp.x[j]!, pp.z[j]!, hint, q);
+      under[j] = this.ground(q.s, q.d, g).height;
+      const reach = Math.max(this.pitHalfLeft[j]!, this.pitHalfRight[j]!) + 2 + PIT_GROUND_BAND;
+      const i0 = this.lap.sampleIndex(q.s - reach);
+      const span = Math.ceil((2 * reach) / this.lap.step);
+      for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
+    }
+    this.pitHeight = smoothOpen(under, PIT_GROUND_SIGMA / pp.step);
     this.pit = new PitLane(data.pit, (x, z) => this.groundHeightAt(x, z));
 
     this.trackLimits = [new Float64Array(2 * n), new Float64Array(2 * n)];
@@ -320,19 +395,6 @@ export class Track {
         this.trackLimits[k][2 * i] = this.lap.x[i]! + d * this.lap.nx[i]!;
         this.trackLimits[k][2 * i + 1] = this.lap.z[i]! + d * this.lap.nz[i]!;
       }
-    }
-
-    // Which lap samples have the pit lane alongside: project every pit sample onto the lap.
-    this.pitNear = new Int32Array(n).fill(-1);
-    const pp = this.pit.path;
-    const q = createPathPoint();
-    const hint = { index: -1 };
-    for (let j = 0; j < pp.count; j++) {
-      this.lap.project(pp.x[j]!, pp.z[j]!, hint, q);
-      const reach = Math.max(this.pit.halfWidthLeft[j]!, this.pit.halfWidthRight[j]!) + 2;
-      const i0 = this.lap.sampleIndex(q.s - reach);
-      const span = Math.ceil((2 * reach) / this.lap.step);
-      for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
     }
 
     this.frameLimit = [new Float64Array(n), new Float64Array(n)];
@@ -451,12 +513,70 @@ export class Track {
 
   /**
    * Ground height at a world point: the point projected onto the lap, then the lap's
-   * cross-section there. The surface sampler, the meshes and every pose use this ground.
+   * cross-section there, blended with the pit lane's own ground on and near the pit lane
+   * (`pitBlend`). The surface sampler, the meshes and every pose use this ground.
    * `hint` speeds up repeated queries for one moving point; omit it for a one-off query.
    */
   groundHeightAt(x: number, z: number, hint: { index: number } = { index: -1 }): number {
     const q = this.project(x, z, hint, this.worldPoint);
-    return this.ground(q.s, q.d, this.groundScratch).height;
+    const h = this.ground(q.s, q.d, this.groundScratch).height;
+    this.pitScratchHint.index = -1;
+    const w = this.pitBlend(x, z, q.s, q.d, this.pitScratchHint, this.pitPoint);
+    return w > 0 ? h + w * (this.pitGroundHeight(this.pitPoint.s) - h) : h;
+  }
+
+  /** Is a pit-frame position (from `pitBlend`) on the pit-lane surface? */
+  pitLaneSurface(p: PathPoint): boolean {
+    const hl = this.pitPath.interpolate(this.pitHalfLeft, p.s);
+    const hr = this.pitPath.interpolate(this.pitHalfRight, p.s);
+    return p.d <= hl && p.d >= -hr;
+  }
+
+  /** The pit lane's own ground height at s_pit. */
+  pitGroundHeight(sPit: number): number {
+    return this.pitPath.interpolate(this.pitHeight, sPit);
+  }
+
+  /** Grade of the pit lane's own ground along the pit lane at s_pit. */
+  pitGroundGrade(sPit: number): number {
+    const e = 0.5 * this.pitPath.step;
+    const a = Math.max(0, sPit - e);
+    const b = Math.min(this.pitPath.length, sPit + e);
+    return b > a ? (this.pitGroundHeight(b) - this.pitGroundHeight(a)) / (b - a) : 0;
+  }
+
+  /**
+   * How much of the pit lane's own ground applies at (x, z), already projected to the lap at
+   * (s, d): 1 on the pit-lane surface, falling smoothly to 0 over PIT_GROUND_BAND beyond its
+   * edges, and fading in over the same band from the lap's track edge (where the pit lane
+   * merges, so the ground stays continuous there); 0 elsewhere. Fills `out` with the pit-frame
+   * position when the result is above 0.
+   */
+  pitBlend(
+    x: number,
+    z: number,
+    s: number,
+    d: number,
+    pitHint: { index: number },
+    out: PathPoint,
+  ): number {
+    const i = this.lap.sampleIndex(s);
+    const near = this.pitNear[i]!;
+    if (near < 0) return 0;
+    const side: SideIndex = d >= 0 ? LEFT : RIGHT;
+    const beyondEdge = Math.abs(d) - this.lap.interpolate(this.halfWidth[side], s);
+    if (side !== this.pitSide || beyondEdge <= 0) return 0;
+    if (pitHint.index < 0) pitHint.index = Math.min(near, this.pitPath.segments - 1);
+    this.pitPath.project(x, z, pitHint, out);
+    if (out.s < 0 || out.s > this.pitPath.length) return 0;
+    const hl = this.pitPath.interpolate(this.pitHalfLeft, out.s);
+    const hr = this.pitPath.interpolate(this.pitHalfRight, out.s);
+    const outside = Math.max(out.d - hl, -hr - out.d);
+    if (outside >= PIT_GROUND_BAND) return 0;
+    return (
+      smoothUnit(1 - Math.max(0, outside) / PIT_GROUND_BAND) *
+      smoothUnit(beyondEdge / PIT_GROUND_BAND)
+    );
   }
 
   private readonly worldPoint = createPathPoint();
@@ -590,17 +710,7 @@ export class Track {
     pitHint: { index: number },
     out: PathPoint,
   ): boolean {
-    const i = this.lap.sampleIndex(s);
-    const near = this.pitNear[i]!;
-    if (near < 0) return false;
-    const side: SideIndex = d >= 0 ? LEFT : RIGHT;
-    if (side !== this.pitSide || Math.abs(d) <= this.halfWidth[side][i]!) return false;
-    if (pitHint.index < 0) pitHint.index = Math.min(near, this.pit.path.segments - 1);
-    this.pit.path.project(x, z, pitHint, out);
-    if (out.s < 0 || out.s > this.pit.length) return false;
-    const hl = this.pit.path.interpolate(this.pit.halfWidthLeft, out.s);
-    const hr = this.pit.path.interpolate(this.pit.halfWidthRight, out.s);
-    return out.d <= hl && out.d >= -hr;
+    return this.pitBlend(x, z, s, d, pitHint, out) > 0 && this.pitLaneSurface(out);
   }
 
   private buildBarriers(): Barrier[] {
