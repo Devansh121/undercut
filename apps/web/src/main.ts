@@ -1,4 +1,6 @@
 import '../../../design/mock/tokens.css';
+import './styles/kit.css';
+import './styles/menu.css';
 import './styles.css';
 import { InputSystem } from '@undercut/input';
 import {
@@ -9,15 +11,21 @@ import {
   navigatorRumble,
 } from '@undercut/input/dom';
 import type { QualityName } from '@undercut/render';
+import { CIRCUITS } from 'virtual:undercut/circuits';
 import { PageAudio } from './audio';
 import { debugEnabled, installDebugApi } from './debug';
 import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
+import { RecordStore, durableStorage, memoryStorage } from './game/records';
+import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
+import { PrefsStore } from './ui/data/prefs';
+import { MenuInput } from './ui/menu-input';
+import { CircuitSelectScreen } from './ui/screens/circuits';
+import { HubScreen, type SessionChoice } from './ui/screens/hub';
+import { LaunchScreen } from './ui/screens/launch';
+import { Shell } from './ui/shell';
 
 type DriveModule = typeof DriveModuleNs;
-import { RecordStore, durableStorage, memoryStorage } from './game/records';
-import { mountLaunchScreen, type LaunchScreen } from './launch';
-import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
 
 const app = document.getElementById('app');
 const canvas = document.getElementById('view');
@@ -28,11 +36,14 @@ if (!(app instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
 const params = new URLSearchParams(window.location.search);
 const touch = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // One record store for the page, so records kept in memory (storage blocked, or ?storage=memory)
-// survive quitting to the launch screen and starting again.
+// survive quitting to the menu and starting again.
 const webStorage = new WebStorageAdapter();
 const records = new RecordStore(
   params.get('storage') === 'memory' ? memoryStorage() : durableStorage(webStorage),
 );
+// What the menus remember (mode, circuit, team, settings), through the same storage port.
+const prefs = new PrefsStore(webStorage);
+await prefs.load();
 // Engine sound for the page: created on the first gesture, saved volumes beside the settings.
 const audio = new PageAudio(webStorage);
 const input = new InputSystem({
@@ -58,48 +69,70 @@ function chooseQuality(): { quality: QualityName; auto: boolean } {
 
 let drive: DriveHandle | null = null;
 let driveModule: DriveModule | null = null;
-let launch: LaunchScreen | null = null;
 let starting: Promise<DriveHandle> | null = null;
-let menuHandle = 0;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function showLaunch(): void {
+// ---- Menus
+const shell = new Shell(app);
+const menuInput = new MenuInput(input, {
+  action: (a, native) => shell.handle(a, native),
+  device: (d) => {
+    shell.setDevice(d);
+    hub.setDevice(d);
+  },
+});
+const hub: HubScreen = new HubScreen({
+  circuits: CIRCUITS,
+  prefs,
+  records,
+  device: () => input.activeDevice,
+  onStart: (choice) => {
+    // The Start press is the gesture that may start audio.
+    audio.gesture();
+    start(choice).catch(() => undefined);
+  },
+  onCircuits: () => shell.push(circuits),
+  onBack: () => shell.pop(),
+});
+const circuits = new CircuitSelectScreen(CIRCUITS, prefs, records, () => shell.pop());
+const launch = new LaunchScreen(__BUILD_HASH__, () => {
+  audio.gesture();
+  shell.push(hub);
+});
+
+function showMenus(screen: 'launch' | 'hub'): void {
   drive = null;
-  launch = mountLaunchScreen(app as HTMLElement, {
-    buildHash: __BUILD_HASH__,
-    record: null,
-    onStart: () => {
-      // The Start click is the gesture that may start audio.
-      audio.gesture();
-      start().catch(() => undefined);
-    },
-  });
-  void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
-  // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
-  let last: number | null = null;
-  const poll = (now: number): void => {
-    if (drive || starting) return;
-    const dt = last === null ? 0 : (now - last) / 1000;
-    last = now;
-    const f = input.sample(dt, 0);
-    for (const e of f.events) {
-      // A focused button already clicks on Enter; gamepads need the accept passed on.
-      const native = f.device === 'keyboard' && document.activeElement?.tagName === 'BUTTON';
-      if (e.type === 'action' && e.action === 'menuAccept' && !native) launch?.start();
-    }
-    menuHandle = requestAnimationFrame(poll);
-  };
-  menuHandle = requestAnimationFrame(poll);
+  shell.mount();
+  if (screen === 'launch' || !shell.current) shell.reset(launch);
+  if (screen === 'hub') {
+    if (shell.current !== hub) shell.push(hub);
+    else hub.enter();
+  }
+  hub.setLoading(false);
+  menuInput.start();
 }
 
-async function start(): Promise<DriveHandle> {
+/** The choice on the main menu now (the debug API starts with it). */
+function currentChoice(): SessionChoice {
+  const p = prefs.get();
+  return {
+    mode: 'timeTrial',
+    circuit: p.circuit,
+    team: p.team,
+    driver: p.driver,
+    timeOfDay: p.timeOfDay[p.circuit] ?? '',
+    assists: p.assists[input.activeDevice] ?? {},
+  };
+}
+
+async function start(choice: SessionChoice = currentChoice()): Promise<DriveHandle> {
   if (drive) return drive;
   if (starting) return starting;
-  launch?.setLoading(true);
-  cancelAnimationFrame(menuHandle);
+  hub.setLoading(true);
+  menuInput.stop();
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -118,16 +151,25 @@ async function start(): Promise<DriveHandle> {
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
-        onQuit: () => showLaunch(),
+        team: choice.team,
+        driver: choice.driver,
+        timeOfDay: choice.timeOfDay,
+        assists: choice.assists,
+        onAssist: (device, key, value) =>
+          prefs.update((p) => {
+            p.assists[device] = { ...(p.assists[device] ?? {}), [key]: value };
+          }),
+        onQuit: () => showMenus('hub'),
       });
       drive = handle;
       return handle;
     } catch (error) {
-      launch?.setLoading(false);
       if (error instanceof Error && error.name === 'LoadCancelled') {
-        showLaunch();
+        showMenus('hub');
         throw error;
       }
+      hub.setLoading(false);
+      menuInput.start();
       document.documentElement.dataset.webgl = 'unavailable';
       console.error('Could not start the session', error);
       throw error;
@@ -138,11 +180,11 @@ async function start(): Promise<DriveHandle> {
   return starting;
 }
 
-showLaunch();
+showMenus('launch');
 if (debugEnabled()) {
   installDebugApi(
     () => drive,
-    start,
+    () => start(),
     () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),

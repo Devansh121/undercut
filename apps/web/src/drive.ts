@@ -58,9 +58,12 @@ import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import { saveQuality } from './game/quality-setting';
+import type { AssistConfig } from './game/assists';
+import type { DeviceKind } from '@undercut/input';
+import { S } from './ui/strings';
 
-/** The team whose colours the player's car wears in M1. */
-const TEAM_ID = 'kestrel';
+/** The team whose colours the player's car wears when the menu chose none. */
+const DEFAULT_TEAM = 'calder';
 const REV_START = 10500;
 const REV_FULL = 12200;
 const REV_FLASH = 12350;
@@ -110,6 +113,15 @@ export interface DriveOptions {
   audio?: DriveAudio;
   /** No saved or requested preset: benchmark the first seconds and pick one. */
   autoQuality?: boolean;
+  /** The player's team (design/teams.json id) and driver (0 or 1). */
+  team?: string;
+  driver?: 0 | 1;
+  /** Time-of-day preset id (render TIMES_OF_DAY); `?tod=` in the URL wins. */
+  timeOfDay?: string;
+  /** The player's assist choices on top of the device preset. */
+  assists?: Partial<AssistConfig>;
+  /** An assist changed in the pause menu (to remember it for that device). */
+  onAssist?: (device: DeviceKind, key: keyof AssistConfig, value: number | boolean) => void;
 }
 
 /** Thrown when the player backs out of a failed load; the launch screen comes back. */
@@ -120,12 +132,13 @@ export class LoadCancelled extends Error {
   }
 }
 
-/** Every driver's car look, from design/teams.json: the player's team first. */
-function liveries(first: string): CarLivery[] {
+/** Every driver's car look, from design/teams.json: the player's car first. */
+function liveries(first: string, driver: 0 | 1): CarLivery[] {
   const out: CarLivery[] = [];
   const ordered = [...teams.teams].sort((a, b) => (a.id === first ? -1 : b.id === first ? 1 : 0));
   for (const t of ordered) {
-    for (const d of t.drivers) {
+    const drivers = t.id === first && driver === 1 ? [...t.drivers].reverse() : t.drivers;
+    for (const d of drivers) {
       out.push({
         team: t.id,
         primary: t.colours.primary,
@@ -206,6 +219,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const records = o.records;
   const record = await records.load(track.id);
   const session = new DriveSession({ track, seed: o.seed, record, today: o.today });
+  for (const [key, value] of Object.entries(o.assists ?? {}) as [keyof AssistConfig, never][]) {
+    session.setAssist(key, value);
+  }
+  /** Change an assist from the pause menu and remember it for the device in use. */
+  const setAssist = <K extends keyof AssistConfig>(key: K, value: AssistConfig[K]): void => {
+    session.setAssist(key, value);
+    o.onAssist?.(session.device, key, value);
+  };
   const params = session.params;
   const mass = computeMass(session.car.state.model, TIME_TRIAL_FUEL, {
     total: 0,
@@ -216,7 +237,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     sprungB: 0,
     yawInertia: 0,
   });
-  const all = liveries(TEAM_ID);
+  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
+  const all = liveries(teamId, o.driver ?? 0);
   const playerLivery = all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -261,11 +283,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       }
     }
   };
-  // `?tod=overcast-day|night-floodlit` (render tests); Monza's afternoon otherwise.
+  // `?tod=overcast-day|night-floodlit` (render tests), else the menu's choice, else the afternoon.
   const tod =
-    TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ?? MONZA_AFTERNOON;
+    TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ??
+    TIMES_OF_DAY[o.timeOfDay ?? ''] ??
+    MONZA_AFTERNOON;
   let quality = o.quality;
-  const loading = mountLoadingScreen(o.host, track.name, 'Time trial');
+  const loading = mountLoadingScreen(o.host, track.name, S.loading.timeTrial);
   let view: RaceView;
   try {
     view = await loadView(quality, loading);
@@ -335,7 +359,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         label: 'Traction control',
         choices: levels,
         get: () => session.assists.tractionControl,
-        set: (v) => session.setAssist('tractionControl', Number(v)),
+        set: (v) => setAssist('tractionControl', Number(v)),
       },
       {
         id: 'abs',
@@ -345,7 +369,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           { value: 2, label: 'On' },
         ],
         get: () => (session.assists.abs > 0 ? 2 : 0),
-        set: (v) => session.setAssist('abs', Number(v)),
+        set: (v) => setAssist('abs', Number(v)),
       },
       {
         id: 'gears',
@@ -355,14 +379,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           { value: 'manual', label: 'Manual' },
         ],
         get: () => (session.assists.autoGears ? 'auto' : 'manual'),
-        set: (v) => session.setAssist('autoGears', v === 'auto'),
+        set: (v) => setAssist('autoGears', v === 'auto'),
       },
       {
         id: 'steering',
         label: 'Steering help',
         choices: levels,
         get: () => session.assists.steering,
-        set: (v) => session.setAssist('steering', Number(v)),
+        set: (v) => setAssist('steering', Number(v)),
       },
     ],
     () =>

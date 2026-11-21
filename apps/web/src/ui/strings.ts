@@ -6,10 +6,37 @@
  * Functions build strings that carry numbers or names; numbers arrive already formatted.
  */
 
+const WORDS = [
+  'no',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+  'twenty',
+];
+/** Small counts in words, as prose writes them; larger ones as figures. */
+export const words = (n: number): string => WORDS[n] ?? String(n);
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
 export const S = {
   launch: {
     tagline: (teams: number, drivers: number) =>
-      `Open-wheel racing on measured circuits. ${teams} teams, ${drivers} drivers, one car model built to the regulations.`,
+      `Open-wheel racing on measured circuits. ${cap(words(teams))} teams, ${words(drivers)} drivers, one car built to the regulations.`,
     press: 'Press any key or tap to start',
     pressTouch: 'Tap to start',
     build: 'Build',
@@ -19,6 +46,7 @@ export const S = {
     main: 'Main',
     settings: 'Settings',
     back: 'Back',
+    loading: 'Loading',
     modes: 'Modes',
     records: 'Best laps on this device',
     noRecord: 'No lap yet',
@@ -79,6 +107,7 @@ export const S = {
     anticlockwise: 'Anticlockwise',
     record: 'Record on this device',
     dry: 'Dry',
+    air: (celsius: number) => `Air ${celsius}°`,
     km: 'km',
     onlyOne: 'More circuits arrive with their track data.',
   },
@@ -116,6 +145,8 @@ export const S = {
     off: 'Off',
     done: 'Done',
     summaryTimeTrial: (tod: string, device: string) => `${tod} · ${device} assists`,
+    assistsFor: (device: string) => `${device} assists`,
+    steeringKeyboard: 'Sticks and touch only',
   },
 
   summary: {

@@ -33,7 +33,14 @@ describe('circuit summary', () => {
     expect(Math.max(...ys)).toBeLessThanOrEqual(plan.height - 13.9);
     expect(plan.path.endsWith('Z')).toBe(true);
     expect(plan.sectorPaths).toHaveLength(3);
-    expect(plan.labels.map((l) => l.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    // Chicanes (1-2, 4-5, 8-9-10) show their first corner's number only.
+    const numbers = plan.labels.map((l) => l.n);
+    expect(numbers[0]).toBe(1);
+    expect(numbers).toContain(11);
+    expect(new Set(numbers).size).toBe(numbers.length);
+    for (const a of plan.labels)
+      for (const b of plan.labels)
+        if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(10);
     // The sector paths join end to start: sector 1 ends where sector 2 begins.
     const end = (p: string): string => p.slice(p.lastIndexOf('L') + 1);
     const start = (p: string): string => p.slice(1, p.indexOf('L'));

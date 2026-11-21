@@ -144,11 +144,11 @@ export function buildPlan(
     const dx = x - cx;
     const dy = y - cy;
     const d = Math.hypot(dx, dy) || 1;
-    labels.push({
-      n: c.number,
-      x: Number(round1(x + (dx / d) * 9)),
-      y: Number(round1(y + (dy / d) * 9)),
-    });
+    const lx = Number(round1(x + (dx / d) * 9));
+    const ly = Number(round1(y + (dy / d) * 9));
+    // Corners closer together than a label is wide (a chicane) share the first one's number.
+    if (labels.some((l) => Math.hypot(l.x - lx, l.y - ly) < 10)) continue;
+    labels.push({ n: c.number, x: lx, y: ly });
   }
   return {
     width,
