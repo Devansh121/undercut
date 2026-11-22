@@ -1734,6 +1734,6 @@ body {
 /* On a short screen the standings leave room for Skip to results under them. */
 @media (max-height: 500px) {
   .race-status {
-    max-height: calc(100vh - 150px);
+    max-height: calc(100vh - 200px);
   }
 }

@@ -38,15 +38,28 @@ test('Quick Race: grid, lights, moving field and player result', async ({ page }
   await page.evaluate(() => window.__undercut!.resume());
   // After the player's flag the standings are provisional, with cars still racing, until the
   // field has finished (one moment, read in one call: the race runs at eight times real time).
-  await page.waitForFunction(
+  // The standings take the screen then: Skip to results inside the viewport (a landscape
+  // phone is 390 px tall), the driving cluster gone from under them.
+  const layout = await page.waitForFunction(
     () => {
       const st = window.__undercut!.state();
       const rows = st.standings as { status: string }[];
-      return st.provisional === true && rows.some((r) => r.status === 'running');
+      const skip = document.querySelector<HTMLElement>('[data-testid="skip-results"]');
+      if (st.provisional !== true || !rows.some((r) => r.status === 'running')) return null;
+      if (!skip || skip.hidden) return null;
+      const cluster = document.querySelector<HTMLElement>('.hud-cluster');
+      return {
+        skipBottom: skip.getBoundingClientRect().bottom,
+        viewport: window.innerHeight,
+        clusterShown: !!cluster && getComputedStyle(cluster).display !== 'none',
+      };
     },
     null,
     { timeout: 120_000 },
   );
+  const seen = (await layout.jsonValue())!;
+  expect(seen.skipBottom).toBeLessThanOrEqual(seen.viewport);
+  expect(seen.clusterShown).toBe(false);
   await page.waitForFunction(() => !!window.__undercut!.state().raceResult, null, {
     timeout: 120_000,
   });
