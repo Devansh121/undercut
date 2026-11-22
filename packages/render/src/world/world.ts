@@ -225,38 +225,44 @@ export class CircuitWorld {
       await maybeYield();
     };
 
-    const lapBox = bounds(
-      Array.from({ length: track.lap.count * 2 }, (_, i) =>
-        i % 2 === 0 ? (track.lap.x[i >> 1] as number) : (track.lap.z[i >> 1] as number),
-      ),
-    );
-    let terrain: ReturnType<typeof buildTerrain> | null = null;
-    await timed('terrain', () => {
-      const grid = decodeTerrain(dressing.terrain);
-      terrain = buildTerrain(
-        track,
-        grid,
-        world.lap,
-        o.drivable,
-        wq.terrain === 'high'
-          ? TERRAIN_HIGH
-          : wq.terrain === 'lite'
-            ? TERRAIN_LITE
-            : TERRAIN_MOBILE,
+    try {
+      const lapBox = bounds(
+        Array.from({ length: track.lap.count * 2 }, (_, i) =>
+          i % 2 === 0 ? (track.lap.x[i >> 1] as number) : (track.lap.z[i >> 1] as number),
+        ),
       );
-      world.heightAt = terrain.heightAt;
-    });
-    await timed('cover', () => {
-      world.buildGround(o, terrain!, lapBox);
-    });
-    if (!wq.structures) {
-      await timed('trees', () => world.placeTrees(o, lapBox));
-    } else {
-      await timed('pit', () => world.placePitComplex(o));
-      await timed('trees', () => world.placeTrees(o, lapBox));
-      await timed('buildings', () => world.placeBuildings(o));
-      await timed('stands', () => world.placeStands(o));
-      await timed('furniture', () => world.placeFurnitureAndDecals(o));
+      let terrain: ReturnType<typeof buildTerrain> | null = null;
+      await timed('terrain', () => {
+        const grid = decodeTerrain(dressing.terrain);
+        terrain = buildTerrain(
+          track,
+          grid,
+          world.lap,
+          o.drivable,
+          wq.terrain === 'high'
+            ? TERRAIN_HIGH
+            : wq.terrain === 'lite'
+              ? TERRAIN_LITE
+              : TERRAIN_MOBILE,
+        );
+        world.heightAt = terrain.heightAt;
+      });
+      await timed('cover', () => {
+        world.buildGround(o, terrain!, lapBox);
+      });
+      if (!wq.structures) {
+        await timed('trees', () => world.placeTrees(o, lapBox));
+      } else {
+        await timed('pit', () => world.placePitComplex(o));
+        await timed('trees', () => world.placeTrees(o, lapBox));
+        await timed('buildings', () => world.placeBuildings(o));
+        await timed('stands', () => world.placeStands(o));
+        await timed('furniture', () => world.placeFurnitureAndDecals(o));
+      }
+    } catch (error) {
+      // Release what the steps so far made; the caller gets the error.
+      world.dispose();
+      throw error;
     }
     const finalSlice = performance.now() - sliceStart;
     if (finalSlice > maxSlice) maxSlice = finalSlice;

@@ -187,10 +187,14 @@ describe('grandstands, start gantry, and over-track bridges', () => {
     const bridges = buildTrackBridges(track, monzaDressing, lap, tex);
     expect(bridges.count).toBeGreaterThanOrEqual(2);
     expect(bridges.geometries.length).toBe(bridges.count * 2);
-    for (const g of bridges.geometries) {
-      expect(g.getAttribute('position').count).toBeGreaterThanOrEqual(8);
+    // One structure and one banner geometry per bridge (chunked for culling): the structure is
+    // a real deck with supports, the banner a face on each side of the bridge.
+    bridges.geometries.forEach((g, i) => {
+      const n = g.getAttribute('position').count;
+      if (i % 2 === 0) expect(n).toBeGreaterThan(20);
+      else expect(n).toBe(8);
       g.dispose();
-    }
+    });
     for (const m of bridges.materials) m.dispose();
     tex.dispose();
   });

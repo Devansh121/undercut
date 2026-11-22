@@ -263,7 +263,13 @@ export class RaceView {
     const assets = await RaceView.fetchAssets(options);
     const t1 = performance.now();
     const view = new RaceView(canvas, options, assets, true);
-    await view.finishWorldAsync(options, assets);
+    try {
+      await view.finishWorldAsync(options, assets);
+    } catch (error) {
+      // A failed world build must not leave the half-built view's GPU objects behind.
+      view.dispose();
+      throw error;
+    }
     view.loadTimes.fetch = t1 - t0;
     return view;
   }
@@ -475,7 +481,7 @@ export class RaceView {
   private async finishWorldAsync(options: RaceViewOptions, assets: SessionAssets): Promise<void> {
     if (assets.dressing) {
       const tw = performance.now();
-      this.world = await CircuitWorld.buildAsync({
+      const world = await CircuitWorld.buildAsync({
         track: options.track,
         dressing: assets.dressing,
         quality: this.quality,
@@ -487,7 +493,13 @@ export class RaceView {
         brands: options.brands,
         propKit: assets.propKit,
       });
-      this.scene.add(this.world.group);
+      // The view may have been released while the world was building (a lost context).
+      if (this.disposed) {
+        world.dispose();
+        return;
+      }
+      this.world = world;
+      this.scene.add(world.group);
       this.loadTimes.world = performance.now() - tw;
       if (this.world.buildTimes.maxSlice !== undefined) {
         this.loadTimes.worldMaxSlice = this.world.buildTimes.maxSlice;
