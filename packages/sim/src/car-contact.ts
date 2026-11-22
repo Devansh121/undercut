@@ -251,6 +251,8 @@ export function carOverlap(a: CarState, b: CarState): number {
 /** What the contact needs of each car: its state. `WorldCar` satisfies it. */
 export interface ContactBody {
   readonly state: CarState;
+  /** A ghost touches no other car. */
+  readonly ghost?: boolean;
 }
 
 function ensure(c: CarContacts, n: number): void {
@@ -309,6 +311,7 @@ export function resolveCarContacts(cars: readonly ContactBody[], contacts: CarCo
       if (sj.x - si.x > 2 * REACH) break;
       const dz = sj.z - si.z;
       if (dz > 2 * REACH || dz < -2 * REACH) continue;
+      if (cars[i]!.ghost === true || cars[j]!.ghost === true) continue;
       pairs[2 * pc] = i < j ? i : j;
       pairs[2 * pc + 1] = i < j ? j : i;
       pc++;

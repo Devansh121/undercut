@@ -231,6 +231,9 @@ export class RaceSession {
       const input = wc.input;
       controller.control(this.contexts[i]!, input);
       const st = control.cars[i]!.status;
+      // Retired, the car is parked out of the race where it stopped: a ghost no car touches
+      // (and the drivers no longer see), so it never blocks the road (race-rules.md).
+      wc.ghost = st === 'dnf' || st === 'dsq';
       if (control.held(i) || st === 'dnf' || st === 'dsq') {
         input.throttle = 0;
         input.brake = 1;

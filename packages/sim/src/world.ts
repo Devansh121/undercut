@@ -28,6 +28,11 @@ export interface WorldCar {
   /** Pose before the latest step, for render interpolation with the current pose. */
   readonly previousPose: CarPose;
   readonly pose: CarPose;
+  /**
+   * A ghost touches no other car (a retired car left where it stopped, which the race rules
+   * park out of the race). Set by the session before each `stepWorld`; default false.
+   */
+  ghost: boolean;
 }
 
 /** The simulation state: clock, RNG, surface and every car. */
@@ -75,6 +80,7 @@ export function addCar(world: World, params: CarParams, start: CarStartOptions =
     input: { ...NEUTRAL_INPUT },
     previousPose: readCarPose(state, createCarPose()),
     pose,
+    ghost: false,
   };
   world.cars.push(car);
   return car;

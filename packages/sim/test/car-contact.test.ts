@@ -229,6 +229,18 @@ describe('car-to-car contact', () => {
     }
   });
 
+  it('leaves a ghost car untouched and untouching (a retired car parked out of the race)', () => {
+    const world = createWorld({ step: STEP, seed: 1 });
+    const a = addCar(world, REFERENCE_CAR, { x: 0, speed: 30 });
+    const b = addCar(world, REFERENCE_CAR, { x: 3, speed: 0 });
+    b.ghost = true;
+    for (let i = 0; i < 24; i++) stepWorld(world);
+    expect(a.state.carContactImpulse).toBe(0);
+    expect(b.state.carContactImpulse).toBe(0);
+    expect(Math.abs(b.state.vx)).toBeLessThan(0.1);
+    expect(carOverlap(a.state, b.state)).toBeGreaterThan(0.5);
+  });
+
   it('can be switched off for a world of ghosts', () => {
     const world = createWorld({ step: STEP, seed: 1, carContact: false });
     addCar(world, REFERENCE_CAR, { x: 0, speed: 30 });

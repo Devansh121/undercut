@@ -286,6 +286,9 @@ export class AiController implements CarController {
     for (let j = 0; j < field.length; j++) {
       const f = field[j]!;
       if (j === ctx.car) continue;
+      // A retired car is parked out of the race, a ghost on the road: no traffic.
+      const status = ctx.control.cars[j]!.status;
+      if (status === 'dnf' || status === 'dsq') continue;
       // A car in the pit lane is seen only where the lane meets the track (entry and exit):
       // behind the pit wall it is no traffic.
       if (f.inPitLane) {

@@ -123,6 +123,11 @@ A car stationary or making no progress for 60 s (from when it stopped) is retire
 except a human driver in time trial or practice: they keep the warning and can reset or
 restart, which puts them back in the session.
 
+A retired car (dnf or dsq) is parked out of the race where it stopped: it becomes a ghost that no
+other car touches and the AI drivers no longer see, so it can never block the road. It is not
+moved: a car lifted elsewhere could land on another car or a barrier. Before it retires, a car
+standing still in the road is an obstacle the AI drivers go round (`packages/ai`, race driver).
+
 ## Snapshots and cost
 
 `RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 2) adds

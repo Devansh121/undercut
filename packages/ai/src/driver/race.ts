@@ -91,6 +91,10 @@ const ALONGSIDE = 0.9 * CAR_LENGTH;
 const PASS_CLEARANCE = 0.3;
 /** Share of the car's braking a car in a move brakes off line with, to the off-line speed. */
 const MOVE_BRAKE_SHARE = 0.9;
+/** Speed a car goes round a car stopped in the road, until past it, m/s. */
+const BYPASS_SPEED = 8;
+/** Centre-to-centre beside a stopped car going round it, m: the car is at an angle, steering. */
+const BYPASS_SIDE_BY_SIDE = SIDE_BY_SIDE + 0.3;
 /** Gap to the car ahead in the lane, m, under which the queue beyond it counts on the launch. */
 const LAUNCH_QUEUE_GAP = 15;
 /** Lateral distance below which a car ahead is in this car's path, m. */
@@ -101,6 +105,8 @@ const EDGE_MARGIN = 0.25;
 const LATERAL_RATE = 1.5;
 /** Gap control: standstill gap, m, speed gain, 1/s, and the deceleration assumed for safety, m/s². */
 const STANDSTILL_GAP = 2;
+/** Gap kept to a car standing still in the road, m: room to steer out and round it. */
+const STILL_GAP = 10;
 const GAP_GAIN = 0.8;
 const SPEED_GAIN = 3;
 /** Share of this car's braking the gap control counts on, and extra reaction time, s. */
@@ -206,6 +212,13 @@ export class RaceDriver implements Driver {
   private aheadPaceId = -1;
   /** The move goes on into the braking zone: level with the other car by the turn-in. */
   private passCommitted = false;
+  /** The move goes round a car stopped in the road (anywhere, a corner too, slowly). */
+  private passBypass = false;
+  /** The car standing still in the road ahead (`obstructId`, -1 none) and how long it has been seen. */
+  private obstructTime = 0;
+  private obstructId = -1;
+  /** Seconds left backing up, to steer out round a stopped car stopped too close to it. */
+  private reverseTime = 0;
   private biasX = 0;
   private biasZ = 0;
   private haveSense = false;
@@ -277,6 +290,10 @@ export class RaceDriver implements Driver {
     this.aheadPace = 1;
     this.aheadPaceId = -1;
     this.passCommitted = false;
+    this.passBypass = false;
+    this.obstructTime = 0;
+    this.obstructId = -1;
+    this.reverseTime = 0;
     this.biasX = 0;
     this.biasZ = 0;
     this.haveSense = false;
@@ -306,6 +323,10 @@ export class RaceDriver implements Driver {
     out.aheadPaceId = this.aheadPaceId;
     out.passDecel = this.passDecel;
     out.passCommitted = this.passCommitted;
+    out.passBypass = this.passBypass;
+    out.obstructTime = this.obstructTime;
+    out.obstructId = this.obstructId;
+    out.reverseTime = this.reverseTime;
     out.biasX = this.biasX;
     out.biasZ = this.biasZ;
     out.haveSense = this.haveSense;
@@ -353,6 +374,10 @@ export class RaceDriver implements Driver {
     this.aheadPaceId = typeof m.aheadPaceId === 'number' ? m.aheadPaceId : -1;
     this.passDecel = typeof m.passDecel === 'number' ? m.passDecel : 0;
     this.passCommitted = m.passCommitted === true;
+    this.passBypass = m.passBypass === true;
+    this.obstructTime = typeof m.obstructTime === 'number' ? m.obstructTime : 0;
+    this.obstructId = typeof m.obstructId === 'number' ? m.obstructId : -1;
+    this.reverseTime = typeof m.reverseTime === 'number' ? m.reverseTime : 0;
     this.biasX = num('biasX');
     this.biasZ = num('biasZ');
     this.haveSense = m.haveSense === true;
@@ -378,6 +403,7 @@ export class RaceDriver implements Driver {
     inner.drive(seen, dt, out);
     this.last.offset = this.o;
     if (view) this.recover(view, tel, dt, out);
+    if (view && !this.recovering) this.backUp(tel, dt, out);
     return out;
   }
 
@@ -496,7 +522,10 @@ export class RaceDriver implements Driver {
     const aggression = clamp01(this.skill.aggression);
     // (Committed to a move, the next few lengths: its lane was checked to the turn-in, and the
     // apex beyond, where the line meets the edge, is not where it is now.)
-    this.bounds(s0, this.passCommitted ? 10 + v * 0.3 : 30 + v * 1.2, this.room);
+    // (Round a stopped car, here only: its lane is fixed on the road beside it, not held against
+    // a line that swings across the track a few metres on.)
+    const roomReach = this.passBypass ? 0 : this.passCommitted ? 10 + v * 0.3 : 30 + v * 1.2;
+    this.bounds(s0, roomReach, this.room);
     const oMin = this.room.lo;
     const oMax = this.room.hi;
     // Braking zone or corner close ahead: the car in front owns the corner unless this one is
@@ -531,11 +560,15 @@ export class RaceDriver implements Driver {
       // Clearances grow with the width the other car takes across the track (spun, turning).
       const wide = c.halfWidth - BODY_HALF_WIDTH;
       const inPathAt = IN_PATH + wide;
-      const owns = cornering && ds >= 0.6 * CAR_LENGTH && c.id !== this.passId;
+      // (A car standing still owns no corner: it is an obstacle where it is, or nothing, as when
+      // it sits in the run-off.)
+      const owns = cornering && ds >= 0.6 * CAR_LENGTH && c.id !== this.passId && c.speed >= 1;
       // The car being passed, in a committed move out of its lane, is in the way only if the
       // bodies would come within a hand's width.
       const passing =
-        this.passCommitted && c.id === this.passId && Math.abs(od - this.o) >= inPathAt - 0.5;
+        (this.passCommitted || this.passBypass) &&
+        c.id === this.passId &&
+        Math.abs(od - this.o) >= inPathAt - 0.5;
       const inPath = passing
         ? lateral < CAR_WIDTH + wide + PASS_CLEARANCE
         : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns;
@@ -647,10 +680,26 @@ export class RaceDriver implements Driver {
     }
     this.passSeenV = watched !== null ? watched.speed : -1;
     this.passSeenId = watched !== null ? watched.id : -1;
-    if (this.passId < 0) this.passCommitted = false;
+    if (this.passId < 0) {
+      this.passCommitted = false;
+      this.passBypass = false;
+    }
     if (this.passId >= 0) {
-      const lost = !passCar || (this.passTime > 15 && !this.passCommitted);
-      const done = passCar !== null && passDs < -(CAR_LENGTH + 2);
+      const lost =
+        !passCar ||
+        (this.passTime > 15 && !this.passCommitted && !this.passBypass) ||
+        this.passTime > 30;
+      // Round a stopped car: over once it moves off again (it is traffic then, not an obstacle).
+      const movedOff = this.passBypass && passCar !== null && passCar.speed > BYPASS_SPEED;
+      let done = passCar !== null && passDs < -(CAR_LENGTH + 2);
+      // Going round a stopped queue: past one car, on to the next one stopped ahead of it.
+      if (done && this.passBypass && passCar !== null) {
+        const next = this.nextStopped(view, passCar);
+        if (next !== null) {
+          this.passId = next.id;
+          done = false;
+        }
+      }
       // Into the braking zone, decided once: a car held up behind one that brakes earlier goes
       // on if, braking at its own point, it would be level by the turn-in with room on its side
       // all the way; otherwise the corner is the other car's, as it is for any car not alongside.
@@ -679,18 +728,22 @@ export class RaceDriver implements Driver {
       }
       const late =
         passCar !== null &&
+        !this.passBypass &&
         (this.passCommitted
           ? midCorner && passDs >= ALONGSIDE
           : cornering && passDs >= 0.6 * CAR_LENGTH);
-      const blockedByOther = leader !== null && leader.id !== this.passId && gapAhead < 25;
-      if (lost || done || late || blockedByOther) {
-        if (!done && !blockedByOther) this.cooldown = 3;
+      // (Round an obstacle the car ahead in the gap is followed through it, not a reason to stop.)
+      const blockedByOther =
+        !this.passBypass && leader !== null && leader.id !== this.passId && gapAhead < 25;
+      if (lost || done || late || blockedByOther || movedOff) {
+        if (!done && !blockedByOther && !movedOff) this.cooldown = this.passBypass ? 1 : 3;
         this.passId = -1;
       } else {
         this.passTime += dt;
         const od = passCar!.d - ldHere;
-        base = od + this.passSide * (passSideBySide(v) + passCar!.halfWidth - BODY_HALF_WIDTH);
-        const fits = this.passSide > 0 ? base <= oMax : base >= oMin;
+        const sideBySide = this.passBypass ? BYPASS_SIDE_BY_SIDE : passSideBySide(v);
+        base = od + this.passSide * (sideBySide + passCar!.halfWidth - BODY_HALF_WIDTH);
+        const fits = this.passBypass || (this.passSide > 0 ? base <= oMax : base >= oMin);
         // Committed, the move holds as far over as the track allows (the lane was checked to the
         // turn-in); it does not give up beside the other car.
         this.passBlocked = fits || this.passCommitted ? 0 : this.passBlocked + dt;
@@ -703,6 +756,13 @@ export class RaceDriver implements Driver {
           this.passId = -1;
           this.cooldown = 3;
           base = 0;
+        } else if (this.passBypass) {
+          // Round a stopped car the lane is the one beside it on the road; a car already further
+          // out keeps that extra air, up to half a metre (never past the edges).
+          base =
+            this.passSide > 0
+              ? Math.min(Math.max(base, Math.min(myO, oMax)), base + 0.5)
+              : Math.max(Math.min(base, Math.max(myO, oMin)), base - 0.5);
         } else if (this.passSide > 0) {
           base = Math.max(base, Math.min(myO, oMax));
         } else {
@@ -712,6 +772,37 @@ export class RaceDriver implements Driver {
     }
     const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));
     const held = this.heldTime > 1.5 - aggression;
+    // A car standing still in the road ahead (crashed, parked, or the back of a queue that has
+    // stopped behind one) is an obstacle, in a corner as on a straight. Seen from as far off as
+    // a driver would brake for it, every car heads for the same side of it (the one with more
+    // road), so the cars behind go round it in single file, each following the one ahead
+    // through the gap, and nothing waits on the obstacle moving.
+    const ob = view.active && !view.launching ? this.obstacleAhead(view, s0, v) : null;
+    if (ob !== null && ob.id === this.obstructId) this.obstructTime += dt;
+    else {
+      this.obstructId = ob !== null ? ob.id : -1;
+      this.obstructTime = 0;
+    }
+    if (ob !== null && this.passId < 0 && this.obstructTime > 0.3) {
+      const track = plan.track;
+      const roomLeft = this.at(track.halfWidth[0], ob.s) - ob.d;
+      const roomRight = this.at(track.halfWidth[1], ob.s) + ob.d;
+      const first = roomLeft >= roomRight ? 1 : -1;
+      const side = this.bypassFits(view, s0, ob, first)
+        ? first
+        : this.bypassFits(view, s0, ob, -first)
+          ? -first
+          : 0;
+      if (side !== 0) {
+        this.passId = ob.id;
+        this.passSide = side;
+        this.passTime = 0;
+        this.passBlocked = 0;
+        this.passCommitted = false;
+        this.passBypass = true;
+        base = ob.d - ldHere + side * (BYPASS_SIDE_BY_SIDE + ob.halfWidth - BODY_HALF_WIDTH);
+      }
+    }
     // Into a braking zone (not the corner itself): held up behind a car that has begun braking
     // and is being caught, a move may start here too, but only one that is sure (below).
     const brakingMove =
@@ -734,7 +825,8 @@ export class RaceDriver implements Driver {
       if ((brakingMove || gapAhead < 25 + v * 0.25) && (faster || held)) {
         const od = leader.d - ldHere;
         const sep = passSideBySide(v) + leader.halfWidth - BODY_HALF_WIDTH;
-        // A side on the track, and not a lane another car is already in, beside or just behind.
+        // A side on the track, and not a lane another car is already in, beside or just behind
+        // (round an obstacle: room on the road beside it, and nothing in that lane up to it).
         const left = od + sep <= oMax && this.laneFree(view, s0, od + sep, leader.id);
         const right = od - sep >= oMin && this.laneFree(view, s0, od - sep, leader.id);
         let side = 0;
@@ -848,7 +940,8 @@ export class RaceDriver implements Driver {
       // Grip falls with speed (downforce), so count on what the brakes give at the slower end.
       const b = this.brakeAt(Math.min(v, vl));
       const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
-      const room = gap - STANDSTILL_GAP;
+      // Behind a car standing still, stop with room to steer out and round it.
+      const room = gap - (vl < 1 ? STILL_GAP : STANDSTILL_GAP);
       const vKin =
         room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl - 1;
       let aSafe = SPEED_GAIN * (vSafe - v);
@@ -877,8 +970,18 @@ export class RaceDriver implements Driver {
     // close ahead in this lane (before that the gaps are the grid's, and they open).
     const queueOn =
       !view.launching || (leader !== null && leaderDs - CAR_LENGTH < LAUNCH_QUEUE_GAP);
-    if (nq > 1 && queueOn) limit = Math.min(limit, this.queueLimit(nq, v));
+    if (nq > 1 && queueOn && !this.passBypass) limit = Math.min(limit, this.queueLimit(nq, v));
     limit = Math.min(limit, this.offLineLimit(s0, v));
+    // Round a stopped car: slowly until past it. Stopped too close behind it to steer out (a car
+    // turns no tighter than it is long), back up a little first, if the road behind is clear.
+    if (this.passBypass && passCar !== null && passDs > -CAR_LENGTH) {
+      limit = Math.min(limit, SPEED_GAIN * (BYPASS_SPEED - v));
+      const tooClose = passDs - CAR_LENGTH < 6 && Math.abs(target - myO) > 1;
+      if (this.reverseTime <= 0 && tooClose && Math.abs(v) < 0.5 && this.clearBehind(view, s0)) {
+        this.reverseTime = 1.5;
+      }
+    }
+    if (this.passId < 0) this.reverseTime = 0;
     // Committed to a move, the exit is where it is made: the full drive the driver asks for.
     // Held up behind a car well under the pace in the corners, likewise: the run to the next
     // braking zone is where the move comes from.
@@ -1133,6 +1236,79 @@ export class RaceDriver implements Driver {
     return true;
   }
 
+  /**
+   * The nearest car standing still in this car's path ahead, within as far as it would brake
+   * for it from speed `v`.
+   */
+  private obstacleAhead(view: TrafficView, s0: number, v: number): TrafficCar | null {
+    const reach = 25 + 2.5 * v;
+    const d = view.self.d;
+    let best: TrafficCar | null = null;
+    let bestDs = Number.POSITIVE_INFINITY;
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      if (c.speed >= 1) continue;
+      const ds = this.ahead(s0, c.s);
+      if (ds <= 0 || ds > reach || ds >= bestDs) continue;
+      // In the way where this car is now, or where its path (the line, at its offset) runs
+      // when it gets there: the line sweeps across the track into a corner.
+      const reachHalf = IN_PATH + c.halfWidth;
+      const onPath = c.d - this.at(this.plan.line.d, c.s) - this.o;
+      if (Math.abs(c.d - d) >= reachHalf && Math.abs(onPath) >= reachHalf) continue;
+      best = c;
+      bestDs = ds;
+    }
+    return best;
+  }
+
+  /** The car stopped just ahead of `c` in its path, if any. */
+  private nextStopped(view: TrafficView, c: TrafficCar): TrafficCar | null {
+    for (let k = 0; k < view.count; k++) {
+      const o = view.cars[k]!;
+      if (o.id === c.id || o.speed >= 1) continue;
+      const ds = this.ahead(c.s, o.s);
+      if (ds > 0 && ds < CAR_LENGTH + 10 && Math.abs(o.d - c.d) < IN_PATH + o.halfWidth) return o;
+    }
+    return null;
+  }
+
+  /**
+   * Room to go round a car `ob` stopped in the road on `side`: its lane beside it on the track,
+   * here and where it is, and no car beside this one in that lane.
+   */
+  private bypassFits(view: TrafficView, s0: number, ob: TrafficCar, side: number): boolean {
+    const track = this.plan.track;
+    const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
+    const sep = BYPASS_SIDE_BY_SIDE + ob.halfWidth - BODY_HALF_WIDTH;
+    const lane = ob.d + side * sep;
+    const edge = side > 0 ? 0 : 1;
+    if (Math.abs(lane) > this.at(track.halfWidth[edge], s0) - margin) return false;
+    if (Math.abs(lane) > this.at(track.halfWidth[edge], ob.s) - margin) return false;
+    // A car beside or just behind in that lane is in the way of moving across (one further up
+    // it is followed through the gap); from as far back as a car beside counts in `planTraffic`.
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      if (c.id === ob.id) continue;
+      const ds = this.ahead(s0, c.s);
+      if (ds < -(CAR_LENGTH + 2) || ds > CAR_LENGTH) continue;
+      if (Math.abs(c.d - lane) < SIDE_BY_SIDE + c.halfWidth - BODY_HALF_WIDTH) return false;
+    }
+    return true;
+  }
+
+  /** No car in this car's path within 10 m behind it. */
+  private clearBehind(view: TrafficView, s0: number): boolean {
+    const d = view.self.d;
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      const ds = this.ahead(s0, c.s);
+      if (ds < 0 && ds > -(CAR_LENGTH + 10) && Math.abs(c.d - d) < IN_PATH + c.halfWidth) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** A car within `range` m behind, at speed, near this lateral position. */
   private carApproaching(view: TrafficView, s0: number, d: number, range: number): boolean {
     for (let k = 0; k < view.count; k++) {
@@ -1157,6 +1333,31 @@ export class RaceDriver implements Driver {
       if (ds < CAR_LENGTH && ds > -(CAR_LENGTH + 15)) return true;
     }
     return false;
+  }
+
+  /**
+   * Backing up to steer out round a stopped car: reverse, the wheels turned so that the nose
+   * swings toward the side it goes round on; then first gear again (the controller underneath
+   * changes up from first, not out of reverse).
+   */
+  private backUp(tel: CarTelemetry, dt: number, out: ControlInput): void {
+    const v = tel.speed;
+    const shiftable = !tel.shifting && Math.abs(v) < 1;
+    if (this.reverseTime > 0) {
+      this.reverseTime = Math.max(0, this.reverseTime - dt);
+      out.steer = -this.passSide;
+      out.drs = false;
+      out.overtake = false;
+      out.gearShift = shiftable && tel.gear >= 0 ? -1 : 0;
+      out.throttle = tel.gear < 0 && v > -3 ? 0.3 : 0;
+      out.brake = v > 0.5 || v < -3 ? 0.5 : 0;
+      return;
+    }
+    if (tel.gear < 1) {
+      out.gearShift = shiftable ? 1 : 0;
+      out.throttle = 0;
+      out.brake = Math.abs(v) > 0.3 ? 0.5 : 0;
+    }
   }
 
   // ---- Recovery after a spin or a crash ----
