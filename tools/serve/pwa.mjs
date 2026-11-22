@@ -83,6 +83,7 @@ const files = [
   ]),
 ];
 const version = crypto.createHash('sha256');
+version.update(fs.readFileSync(new URL(import.meta.url)));
 for (const file of files) version.update(fs.readFileSync(`${dir}/${file}`));
 const name = `race-shell-${version.digest('hex').slice(0, 16)}`;
 fs.writeFileSync(
@@ -103,7 +104,7 @@ self.addEventListener('fetch', event => {
   if(request.method!=='GET' || url.origin!==base.origin || !url.pathname.startsWith(base.pathname) || url.pathname.startsWith(base.pathname+'rooms')) return;
   if(request.mode==='navigate') {
     if(url.pathname!==base.pathname && url.pathname!==base.pathname+'index.html') return;
-    event.respondWith(fetch(request).catch(()=>caches.open(NAME).then(c=>c.match('index.html')))); return;
+    event.respondWith(caches.open(NAME).then(c=>c.match('index.html'))); return;
   }
   if(!FILES.some(file=>new URL(file,base).pathname===url.pathname)) return;
   event.respondWith(caches.open(NAME).then(async cache => (await cache.match(request, {ignoreSearch:true})) || fetch(request)));

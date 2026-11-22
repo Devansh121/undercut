@@ -1,0 +1,50 @@
+{
+  "sha": "fcb943a",
+  "circuit": "monza",
+  "shots": [
+    {
+      "screen": "onboarding",
+      "viewport": "844x390",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/onboarding-844x390.png"
+    },
+    {
+      "screen": "hud",
+      "viewport": "844x390",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/hud-844x390.png"
+    },
+    {
+      "screen": "pause",
+      "viewport": "844x390",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/pause-844x390.png"
+    },
+    {
+      "screen": "settings",
+      "viewport": "844x390",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/settings-844x390.png"
+    },
+    {
+      "screen": "onboarding",
+      "viewport": "390x844",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/onboarding-390x844.png"
+    },
+    {
+      "screen": "hud",
+      "viewport": "390x844",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/hud-390x844.png"
+    },
+    {
+      "screen": "pause",
+      "viewport": "390x844",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/pause-390x844.png"
+    },
+    {
+      "screen": "settings",
+      "viewport": "390x844",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/settings-390x844.png"
+    }
+  ],
+  "perf": [],
+  "lap": null,
+  "moving": null,
+  "errors": []
+}

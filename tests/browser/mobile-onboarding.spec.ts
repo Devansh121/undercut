@@ -31,6 +31,9 @@ test('first-lap coach can be skipped and replayed, with safe phone rotation', as
     );
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByTestId('rotate-prompt')).toBeVisible();
+    expect(
+      await page.getByTestId('pause-menu').evaluate((e) => e.scrollWidth <= e.clientWidth),
+    ).toBe(true);
     await expect(page.locator('html')).toHaveAttribute('data-paused', '');
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(page.getByTestId('rotate-prompt')).toBeHidden();

@@ -1784,3 +1784,38 @@ html[data-screen='drive']:not([data-paused]) #view {
     padding-top: 100px;
   }
 }
+@media (max-height: 500px) {
+  .pause__actions {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .pause__card {
+    min-width: 0;
+    padding: 16px;
+  }
+  .pause__head {
+    flex-wrap: wrap;
+  }
+  .pause__body {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: 16px;
+  }
+  .pause__setting {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .pause__setting .seg {
+    flex-wrap: wrap;
+  }
+  .pause__setting .seg__opt {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .pause__controls {
+    display: none;
+  }
+}

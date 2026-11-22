@@ -401,10 +401,10 @@ async function mobileUi(browser, report) {
         if (screen === 'pause' || screen === 'settings')
           await page.evaluate(() => globalThis.__undercut.pause());
         if (screen === 'settings')
-          await page.locator('[data-setting=units]').scrollIntoViewIfNeeded();
+          await page.locator('[data-slider=master]').scrollIntoViewIfNeeded();
         await page.waitForTimeout(300);
         const file = path.join(outDir, `${screen}-${label}.png`);
-        await page.screenshot({ path: file });
+        await page.screenshot({ path: file, scale: 'css' });
         report.shots.push({ screen, viewport: label, file });
       }
     }

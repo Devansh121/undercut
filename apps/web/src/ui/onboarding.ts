@@ -1,5 +1,5 @@
 import type { ControlsSource } from './controls-help';
-import { controlsHint, controlRows } from './controls-help';
+import { controlRows } from './controls-help';
 import { el } from './dom';
 import { button } from './kit/components';
 import { S } from './strings';
@@ -76,7 +76,13 @@ export class Onboarding {
     this.title.textContent = `${S.intro.title} · ${this.step + 1}/4`;
     this.text.textContent =
       [
-        `${S.intro.steer(controlRows(this.source.bindings(), this.source.device())[0]?.input ?? '')} ${controlsHint(this.source.bindings(), this.source.device())}`,
+        S.intro.controls(
+          ...((['steer', 'brake', 'throttle', 'pause'] as const).map(
+            (id) =>
+              controlRows(this.source.bindings(), this.source.device()).find((r) => r.id === id)
+                ?.input ?? '',
+          ) as [string, string, string, string]),
+        ),
         S.intro.brake,
         S.intro.limits,
         S.intro.pause,

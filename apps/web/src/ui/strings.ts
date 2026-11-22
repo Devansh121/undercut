@@ -36,17 +36,18 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 export const S = {
   intro: {
     title: 'First lap',
-    steer: (input: string) => `Steer: ${input}. Pause to skip or replay the intro.`,
+    controls: (steer: string, brake: string, throttle: string, pause: string) =>
+      `Steer: ${steer} · Brake: ${brake} · Throttle: ${throttle} · Pause: ${pause}`,
     brakeNow: 'Brake now · 2/4',
     next: 'Next tip',
     skip: 'Skip intro',
-    replay: 'Replay first-lap intro',
+    replay: 'Replay intro',
     brake:
-      'Brake in a straight line before turning. The driving line turns red when you need to brake. Try braking, or continue to the next tip.',
+      'Brake straight before turning. The driving line turns red when you need to brake. Try the brake pedal.',
     limits:
-      'Keep at least one wheel inside the white lines. All four wheels outside invalidates the lap: it will not count as a record. Keep driving to start a clean lap.',
+      'Four wheels past the white lines invalidates this lap. It cannot set a record. Keep driving for a clean lap.',
     pause:
-      'Pause opens controls and settings. Use the pause button, Esc on keyboard or Menu on a gamepad. You can replay this intro from pause settings.',
+      'Pause for controls and settings: Esc, gamepad Menu or the pause button. Skip or replay this intro in pause settings.',
     rotate: 'Rotate your phone to drive',
     rotateHelp: 'Use landscape for room to steer and brake. The session is paused.',
     fullscreen: 'Fullscreen',

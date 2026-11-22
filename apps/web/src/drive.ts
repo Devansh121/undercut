@@ -90,7 +90,7 @@ import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import { saveQuality } from './game/quality-setting';
-import type { AssistConfig } from './game/assists';
+import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
 import { speedUnit, setSpeedUnit } from './ui/player-settings';
@@ -499,8 +499,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       resume();
     },
     resetSettings: () => {
-      session.resetAssists();
-      for (const [key, value] of Object.entries(session.assists) as [keyof AssistConfig, never][])
+      for (const [key, value] of Object.entries(assistsFor(session.device, {})) as [
+        keyof AssistConfig,
+        never,
+      ][])
         setAssist(key, value);
       view.setDrivingLine(session.assists.racingLine ?? 'off');
       setSpeedUnit('kmh');
@@ -708,13 +710,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     messageLeft = seconds;
   };
   // The storage warning goes first; the first-start controls hint follows it.
-  let queued: HudMessage | null = takeFirstStartHint()
-    ? {
-        tag: S.controls.hintTag,
-        text: controlsHint(input.profile.bindings, input.activeDevice),
-        tone: 'info',
-      }
-    : null;
+  let queued: HudMessage | null =
+    takeFirstStartHint() && intro.root.hidden
+      ? {
+          tag: S.controls.hintTag,
+          text: controlsHint(input.profile.bindings, input.activeDevice),
+          tone: 'info',
+        }
+      : null;
   if (!records.persistent)
     say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
 
