@@ -320,6 +320,9 @@ const CIRCUIT_STATIONS = {
     tv('grid-tv', [12, 5, 3], [4840, 0, 0.8], 30),
     chase('turn-1', 120, 260, 280),
     chase('raffles', 650, 230, 820),
+    // Up to the two buildings mapped across the road (s 1234 and 1366), which are left out.
+    chase('raffles-1234', 1080, 200, 1200),
+    chase('raffles-1366', 1210, 200, 1330),
     tv('esplanade-tv', [2850, 20, 6], [2700, 0, 1], 34),
     chase('marina', 3300, 230, 3460, 'chase-far'),
     tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
