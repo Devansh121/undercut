@@ -606,6 +606,10 @@ const PERF_VIEWPORTS = [
  * Blanchimont (the most near trees), Singapore's waterfront.
  */
 const PERF_DRIVE_S = { monza: 4300, spa: 5200, singapore: 3300 };
+/** The circuit's last grid slot (its track file), where the grid run stands. */
+const LAST_SLOT = JSON.parse(
+  fs.readFileSync(path.join(root, `packages/track/data/${circuit}.json`), 'utf8'),
+).grid.at(-1);
 
 async function perf(report) {
   for (const vsync of flag('phone-audit') ? [true] : [true, false]) await perfRuns(report, vsync);
@@ -637,7 +641,7 @@ async function perfRuns(report, vsync) {
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
         await page.evaluate(
-          ([run, driveS]) => {
+          ([run, driveS, slot]) => {
             const u = globalThis.__undercut;
             u.autopilot(false);
             u.drive(null);
@@ -651,15 +655,22 @@ async function perfRuns(report, vsync) {
               u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
               u.drive({ throttle: 0, brake: 1, steer: 0 });
             } else {
-              // From the last slot looking up the grid: nineteen cars ahead, all in view.
-              u.restartLap();
+              // From the last slot looking up the grid: nineteen cars ahead, all in view. The
+              // player stands on the last slot first (the fleet leaves the player's slot free).
+              u.teleport(slot.s, slot.d, 0);
+              u.setTimeScale(0);
               u.gridCars(19);
               u.camera('chase-far');
               u.drive({ throttle: 0, brake: 1, steer: 0 });
             }
           },
-          [run, PERF_DRIVE_S[circuit]],
+          [run, PERF_DRIVE_S[circuit], LAST_SLOT],
         );
+        if (run === 'grid') {
+          const at = await page.evaluate(() => globalThis.__undercut.state());
+          if (Math.abs(at.s - LAST_SLOT.s) > 1 || Math.abs(at.d - LAST_SLOT.d) > 0.5)
+            throw new Error(`grid run: player at s ${at.s}, d ${at.d}, not the last slot`);
+        }
         await page.waitForTimeout(3000);
         // Frame times are the page's animation frames; the pacer skips the draw on a frame when
         // the GPU is two frames behind, so the frames actually drawn are counted as well.
