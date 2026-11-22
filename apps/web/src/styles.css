@@ -1711,3 +1711,58 @@ body {
 .online-notice {
   min-height: 24px;
 }
+
+html[data-screen='drive']:not([data-paused]) {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+html[data-screen='drive']:not([data-paused]) #view {
+  touch-action: none;
+}
+.onboarding {
+  position: fixed;
+  z-index: 11;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, 46vw);
+  padding: 12px;
+  background: var(--c-ink-1);
+  border-left: 3px solid var(--c-accent);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--c-text-1);
+}
+.onboarding p {
+  margin: 6px 0;
+}
+.onboarding .btn {
+  min-height: 44px;
+  padding: 4px 12px;
+}
+[data-paused] .onboarding {
+  display: none;
+}
+.rotate-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-content: center;
+  text-align: center;
+  padding: 24px;
+  background: var(--c-ink-0);
+  color: var(--c-text-1);
+}
+.rotate-prompt[hidden],
+.onboarding[hidden] {
+  display: none;
+}
+[data-portrait] .ut-touch {
+  display: none;
+}
+.onboarding.is-braking {
+  border-left-color: var(--c-time-invalid);
+}

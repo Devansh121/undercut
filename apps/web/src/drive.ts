@@ -68,6 +68,7 @@ const propCatalog: unknown = Object.values(
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
+import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
@@ -91,6 +92,9 @@ import { saveQuality } from './game/quality-setting';
 import type { AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
+import { speedUnit, setSpeedUnit } from './ui/player-settings';
+import { Onboarding } from './ui/onboarding';
+import { phoneSession } from './ui/phone-session';
 
 /** The team whose colours the player's car wears when the menu chose none. */
 const DEFAULT_TEAM = 'calder';
@@ -483,7 +487,35 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     pilot.pilot.reset();
     resume();
   };
+  const intro = new Onboarding({
+    bindings: () => input.profile.bindings,
+    device: () => input.activeDevice,
+  });
+  let autoQuality = o.autoQuality ?? false;
   const actions = {
+    resetSettings: () => {
+      session.resetAssists();
+      for (const [key, value] of Object.entries(session.assists) as [keyof AssistConfig, never][])
+        setAssist(key, value);
+      view.setDrivingLine(session.assists.racingLine ?? 'off');
+      setSpeedUnit('kmh');
+      for (const key of ['master', 'engine', 'effects', 'ui', 'ambience'] as const)
+        o.audio?.setVolume(key, AUDIO_DEFAULTS[key]);
+      saveQuality('auto');
+      autoQuality = true;
+      benchmark();
+    },
+    replayIntro: () => {
+      intro.replay();
+      resume();
+    },
+    ...(o.touch
+      ? {
+          fullscreen: () => {
+            void document.documentElement.requestFullscreen?.().catch(() => {});
+          },
+        }
+      : {}),
     resume: () => resume(),
     ...(ext ? {} : { restartLap }),
     resetToTrack: () => {
@@ -504,6 +536,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     actions,
     [
       {
+        id: 'units',
+        label: S.pause.units,
+        choices: [
+          { value: 'kmh', label: S.hud.kmh },
+          { value: 'mph', label: S.pause.mph },
+        ],
+        get: speedUnit,
+        set: (v) => setSpeedUnit(v as 'kmh' | 'mph'),
+      },
+      {
         id: 'camera',
         label: S.pause.camera,
         choices: CAMERA_ORDER.map((c) => ({
@@ -516,9 +558,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'quality',
         label: S.pause.graphics,
-        choices: PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
-        get: () => quality,
+        choices: [
+          { value: 'auto', label: S.pause.autoGraphics },
+          ...PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
+        ],
+        get: () => (autoQuality ? 'auto' : quality),
         set: (v) => {
+          autoQuality = v === 'auto';
+          if (autoQuality) {
+            saveQuality('auto');
+            benchmark();
+            return;
+          }
           saveQuality(v as QualityName);
           void setQuality(v as QualityName);
         },
@@ -607,6 +658,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             ['master', S.pause.volume],
             ['engine', S.pause.engine],
             ['effects', S.pause.effects],
+            ['ui', S.pause.uiAudio],
+            ['ambience', S.pause.ambience],
           ] as const
         ).map(([id, label]) => ({
           id,
@@ -617,7 +670,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       : [],
     { bindings: () => input.profile.bindings, device: () => input.activeDevice },
   );
-  o.host.replaceChildren(hud.root, results.root, pause.root);
+  o.host.replaceChildren(hud.root, results.root, pause.root, intro.root);
+  const phone = o.touch ? phoneSession(doPause) : null;
+  if (phone) o.host.append(phone.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
   // phone). Measured when the layout changes, not every frame.
   const cluster = hud.root.querySelector<HTMLElement>('.hud-drive');
@@ -697,6 +752,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   function openPause(): void {
     o.audio?.setActive(false);
+    phone?.active(false);
     if (!pause.open) {
       input.setContext('menu');
       pause.show();
@@ -708,6 +764,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     openPause();
   }
   function resume(): void {
+    if (o.touch && innerHeight > innerWidth) return;
+    phone?.active(true);
     pause.hide();
     delete document.documentElement.dataset.paused;
     input.setContext('driving');
@@ -823,6 +881,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       setGlyphContext(lastHudDevice, input.profile.bindings);
     }
 
+    intro.brakingCue(
+      drivingLine !== null &&
+        session.car.state.u >
+          drivingLine.speedAt(session.position.s + Math.abs(session.car.state.u) * 0.3),
+    );
+    intro.update(
+      session.car.state.brakeApplied > 0.1,
+      !session.timing.valid,
+      session.phase === 'paused',
+      lastLap !== null,
+    );
     const playing = session.phase === 'running';
     const realDt = playing ? dt : 0;
     clock += realDt;
@@ -965,6 +1034,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   });
   input.setContext('driving');
   loop.start();
+  phone?.active(true);
   o.audio?.setActive(true);
   const loadTimes: Record<string, number> = {
     ...view.loadTimes,
@@ -1036,7 +1106,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   }
 
   // First run without a saved preset: time a few seconds of driving and settle on a preset.
-  if (o.autoQuality) {
+  function benchmark(): void {
     const measured = quality;
     window.setTimeout(() => {
       if (quitting) return;
@@ -1048,11 +1118,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         const median = times[Math.floor(times.length / 2)] as number;
         const gpu = view.stats().gpuMs;
         const pick = benchmarkPick(measured, { gpuMs: gpu, frameMs: median }, o.touch);
-        saveQuality(pick);
+        if (!autoQuality) return;
         if (pick !== quality) void setQuality(pick);
       }, 3000);
     }, 2500);
   }
+
+  if (autoQuality) benchmark();
 
   function quit(): void {
     if (quitting) return;
@@ -1067,6 +1139,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.quit();
     ext?.detach?.();
     overlay?.destroy();
+    phone?.destroy();
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     view.dispose();
     input.setContext('menu');
     delete document.documentElement.dataset.ready;

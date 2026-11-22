@@ -34,6 +34,22 @@ export const words = (n: number): string => WORDS[n] ?? String(n);
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const S = {
+  intro: {
+    title: 'First lap',
+    brakeNow: 'Brake now · 2/4',
+    next: 'Next tip',
+    skip: 'Skip intro',
+    replay: 'Replay first-lap intro',
+    brake:
+      'Brake in a straight line before turning. The driving line turns red when you need to brake. Try braking, or continue to the next tip.',
+    limits:
+      'Keep at least one wheel inside the white lines. All four wheels outside invalidates the lap: it will not count as a record. Keep driving to start a clean lap.',
+    pause:
+      'Pause opens controls and settings. Use the pause button, Esc on keyboard or Menu on a gamepad. You can replay this intro from pause settings.',
+    rotate: 'Rotate your phone to drive',
+    rotateHelp: 'Use landscape for room to steer and brake. The session is paused.',
+    fullscreen: 'Fullscreen',
+  },
   launch: {
     tagline: (teams: number, drivers: number) =>
       `Open-wheel racing on measured circuits. ${cap(words(teams))} teams, ${words(drivers)} drivers, one car built to the regulations.`,
@@ -247,6 +263,13 @@ export const S = {
   },
 
   pause: {
+    uiAudio: 'Interface volume',
+    ambience: 'Ambience volume',
+    units: 'Speed units',
+    mph: 'mph',
+    autoGraphics: 'Auto',
+    resetDefaults: 'Reset settings',
+
     title: 'Paused',
     resume: 'Resume',
     restartLap: 'Restart lap',

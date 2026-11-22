@@ -33,6 +33,9 @@ export interface PauseSlider {
 
 export interface PauseActions {
   resume(): void;
+  resetSettings?: () => void;
+  replayIntro?: () => void;
+  fullscreen?: () => void;
   /** Absent: no restart (an online race cannot restart one car's lap). */
   restartLap?: () => void;
   resetToTrack(): void;
@@ -120,6 +123,19 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
+    if (actions.replayIntro)
+      addAction(S.intro.replay, 'restart', actions.replayIntro, 'replay-intro');
+    if (actions.fullscreen) addAction(S.intro.fullscreen, 'play', actions.fullscreen, 'fullscreen');
+    if (actions.resetSettings)
+      addAction(
+        S.pause.resetDefaults,
+        'reset',
+        () => {
+          actions.resetSettings?.();
+          this.sync();
+        },
+        'reset-settings',
+      );
     if (actions.restartLap) addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
     addAction(S.pause.resetToTrack, 'reset', actions.resetToTrack, 'reset');
     this.controls = controls ? new ControlsPanel(controls) : null;

@@ -26,7 +26,7 @@ export function loadQuality(): QualityName | null {
   }
 }
 
-export function saveQuality(q: QualityName): void {
+export function saveQuality(q: QualityName | 'auto'): void {
   try {
     window.localStorage.setItem(KEY, q);
   } catch {
