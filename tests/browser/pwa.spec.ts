@@ -3,22 +3,33 @@ import fs from 'node:fs';
 import { startTimeTrial } from './helpers';
 import { test, expect } from './base';
 
-test('installable shell caches Mobile assets and opens offline without caching rooms', async ({
+test('installable shell survives a redirecting host, updates on reload, and drives offline on Auto', async ({
   page,
   context,
   baseURL,
 }, info) => {
   test.skip(info.project.name !== 'phone', 'one shell check on the phone');
   let updated = false;
+  let networkInfoHits = 0;
   const workerSource = fs.readFileSync('apps/web/dist/sw.js', 'utf8');
+  // In front of the static server: answers /index.html with a redirect to / as Cloudflare's
+  // static assets do, and can swap in a "new build" of the worker.
   const server = createServer((req, res) => {
-    if (req.url === '/sw.js') {
+    const path = (req.url ?? '/').split('?')[0];
+    if (path === '/index.html') {
+      res.writeHead(307, { Location: '/' });
+      res.end();
+      return;
+    }
+    if (path === '/sw.js') {
       res.setHeader('Content-Type', 'text/javascript');
+      res.setHeader('Cache-Control', 'no-cache');
       res.end(
         updated ? workerSource.replace(/(race-shell-[a-f0-9]+)/g, '$1-update') : workerSource,
       );
       return;
     }
+    if (path === '/network-info') networkInfoHits++;
     const upstream = request(
       new URL(req.url ?? '/', baseURL),
       { headers: req.headers },
@@ -37,14 +48,21 @@ test('installable shell caches Mobile assets and opens offline without caching r
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('no test address');
   const origin = `http://127.0.0.1:${address.port}`;
+  const home = origin + '/?debug=1&world=lite&offline=1';
+  const shellCaches = (): Promise<string[]> =>
+    page.evaluate(async () => (await caches.keys()).filter((n) => n.startsWith('race-shell-')));
   try {
-    await page.goto(origin + '/?debug=1&quality=mobile&world=lite&offline=1');
+    await page.goto(home + '&quality=mobile');
     const manifest = (await page.evaluate(async () =>
       (await fetch('./manifest.webmanifest')).json(),
-    )) as { display: string; orientation: string; icons: { sizes: string }[] };
+    )) as { display: string; orientation: string; icons: { sizes: string; purpose: string }[] };
     expect(manifest.display).toBe('standalone');
     expect(manifest.orientation).toBe('landscape');
-    expect(manifest.icons.map((i) => i.sizes)).toEqual(['192x192', '512x512']);
+    expect(manifest.icons.map((i) => `${i.sizes} ${i.purpose}`)).toEqual([
+      '192x192 any',
+      '512x512 any',
+      '512x512 maskable',
+    ]);
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
     });
@@ -56,43 +74,54 @@ test('installable shell caches Mobile assets and opens offline without caching r
       const cache = await caches.open(names[0]!);
       return (await cache.keys()).map((r) => new URL(r.url).pathname);
     });
+    expect(cached).toContain('/');
     expect(cached.some((p) => p.includes('car_mobile.glb'))).toBe(true);
-    expect(cached.some((p) => p.startsWith('/rooms'))).toBe(false);
-    // Install a new build while an old page is open: it must wait rather than mix chunks.
+    expect(cached.filter((p) => /^\/(rooms|network-info|index\.html)/.test(p))).toEqual([]);
+
+    // Dynamic endpoints always reach the network (invite addresses change with the Wi-Fi).
+    const before = networkInfoHits;
+    await page.evaluate(async () => {
+      await fetch('./network-info');
+      await fetch('./network-info');
+    });
+    expect(networkInfoHits).toBe(before + 2);
+
+    // A second visit is answered from the cache, not with a redirected response.
+    await page.reload();
+    await expect(page.locator('[data-action=press-start]')).toBeVisible();
+    await page.goto(origin + '/index.html?debug=1&quality=mobile&offline=1');
+    await expect(page.locator('[data-action=press-start]')).toBeVisible();
+
+    // A new build installs beside this page and offers a reload instead of mixing chunks.
     updated = true;
     await page.evaluate(async () => {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.update();
+      await (await navigator.serviceWorker.ready).update();
     });
-    await expect
-      .poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.ready).waiting)))
-      .toBe(true);
-    expect(
-      await page.evaluate(
-        async () => (await caches.keys()).filter((n) => n.startsWith('race-shell-')).length,
-      ),
-    ).toBe(2);
-    await page.goto('about:blank');
-    await expect
-      .poll(async () => {
-        const worker = context.serviceWorkers()[0];
-        return worker
-          ? worker.evaluate(async () =>
-              (await caches.keys()).filter((n) => n.startsWith('race-shell-')),
-            )
-          : [];
-      })
-      .toEqual([expect.stringMatching(/-update$/)]);
+    const prompt = page.getByTestId('update-ready');
+    await expect(prompt).toBeVisible();
+    expect(await shellCaches()).toHaveLength(2);
+    await Promise.all([page.waitForEvent('load'), prompt.getByRole('button').click()]);
+    await expect(page.locator('[data-action=press-start]')).toBeVisible();
+    await expect.poll(shellCaches).toEqual([expect.stringMatching(/-update$/)]);
+    await expect(prompt).toBeHidden();
+
+    // Offline on Auto (no preset in the URL, so no debug API either) with a saved Medium pick
+    // the cache does not hold: the session starts on Mobile instead of stopping on a download.
+    await page.evaluate(() => {
+      localStorage.removeItem('settings.quality');
+      localStorage.setItem('settings.quality.auto', 'medium');
+    });
     await context.setOffline(true);
-    await page.goto(origin + '/?debug=1&quality=mobile&world=lite&offline=1');
+    await page.goto(origin + '/?world=lite');
     await expect(page.locator('[data-action=press-start]')).toBeVisible();
     await startTimeTrial(page);
     await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
-    await expect
-      .poll(() => page.evaluate(() => Number(window.__undercut!.state().tick)))
-      .toBeGreaterThan(20);
+    await expect(page.locator('html')).toHaveAttribute('data-quality', 'mobile');
+    await expect(page.getByTestId('loading')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('settings.quality.auto'))).toBe('medium');
     await context.setOffline(false);
   } finally {
+    await context.setOffline(false);
     await page.evaluate(() => window.__undercut?.quit()).catch(() => {});
     await page.goto('about:blank');
     server.closeAllConnections();

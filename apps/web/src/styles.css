@@ -1721,29 +1721,41 @@ html[data-screen='drive']:not([data-paused]) {
 html[data-screen='drive']:not([data-paused]) #view {
   touch-action: none;
 }
+/* The first-lap coach: under the timing tower (drive.ts sets --coach-top), clear of the lap
+   timer, the sectors and the invalid-lap flag. */
 .onboarding {
   position: fixed;
   z-index: 11;
-  top: max(12px, env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(360px, 46vw);
-  padding: 12px;
-  background: var(--c-ink-1);
+  top: var(--coach-top, calc(var(--safe-t) + 160px));
+  left: var(--safe-l);
+  width: min(320px, 40vw);
+  padding: 10px 12px;
+  background: var(--hud-panel-solid, var(--c-ink-1));
   border-left: 3px solid var(--c-accent);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--fs-12);
+  line-height: 1.4;
   color: var(--c-text-1);
 }
 .onboarding p {
-  margin: 6px 0;
+  margin: 4px 0 0;
+}
+.onboarding__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 .onboarding .btn {
   min-height: 44px;
   padding: 4px 12px;
+  white-space: nowrap;
 }
-[data-paused] .onboarding {
+.pause__command[hidden] {
   display: none;
+}
+.pause__run {
+  justify-self: end;
+  white-space: nowrap;
 }
 .update-bar {
   position: fixed;
@@ -1764,6 +1776,9 @@ html[data-screen='drive']:not([data-paused]) #view {
   color: var(--c-text-1);
 }
 html[data-screen='drive']:not([data-paused]) .update-bar {
+  display: none;
+}
+[data-paused] .onboarding {
   display: none;
 }
 .rotate-prompt {
@@ -1809,6 +1824,21 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
   .pause__actions {
     min-height: 0;
     overflow-y: auto;
+  }
+  /* Phone landscape: a compact card under the tower that lets touches through to the steering
+     zone; each tip moves on by itself, and Skip lives in the pause menu. */
+  .onboarding {
+    width: min(270px, 34vw);
+    padding: 6px 10px;
+    font-size: var(--fs-11);
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  .onboarding p {
+    margin-top: 2px;
+  }
+  .onboarding__actions {
+    display: none;
   }
 }
 @media (orientation: portrait) and (max-width: 600px) {

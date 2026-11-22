@@ -93,7 +93,7 @@ export interface DebugApi {
   /** Can this browser run the audio worklet, and why sound fell back to silent if it did. */
   audioCapability(): { supported: boolean; fallback: string | null };
   /** What the steering-wheel display last drew (cockpit camera), or null. */
-  dashboard(): { gear: string; speed: string; revs: number } | null;
+  dashboard(): { gear: string; speed: string; revs: number; unit: string } | null;
   /** The player's car's projected bounding box, CSS px. */
   carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** Show or hide the HUD layer (frame-time measurement). */
@@ -248,6 +248,7 @@ export function installDebugApi(
       if (!isQuality(name)) throw new Error(`unknown preset ${name}`);
       await need().setQuality(name);
     },
+
     setStartLights: (mask) => need().view.world?.setStartLights(mask),
     treeSwap: (distance) => need().view.world?.treeSwapDistance(distance) ?? 0,
     worldCounts: () => {

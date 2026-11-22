@@ -23,7 +23,7 @@ import { debugEnabled, installDebugApi } from './debug';
 import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
 import { RecordStore, durableStorage, memoryStorage } from './game/records';
-import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
+import { firstGuess, isQuality, loadAutoPick, loadQuality } from './game/quality-setting';
 import { PrefsStore } from './ui/data/prefs';
 import { MenuInput } from './ui/menu-input';
 import { CircuitSelectScreen } from './ui/screens/circuits';
@@ -61,14 +61,17 @@ attachKeyboard(input);
 attachFocusGuard(input);
 input.setContext('menu');
 
-/** A preset in the URL (tests, stations), else the saved choice, else a default to benchmark. */
+/**
+ * A preset in the URL (tests, stations), else the saved choice, else Auto: the preset its one
+ * benchmark settled on, or a first guess to benchmark from.
+ */
 function chooseQuality(): { quality: QualityName; auto: boolean } {
   const asked = params.get('quality');
   if (isQuality(asked)) return { quality: asked, auto: false };
   const saved = loadQuality();
   if (saved) return { quality: saved, auto: false };
   return {
-    quality: firstGuess(touch, Math.min(window.innerWidth, window.innerHeight)),
+    quality: loadAutoPick() ?? firstGuess(touch, Math.min(window.innerWidth, window.innerHeight)),
     auto: true,
   };
 }

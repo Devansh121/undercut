@@ -163,6 +163,8 @@ export interface ViewFrame {
   /** For the steering-wheel display: gear and rev lights lit (0–15, 16 at the limiter). */
   gear: number;
   revLights: number;
+  /** The steering-wheel display's speed unit; default km/h. */
+  speedUnit?: 'kmh' | 'mph';
   /** Real milliseconds since the previous animation frame (dynamic resolution). */
   frameMs?: number;
 }
@@ -593,7 +595,7 @@ export class RaceView {
     return this.drivingLine.snapshot();
   }
 
-  get dashboard(): { gear: string; speed: string; revs: number } | null {
+  get dashboard(): { gear: string; speed: string; revs: number; unit: string } | null {
     return this.car.dashboard;
   }
 
@@ -779,8 +781,15 @@ export class RaceView {
       frame.lookBack,
     );
     this.car.setHelmetVisible(mode.helmet);
-    if (mode.name === 'cockpit')
-      this.car.setDashboard(frame.gear, frame.speed * 3.6, frame.revLights);
+    if (mode.name === 'cockpit') {
+      const mph = frame.speedUnit === 'mph';
+      this.car.setDashboard(
+        frame.gear,
+        frame.speed * (mph ? 3600 / 1609.344 : 3.6),
+        frame.revLights,
+        mph ? 'MPH' : 'KM/H',
+      );
+    }
     this.frame(mode.name === 'chase-near' || mode.name === 'chase-far', dt);
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();

@@ -38,19 +38,21 @@ export const S = {
     title: 'First lap',
     controls: (steer: string, brake: string, throttle: string, pause: string) =>
       `Steer: ${steer} · Brake: ${brake} · Throttle: ${throttle} · Pause: ${pause}`,
-    brakeNow: 'Brake now · 2/4',
+    brakeNow: 'Brake now',
     next: 'Next tip',
     skip: 'Skip intro',
     replay: 'Replay intro',
-    brake:
-      'Brake straight before turning. The driving line turns red when you need to brake. Try the brake pedal.',
+    brake: (input: string) =>
+      `Brake in a straight line before turning in. The driving line turns red where you need to brake. Brake: ${input}.`,
     limits:
       'Four wheels past the white lines invalidates this lap. It cannot set a record. Keep driving for a clean lap.',
-    pause:
-      'Pause for controls and settings: Esc, gamepad Menu or the pause button. Skip or replay this intro in pause settings.',
+    pause: (input: string) =>
+      `Pause with ${input} for controls and settings. Skip or replay this intro from the pause menu.`,
+    row: 'First-lap intro',
     rotate: 'Rotate your phone to drive',
     rotateHelp: 'Use landscape for room to steer and brake. The session is paused.',
     fullscreen: 'Fullscreen',
+    display: 'Display',
   },
   update: {
     ready: 'A new version is ready.',
@@ -275,6 +277,7 @@ export const S = {
     mph: 'mph',
     autoGraphics: 'Auto',
     resetDefaults: 'Reset settings',
+    defaults: 'Defaults',
 
     title: 'Paused',
     resume: 'Resume',

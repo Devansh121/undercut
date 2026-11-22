@@ -294,11 +294,12 @@ export class CarModel {
     return s ? s.getWorldPosition(out) : out.set(0, 0, 0);
   }
 
-  setDashboard(gear: number, speedKmh: number, revLights: number): void {
-    this.dash?.draw(gear, speedKmh, revLights);
+  /** `speed` is already in `unit` (the label drawn under it). */
+  setDashboard(gear: number, speed: number, revLights: number, unit = 'KM/H'): void {
+    this.dash?.draw(gear, speed, revLights, unit);
   }
 
-  get dashboard(): { gear: string; speed: string; revs: number } | null {
+  get dashboard(): { gear: string; speed: string; revs: number; unit: string } | null {
     return this.dash?.shown ?? null;
   }
 

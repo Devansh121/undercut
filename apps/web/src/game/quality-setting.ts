@@ -33,3 +33,39 @@ export function saveQuality(q: QualityName | 'auto'): void {
     // Blocked storage: the choice lasts for this page only.
   }
 }
+
+/** The preset the Auto benchmark settled on, so later sessions start there without measuring. */
+const AUTO_KEY = 'settings.quality.auto';
+
+export function loadAutoPick(): QualityName | null {
+  try {
+    const v = window.localStorage.getItem(AUTO_KEY);
+    return isQuality(v) && v !== 'lite' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAutoPick(q: QualityName | null): void {
+  try {
+    if (q) window.localStorage.setItem(AUTO_KEY, q);
+    else window.localStorage.removeItem(AUTO_KEY);
+  } catch {
+    // Blocked storage: Auto measures again next session.
+  }
+}
+
+/** The preset the offline cache (tools/serve/pwa.mjs) holds. */
+export const OFFLINE_PRESET: QualityName = 'mobile';
+
+/**
+ * Whether Auto may rebuild the view at its pick. Offline it may only move to the cached preset:
+ * any other one would fetch textures that are not there.
+ */
+export function autoSwitchAllowed(
+  pick: QualityName,
+  current: QualityName,
+  online: boolean,
+): boolean {
+  return pick !== current && (online || pick === OFFLINE_PRESET);
+}

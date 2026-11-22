@@ -31,12 +31,22 @@ export interface PauseSlider {
   set(value: number): void;
 }
 
+/**
+ * A one-press command shown as a settings row (replay the intro, reset to defaults), so the
+ * action column keeps the driving actions in view on a short phone screen.
+ */
+export interface PauseCommand {
+  /** `data-action` of its button. */
+  id: string;
+  label: string;
+  button: string;
+  run(): void;
+  /** Absent: always shown. False: hidden (the intro is finished, no fullscreen API). */
+  visible?: () => boolean;
+}
+
 export interface PauseActions {
   resume(): void;
-  skipIntro?: () => void;
-  resetSettings?: () => void;
-  replayIntro?: () => void;
-  fullscreen?: () => void;
   /** Absent: no restart (an online race cannot restart one car's lap). */
   restartLap?: () => void;
   resetToTrack(): void;
@@ -74,6 +84,7 @@ export class PauseMenu {
     string,
     { slider: PauseSlider; input: HTMLInputElement; output: HTMLOutputElement }
   >();
+  private readonly commands: { command: PauseCommand; row: HTMLElement }[] = [];
   private focusIndex = 0;
   /** The controls list, when the menu was given a bindings source. */
   readonly controls: ControlsPanel | null;
@@ -84,6 +95,7 @@ export class PauseMenu {
     note: () => string,
     sliders: PauseSlider[] = [],
     controls?: ControlsSource,
+    commands: PauseCommand[] = [],
   ) {
     const root = el('div', 'pause');
     root.dataset.testid = 'pause-menu';
@@ -124,20 +136,6 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
-    if (actions.skipIntro) addAction(S.intro.skip, 'play', actions.skipIntro, 'skip-intro');
-    if (actions.replayIntro)
-      addAction(S.intro.replay, 'restart', actions.replayIntro, 'replay-intro');
-    if (actions.fullscreen) addAction(S.intro.fullscreen, 'play', actions.fullscreen, 'fullscreen');
-    if (actions.resetSettings)
-      addAction(
-        S.pause.resetDefaults,
-        'reset',
-        () => {
-          actions.resetSettings?.();
-          this.sync();
-        },
-        'reset-settings',
-      );
     if (actions.restartLap) addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
     addAction(S.pause.resetToTrack, 'reset', actions.resetToTrack, 'reset');
     this.controls = controls ? new ControlsPanel(controls) : null;
@@ -207,6 +205,25 @@ export class PauseMenu {
       this.sliders.set(slider.id, { slider, input, output });
     }
 
+    for (const command of commands) {
+      const row = el('div', 'pause__setting pause__command');
+      row.dataset.command = command.id;
+      const run = button({
+        label: command.button,
+        variant: 'secondary',
+        action: command.id,
+        onClick: () => {
+          command.run();
+          this.sync();
+        },
+      });
+      run.classList.add('pause__run');
+      row.append(el('span', 'pause__key', command.label), run);
+      grid.append(row);
+      this.focusables.push(run);
+      this.commands.push({ command, row });
+    }
+
     const legend = el('section', 'pause__controls');
     legend.setAttribute('aria-label', S.pause.controls);
     const controlsList = el('div', 'pause__controls-list');
@@ -249,6 +266,10 @@ export class PauseMenu {
     this.refreshNote();
     refreshGlyphs(this.root);
     this.root.hidden = false;
+    // Open at the top, with Resume and the driving actions in view, wherever it was scrolled.
+    for (const node of this.root.querySelectorAll<HTMLElement>('.pause__card, .pause__actions'))
+      node.scrollTop = 0;
+    this.root.scrollTop = 0;
     this.focusIndex = 0;
     this.focus();
   }
@@ -260,6 +281,7 @@ export class PauseMenu {
 
   /** Reflect each setting's current value. */
   sync(): void {
+    for (const { command, row } of this.commands) row.hidden = !(command.visible?.() ?? true);
     for (const { slider, input, output } of this.sliders.values()) {
       const v = Math.round(slider.get() * 10) / 10;
       input.value = String(v);
@@ -312,7 +334,8 @@ export class PauseMenu {
         let next = index < 0 ? 0 : index;
         for (let k = 0; k < n; k++) {
           next = (next + step + n) % n;
-          if (!(this.focusables[next] as HTMLButtonElement).disabled) break;
+          const f = this.focusables[next] as HTMLButtonElement;
+          if (!f.disabled && !f.closest('[hidden]')) break;
         }
         this.focusIndex = next;
         this.focus();
