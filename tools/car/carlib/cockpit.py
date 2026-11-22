@@ -3,7 +3,7 @@ stalks, T-camera. And the suspension links, which share the streamlined-leg help
 
 import math
 
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from . import dims as D
 from .geom import Mesh, arm, clamp, lerp, loft, naca4, smoothstep, superellipse_half, tube
@@ -44,11 +44,13 @@ def build_halo(mesh_paint, patches, q):
         path = [path[0]] + [(path[i - 1] + path[i] * 2 + path[i + 1]) / 4 for i in range(1, len(path) - 1)] + [path[-1]]
     nsec = q.n(16, 8)
     grid = []
+    frames = []
     for k, p in enumerate(path):
         t = (path[min(k + 1, len(path) - 1)] - path[max(k - 1, 0)]).normalized()
         up = Vector((0, 0, 1))
         side = t.cross(up).normalized()
         upn = side.cross(t).normalized()
+        frames.append((p, side, upn))
         s = k / (len(path) - 1)
         a, b = lerp(0.034, 0.030, s), lerp(0.024, 0.026, s)
         ring = []
@@ -60,7 +62,21 @@ def build_halo(mesh_paint, patches, q):
             ring.append(p + side * (a * c) + upn * (bb * si))
         grid.append(ring)
     m = Mesh()
-    loft(m, grid, "paint", closed=True, cap1=True, patch_key="halo", patches=patches)
+    base = loft(m, grid, "paint", closed=True, cap1=True, patch_key="halo", patches=patches)
+    # The underside and the inner face (towards the driver's head) are bare carbon, as on the real
+    # part: from the cockpit the hoop reads dark against the sky, with the painted top beyond it.
+    cols = len(grid[0])
+    for k, f in enumerate(m.f):
+        j = (min(f) - base) // cols
+        if j >= len(frames) - 1:
+            continue
+        p, side, upn = frames[j]
+        centre = sum((m.v[i] for i in f), Vector()) / len(f)
+        d = (centre - p).normalized()
+        if d.dot(side) < -0.35 or d.dot(upn) < -0.55:
+            m.mat[k] = "carbon"
+            m.patch[k] = None
+            m.uv0[k] = None
     mesh_paint.merge(m.with_mirror())
     # centre pylon: a faired blade from the chassis to the hoop front
     py = Mesh()
@@ -157,39 +173,222 @@ def build_helmet(q, patches):
     return m
 
 
-def build_steering_wheel(q):
-    """Steering wheel in its own frame: origin at the wheel centre, +X towards the driver along
-    the column, display facing the driver."""
-    m = Mesh()
-    w, h, t = 0.135, 0.075, 0.035
-    rows = []
-    n = q.n(20, 8)
+# Steering wheel, in its own frame: origin at the wheel centre, +X towards the driver along the
+# column, +Y to the wheel's left as built (the assembly turns it to face the driver), +Z up.
+WHEEL_HALF_WIDTH, WHEEL_HALF_HEIGHT = 0.120, 0.078
+GRIP_Y = WHEEL_HALF_WIDTH + 0.010
+GRIP_X = -0.016
+DISPLAY_HALF = (0.047, 0.0295)  # the screen is 1.6:1, like the 256 x 160 canvas drawn into it
+DISPLAY_Z = 0.014
+
+
+def _outline(n, scale, x):
+    """Faceplate outline: flat top and bottom, full sides where the grips attach."""
+    pts = []
     for k in range(n):
         th = 2 * math.pi * k / n
         c, s = math.cos(th), math.sin(th)
-        y = math.copysign(abs(c) ** 0.4, c) * w
-        z = math.copysign(abs(s) ** 0.6, s) * h
-        rows.append(Vector((0, y, z)))
-    front = rows
-    back = [p + Vector((-t, 0, 0)) for p in rows]
-    loft(m, [back, front], "carbon", closed=True, cap0=True)
-    # display recess on the face
-    disp = [Vector((0.001, y, z)) for (y, z) in ((-0.05, -0.028), (0.05, -0.028), (0.05, 0.026), (-0.05, 0.026))]
+        y = math.copysign(abs(c) ** 0.35, c) * WHEEL_HALF_WIDTH * scale
+        z = math.copysign(abs(s) ** 0.55, s) * WHEEL_HALF_HEIGHT * scale
+        pts.append(Vector((x, y, z)))
+    return pts
+
+
+def _rounded_rect(hw, hh, r, x, n_corner):
+    pts = []
+    for cy, cz, a0 in ((hw - r, hh - r, 0.0), (-hw + r, hh - r, 0.5 * math.pi),
+                       (-hw + r, -hh + r, math.pi), (hw - r, -hh + r, 1.5 * math.pi)):
+        for k in range(n_corner + 1):
+            a = a0 + 0.5 * math.pi * k / n_corner
+            pts.append(Vector((x, cy + r * math.cos(a), DISPLAY_Z + cz + r * math.sin(a))))
+    return pts
+
+
+def _planar_metric_uv(m, mats):
+    """Metric UVs projected along each face's dominant axis (the weave keeps its 3 mm scale on
+    caps and flat faces, where loft caps would otherwise stretch it into stripes)."""
+    for k, f in enumerate(m.f):
+        if m.mat[k] not in mats:
+            continue
+        a, b, c = (m.v[i] for i in f[:3])
+        nrm = (b - a).cross(c - a)
+        ax = max(range(3), key=lambda i: abs(nrm[i]))
+        iu, iv = ((1, 2), (0, 2), (0, 1))[ax]
+        m.uv1[k] = [(m.v[i][iu], m.v[i][iv]) for i in f]
+
+
+def build_steering_wheel(q):
+    """A current single-seater wheel: a bevelled carbon faceplate with the screen in a bezel at the
+    top, push buttons round it, knurled rotary switches below, and moulded rubber grips with
+    finger ridges at both sides."""
+    m = Mesh()
+    n = q.n(28, 12)
+    rows = [_outline(n, 0.95, -0.032), _outline(n, 1.0, -0.027), _outline(n, 1.0, -0.005), _outline(n, 0.97, 0.0)]
+    loft(m, rows, "carbon", closed=True, cap0=True, cap1=True)
+    if q.lod == "high":
+        # Printed legends and switch indices on the existing front polygon; no decal geometry.
+        m.mat[-1] = "wheel_controls"
+        m.uv0[-1] = [(m.v[i].y / (.24) + .5, m.v[i].z / (.156) + .5) for i in m.f[-1]]
+    # screen bezel standing proud of the face, and the screen itself (UV1 0..1 across it; u runs
+    # from the driver's left to right once the wheel faces the driver, v from bottom to top)
+    hw, hh = DISPLAY_HALF
+    nc = q.n(3, 1)
+    outer0 = _rounded_rect(hw + 0.007, hh + 0.007, 0.008, 0.0, nc)
+    outer1 = _rounded_rect(hw + 0.006, hh + 0.006, 0.007, 0.0045, nc)
+    inner1 = _rounded_rect(hw + 0.001, hh + 0.001, 0.003, 0.0045, nc)
+    inner0 = _rounded_rect(hw + 0.001, hh + 0.001, 0.003, 0.0025, nc)
+    loft(m, [outer0, outer1, inner1, inner0], "dark", closed=True)
     d = Mesh()
+    disp = [Vector((0.0026, y, DISPLAY_Z + z)) for (y, z) in ((-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh))]
     i0 = d.add_verts(disp)
     d.add_face((i0, i0 + 1, i0 + 2, i0 + 3), "display", uv1=[(0, 0), (1, 0), (1, 1), (0, 1)])
     m.merge(d)
-    # grips
-    for side in (-1, 1):
-        g = Mesh()
+    # push buttons: alternate team-coloured and black caps, as real wheels colour-code them. On
+    # Mobile the phone's driver cluster covers the wheel face, so its triangles go to the hands.
+    nb = q.n(8, 6)
+    buttons = []
+    if q.lod == "high":
+        buttons = [(0.078, 0.042), (0.084, 0.016), (0.080, -0.010), (0.064, -0.034), (0.030, -0.036),
+                   (0.062, 0.056), (0.092, -0.032)]
+    for k, (y, z) in enumerate(buttons):
+        for side in (1, -1):
+            mat = "paint_edge" if (k % 2 == 0) == (side > 0) else "dark"
+            tube(m, (0.0, side * y, z), (0.0045, side * y, z), 0.0068, nb, mat)
+    # rotary switches: knurled machined knobs on a collar
+    nk = q.n(16, 8)
+    for (y, z, r) in ((0.052, -0.052, 0.0115), (-0.052, -0.052, 0.0115), (0.0, -0.060, 0.0095)):
+        rings = []
+        for x, rr in ((0.0, 1.08), (0.003, 1.08), (0.0035, 1.0), (0.012, 1.0), (0.0135, 0.86)):
+            ring = []
+            for k in range(nk):
+                a = 2 * math.pi * k / nk
+                knurl = 1.0 if (k % 2 == 0 or rr > 1.05 or rr < 0.9) else 0.93
+                ring.append(Vector((x, y + r * rr * knurl * math.cos(a), z + r * rr * knurl * math.sin(a))))
+            rings.append(ring)
+        loft(m, rings, "metal_dark", closed=True, cap0=True, cap1=True)
+        if q.lod == "high":
+            m.mat[-1] = "wheel_controls"
+            m.uv0[-1] = [(m.v[i].y / .24 + .5, m.v[i].z / .156 + .5) for i in m.f[-1]]
+    # grips: moulded rubber, fuller in the palm, with finger ridges on the back
+    ng, nr = q.n(12, 8), q.n(10, 5)
+    for side in (1, -1):
         rows = []
-        for k in range(6):
-            z = lerp(-0.07, 0.065, k / 5)
-            rr = 0.024 * (1 - 0.3 * abs(2 * k / 5 - 1))
-            rows.append([Vector((-0.02 + rr * math.cos(2 * math.pi * i / 10), side * (w + 0.010) + rr * 0.8 * math.sin(2 * math.pi * i / 10), z))
-                         for i in range(10)])
-        loft(g, rows, "grip", closed=True, cap0=True, cap1=True)
-        m.merge(g)
+        for k in range(nr + 1):
+            t = k / nr
+            z = lerp(-0.080, 0.070, t)
+            body_r = 0.024 * (0.72 + 0.28 * math.sin(math.pi * min(1.0, 0.08 + 0.92 * t)) ** 0.6)
+            ridge = 0.12 * max(0.0, math.cos(2 * math.pi * 4 * t)) if 0.18 < t < 0.82 else 0.0
+            ring = []
+            for i in range(ng):
+                a = 2 * math.pi * i / ng
+                back = max(0.0, -math.cos(a))
+                rr = body_r * (1 + ridge * back)
+                ring.append(Vector((GRIP_X + rr * math.cos(a), side * GRIP_Y + rr * 0.85 * math.sin(a), z)))
+            rows.append(ring)
+        loft(m, rows, "grip", closed=True, cap0=True, cap1=True)
+    _planar_metric_uv(m, {"carbon"})
+    return m
+
+
+def build_cockpit_padding(mesh_dark, q):
+    """Padded coaming round the front of the cockpit opening, from the side pads forward round
+    the dash: a soft rounded roll sitting on the rim, the edge the driver sees round the wheel."""
+    from .body import spine_ring
+
+    n_side, n_top = q.n(34, 8), q.n(8, 3)
+    nx, nr = q.n(16, 7), q.n(10, 6)
+    m = Mesh()
+    rim = []
+    for k in range(nx + 1):
+        x = lerp(0.42, D.X_COCKPIT_FRONT - 0.035, (k / nx) ** 0.85)
+        rim.append(spine_ring(x, n_side, n_top)[n_side - 1])
+    rows = []
+    for k, p in enumerate(rim):
+        tang = (rim[min(k + 1, nx)] - rim[max(k - 1, 0)]).normalized()
+        inward = Vector((0, 0, 1)).cross(tang).normalized()
+        if inward.y > 0:
+            inward = -inward
+        c = p + inward * 0.010 + Vector((0, 0, 0.006))
+        rows.append([c + inward * (0.020 * math.cos(2 * math.pi * i / nr)) + Vector((0, 0, 0.015 * math.sin(2 * math.pi * i / nr)))
+                     for i in range(nr)])
+    loft(m, rows, "headrest", closed=True, cap0=True, cap1=True)
+    mesh_dark.merge(m.with_mirror())
+
+
+def sleeve_path(side):
+    return [Vector((.20, side * .176, .622)), Vector((.27, side * .178, .632)),
+            Vector((.37, side * .166, .630)), Vector((.455, side * .151, .617))]
+
+
+def wrist_join(side):
+    transform = Matrix.Rotation(math.radians(D.STEERING_COLUMN_PITCH_DEG), 3, "Y") @ Matrix.Rotation(math.pi, 3, "Z")
+    sleeve = sleeve_path(-side)
+    endpoint = sleeve[-1]
+    inside = endpoint + (sleeve[-2] - endpoint).normalized() * .020
+    origin = Vector(D.STEERING_WHEEL_CENTRE)
+    local = transform.transposed()
+    # Closed gauntlet cap stays buried inside the final sleeve segment, even after export.
+    assert (transform @ (local @ (endpoint - origin)) + origin - endpoint).length < 1e-8
+    return local @ (endpoint - origin), local @ (inside - origin)
+
+
+def build_gloves(q):
+    """Gloved hands round the grips, in the wheel's frame so they turn with it: a closed fist
+    with knuckles over the grip, the thumb along the faceplate towards the buttons, and the
+    gauntlet with its wrist strap running back towards the driver."""
+    m = Mesh()
+    # the hands are the nearest objects to the cockpit camera: smooth sections, many rows
+    n, rows_n = {"high": (22, 14), "mobile": (14, 9)}.get(q.lod, (8, 5))
+    for side in (1, -1):
+        cx, cy = GRIP_X + 0.010, side * (GRIP_Y + 0.006)
+        rows = []
+        for k in range(rows_n + 1):
+            t = k / rows_n
+            z = lerp(-0.050, 0.048, t)
+            end = math.sin(math.pi * min(1.0, 0.10 + 0.90 * t)) ** 0.45
+            ring = []
+            for i in range(n):
+                a = 2 * math.pi * i / n
+                # a = 0 faces the driver, a = pi/2 faces outboard
+                dx, dy = math.cos(a), math.sin(a)
+                # a squared-off section: a flat back of the hand, not a ball
+                r = (0.034 * end + 0.004) / (abs(dx) ** 3 + abs(dy) ** 3) ** (1 / 3)
+                # knuckles: four ridges where the fingers fold over the grip (driver side, outboard)
+                facing = max(0.0, math.cos(a - 0.8))
+                if 0.12 < t < 0.92:
+                    r += 0.0075 * facing ** 3 * max(0.0, math.cos(2 * math.pi * 4 * (t - 0.12) / 0.8)) ** 2
+                ring.append(Vector((cx + r * dx, cy + side * r * 0.85 * dy, z)))
+            rows.append(ring if side > 0 else list(reversed(ring)))
+        loft(m, rows, "glove", closed=True, cap0=True, cap1=True)
+        # thumb: from the inside of the fist across the face towards the upper buttons
+        path = [Vector((0.006, side * (GRIP_Y - 0.020), 0.022)),
+                Vector((0.020, side * (GRIP_Y - 0.035), 0.028)),
+                Vector((0.027, side * (GRIP_Y - 0.034), 0.009)),
+                Vector((0.015, side * (GRIP_Y - 0.020), -0.004))]
+        radii = (0.0105, 0.0092, 0.0084, 0.0055)
+        nt = q.n(12, 6)
+        rings = []
+        for p, r, t_ in zip(path, radii, range(len(path))):
+            tang = (path[min(t_ + 1, 3)] - path[max(t_ - 1, 0)]).normalized()
+            u = tang.cross(Vector((0, 0, 1))).normalized()
+            w = tang.cross(u)
+            rings.append([p + (u * math.cos(2 * math.pi * k / nt) + w * math.sin(2 * math.pi * k / nt) * 0.8) * r
+                          for k in range(nt)])
+        loft(m, rings, "glove", closed=True, cap0=True, cap1=True, flip=side > 0)
+        # Derive the join in wheel-local coordinates from the actual sleeve end. Local hand
+        # side is reversed by the assembly's half-turn. The closed rear cap is 20 mm inside
+        # the sleeve; the flared middle ring overlaps its open mouth.
+        sleeve, inside = wrist_join(side)
+        a = Vector((cx + 0.026, cy + side * 0.012, -0.004))
+        axis = (inside - a).normalized()
+        u = axis.cross(Vector((0, 0, 1))).normalized()
+        w = axis.cross(u)
+        ng = q.n(20, 10)
+        grid = [[p + (u * math.cos(2 * math.pi * k / ng) + w * math.sin(2 * math.pi * k / ng)) * r
+                 for k in range(ng)] for p, r in ((a, .031), (sleeve, .035), (inside, .026))]
+        loft(m, grid, "glove", closed=True, cap0=True, cap1=True)
+        tube(m, a.lerp(sleeve, .30), a.lerp(sleeve, .52), .034, ng, "dark")
+    _planar_metric_uv(m, {"glove"})
     return m
 
 
@@ -211,15 +410,29 @@ def build_mirrors(mesh_paint, mesh_carbon, mesh_dark, patches, q):
                                 cz + math.copysign(abs(si) ** 0.6, si) * h / 2 * s)))
         rows.append(ring)
     loft(m, rows, "paint", closed=True, patch_key="mirror", patches=patches, flip=True)
-    glass = [p + Vector((0.004, 0, 0)) for p in rows[-1]]
-    glass = [Vector((p.x, cy + (p.y - cy) * 0.9, cz + (p.z - cz) * 0.85)) for p in glass]
+    # housing lip and a short recess wall down to the glass
+    lip = [Vector((p.x + 0.004, cy + (p.y - cy) * 0.9, cz + (p.z - cz) * 0.85)) for p in rows[-1]]
+    seat = [p + Vector((0.006, 0, 0)) for p in lip]
     g = Mesh()
-    loft(g, [rows[-1], glass], "dark", closed=True)
-    cen = sum(glass, Vector()) / len(glass)
-    ci = g.add_verts([cen])
-    gi = g.add_verts(glass)
+    loft(g, [rows[-1], lip, seat], "dark", closed=True)
+    # The glass has its own vertices (no normals shared with the lip, which made the old fan read
+    # as facets) and is gently convex, about 1.2 m radius, so the environment slides across it.
+    rings = []
+    for s_ in (1.0, 0.72, 0.42, 0.16):
+        rings.append([Vector((p.x - 0.0002 - 0.0045 * (1 - s_ * s_), cy + (p.y - cy) * s_, cz + (p.z - cz) * s_))
+                      for p in seat])
+    gi = g.add_verts([v for ring in rings for v in ring])
+    for r in range(len(rings) - 1):
+        for i in range(n):
+            a0, a1 = gi + r * n + i, gi + r * n + (i + 1) % n
+            b0, b1 = a0 + n, a1 + n
+            g.add_face((a0, a1, b1, b0), "mirror_glass")
+    centre = sum(rings[-1], Vector()) / n
+    centre.x -= 0.0005
+    ci = g.add_verts([centre])
+    last = gi + (len(rings) - 1) * n
     for i in range(n):
-        g.add_face((gi + i, gi + (i + 1) % n, ci), "mirror_glass")
+        g.add_face((last + i, last + (i + 1) % n, ci), "mirror_glass")
     mesh_paint.merge(m.with_mirror())
     mesh_dark.merge(g.with_mirror())
     st = Mesh()
@@ -297,10 +510,18 @@ def build_driver(mesh_paint, mesh_dark, q):
     mesh_paint.merge(m.with_mirror())
     # forearms: from the shoulder line to the wrists beside the wheel grips
     arms = Mesh()
+    na = q.n(12, 6)
     for side in (1, -1):
-        a = Vector((0.20, side * 0.175, 0.625))
-        b = Vector((0.46, side * 0.150, 0.615))
-        tube(arms, a, b, 0.038, q.n(12, 6), "paint_edge", radius_b=0.030)
+        path = sleeve_path(side)
+        radii = (0.040, 0.041, 0.036, 0.031)
+        rings = []
+        for k, (p, r) in enumerate(zip(path, radii)):
+            tang = (path[min(k + 1, 3)] - path[max(k - 1, 0)]).normalized()
+            u = tang.cross(Vector((0, 0, 1))).normalized()
+            w = tang.cross(u)
+            rings.append([p + (u * math.cos(2 * math.pi * i / na) * 1.05 + w * math.sin(2 * math.pi * i / na) * 0.95) * r
+                          for i in range(na)])
+        loft(arms, rings, "paint_edge", closed=True, cap0=True, cap1=False)
     mesh_paint.merge(arms)
     # harness: two straps over the shoulders, converging at the chest
     hn = Mesh()
@@ -313,22 +534,6 @@ def build_driver(mesh_paint, mesh_dark, q):
                                                                   (0.024, -0.002))])
         loft(hn, grid, "dark", closed=True, cap0=True, cap1=True)
     mesh_dark.merge(hn)
-
-
-def build_gloves(q, hand_y=0.150):
-    """Gloved hands round the steering-wheel grips, in the wheel's own frame (built facing +X)."""
-    m = Mesh()
-    n = q.n(12, 6)
-    for side in (1, -1):
-        rows = []
-        for k in range(6):
-            t = k / 5
-            z = lerp(-0.045, 0.040, t)
-            r = 0.036 * math.sin(math.pi * min(1.0, 0.12 + 0.88 * t)) ** 0.5 + 0.004
-            rows.append([Vector((-0.020 + r * 0.95 * math.cos(2 * math.pi * i / n), side * hand_y + r * 0.85 * math.sin(2 * math.pi * i / n), z))
-                         for i in range(n)])
-        loft(m, rows, "paint_edge", closed=True, cap0=True, cap1=True)
-    return m
 
 
 def build_halo_mounts(mesh_paint, q):
