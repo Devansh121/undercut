@@ -4,7 +4,8 @@ import { viewPixels, watchProblems } from './helpers';
 /**
  * Context loss and full Mobile-preset view rebuild (including PMREM environment rebake). Two full
  * Mobile shader/environment compiles take about a minute on CI's software renderer, so this runs
- * in the nightly Playwright project (`npm run test:browser:nightly`).
+ * in the `lifecycle` Playwright project, which CI runs in the `build` job beside the `browser`
+ * job (`npm run test:browser:lifecycle`).
  */
 test.use({ viewport: { width: 480, height: 300 } });
 

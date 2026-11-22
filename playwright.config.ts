@@ -10,6 +10,13 @@ const roomsPort = Number(process.env.TEST_ROOMS_PORT ?? 4787);
 
 // Software WebGL (SwiftShader): identical on CI and on a laptop, and it keeps tests
 // off the shared GPU.
+/**
+ * The two longest scenarios (five Mobile sessions on one page, and a context loss with a full
+ * Mobile rebake) form their own project. CI runs it in the `build` job, in parallel with the
+ * `browser` job that runs desktop and phone; a plain `playwright test` runs all three.
+ */
+const LIFECYCLE = /\/(lifecycle|context-loss)\.spec\.ts$/;
+
 const launchOptions = {
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 };
@@ -31,7 +38,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      testIgnore: /\.nightly\.spec\.ts$/,
+      testIgnore: LIFECYCLE,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -41,7 +48,7 @@ export default defineConfig({
     },
     {
       name: 'phone',
-      testIgnore: /\.nightly\.spec\.ts$/,
+      testIgnore: LIFECYCLE,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },
@@ -52,8 +59,8 @@ export default defineConfig({
       },
     },
     {
-      name: 'nightly',
-      testMatch: /\.nightly\.spec\.ts$/,
+      name: 'lifecycle',
+      testMatch: LIFECYCLE,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },

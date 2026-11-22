@@ -3,8 +3,8 @@ import { viewPixels, watchProblems } from './helpers';
 
 /**
  * The renderer adapts to what the GPU can do (the preset guard and the direct-path fallback
- * without float targets). Context loss and Mobile PMREM rebake run in the nightly project
- * (context-loss.nightly.spec.ts). One project covers this at a small viewport: software WebGL
+ * without float targets). Context loss and Mobile PMREM rebake run in the `lifecycle` project
+ * (context-loss.spec.ts). One project covers this at a small viewport: software WebGL
  * in CI pays for every pixel.
  */
 test.use({ viewport: { width: 480, height: 300 } });

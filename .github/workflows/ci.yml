@@ -92,6 +92,33 @@ jobs:
       - run: npm run build
       # Verifies the Cloudflare bundle (dry-run, limits, DO migrations) and local Workers runtime.
       - run: node tools/deploy/check.mjs && npm run test:deploy
+      # The two longest browser scenarios (five-session leak test, context loss with a full
+      # rebake) run here, on the build just made, in parallel with the browser job.
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Install Chromium system libraries
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run test:browser:lifecycle
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-lifecycle
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
       - name: Keep the built client
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
@@ -127,7 +154,12 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npm run build
-      - run: npm run test:browser
+      # Measurement only (to be reverted): the same suite at 2 and then 3 workers on one runner.
+      - name: Desktop and phone, 2 workers
+        run: npm run test:browser:views -- --workers=2
+      - name: Desktop and phone, 3 workers
+        if: success() || failure()
+        run: npm run test:browser:views -- --workers=3
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7

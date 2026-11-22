@@ -10,9 +10,7 @@ import { viewPixels } from './helpers';
  */
 test('the sky is exposed and tone-mapped the same on the direct path as on the HDR path', async ({
   drive: { page },
-}, info) => {
-  // Sky tone-mapping is renderer logic and does not depend on the viewport: one project covers it.
-  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+}) => {
   await page.evaluate(() => {
     const u = window.__undercut;
     u?.camera('chase-near');
@@ -20,7 +18,7 @@ test('the sky is exposed and tone-mapped the same on the direct path as on the H
     u?.setTimeScale(0);
     u?.resetFrameTimes();
   });
-  await page.waitForFunction(() => (window.__undercut?.frameTimes().length ?? 0) >= 1);
+  await page.waitForFunction(() => (window.__undercut?.frameTimes().length ?? 0) >= 3);
 
   const measure = async (path: 'hdr' | 'direct'): Promise<number> => {
     await page.evaluate((p) => {

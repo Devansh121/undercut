@@ -617,8 +617,7 @@ test.describe('drive', () => {
 
   test('a clumsy keyboard lap on the default assists completes without a spin', async ({
     drive: { page, problems },
-  }, info) => {
-    test.skip(info.project.name !== 'desktop', 'keyboard autopilot runs on the desktop project');
+  }) => {
     // The keyboard autopilot as a clumsy player (late and early braking, flooring the throttle
     // before the exits, slow feet), through the real key events, shaping and assists. The same
     // seed spins with the stability assist off (apps/web/test/clumsy-lap.test.ts).
