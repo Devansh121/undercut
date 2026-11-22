@@ -1,5 +1,5 @@
 import type { ControlsSource } from './controls-help';
-import { controlsHint } from './controls-help';
+import { controlsHint, controlRows } from './controls-help';
 import { el } from './dom';
 import { button } from './kit/components';
 import { S } from './strings';
@@ -48,7 +48,7 @@ export class Onboarding {
     if (++this.step >= 4) this.finish();
     else this.paint();
   }
-  private finish(): void {
+  finish(): void {
     this.root.hidden = true;
     finished = true;
     try {
@@ -76,7 +76,7 @@ export class Onboarding {
     this.title.textContent = `${S.intro.title} · ${this.step + 1}/4`;
     this.text.textContent =
       [
-        controlsHint(this.source.bindings(), this.source.device()),
+        `${S.intro.steer(controlRows(this.source.bindings(), this.source.device())[0]?.input ?? '')} ${controlsHint(this.source.bindings(), this.source.device())}`,
         S.intro.brake,
         S.intro.limits,
         S.intro.pause,

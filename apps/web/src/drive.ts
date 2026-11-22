@@ -493,6 +493,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   });
   let autoQuality = o.autoQuality ?? false;
   const actions = {
+    skipIntro: () => {
+      intro.finish();
+      resume();
+    },
     resetSettings: () => {
       session.resetAssists();
       for (const [key, value] of Object.entries(session.assists) as [keyof AssistConfig, never][])
@@ -1249,6 +1253,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     quit,
     loadTimes: () => ({ ...loadTimes }),
     resetForTest: () => {
+      autoQuality = false;
       // Drop any key or touch press that arrived after the previous test's last frame.
       input.setContext('menu');
       input.releaseAll();

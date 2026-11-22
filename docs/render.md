@@ -38,7 +38,7 @@ The numbers are in `packages/render/src/presets.json` (also read by the budget c
 
 | | Ultra | High | Medium | Mobile | Lite (tests) |
 | --- | --- | --- | --- | --- | --- |
-| Pixel ratio cap | 2 | 1.5 | 1.25 | 1.5 | 0.4 |
+| Pixel ratio cap | 2 | 1.5 | 1.25 | 1.25 | 0.4 |
 | MSAA / SMAA | 4× / yes | 4× / yes | 4× / no | 2× / no | none |
 | Sun shadows | 3 × 4096, 320 m | 3 × 2048, 300 m | 2 × 2048, 160 m | 1 × 1024, 32 m, plus blob | blob only |
 | GTAO | half res | half res | off | off | off |

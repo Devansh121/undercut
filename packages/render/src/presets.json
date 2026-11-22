@@ -113,7 +113,7 @@
   },
   "mobile": {
     "label": "Mobile",
-    "pixelRatioCap": 1.5,
+    "pixelRatioCap": 1.25,
     "msaa": 2,
     "smaa": false,
     "post": true,

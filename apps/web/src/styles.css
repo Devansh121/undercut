@@ -1766,3 +1766,21 @@ html[data-screen='drive']:not([data-paused]) #view {
 .onboarding.is-braking {
   border-left-color: var(--c-time-invalid);
 }
+@media (orientation: portrait) {
+  .rotate-prompt {
+    bottom: auto;
+    padding: 12px;
+    border-bottom: 1px solid var(--c-line-strong);
+  }
+  .rotate-prompt h2 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .rotate-prompt p {
+    font-size: 12px;
+    margin: 0;
+  }
+  [data-portrait] .pause {
+    padding-top: 100px;
+  }
+}

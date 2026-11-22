@@ -378,6 +378,44 @@ async function runStation(page, station) {
   await page.waitForTimeout(900);
 }
 
+async function mobileUi(browser, report) {
+  const vp = PERF_VIEWPORTS[1];
+  const { context, page, errors } = await openGame(browser, vp);
+  try {
+    for (const size of [
+      { width: 844, height: 390 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(size);
+      const label = `${size.width}x${size.height}`;
+      if (size.width > size.height) await page.evaluate(() => globalThis.__undercut.resume());
+      for (const screen of ['onboarding', 'hud', 'pause', 'settings']) {
+        if (screen === 'onboarding') {
+          await page.evaluate(() => globalThis.__undercut.pause());
+          await page.locator('[data-action=replay-intro]').click();
+        }
+        if (screen === 'hud') {
+          await page.evaluate(() => globalThis.__undercut.pause());
+          await page.locator('[data-action=skip-intro]').click();
+        }
+        if (screen === 'pause' || screen === 'settings')
+          await page.evaluate(() => globalThis.__undercut.pause());
+        if (screen === 'settings')
+          await page.locator('[data-setting=units]').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(300);
+        const file = path.join(outDir, `${screen}-${label}.png`);
+        await page.screenshot({ path: file });
+        report.shots.push({ screen, viewport: label, file });
+      }
+    }
+    report.errors.push(...errors);
+  } finally {
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await page.goto('about:blank');
+    await context.close();
+  }
+}
+
 async function shots(browser, report) {
   const only = option('only')?.split(',');
   const sizes = option('viewport')?.split(',');
@@ -453,6 +491,8 @@ function summarise(times) {
     onePercentLowFps: +(1000 / worstMean).toFixed(1),
     p99FrameMs: +p99.toFixed(2),
     meanFrameMs: +mean.toFixed(2),
+    medianFrameMs: +sorted[Math.floor(sorted.length * 0.5)].toFixed(2),
+    p95FrameMs: +sorted[Math.floor(sorted.length * 0.95)].toFixed(2),
   };
 }
 
@@ -482,7 +522,7 @@ const PERF_VIEWPORTS = [
 ];
 
 async function perf(report) {
-  for (const vsync of [true, false]) await perfRuns(report, vsync);
+  for (const vsync of flag('phone-audit') ? [true] : [true, false]) await perfRuns(report, vsync);
 }
 
 async function perfRuns(report, vsync) {
@@ -490,10 +530,26 @@ async function perfRuns(report, vsync) {
     args: [...GPU_ARGS, ...(vsync ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit'])],
   });
   try {
-    for (const vp of PERF_VIEWPORTS) {
+    for (const vp of flag('phone-audit')
+      ? [2, 3].flatMap((deviceScaleFactor) =>
+          [
+            { width: 844, height: 390 },
+            { width: 390, height: 844 },
+          ].map((viewport) => ({
+            label: `${viewport.width}x${viewport.height}-dpr${deviceScaleFactor}`,
+            viewport,
+            deviceScaleFactor,
+            isMobile: true,
+            hasTouch: true,
+            quality: 'mobile',
+          })),
+        )
+      : PERF_VIEWPORTS) {
       const quality = option('perf-quality') ?? vp.quality;
       const { context, page } = await openGame(browser, { ...vp, quality });
-      for (const run of ['drive', 'grid']) {
+      for (const run of flag('phone-audit')
+        ? ['grid', 'chicane', 'lesmo', 'parabolica']
+        : ['drive', 'grid']) {
         await page.evaluate((run) => {
           const u = globalThis.__undercut;
           u.autopilot(false);
@@ -503,6 +559,10 @@ async function perfRuns(report, vsync) {
             u.camera('chase-near');
             u.teleport(4300, 0, 250);
             u.autopilot(true);
+          } else if (run !== 'grid') {
+            u.camera('chase-near');
+            u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
+            u.drive({ throttle: 0, brake: 1, steer: 0 });
           } else {
             // From the last slot looking up the grid: nineteen cars ahead, all in view.
             u.restartLap();
@@ -531,6 +591,12 @@ async function perfRuns(report, vsync) {
           ...summarise(times),
           gpu,
           render: stats,
+          memory: await page.evaluate(() => ({
+            heapBytes: performance.memory?.usedJSHeapSize ?? null,
+            resources: performance
+              .getEntriesByType('resource')
+              .reduce((sum, r) => sum + r.transferSize, 0),
+          })),
           file: path.relative(root, file),
         };
         report.perf.push(summary);
@@ -538,6 +604,8 @@ async function perfRuns(report, vsync) {
           `  perf ${run} ${vp.label} ${quality} vsync=${vsync}: ${JSON.stringify(summary)}`,
         );
       }
+      await page.evaluate(() => globalThis.__undercut.quit());
+      await page.goto('about:blank');
       await context.close();
     }
   } finally {
@@ -822,6 +890,7 @@ try {
   await waitForServer(server);
   const browser = await chromium.launch({ args: GPU_ARGS });
   try {
+    if (flag('mobile-ui')) await mobileUi(browser, report);
     if (!flag('no-shots')) await shots(browser, report);
     if (flag('lap')) await lap(browser, report);
     if (flag('moving')) await moving(browser, report);

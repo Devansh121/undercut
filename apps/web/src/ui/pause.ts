@@ -33,6 +33,7 @@ export interface PauseSlider {
 
 export interface PauseActions {
   resume(): void;
+  skipIntro?: () => void;
   resetSettings?: () => void;
   replayIntro?: () => void;
   fullscreen?: () => void;
@@ -123,6 +124,7 @@ export class PauseMenu {
       this.focusables.push(b);
     };
     addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
+    if (actions.skipIntro) addAction(S.intro.skip, 'play', actions.skipIntro, 'skip-intro');
     if (actions.replayIntro)
       addAction(S.intro.replay, 'restart', actions.replayIntro, 'replay-intro');
     if (actions.fullscreen) addAction(S.intro.fullscreen, 'play', actions.fullscreen, 'fullscreen');

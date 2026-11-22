@@ -36,6 +36,7 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 export const S = {
   intro: {
     title: 'First lap',
+    steer: (input: string) => `Steer: ${input}. Pause to skip or replay the intro.`,
     brakeNow: 'Brake now · 2/4',
     next: 'Next tip',
     skip: 'Skip intro',
