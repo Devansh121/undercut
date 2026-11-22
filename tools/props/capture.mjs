@@ -54,9 +54,13 @@ try {
       });
       await page.evaluate(() => document.getElementById('tree-diff')?.remove());
     }
+    const transitionFile = 'docs/evidence/m2-models/forest-transition.json';
     fs.writeFileSync(
-      'docs/evidence/m2-models/forest-transition.json',
-      JSON.stringify(transition, null, 2) + '\n',
+      transitionFile,
+      await format(JSON.stringify(transition), {
+        ...(await resolveConfig(transitionFile)),
+        parser: 'json',
+      }),
     );
     fs.writeFileSync(
       'docs/evidence/m2-models/forest-luma.json',

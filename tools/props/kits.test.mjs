@@ -58,10 +58,14 @@ it('keeps opposing forest card faces visible from every quadrant', async () => {
       if (Math.abs(z) > 0.01) signs.add(z > 0 ? '+Z' : '-Z');
     }
     expect([...signs].sort()).toEqual(['+X', '+Z', '-X', '-Z']);
-    for (let i = 1; i < mesh.NORMAL.values.length; i += 3) {
-      expect(mesh.NORMAL.values[i]).toBeGreaterThan(0.6);
-      expect(mesh.NORMAL.values[i]).toBeLessThan(0.8);
-    }
+    // Cards keep their geometric (horizontal) normals; the shading of the near tree comes from
+    // the card material's normal atlas, not from tilted vertex normals.
+    for (let i = 1; i < mesh.NORMAL.values.length; i += 3)
+      expect(Math.abs(mesh.NORMAL.values[i])).toBeLessThan(0.05);
+    const bytes = fs.readFileSync('apps/web/public/' + prop(id).lods[2].file);
+    const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
+    const leaf = gltf.materials.find((m) => m.name.includes('needles'));
+    expect(leaf.normalTexture).toBeDefined();
   }
 });
 
