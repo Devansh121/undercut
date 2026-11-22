@@ -358,6 +358,20 @@ export function buildStands(frames: readonly StandFrame[]): BufferGeometry {
       top + STAND.backWall,
       STEEL,
     );
+    // Painted bands: the stand's colour along the back wall and a pale stripe under it, so the
+    // back reads as a finished building from outside, not raw concrete.
+    const band = f.seat.map((c) => Math.min(1, c * 1.6));
+    b.box(f, 0, L, back + 0.35, back + 0.38, top * 0.62, top * 0.62 + 1.1, band);
+    b.box(
+      f,
+      0,
+      L,
+      back + 0.35,
+      back + 0.38,
+      top * 0.62 - 0.35,
+      top * 0.62 - 0.05,
+      [0.42, 0.41, 0.39],
+    );
     const backCols = Math.max(2, Math.round(L / 10));
     for (let k = 0; k <= backCols; k++) {
       const u = (k / backCols) * (L - 0.5) + 0.25;
@@ -369,6 +383,33 @@ export function buildStands(frames: readonly StandFrame[]): BufferGeometry {
     const yBackSide = top + Math.min(STAND.backWall, 1.4);
     b.slopedWall(f, -0.35, 0, 0, back + 0.35, yFrontSide, yBackSide, CONCRETE_DARK);
     b.slopedWall(f, L, L + 0.35, 0, back + 0.35, yFrontSide, yBackSide, CONCRETE_DARK);
+    // The stand's colour as a 0.7 m band under the top of each side wall, outside faces only.
+    const PS = (u: number, v: number, y: number): number[] => [
+      f.ox + f.ax * u + f.bx * v,
+      f.base + y,
+      f.oz + f.az * u + f.bz * v,
+    ];
+    const v1s = back + 0.35;
+    const bandFace = (u: number, out: 1 | -1): void => {
+      const a = [0, yFrontSide - 0.75];
+      const c = [v1s, yBackSide - 0.75];
+      const quad = [
+        PS(u, a[0] as number, a[1] as number),
+        PS(u, c[0] as number, c[1] as number),
+        PS(u, c[0] as number, (c[1] as number) + 0.7),
+        PS(u, a[0] as number, (a[1] as number) + 0.7),
+      ];
+      const uv = [
+        [0, 0],
+        [v1s, 0],
+        [v1s, 0.7],
+        [0, 0.7],
+      ];
+      if (out < 0) b.quad(quad[0]!, quad[1]!, quad[2]!, quad[3]!, band, uv);
+      else b.quad(quad[1]!, quad[0]!, quad[3]!, quad[2]!, band, [uv[1]!, uv[0]!, uv[3]!, uv[2]!]);
+    };
+    bandFace(-0.37, -1);
+    bandFace(L + 0.37, 1);
 
     // Stairs: lighter concrete step band every 22 m.
     for (let u = 11; u < L - 6; u += 22) {

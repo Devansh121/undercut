@@ -15,7 +15,7 @@ import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
 import type { DressingFile, MappedFeature } from './dressing';
-import type { StandFrame } from './grandstands';
+import { STAND, rowHeight, type StandFrame } from './grandstands';
 import type { LapIndex } from './lap-index';
 import type { PitComplexData } from './pit-building';
 
@@ -1498,6 +1498,21 @@ export function placeTracksideFurniture(options: {
       const x = st.ox + st.ax * u - st.bx * 0.16;
       const z = st.oz + st.az * u - st.bz * 0.16;
       placeHoarding(x, st.base + 0.3, z, yawFront, st.s);
+    }
+    // Bigger stands carry a row of brand boards on their back wall, facing out over the park.
+    if (st.rows >= 8) {
+      const back = 0.3 + st.rows * STAND.rowDepth + 0.9;
+      const y = st.base + rowHeight(st.rows) * 0.62 + 1.35;
+      const yawBack = Math.atan2(-st.bz, st.bx);
+      for (let u = 4; u < st.length - 4; u += hoardPitch * 1.5) {
+        placeHoarding(
+          st.ox + st.ax * u + st.bx * back,
+          y,
+          st.oz + st.az * u + st.bz * back,
+          yawBack,
+          st.s,
+        );
+      }
     }
   }
   counts.hoardings = hoardings;
