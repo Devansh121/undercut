@@ -153,24 +153,20 @@ export interface LapGap {
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
   'spa-lap-m4': {
-    measured: 107.114,
+    measured: 107.357,
     reason:
-      'Spa reference lap (medium trim): 6.5 % over the 2025 pole after the brake and downforce ' +
-      'identification (section 7.9). Most of it is sector 2 (+10 % on the session best): the ' +
-      "car is still slower than the era's cars through Les Combes, Malmedy, Pouhon and Campus. " +
+      'Spa reference lap (medium trim): 6.8 % over the 2025 pole after the brake and downforce ' +
+      'identification (section 7.9). Most of it is sector 2 (+10.8 % on the session best), ' +
+      'through the medium-speed corners (Les Combes, Malmedy, Bruxelles, Campus) and Pouhon. ' +
       'docs/physics-validation.md sections 7.8 and 7.9.',
   },
   'spa-s1': {
-    measured: 31.576,
+    measured: 31.584,
     reason: 'Sector 1 on the Spa reference lap, 6.1 % over the session best (section 7.9).',
   },
   'spa-s2': {
-    measured: 46.937,
-    reason: 'Sector 2 on the Spa reference lap, 10.4 % over the session best (section 7.9).',
-  },
-  'singapore-s3': {
-    measured: 26.109,
-    reason: 'Sector 3 on the Singapore reference lap, 3.5 % over the session best (section 7.9).',
+    measured: 47.133,
+    reason: 'Sector 2 on the Spa reference lap, 10.8 % over the session best (section 7.9).',
   },
 });
 
@@ -187,7 +183,11 @@ export interface ExactLap {
 }
 
 export const REFERENCE_LAP_EXACT: Readonly<Record<string, ExactLap>> = Object.freeze({
-  'monza-lap-m1': Object.freeze({ time: 82.53153349700409, trap: 348.6074090823429, ticks: 39642 }),
+  'monza-lap-m1': Object.freeze({
+    time: 82.45467836214588,
+    trap: 348.74138129128346,
+    ticks: 39617,
+  }),
 });
 
 export { gapSlack, outside };

@@ -29,12 +29,9 @@ describe('drivability: keyboard', () => {
   const preset = tally('keyboard', {}, 5, 2);
   const noStability = tally('keyboard', { stability: 0 }, 5, 2);
 
-  it('known gap: a clumsy driver on the default assists, 2 incidents in 10 laps against 1', () => {
-    const gap = DRIVABILITY_GAPS.clumsyKeyboard;
+  it('meets the target: at most 1 spin in 10 laps for a clumsy driver on the default assists', () => {
     expect(preset.laps).toBe(10);
-    const incidents = Math.round(preset.spinsPerLap * preset.laps);
-    expect(incidents, gap.reason).toBeGreaterThan(1);
-    expect(Math.abs(incidents - gap.incidents), gap.reason).toBeLessThanOrEqual(1);
+    expect(Math.round(preset.spinsPerLap * preset.laps)).toBeLessThanOrEqual(1);
     expect(preset.spinsPerLap).toBeLessThan(0.25 * noStability.spinsPerLap);
   });
 

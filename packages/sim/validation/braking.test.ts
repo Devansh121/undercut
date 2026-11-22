@@ -38,7 +38,7 @@ describe('fit, selection and validation sets', () => {
       .sort();
   it('marks exactly the declared direct fits', () => {
     expect(ids('fit')).toEqual(Object.keys(FIT_TARGETS).sort());
-    expect(ids('fit')).toHaveLength(8);
+    expect(ids('fit')).toHaveLength(7);
   });
   it('marks exactly the declared selection checks, disjoint from the fits', () => {
     expect(ids('selection')).toEqual(Object.keys(SELECTION_TARGETS).sort());
