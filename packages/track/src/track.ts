@@ -68,6 +68,11 @@ export const VERGE_FALL = 0.02;
  */
 export const FOLD_KERB_MARGIN = 0;
 export const FOLD_RAMP = 1;
+/**
+ * A fold is filled only where the track's edge itself is compressed by the bend (its stretch below
+ * this; estimate): a pocket the bend wraps around, not a wide run-off inside a gentle bend.
+ */
+export const FOLD_EDGE_STRETCH = 0.8;
 
 export const LEFT = 0;
 export const RIGHT = 1;
@@ -714,6 +719,7 @@ export class Track {
         i0,
         j,
         f,
+        s,
         d,
         sign,
         u,
@@ -734,6 +740,7 @@ export class Track {
     i0: number,
     j: number,
     f: number,
+    s: number,
     d: number,
     sign: number,
     u: number,
@@ -751,8 +758,27 @@ export class Track {
     // The kerb and a margin beyond it keep the original ground (a kerb is laid along the track
     // edge and follows it); the fill grows in beyond that over FOLD_RAMP.
     const side: SideIndex = sign > 0 ? LEFT : RIGHT;
+    // The kerb's width tapers with its profile at a kerb's ends, so the fill's start is continuous
+    // along the lap.
+    let kerbWidth = 0;
+    let kerbRate = 0; // d(kerbWidth)/ds
     const kp = this.kerb[side][out.sample]!;
-    const from = (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN;
+    if (kp >= 0) {
+      const prof = this.kerbProfiles[kp]!;
+      const i = out.sample;
+      const along = this.lap.wrap(s - this.kerbStart[side][i]!);
+      const left = this.kerbEnd[side][i]! - this.kerbStart[side][i]! - along;
+      let t = 1;
+      if (along < prof.taper && along <= left) {
+        t = along / prof.taper;
+        kerbRate = prof.width / prof.taper;
+      } else if (left < prof.taper) {
+        t = left / prof.taper;
+        kerbRate = -prof.width / prof.taper;
+      }
+      kerbWidth = Math.max(0, t) * prof.width;
+    }
+    const from = kerbWidth + FOLD_KERB_MARGIN;
     const tr = Math.min(1, Math.max(0, (u - from) / FOLD_RAMP));
     if (tr <= 0) return;
     const ramp = tr * tr * (3 - 2 * tr);
@@ -773,10 +799,26 @@ export class Track {
     const kz = (kerbSlopeS / m) * tz + sign * kerbSlopeU * nz;
     out.height += w * diff;
     out.world = true;
-    const wx = fs.wx * ramp + fs.weight * dRamp * sign * nx;
-    const wz = fs.wz * ramp + fs.weight * dRamp * sign * nz;
+    // The ramp's start moves along the lap at a kerb's ends: d(ramp)/ds = −dRamp · kerbRate,
+    // a world step of m per metre of s.
+    const rampS = (-fs.weight * dRamp * kerbRate) / m;
+    const wx = fs.wx * ramp + fs.weight * dRamp * sign * nx + rampS * tx;
+    const wz = fs.wz * ramp + fs.weight * dRamp * sign * nz + rampS * tz;
     out.gx = (1 - w) * bx + w * fs.gx + wx * diff + kx;
     out.gz = (1 - w) * bz + w * fs.gz + wz * diff + kz;
+  }
+
+  /**
+   * Does the run-off beside lap sample i fold: the frame folds before the barrier, and the
+   * track's own edge (beyond its kerb) is compressed, so the run-off is a pocket the bend
+   * wraps around rather than a wide run-off inside a gentle bend (where the fold lies far out).
+   */
+  private foldsHere(side: SideIndex, i: number): boolean {
+    const sign = side === LEFT ? 1 : -1;
+    const k = this.lap.curvature[i]! * sign;
+    const kp = this.kerb[side][i]!;
+    const edge = this.halfWidth[side][i]! + (kp >= 0 ? this.kerbProfiles[kp]!.width : 0);
+    return 1 - k * this.barrier[side][i]! < FOLD_STRETCH && 1 - k * edge < FOLD_EDGE_STRETCH;
   }
 
   /**
@@ -791,8 +833,7 @@ export class Track {
     const boxes: Box[] = [];
     for (const side of [LEFT, RIGHT] as const) {
       const sign = side === LEFT ? 1 : -1;
-      const folds = (i: number): boolean =>
-        1 - lap.curvature[i]! * sign * this.barrier[side][i]! < FOLD_STRETCH;
+      const folds = (i: number): boolean => this.foldsHere(side, i);
       let start = -1;
       for (let i = 0; i < n; i++)
         if (folds(i) && !folds((i + n - 1) % n)) start = start < 0 ? i : start;
@@ -823,11 +864,7 @@ export class Track {
     if (boxes.length === 0) return null;
     const folding = [new Uint8Array(n), new Uint8Array(n)] as const;
     for (const side of [LEFT, RIGHT] as const) {
-      const sign = side === LEFT ? 1 : -1;
-      for (let i = 0; i < n; i++) {
-        folding[side][i] =
-          1 - lap.curvature[i]! * sign * this.barrier[side][i]! < FOLD_STRETCH ? 1 : 0;
-      }
+      for (let i = 0; i < n; i++) folding[side][i] = this.foldsHere(side, i) ? 1 : 0;
     }
     const q = createPathPoint();
     const hint = { index: -1 };

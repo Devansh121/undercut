@@ -10,7 +10,8 @@ import { REVIEW_SIM_CASES, reviewRun } from './review-cases';
 // passes since the merge. The rest are still open (kerb and barrier strikes at the first chicane,
 // see apps/web/test/kerb-safety.test.ts and docs/track-data.md 5.6) and run as expected failures, so each one turns this
 // suite red the moment it passes and must then move into this list.
-const FIXED = new Set([97513]);
+// Six more pass since the folded run-off is filled (docs/track-data.md 5.8), 94146 among them.
+const FIXED = new Set([91445, 91593, 91778, 92037, 94146, 97402, 97513]);
 
 describe('flat-out kerb strikes at Monza (review of PR 19)', () => {
   const track = Track.fromJSON(monza);
