@@ -264,4 +264,38 @@ describe('race driver on the sim', () => {
     expect(contact).toBe(0);
     expect(s.result().entries.every((e) => e.status === 'finished')).toBe(true);
   }, 300_000);
+
+  // The review's stuck cars: one gone round a stopped car into the run-off at walking pace, one
+  // back on the road turned toward the edge. Each direction of the multi-point turn is held
+  // until its gear is in, so the car never sits between first and neutral.
+  it.each([
+    ['in the run-off, turned back toward the road', -1, 4, 0.9],
+    ['on the road at the edge, turned toward it', 1, -1.5, -0.6],
+  ])(
+    'a car stopped %s at walking pace gets back to racing',
+    (_, side, past, turn) => {
+      const s = race([racer({}, 41), racer({}, 42), racer({}, 43)], 2, 6);
+      while (s.control.timer(0).lap < 2 && s.time < 400) s.tick();
+      // In the turn-one braking zone, 150 m ahead of the leader: past the edge (run-off) or
+      // just inside it, pointing across the road.
+      const at = s.track.wrap(s.carFacts(0).s + 150);
+      const half = s.track.halfWidthAt(at, side > 0 ? 0 : 1);
+      const lane = side * (half + past);
+      const pose = s.lapPose(at, lane);
+      s.placeCar(2, pose.x, pose.z, pose.yaw - side * turn, 2);
+      const start = s.time;
+      let back: number | null = null;
+      while (!s.ended && s.time < start + 300) {
+        s.tick();
+        const f = s.carFacts(2);
+        if (back === null && f.speed > 15 && Math.abs(f.heading) < 0.3 && f.wheelsOff < 4) {
+          back = s.time - start;
+        }
+      }
+      expect(back).not.toBeNull();
+      expect(back!).toBeLessThan(40);
+      expect(s.result().entries.every((e) => e.status === 'finished')).toBe(true);
+    },
+    300_000,
+  );
 });

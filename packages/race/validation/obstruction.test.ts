@@ -69,15 +69,23 @@ interface Outcome {
   finished: number;
   /** The car that stopped took the flag too (it drove on). */
   stopperFinished: boolean;
+  /** Cars in the race. */
+  cars: number;
+  /** The stopped car became a ghost for holding up traffic. */
+  ghostFormed: boolean;
+  /** Fastest contact the stopped car had, m/s, from the stop on. */
+  stopperMaxContact: number;
+  /** Spins (pointing over 0.8 rad off the lap's direction), every car, from the stop on. */
+  spins: number;
 }
 
-/** A 12-car, 2-lap race whose car 0 stops on its `Stopper` when told to. */
-function build(seed: number): { session: RaceSession; stopper: Stopper } {
+/** A 2-lap race (12 cars unless told) whose car 0 stops on its `Stopper` when told to. */
+function build(seed: number, cars = CARS): { session: RaceSession; stopper: Stopper } {
   const stopper = new Stopper(
     createRaceDriver({ track, line, envelope, params, skill: { ...DEFAULT_RACE_SKILL, seed } }),
   );
   const drivers: Driver[] = [stopper];
-  for (let i = 1; i < CARS; i++) {
+  for (let i = 1; i < cars; i++) {
     drivers.push(
       createRaceDriver({
         track,
@@ -88,7 +96,7 @@ function build(seed: number): { session: RaceSession; stopper: Stopper } {
       }),
     );
   }
-  const entrants = entrantsFor(CARS);
+  const entrants = entrantsFor(cars);
   const session = new RaceSession({
     track,
     session: { kind: 'race', laps: 2 },
@@ -118,7 +126,7 @@ function ahead(a: number, b: number): number {
  */
 function parkIfComing(session: RaceSession, stopper: Stopper, s: number, d: number): boolean {
   let coming = false;
-  for (let i = 1; i < CARS; i++) {
+  for (let i = 1; i < session.cars.length; i++) {
     const g = ahead(session.carFacts(i).s, s);
     if (g > 400 && g < 600) coming = true;
   }
@@ -131,13 +139,18 @@ function parkIfComing(session: RaceSession, stopper: Stopper, s: number, d: numb
 
 /**
  * Stop car 0 at lap position (s, d) just before the field gets there; run to the flag. With
- * `releaseAfter`, it drives on again after that long stopped.
+ * `releaseAfter`, it drives on again after that long stopped (on its racing driver).
  */
-function stopIn(s: number, d: number, seed: number, releaseAfter?: number): Outcome {
-  const { session, stopper } = build(seed);
+function stopIn(s: number, d: number, seed: number, releaseAfter?: number, cars = CARS): Outcome {
+  const { session, stopper } = build(seed, cars);
   const c = session.control;
-  const near = new Array<number | null>(CARS).fill(null);
-  const past = new Array<number | null>(CARS).fill(null);
+  const n = cars;
+  const near = new Array<number | null>(n).fill(null);
+  const past = new Array<number | null>(n).fill(null);
+  const spinning = new Array<boolean>(n).fill(false);
+  let ghostFormed = false;
+  let stopperMaxContact = 0;
+  let spins = 0;
   let retiredAt: number | null = null;
   let parkedAt: number | null = null;
   let released = false;
@@ -157,7 +170,14 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number): Outc
       released = true;
     }
     if (retiredAt === null && c.cars[0]!.status === 'dnf') retiredAt = session.time;
-    for (let i = 1; i < CARS; i++) {
+    if (session.blockingGhost(0)) ghostFormed = true;
+    stopperMaxContact = Math.max(stopperMaxContact, session.worldCar(0).state.carContactSpeed);
+    for (let i = 0; i < n; i++) {
+      const off = Math.abs(session.carFacts(i).heading);
+      if (off > 0.8 && !spinning[i] && c.cars[i]!.status === 'running') spins++;
+      spinning[i] = off > 0.8 ? true : off < 0.3 ? false : spinning[i]!;
+    }
+    for (let i = 1; i < n; i++) {
       const f = session.carFacts(i);
       // From the spot where it stopped (where it stays, unless it drives on).
       const ds = ahead(s, f.s);
@@ -168,7 +188,7 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number): Outc
         if (nearSpot(i)) allOffTicksNear++;
       }
     }
-    for (let i = 0; i < CARS; i++) {
+    for (let i = 0; i < n; i++) {
       if (session.worldCar(i).state.carContacts === 0) continue;
       contactTicks++;
       if (nearSpot(i)) contactTicksNear++;
@@ -186,16 +206,20 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number): Outc
     allOffTicksNear,
     finished: c.cars.slice(1).filter((x) => x.status === 'finished').length,
     stopperFinished: c.cars[0]!.status === 'finished',
+    cars: n,
+    ghostFormed,
+    stopperMaxContact,
+    spins,
   };
 }
 
 /** Every other car past before the rules retire it, within 20 s, untouched, on the road, home. */
 function expectClean(o: Outcome): void {
-  expect(o.pastBeforeRetired).toBe(CARS - 1);
+  expect(o.pastBeforeRetired).toBe(o.cars - 1);
   expect(Math.max(...o.waits)).toBeLessThan(20);
   expect(o.contactTicks).toBe(0);
   expect(o.allOffTicks).toBe(0);
-  expect(o.finished).toBe(CARS - 1);
+  expect(o.finished).toBe(o.cars - 1);
 }
 
 describe('a car stopped in the road', () => {
@@ -235,6 +259,32 @@ describe('a car stopped in the road', () => {
     expect(o.allOffTicksNear).toBe(0);
     expect(o.finished).toBe(CARS - 1);
     expect(o.stopperFinished).toBe(true);
+  }, 300_000);
+
+  // The review's rear-ends: a ghost that turned solid with a car arriving behind it at racing
+  // speed was hit at 19 to 25 m/s. Now it turns solid only with no car closing on it, and the
+  // drivers see it as traffic as soon as it moves.
+  it.each([1, 29])(
+    'stopped 30 s at Roggia and driving on, seed %i: it is a ghost, then solid, untouched',
+    (seed) => {
+      const o = stopIn(1842, 5.49, seed, 30);
+      expect(o.ghostFormed).toBe(true);
+      expect(o.stopperMaxContact).toBeLessThan(2);
+      expect(o.spins).toBe(0);
+      expect(o.finished).toBe(CARS - 1);
+      expect(o.stopperFinished).toBe(true);
+    },
+    300_000,
+  );
+
+  it('twenty cars, the turn-one braking zone: every car gets past and finishes', () => {
+    // The review's retirement: a car gone round at walking pace into the run-off that never
+    // got going again.
+    const o = stopIn(500, 1.01, 1, undefined, 20);
+    expect(o.pastBeforeRetired).toBe(19);
+    expect(Math.max(...o.waits)).toBeLessThan(20);
+    expect(o.spins).toBe(0);
+    expect(o.finished).toBe(19);
   }, 300_000);
 
   it('a session restored across the change to a ghost goes on bit for bit', () => {
