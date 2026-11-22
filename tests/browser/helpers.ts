@@ -11,6 +11,25 @@ export function watchProblems(page: Page): string[] {
   return problems;
 }
 
+/**
+ * Wait until the 3D view has drawn `n` more frames, so the canvas shows a state set before the
+ * call. Animation frames are not enough: while the GPU is two frames behind, a frame skips its
+ * draw (FramePacer in packages/render), and on software WebGL that is the usual case.
+ */
+export async function waitForDraws(page: Page, n = 2): Promise<void> {
+  const drawn = (): Promise<number> =>
+    page.evaluate(() => window.__undercut?.renderStats().drawnFrames as number);
+  const from = await drawn();
+  await page.waitForFunction(
+    ({ from, n }) => {
+      const now = window.__undercut?.renderStats().drawnFrames as number;
+      // A new view (quality switch, context restore) counts from zero.
+      return now >= from + n || (now < from && now >= n);
+    },
+    { from, n },
+  );
+}
+
 /** From the launch screen to the main menu, with a real click on the prompt. */
 export async function openMenu(page: Page): Promise<void> {
   await page.locator('[data-action=press-start]').click();

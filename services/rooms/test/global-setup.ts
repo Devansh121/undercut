@@ -32,13 +32,13 @@ export default async function setup(project: TestProject): Promise<() => Promise
   const port = await freePort();
   const logFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rooms-log-')), 'service.log');
   fs.writeFileSync(logFile, '');
-  // Its own state directory: the tools/serve runtime tests in this project start servers on
-  // the same config, and a shared directory let two runtimes lock each other's SQLite files.
-  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'rooms-state-'));
+  // No `persistTo`: the service then keeps its state in a private directory on memory
+  // (/dev/shm) where there is one. On disk, the room's storage fsyncs about ten times a second
+  // during a race, and each one stalls its snapshot relay: on a slow CI disk that showed up as
+  // relayed-frame stalls of 140 to 320 ms and failed the soak's remote-car error bounds.
   const rooms = await startRooms({
     port,
     quiet: true,
-    persistTo: state,
     log: (text: string) => fs.appendFileSync(logFile, text),
     vars: {
       ROOM_TIMINGS: JSON.stringify(TEST_TIMINGS),
@@ -52,6 +52,5 @@ export default async function setup(project: TestProject): Promise<() => Promise
   return async () => {
     await rooms.stop();
     fs.rmSync(path.dirname(logFile), { recursive: true, force: true });
-    fs.rmSync(state, { recursive: true, force: true });
   };
 }
