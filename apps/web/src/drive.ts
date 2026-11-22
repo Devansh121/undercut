@@ -35,6 +35,7 @@ import {
   type DrivingLineMode,
   type QualityName,
   type ToneMap,
+  type RaceViewOptions,
 } from '@undercut/render';
 import {
   DRIVING_LINE_SCALE,
@@ -354,6 +355,11 @@ export interface DriveHandle {
   readonly records: RecordStore;
   /** Frame times in ms, most recent last. */
   frameTimes(): number[];
+  /**
+   * Download (and decode) what a session here would on `quality`, then release it: the first
+   * race's requests on a preset without drawing it (the budget's request-log test on High).
+   */
+  prefetch(quality: QualityName): Promise<void>;
   resetFrameTimes(): void;
   telemetry(): CarTelemetry;
   setCamera(name: CameraName): void;
@@ -437,6 +443,35 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     tyreRadius: params.tyre.rollingRadius,
   };
   /** `quiet`: a failure throws instead of asking the player to retry (Auto's own changes). */
+  /** The view's options on a preset: what a session there downloads and builds. */
+  const viewOptions = (quality: QualityName): RaceViewOptions => ({
+    renderer,
+    track,
+    quality,
+    livery: playerLivery,
+    fleetLiveries: all,
+    car: carGeometry,
+    racingLine: line,
+    dressingUrl: DRESSINGS[`../../../packages/render/data/${track.id}.dressing.json`] ?? null,
+    propCatalog,
+    garageTeams: teams.teams.map((t) => ({
+      name: t.name,
+      code: t.code,
+      primary: t.colours.primary,
+      secondary: t.colours.secondary,
+    })),
+    brands: brandsData.brands,
+    drivingLine,
+    drivingLineMode: session.assists.racingLine ?? 'off',
+    assetsBase: 'assets/',
+    toneMap: toneMapParam(),
+    worldDetail: worldDetailParam(),
+    checkRegistration: import.meta.env.DEV || debugEnabled(),
+    compound: compoundLook('medium'),
+    timeOfDay: tod,
+    localLights: tod.localLightSlots > 0 ? floodlightsAlong(track, 36) : [],
+    dracoPath: new URL('assets/draco/', document.baseURI).href,
+  });
   const loadView = async (
     quality: QualityName,
     screen: LoadingScreen,
@@ -445,32 +480,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     for (;;) {
       try {
         return await RaceView.load(o.canvas, {
-          renderer,
-          track,
-          quality,
-          livery: playerLivery,
-          fleetLiveries: all,
-          car: carGeometry,
-          racingLine: line,
-          dressingUrl: DRESSINGS[`../../../packages/render/data/${track.id}.dressing.json`] ?? null,
-          propCatalog,
-          garageTeams: teams.teams.map((t) => ({
-            name: t.name,
-            code: t.code,
-            primary: t.colours.primary,
-            secondary: t.colours.secondary,
-          })),
-          brands: brandsData.brands,
-          drivingLine,
-          drivingLineMode: session.assists.racingLine ?? 'off',
-          assetsBase: 'assets/',
-          toneMap: toneMapParam(),
-          worldDetail: worldDetailParam(),
-          checkRegistration: import.meta.env.DEV || debugEnabled(),
-          compound: compoundLook('medium'),
-          timeOfDay: tod,
-          localLights: tod.localLightSlots > 0 ? floodlightsAlong(track, 36) : [],
-          dracoPath: new URL('assets/draco/', document.baseURI).href,
+          ...viewOptions(quality),
           onProgress: (p) => screen.progress(p.loaded, p.total),
         });
       } catch (error) {
@@ -1332,6 +1342,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     gridCars: (count) => view.setGridCars(count, pose),
     records,
     frameTimes: () => frameLog.slice(),
+    // The preset's whole world, whatever `?world=` the page has.
+    prefetch: async (q) =>
+      RaceView.releaseAssets(
+        await RaceView.fetchAssets({ ...viewOptions(q), worldDetail: 'preset' }),
+      ),
     resetFrameTimes: () => {
       frameLog.length = 0;
     },

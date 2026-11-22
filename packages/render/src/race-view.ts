@@ -304,6 +304,14 @@ export class RaceView {
     return view;
   }
 
+  /** Release downloaded session assets that no view took (a prefetch, a failed load). */
+  static releaseAssets(assets: SessionAssets): void {
+    for (const s of Object.values(assets.sets)) disposeSet(s);
+    assets.car.dispose();
+    assets.propKit?.dispose();
+    assets.sky.image.close();
+  }
+
   static async fetchAssets(options: RaceViewOptions): Promise<SessionAssets> {
     const q = QUALITY[options.quality];
     const tod = options.timeOfDay ?? MONZA_AFTERNOON;
