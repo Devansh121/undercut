@@ -41,6 +41,34 @@ export interface BuildingPalette {
   roofs: readonly string[];
 }
 
+/** A temporary stand along the track: lap distance from and to, and the side it stands on. */
+export interface StandRun {
+  name: string;
+  s0: number;
+  s1: number;
+  side: 'left' | 'right';
+}
+
+/**
+ * A street circuit: the kit's concrete blocks with debris fencing on every concrete barrier run
+ * (terminal posts where a run ends), floodlight masts by the track file's lighting rule, lighting
+ * trusses over the fence in front of the temporary scaffold stands, and the kit's marina
+ * backdrops in place of the smaller mapped buildings near the track.
+ */
+export interface StreetCircuit {
+  block: string;
+  fence: string;
+  fenceEnd: string;
+  mast: string;
+  truss: string;
+  stand: string;
+  stands: readonly StandRun[];
+  /** Kit backdrops by the mapped building's height (first whose `maxHeight` it fits). */
+  backdrops: readonly { maxHeight: number; id: string }[];
+  /** Mapped buildings within this distance of the track (and small enough) become backdrops, m. */
+  backdropReach: number;
+}
+
 export interface WorldTheme {
   id: string;
   trees: TreeMix;
@@ -53,6 +81,9 @@ export interface WorldTheme {
    * garage modules, one per bay (`kit-garages`).
    */
   pit: 'building' | 'kit-garages';
+  street: StreetCircuit | null;
+  /** Draw mapped water (lakes, a bay) as a water surface. */
+  water: boolean;
 }
 
 /** Lombardy plaster, ochre and brick, kept below white so facades read as painted render in sun. */
@@ -81,6 +112,14 @@ export const DEFAULT_THEME: WorldTheme = {
   conifers: null,
   buildings: LOMBARDY,
   pit: 'building',
+  street: null,
+  water: false,
+};
+
+/** Marina Bay: white and pale grey render, warm stone, tinted glass; pale roofs and plant decks. */
+const MARINA: BuildingPalette = {
+  walls: ['#d9d8d2', '#c8ccce', '#b9c2c6', '#e2ddd2', '#a9b4b9', '#cfc6b6', '#8f9ca3', '#bdb7aa'],
+  roofs: ['#8d9092', '#a3a5a6', '#6f7476', '#b3b0aa', '#7c8184', '#5f6366'],
 };
 
 const THEMES: Readonly<Record<string, WorldTheme>> = {
@@ -106,6 +145,46 @@ const THEMES: Readonly<Record<string, WorldTheme>> = {
     },
     buildings: ARDENNES,
     pit: 'kit-garages',
+    street: null,
+    water: false,
+  },
+  singapore: {
+    id: 'singapore',
+    // Rain trees and angsana in the parks and along the boulevards (broad, open crowns).
+    trees: {
+      wood: [2, 0, 6, 7, 2, 0],
+      row: [2, 0, 2, 6],
+      park: [2, 0, 6, 7],
+    },
+    species: {},
+    conifers: null,
+    buildings: MARINA,
+    pit: 'building',
+    street: {
+      block: 'street-block',
+      fence: 'street-fence',
+      fenceEnd: 'street-fence-end',
+      mast: 'floodlight-mast',
+      truss: 'lighting-truss',
+      stand: 'temporary-grandstand',
+      // Open ground behind the wall (no mapped building or water within 12 m), on the outside of
+      // the corner where there is one.
+      stands: [
+        { name: 'pit', s0: 4760, s1: 130, side: 'right' },
+        { name: 'turn-1', s0: 200, s1: 300, side: 'right' },
+        { name: 'republic', s0: 430, s1: 540, side: 'right' },
+        { name: 'stamford', s0: 1790, s1: 1880, side: 'left' },
+        { name: 'padang', s0: 2200, s1: 2480, side: 'left' },
+        { name: 'bay', s0: 4330, s1: 4540, side: 'left' },
+      ],
+      backdrops: [
+        { maxHeight: 10, id: 'marina-pavilion' },
+        { maxHeight: 24, id: 'marina-office' },
+        { maxHeight: 34, id: 'marina-hotel' },
+      ],
+      backdropReach: 70,
+    },
+    water: true,
   },
 };
 
