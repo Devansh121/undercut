@@ -20,6 +20,7 @@
  *   __undercut.tvCamera(x, y, z, fov)        // trackside camera at a world point (stations)
  *   __undercut.quality() / setQuality('ultra')
  */
+import type { SettingsPatch } from '@undercut/protocol';
 import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
 import type { ControlInput } from '@undercut/sim';
@@ -32,6 +33,7 @@ export interface DebugApi {
     state: OnlineState | null;
     race: OnlineRaceReport | null;
   };
+  onlineSettings(patch: SettingsPatch): boolean;
   start(): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
@@ -172,6 +174,7 @@ export function installDebugApi(
   };
   window.__undercut = {
     online: () => ({ state: null, race: null }),
+    onlineSettings: () => false,
     start: async () => {
       if (!getDrive()) await start();
     },

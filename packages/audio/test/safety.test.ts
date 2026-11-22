@@ -352,17 +352,20 @@ describe('cost', () => {
     // first, so every timed run uses optimised code.
     const core = new AudioCore({ sampleRate: FS });
     const out = [new Float32Array(128), new Float32Array(128)];
-    const state = engineState(11_000, 1, {
+    const extra = {
       boost: 1,
       ersPower: 120_000,
       speed: 80,
       slipRear: 0.05,
-    });
+    };
+    // Vary engine speed every update so the test exercises the control-ramp path as well as held
+    // controls, without allocating inside the timed loop.
+    const states = [engineState(10_950, 1, extra), engineState(11_050, 1, extra)];
     const blocks = 3750; // 10 s of audio per run
     const run = () => {
       const t0 = performance.now();
       for (let i = 0; i < blocks; i++) {
-        if (i % 3 === 0) core.setCarState(state);
+        if (i % 3 === 0) core.setCarState(states[(i / 3) & 1]!);
         core.process(out, 128);
       }
       const seconds = (performance.now() - t0) / 1000;
