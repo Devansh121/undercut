@@ -1813,6 +1813,6 @@
     "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
     "licence": "ODbL-1.0",
     "changes": "Derived database built by tools/dressing/build.py spa: OSM woods, tree rows, single trees, buildings, grandstands, bridges, roads, paths, water and car parks within 600 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 6 km with the forest roof (22 m) taken off inside mapped woods, a 150 m opening and a 100 m average. Notices in packages/render/data/LICENSE-DATA.md",
-    "sha256": "5e3f9a83a4ec09490b25bd376ecb3db5221780482a2461c7801c33e43820d7e3"
+    "sha256": "c16e4668334d8aaf93c24c0c7d83873ab0c95ab4ac0c28cac856d42f04736761"
   }
 ]
