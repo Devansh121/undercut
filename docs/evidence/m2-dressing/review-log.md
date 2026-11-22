@@ -32,6 +32,17 @@ The modelled kit (#27) merged. The world places its hoardings, catch fence, brak
 - Giveaways found and fixed: (1) brand text upside down on the kit hoardings and boards: the kit's faces use glTF uv (v down), the brand and signage atlases are canvas textures (v up), so v is turned over for kit faces; (2) the kit screen tower's face is a blank panel: the live timing face now goes on its catalogued `screen-face` attachment; (3) kit boards would have thrown on the stand-in's separate post kind; (4) a shader compile error from the kit's instance-tint guard (vColor is a vec4 in this three.js); (5) the lifecycle test caught a GL texture leaked per session (the kit boards' slot textures were not released with the world).
 - New giveaway: absorber blocks read as plain black boxes at the chicane exits.
 
+## Round 11: review and playtest of #31
+
+Reviewer: "much better than master" (graphics about 3/5 against 2/5), the whole lap dressed, no hard edge, floating props, z-fighting or verge cracks, scale right, 60 fps with twenty cars in view. Fixed from the review:
+
+- The browser job was 7m24s against about 5 on master. Lite (and `?world=lite`) now loads no dressing, so the software-WebGL tests run on the track package's own ground; the full Mobile world is tested once (`world-dressing.spec.ts`, which also checks the dressing and prop files against the budget inventory and quits). The nearest-lap search visited every cell of every ring out to the 6 km horizon; it now visits only ring borders inside the grid: terrain build 1.9 s to 0.12 s, the Mobile world 2.9 s to 0.5 s, High 1.1 s. The browser job is now 5m34s to 6m12s, level with master's own runs at the same times (5m53s, 7m09s).
+- `assets/MANIFEST.json` had a stale hash for the dressing file because the licence check did not scan `packages/*/data`; it does now.
+- Brands renamed for reading too close to real companies or sponsors: SOLVANT to TERVALE, TELMARK to CALMONDE, FINVEX to VELMOREN, ALPENGRID to GLACERNE; teal-on-dark schemes (ZENTRO, VELMOREN, CALDERA) recoloured.
+- "Map data © OpenStreetMap contributors. Heights: Copernicus WorldDEM-30." on the launch screen (`stations/launch-*.jpg`).
+- The start gantry follows the online start (`lightsOutAt`): lamps lit before lights out, all out at lights out.
+- Tests pin the old-oval guard (it fails with the guard removed) and the bounded nearest-lap search against brute force.
+
 ## Remaining giveaways, ranked
 
 1. Tree impostors are painted cards: from the trackside camera near trees show their planes and a speckled, painterly leaf texture. Real geometry or a baked multi-view impostor is next.
