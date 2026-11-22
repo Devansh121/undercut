@@ -26,7 +26,11 @@ What changed, from the driver's seat:
 - Carbon: 2x2 twill with 3 mm tows (was 6 mm) and fibre anisotropy along the tows
   (`KHR_materials_anisotropy` with a direction texture); presets without clear coat drop it.
 
+After the first review (PR #33): the gauntlets are lofted from the actual sleeve ends, with their
+closed caps 20 mm inside the sleeve so no cap shows; the thumbs curl round the grip; the faceplate
+carries printed control legends and rotary index marks, and the gloves a suede texture with seams
+and sparse wear, all inside the existing triangle budgets. The after rows above are from 6151b9b.
+
 Known gaps: on the phone the driver cluster covers the wheel face (a HUD layout choice; the
 wheel's buttons are left off the Mobile level for that reason). On Mobile, without the sheen,
-the twill on the halo reads as a coarse zigzag at that distance. Belts are the existing straps;
-no buckle or wear decals yet.
+the twill on the halo reads as a coarse zigzag at that distance. Belts are the existing straps; no buckle yet. These Mobile items are tracked in `docs/STATUS.md`.
