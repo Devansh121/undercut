@@ -3,6 +3,7 @@ import type { Track } from '@undercut/track';
 import type { LocalLight } from '../lighting/light-pool';
 import type { PropCatalogEntry, PropKitAssets, PropLodOptions } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
+import { footprintOnTrack } from './corridor';
 import { hash01, inRing, type MappedFeature } from './dressing';
 import type { LapIndex } from './lap-index';
 import type { StandRun, StreetCircuit } from './theme';
@@ -453,8 +454,8 @@ export function pickBackdrops(
     cx /= m;
     cz /= m;
     if (area < 60 || area > 1500) continue;
+    if (footprintOnTrack(p, lap)) continue;
     lap.nearest(cx, cz, hit);
-    if (hit.dist < 12) continue;
     if (hit.dist - lap.barrierAt(hit.index, hit.d) > street.backdropReach) continue;
     const h = heightOf(area, f.t ?? {});
     const pick = street.backdrops.find((b) => h <= b.maxHeight && kit.has(b.id));

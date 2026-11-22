@@ -41,6 +41,7 @@ import {
   grandstandMaterial,
   type StandFrame,
 } from './grandstands';
+import { footprintOnTrack } from './corridor';
 import { LapIndex } from './lap-index';
 import {
   buildGarageBoardsGeometry,
@@ -1016,12 +1017,12 @@ export class CircuitWorld {
       this.heightAt,
       (f) => {
         if (asBackdrop.has(f.id)) return true;
-        // Buildings on the circuit itself (mapped over the pit lane or under bridges) stay out.
+        // Buildings reaching into the circuit (mapped over a road the race closes, the pit lane
+        // or under bridges) stay out, whole footprint judged.
+        if (footprintOnTrack(f.p, this.lap)) return true;
         const [x0, z0, x1, z1] = bounds(f.p);
         const cx = (x0 + x1) / 2;
         const cz = (z0 + z1) / 2;
-        const hit = this.lap.nearest(cx, cz);
-        if (hit.dist < 12) return true;
         // Exclude mapped OSM slabs overlapping the dedicated pit complex (e.g. Palazzina Box).
         if (pitFoot.length >= 6) {
           if (inRing(pitFoot, cx, cz)) return true;
