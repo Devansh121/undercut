@@ -268,16 +268,18 @@ export interface DiffParams {
 }
 
 /**
- * Brake hardware. The full-pedal torque follows from it (`brakeCapacity`), not from any
- * operating point: the published peak braking powers (doc 1.5) are event figures, so they are
- * checked against the model's output instead of being used to set a ceiling.
+ * Brake hardware. The full-pedal torque follows from it (`brakeCapacity`). The published peak
+ * braking powers (doc 1.5) set its one free element, the master-cylinder bore: at the start of
+ * each published stop, with the published peak pedal load, the friction force is at most
+ * P / v1, 28–30 kN at all four events across the three trims, so the brakes, not the tyres,
+ * limit those stops at speed (docs/physics-validation.md section 7.9).
  */
 export interface BrakeParams {
   /** Peak pedal force, N. Doc 1.5: 145–162 kg at the hardest stops; 160 kg. */
   pedalForce: number;
   /** Pedal lever ratio. Estimate: about 3:1 on racing pedal boxes. */
   pedalRatio: number;
-  /** Master-cylinder bore area, m². Estimate: 17.8 mm (0.7 in) bore. */
+  /** Master-cylinder bore area, m². Set from the published peak brake powers: 23 mm bore. */
   masterCylinderArea: number;
   /** Front caliper piston area on one side of the disc, m². Estimate: three 36 mm pistons. */
   frontPistonArea: number;
@@ -321,55 +323,59 @@ export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
   // Doc 1.4: 1.15 (1.05–1.25), derived from the Monza trap; re-fitted to it with the
   // calibrated tyres and floor (Results section): 1.16.
   cdA: 1.16,
-  clA: 3.6, // doc 1.4: 3.6 (3.0–4.2)
+  // Doc 1.4 (section 7.9): [57] puts downforce at "three or four times the weight of the car" at
+  // top speed; 3.5 × 795 kg at this trim's own top speed (344 km/h, DRS closed, Monza air).
+  clA: 5.15,
   balance: 0.44,
   drsDrag: -0.12,
   drsDownforce: -0.08, // estimate: a small rear wing has less to lose
-  rideHeightFront: 0.025,
+  // Doc 1.6: 20–30 mm; the top of the range keeps the floor's leading edge above the stall
+  // height at 300 km/h with the downforce above (section 7.9).
+  rideHeightFront: 0.03,
   rideHeightRear: 0.065,
   drsOpenTime: 0.2,
   drsCloseTime: 0.15,
   heightSensitivity: 20, // doc 1.4: k_h ≈ 0.02 per mm of the floor's downforce
   floorShare: 0.6, // estimate (doc 1.4): the floor makes most of this era's downforce
   frontHeightWeight: 0.7, // estimate: "downforce rises as the floor's front ride height falls"
-  referenceHeight: 0.0214, // measured at 300 km/h, 50 kg fuel (Results section)
+  referenceHeight: 0.0186, // measured at 300 km/h, 50 kg fuel (section 7.9)
   leadingEdge: 0.3, // estimate: the floor starts about 1.1 m behind the front axle
-  stallHeight: 0.02, // doc 1.4: 15–20 mm; top of the range (see stallLoss)
+  // Doc 1.4: 15–20 mm and 10–25 %; the middle of both ranges. They were at the top to make the
+  // published braking peaks flat across trims; the published brake powers explain that instead
+  // (the brakes, not the tyres, limit those stops at speed; `BrakeParams`, section 7.9).
+  stallHeight: 0.0175,
   stallWidth: 0.004,
-  // Doc 1.4: 10–25 %; top of the range. The published peak decelerations barely change with
-  // the downforce level (4.7 g Monza, 4.9 g Singapore), so the floor must give up downforce
-  // when the nose dives under braking, as a ground-effect floor does below its critical height.
-  stallLoss: 0.25,
+  stallLoss: 0.175,
   rakeBalance: 0.6, // estimate: +0.6 points of front share per 10 mm more rake
-  referenceRake: 0.0304, // measured at 300 km/h
+  referenceRake: 0.0219, // measured at 300 km/h
 });
 
 export const AERO_MEDIUM: Readonly<AeroParams> = Object.freeze({
   ...AERO_LOW_DRAG,
   name: 'medium',
   cdA: 1.3, // doc 1.4: 1.30 (1.15–1.45), Spa
-  clA: 4.6, // doc 1.4: 4.6 (4.0–5.2)
+  clA: 5.55, // [57]: 3.5 × 795 kg at 336 km/h, DRS closed, Spa air (section 7.9)
   balance: 0.44,
   drsDrag: -0.15,
   drsDownforce: -0.1,
-  rideHeightFront: 0.027,
+  rideHeightFront: 0.029, // doc 1.6: 20–30 mm; floor clear of the stall at 300 km/h (7.9)
   rideHeightRear: 0.072,
-  referenceHeight: 0.0207,
-  referenceRake: 0.033,
+  referenceHeight: 0.0184,
+  referenceRake: 0.0289,
 });
 
 export const AERO_HIGH_DOWNFORCE: Readonly<AeroParams> = Object.freeze({
   ...AERO_LOW_DRAG,
   name: 'high',
   cdA: 1.6, // doc 1.4: 1.60 (1.45–1.75), Singapore
-  clA: 5.8, // doc 1.4: 5.8 (5.0–6.5)
+  clA: 6.24, // [57]: 3.5 × 795 kg at 310 km/h, DRS closed, Singapore air (section 7.9)
   balance: 0.45,
   drsDrag: -0.18,
   drsDownforce: -0.12,
   rideHeightFront: 0.03,
   rideHeightRear: 0.08,
-  referenceHeight: 0.0201,
-  referenceRake: 0.0362,
+  referenceHeight: 0.0195,
+  referenceRake: 0.0359,
 });
 
 export type AeroTrim = 'low' | 'medium' | 'high';
@@ -490,7 +496,9 @@ export const REFERENCE_CAR: Readonly<CarParams> = deepFreeze({
   brakes: {
     pedalForce: 160 * 9.80665,
     pedalRatio: 3,
-    masterCylinderArea: Math.PI * 0.0089 * 0.0089,
+    // 23 mm bore: sets the full-pedal capacity so the published peak brake powers come out
+    // (doc 1.5, section 7.9); the other hardware estimates are anchored to rules or sources.
+    masterCylinderArea: Math.PI * 0.0115 * 0.0115,
     frontPistonArea: 3 * Math.PI * 0.018 * 0.018,
     frontRadius: 0.14,
     padFriction: 0.55,

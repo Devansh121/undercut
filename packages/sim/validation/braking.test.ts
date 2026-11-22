@@ -20,7 +20,7 @@ describe('validation: published braking events (doc 2.4)', () => {
   for (const e of BRAKING_EVENTS) {
     describe(e.label, () => {
       const { values } = measureBrakingEvent(e);
-      for (const what of ['distance', 'time', 'peak']) {
+      for (const what of e.power === undefined ? ['distance', 'time', 'peak'] : ['distance', 'time', 'peak', 'power']) {
         const id = `${e.id}-${what}`;
         it(targetName(id), () => expectTarget(id, values[id]!));
       }
@@ -36,7 +36,7 @@ describe('fit, selection and validation sets', () => {
       .sort();
   it('marks exactly the declared direct fits', () => {
     expect(ids('fit')).toEqual(Object.keys(FIT_TARGETS).sort());
-    expect(ids('fit')).toHaveLength(4);
+    expect(ids('fit')).toHaveLength(8);
   });
   it('marks exactly the declared selection checks, disjoint from the fits', () => {
     expect(ids('selection')).toEqual(Object.keys(SELECTION_TARGETS).sort());

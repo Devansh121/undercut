@@ -78,6 +78,10 @@ export const FIT_TARGETS: Readonly<Record<string, string>> = Object.freeze({
   'monza-t1-2025-peak': 'tyre μx at the reference load (with 0–100 km/h)',
   'lateral-slow-low': 'tyre μy at the reference load',
   'top-speed-low-drs': 'low-trim CdA',
+  'monza-t1-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
+  'spa-t5-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
+  'singapore-t7-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
+  'singapore-t14-2024-power': 'brake capacity (master-cylinder bore), one value for the four powers',
 });
 
 /**
@@ -105,6 +109,11 @@ export interface BrakingEvent {
   distance: number;
   time: number;
   peak: number;
+  /**
+   * Published peak braking power of the stop, kW (doc 1.5), where the source gives one: what
+   * the friction brakes dissipate, so it bounds the friction force near v1 (P / v1).
+   */
+  power?: number;
   source: string;
 }
 
@@ -118,6 +127,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 129,
     time: 2.75,
     peak: 4.7,
+    power: 2715,
     source: '[21][47]',
   },
   {
@@ -151,6 +161,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 93,
     time: 1.48,
     peak: 4.7,
+    power: 2584,
     source: '[22]',
   },
   {
@@ -173,6 +184,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 96,
     time: 1.9,
     peak: 4.9,
+    power: 2542,
     source: '[23][29]',
   },
   {
@@ -184,6 +196,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 94,
     time: 2.19,
     peak: 4.6,
+    power: 2239,
     source: '[51]',
   },
 ];
@@ -294,6 +307,17 @@ for (const e of BRAKING_EVENTS) {
       `doc 2.4 ${e.source}`,
     ),
   );
+  if (e.power !== undefined)
+    list.push(
+      target(
+        `${e.id}-power`,
+        `${e.label}: peak friction brake power`,
+        'kW',
+        rel(e.power, 0.1),
+        `${e.power} ± 10 %`,
+        `doc 1.5 ${e.source}`,
+      ),
+    );
 }
 list.push(
   target(

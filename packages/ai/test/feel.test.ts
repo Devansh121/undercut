@@ -15,8 +15,18 @@ describe('what the driver feels', () => {
     // Threshold for the light wheel: peak × min(3, sqrt(4)) = 0.2.
     expect(lockExcess([-0.05, -0.18, -0.05, -0.05], load, peak)).toBeLessThan(0);
     expect(lockExcess([-0.05, -0.25, -0.05, -0.05], load, peak)).toBeCloseTo(0.05, 9);
-    expect(lockExcess([-0.05, -1, -0.05, -0.05], [5000, 10, 4000, 4000], peak)).toBeGreaterThan(
+    // A fifth of the outside's load still steers the car: no full lock (allowance √5 × peak).
+    expect(lockExcess([-0.05, -1, -0.05, -0.05], [5000, 1000, 4000, 4000], peak)).toBeGreaterThan(
       0.5,
+    );
+  });
+
+  it('does not feel a front wheel lifted off the ground', () => {
+    // Inside front at under a tenth of the outside's load (lifting through a fast turn-in): it
+    // carries neither braking nor cornering force, and its slip says nothing about the axle.
+    expect(lockExcess([-0.05, -0.6, -0.05, -0.05], [6000, 200, 4800, 2000], peak)).toBeLessThan(0);
+    expect(lockExcess([-0.05, -0.6, -0.05, -0.05], [6000, 700, 4800, 2000], peak)).toBeGreaterThan(
+      0,
     );
   });
 
