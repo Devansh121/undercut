@@ -68,6 +68,9 @@ async function installFakePad(page: Page): Promise<void> {
         pad.connected = true;
         window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
       },
+      axis(i: number, value: number) {
+        pad.axes[i] = value;
+      },
       button(i: number, value: number) {
         pad.buttons[i] = { pressed: value > 0.5, touched: value > 0, value };
       },
@@ -124,9 +127,12 @@ type Dir = 'up' | 'down' | 'left' | 'right';
  * for one frame after focusing and reads the result two frames later, so a pad step is a single
  * round trip.
  */
+/** A pad input for one direction: a D-pad button, or the left stick pushed one way. */
+type PadInput = { button: number } | { axis: number; value: number };
+
 function step(
   page: Page,
-  o: { frames: number; focus: string | null; pad?: number },
+  o: { frames: number; focus: string | null; pad?: PadInput },
 ): Promise<{ before: string; after: string }> {
   return page.evaluate(async ({ frames, focus, pad }) => {
     const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
@@ -148,13 +154,20 @@ function step(
     }
     let after = '';
     if (pad !== undefined) {
-      const fake = (window as unknown as { fakePad: { button(i: number, v: number): void } })
-        .fakePad;
-      fake.button(pad, 1);
-      await raf();
-      fake.button(pad, 0);
+      const fake = (
+        window as unknown as {
+          fakePad: { button(i: number, v: number): void; axis(i: number, v: number): void };
+        }
+      ).fakePad;
+      // Held for one frame (the menus sample it and move focus), then let go. The release is
+      // read in the next step's frame, which presses the other kind of input (button or stick),
+      // so each step costs one frame.
+      if ('button' in pad) fake.button(pad.button, 1);
+      else fake.axis(pad.axis, pad.value);
       await raf();
       after = keyOf(document.activeElement);
+      if ('button' in pad) fake.button(pad.button, 0);
+      else fake.axis(pad.axis, 0);
     }
     return { before, after };
   }, o);
@@ -189,6 +202,7 @@ async function explore(page: Page, device: 'keyboard' | 'gamepad') {
   const seen = new Set([start]);
   const queue = [start];
   let pending: { from: string; dir: Dir } | null = null;
+  let padSteps = 0;
   const record = (from: string, dir: Dir, now: string): void => {
     expect(now, `focus lost after ${dir} from ${from}`).not.toBe('');
     expect(all, `focus left the screen's controls after ${dir}`).toContain(now);
@@ -203,7 +217,16 @@ async function explore(page: Page, device: 'keyboard' | 'gamepad') {
     for (const dir of ['up', 'down', 'left', 'right'] as const) {
       if (seen.size >= all.length) break;
       if (device === 'gamepad') {
-        const r = await step(page, { frames: 0, focus: key, pad: PAD[dir] });
+        // Alternate the D-pad and the left stick (both are bound to menu directions).
+        padSteps++;
+        const pad: PadInput =
+          padSteps % 2 === 0
+            ? { button: PAD[dir] }
+            : {
+                axis: dir === 'left' || dir === 'right' ? 0 : 1,
+                value: dir === 'left' || dir === 'up' ? -1 : 1,
+              };
+        const r = await step(page, { frames: 0, focus: key, pad });
         record(key, dir, r.after);
         continue;
       }
@@ -316,7 +339,7 @@ test.describe('menus, gamepad only', () => {
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
   };
 
-  test('the D-pad reaches every control on the main menu', async ({ page }) => {
+  test('the D-pad and the stick reach every control on the main menu', async ({ page }) => {
     const problems = watchProblems(page);
     await padMenu(page);
     const hub = await explore(page, 'gamepad');
