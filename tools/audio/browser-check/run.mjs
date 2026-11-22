@@ -40,6 +40,8 @@ const browser = await chromium.launch({
 let failed;
 try {
   const page = await browser.newPage({ viewport: { width: 844, height: 390 }, isMobile: true });
+  // DevTools CPU throttling (Emulation.setCPUThrottlingRate) does not reach the audio worklet
+  // thread: at 4x the measured cost was unchanged (2.39 % against 2.34 %), so it is not used.
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   const result = await page.evaluate(() => globalThis.result);
   console.log(JSON.stringify(result, null, 2));
