@@ -888,12 +888,12 @@ for ident, module in specs:
             # from this LOD's geometry. Feet, shins and hands lie forward of |x| < 0.12. Every LOD
             # must agree with High, or the figure would pop on its seat at the LOD switch.
             under = [p.z for p in points if abs(p.x) < .12 and abs(p.y) < .16 and p.z > .3]
-            seat = round(min(under), 3)
+            seat_contact_height = round(min(under), 3)
             if lod == 0:
-                seat_high = seat
-            elif abs(seat - seat_high) > .006:
-                raise ValueError(f'{ident} LOD {lod} seat {seat} differs from High {seat_high}')
-            attachments.append({'name': 'seat', 'position': [0, seat, 0], 'front': '+X'})
+                seat_high = seat_contact_height
+            elif abs(seat_contact_height - seat_high) > .006:
+                raise ValueError(f'{ident} LOD {lod} seat {seat_contact_height} differs from High {seat_high}')
+            attachments.append({'name': 'seat', 'position': [0, seat_contact_height, 0], 'front': '+X'})
         if lod == 0:
             entry['bounds'] = bounds
             entry['attachments'] = attachments
