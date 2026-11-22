@@ -51,13 +51,19 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
+ * `persistTo` gives the runtime its own state directory. Without it every `wrangler dev` for
+ * this config shares one directory beside it, and two running at once (the test suite's
+ * service and a server started by another test) can collide on its SQLite files
+ * (SQLITE_BUSY, "database is locked").
+ *
+ * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
 export function createRoomsService({
   port,
   log = (text) => void process.stdout.write(text),
   quiet = false,
   vars = {},
+  persistTo,
 }) {
   const url = `http://127.0.0.1:${port}`;
   const cancel = new AbortController();
@@ -94,6 +100,7 @@ export function createRoomsService({
         '--log-level',
         quiet ? 'error' : 'warn',
         ...Object.entries(vars).flatMap(([key, value]) => ['--var', `${key}:${value}`]),
+        ...(persistTo ? ['--persist-to', persistTo] : []),
       ],
       {
         cwd: REPO_ROOT,

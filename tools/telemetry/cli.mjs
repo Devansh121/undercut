@@ -117,8 +117,15 @@ async function loadAiLib() {
 async function lap(options) {
   const ai = await loadAiLib();
   const laps = Number(options.laps ?? 1);
-  const setup = ai.MONZA;
-  const fuel = Number(options.fuel ?? (laps > 1 ? setup.fuel + 2.2 * (laps + 1) : setup.fuel));
+  const setups = { monza: ai.MONZA, spa: ai.SPA, singapore: ai.SINGAPORE };
+  const setup = setups[options.circuit ?? 'monza'];
+  if (!setup)
+    throw new Error(
+      `no racing line for ${options.circuit}; one of ${Object.keys(setups).join(', ')}`,
+    );
+  // Fuel a lap with a margin, as the soak carries (packages/ai/validation/soak).
+  const perLap = { monza: 2.2, spa: 2.7, singapore: 2.0 }[setup.id];
+  const fuel = Number(options.fuel ?? (laps > 1 ? setup.fuel + perLap * (laps + 1) : setup.fuel));
   const every = Number(options.every ?? 6);
   const t0 = performance.now();
   const { result, plan } = ai.referenceLap(setup, {
@@ -131,7 +138,7 @@ async function lap(options) {
   if (result.spun) console.log('The car spun; no lap completed.');
   const summary = { circuit: setup.id, trim: setup.trim, fuel, laps: [], traces: [] };
   result.laps.forEach((l, k) => {
-    const report = ai.monzaLapReport(l, plan, setup.controlLine);
+    const report = ai.circuitLapReport(setup.id, l, plan, setup.controlLine);
     console.log(`\nLap ${k + 1}\n${ai.formatLapReport(report)}`);
     summary.laps.push(report);
   });
