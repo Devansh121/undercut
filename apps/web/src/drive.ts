@@ -1234,6 +1234,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     delete document.documentElement.dataset.ready;
     delete document.documentElement.dataset.paused;
     delete document.documentElement.dataset.screen;
+    delete document.documentElement.dataset.drs;
     delete document.documentElement.dataset.quality;
     o.host.replaceChildren();
     o.onQuit();

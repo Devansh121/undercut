@@ -71,7 +71,10 @@ test('safe phone rotation with touch controls sized for thumbs', async ({ drive 
   test.skip(info.project.name !== 'phone', 'phone layout');
   const { page } = drive;
   const controls = page.locator('.ut-touch [data-control]');
-  for (const control of await controls.all()) {
+  // The compact phone HUD has no camera button (the camera is in the pause menu).
+  await expect(page.locator('.ut-touch [data-control=camera]')).toBeHidden();
+  await expect(page.locator('.ut-touch [data-control=pause]')).toBeVisible();
+  for (const control of await controls.filter({ visible: true }).all()) {
     const rect = await control.boundingBox();
     expect(rect!.width).toBeGreaterThanOrEqual(44);
     expect(rect!.height).toBeGreaterThanOrEqual(44);
