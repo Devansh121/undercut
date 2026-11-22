@@ -266,6 +266,8 @@ export const S = {
     resetToTrack: 'Reset to track',
     storage: 'Storage',
     recordsUntilClose: 'Records last until the page closes',
+    blockingGhostOn: 'Cars held up behind you pass through your car',
+    blockingGhostOff: 'Your car is solid again',
     recordKept: 'Record kept until the page closes',
     camera: 'Camera',
     ersModes: { off: 'Off', balanced: 'Balanced', overtake: 'Overtake' },

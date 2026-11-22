@@ -122,6 +122,8 @@ const ERS_MODE_LABEL: Record<number, string> = {
 const FRAME_LOG = 7200;
 /** A retired car fades out of the scene and off the map over this long, s. */
 const RETIRED_FADE_S = 3;
+/** A car that is a ghost for holding up traffic is drawn at this opacity. */
+const BLOCKING_GHOST_OPACITY = 0.5;
 
 /** The page's renderer, created by the first session and reused by every later one. */
 let pageRenderer: ReturnType<typeof createRenderer> | null = null;
@@ -932,6 +934,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const fleetDrs = new Array<number>(fleetPoses.length).fill(0);
   // A retired car is a ghost parked out of the race: it fades out of the scene and off the map.
   const fleetOpacity = new Array<number>(fleetPoses.length).fill(1);
+  let playerWasGhost = false;
   // The AI cars on the minimap, in their team's colour.
   const fleetDots = fleetPoses.map((_, i) => ({
     x: 0,
@@ -1207,13 +1210,31 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         fleetDrs[i] = c.state.drsPosition;
         const status = session.race.control.cars[i + 1]!.status;
         const retired = status === 'dnf' || status === 'dsq';
-        fleetOpacity[i] = retired ? Math.max(0, fleetOpacity[i]! - dt / RETIRED_FADE_S) : 1;
+        // A car that is a ghost for holding up traffic is drawn at half strength while it is
+        // one, so the cars passing through it read as the rule they are.
+        const goal = retired ? 0 : session.race.blockingGhost(i + 1) ? BLOCKING_GHOST_OPACITY : 1;
+        const step = dt / RETIRED_FADE_S;
+        const now = fleetOpacity[i]!;
+        fleetOpacity[i] = now > goal ? Math.max(goal, now - step) : Math.min(goal, now + step);
         const dot = fleetDots[i]!;
         dot.x = p.x;
         dot.z = p.z;
         dot.opacity = fleetOpacity[i]!;
       });
       view.setRaceCars(fleetPoses, fleetDrs, fleetOpacity);
+      // The player's own car: a notice when it becomes a ghost and when it is solid again.
+      const playerGhost = session.race.blockingGhost(0);
+      if (playerGhost !== playerWasGhost) {
+        playerWasGhost = playerGhost;
+        say(
+          {
+            tag: S.hud.ghost,
+            text: playerGhost ? S.hud.blockingGhostOn : S.hud.blockingGhostOff,
+            tone: 'info',
+          },
+          3,
+        );
+      }
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
