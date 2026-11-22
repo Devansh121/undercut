@@ -341,6 +341,7 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
 | Spa reference lap 109.072 s against the M4 band 97.545–103.579 s (section 7.8) | 5.49 s outside M4; all three sectors outside their ±3 % bands, sector 2 by most (+14 % on the session best) | The car's fast-corner grip: the line asks for the measured flat limit through Pouhon, Stavelot and Les Fagnes. Same cause as the Pouhon sweep row above and Monza's fast corners |
+| Raidillon lift on `spa-medium` (section 7.8) | Profile plans a brief braking pulse at s = 1008–1016 m; the reference driver lifts for 0.167 s (< 99 % throttle) and brakes for 0.063 s (> 1 % brake) at s = 991–1005 m, whereas real cars take T3–T4 flat | Caused by linear extrapolation of the `[0.8, 1.0, 1.2] g` envelope load grid to 2.0–2.2 g Eau Rouge compression after the floor enters the 20 mm stall band at 320 km/h (`−0.129 g/g` slope). Forcing full throttle through Raidillon is clean (1.47° max sideslip) and gains 0.032 s in S1 |
 | Singapore sectors 1 and 3 (section 7.8) | +3.1 % and +4.1 % on the session best; the lap itself is inside its band by 0.016 s | Recorded gaps; the lap is close to its band edge, so a small change to the car can move it outside |
 | Monza reference lap 84.872 s against the M1 band 74.852–82.732 s (section 7.6) | 2.14 s outside M1 (2.24 s before DRS zone 2 moved to its mapped activation), 3.72 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
 | Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
@@ -997,6 +998,8 @@ measured flat limit almost everywhere in that sector (Pouhon T10 3.86 g against 
 gap as at Monza's Lesmo and Parabolica (7.6) and as the Pouhon sweep in section 5, not the driver.
 The largest line error (5.0 m, RMS 0.77 m) is the driver's; the lap is still clean.
 
+**Raidillon lift (T3–T4).** The `spa-medium` profile plans a brief braking pulse at s = 1008–1016 m (speed dropping from 321.2 to 313.4 km/h on the 155.7 m line radius); via its 0.2 s speed preview the reference driver lifts at s = 990.9–1005.0 m (0.167 s under 99 % throttle, 0.063 s over 1 % brake on the timed lap), whereas real cars take Raidillon flat. Cause: at 320 km/h the medium-trim floor's leading edge drops into the 20 mm stall band under 1.2 g load, so the measured lateral envelope falls from 5.158 g (1.0 g) to 5.132 g (1.2 g), a −0.129 g/g slope. `EnvelopeModel` linearly extrapolates that `[0.8, 1.0, 1.2] g` grid to the 2.03–2.21 g Eau Rouge compression, underpredicting the limit as 5.00 g (4.90 g at 98 % planning scale) and capping the corner at 315.4 km/h. In the simulator itself the car compresses to a 7.9–14.7 mm leading-edge height (stalling ClA from 4.64 to 4.11–4.18 m² and touching the plank at 1.3–2.8 kN), yet lateral grip still grows with load, and holding full throttle through s = 960–1080 m stays clean (max sideslip 1.47°, at most 2 wheels off, 0 grass samples, min speed 311.2 km/h, trap 314.5 km/h, −0.032 s in S1).
+
 **Singapore** is the slow-corner circuit, where the car is closest to the era's cars: the lap is
 inside its band, sector 2 is inside its band, and sectors 1 and 3 miss by 0.8 % and 1.1 % beyond
 the ±3 %. The lap sits 0.016 s inside its band, so a small change to the car can move it outside;
@@ -1023,7 +1026,7 @@ the suite will then fail and the result must be recorded, as section 3 requires.
 | T14 Esplanade | 89.8 | 27.4 | 2.31 | 2.28 |
 | T18 Marina Promenade | 184.6 | 77.0 | 3.48 | 3.48 |
 
-Singapore's turn 13 hairpin is taken at 62.5 km/h on a 15.6 m line radius, inside the 8.3 m
+Singapore's turn 13 hairpin is taken at 62.5 km/h on a 15.6 m line radius, wider than the 8.3 m
 centreline radius the map data gives (track-data 5.3); later work may use the wider path a
 reviewer judged drivable there.
 

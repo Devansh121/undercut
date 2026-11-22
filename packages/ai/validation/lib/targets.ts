@@ -42,7 +42,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 309,
     high: 321,
     stated: '315 ± 6',
-    source: 'doc 2.2 [12]',
+    source: 'doc 2.2 [13]',
     role: 'validation',
   },
   'spa-s1': {
@@ -52,7 +52,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 28.868,
     high: 30.654,
     stated: '29.761 ± 3 %',
-    source: 'doc 2.2 [12]',
+    source: 'doc 2.2 [14]',
     role: 'validation',
   },
   'spa-s2': {
@@ -62,7 +62,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 41.256,
     high: 43.808,
     stated: '42.532 ± 3 %',
-    source: 'doc 2.2 [12]',
+    source: 'doc 2.2 [14]',
     role: 'validation',
   },
   'spa-s3': {
@@ -72,7 +72,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 27.021,
     high: 28.693,
     stated: '27.857 ± 3 %',
-    source: 'doc 2.2 [12]',
+    source: 'doc 2.2 [14]',
     role: 'validation',
   },
   'singapore-lap-m4': {
@@ -92,7 +92,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 298,
     high: 310,
     stated: '304 ± 6',
-    source: 'doc 2.2 [13]',
+    source: 'doc 2.2 [15]',
     role: 'validation',
   },
   'singapore-s1': {
@@ -102,7 +102,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 25.623,
     high: 27.207,
     stated: '26.415 ± 3 %',
-    source: 'doc 2.2 [13]',
+    source: 'doc 2.2 [16]',
     role: 'validation',
   },
   'singapore-s2': {
@@ -112,7 +112,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 36.209,
     high: 38.449,
     stated: '37.329 ± 3 %',
-    source: 'doc 2.2 [13]',
+    source: 'doc 2.2 [16]',
     role: 'validation',
   },
   'singapore-s3': {
@@ -122,7 +122,7 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     low: 24.463,
     high: 25.977,
     stated: '25.22 ± 3 %',
-    source: 'doc 2.2 [13]',
+    source: 'doc 2.2 [16]',
     role: 'validation',
   },
 });
