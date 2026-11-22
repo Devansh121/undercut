@@ -856,6 +856,11 @@ export function buildTrackBridges(
  * raceways near the circuit): extruded weathered concrete slab with banked outer lip so the old
  * high-speed banking reads clearly where it crosses or parallels the view.
  */
+/** Absorber block shell (linear RGB, a weathered blue) and its two alternating band colours. */
+const ABSORBER_SHELL: [number, number, number] = [0.035, 0.075, 0.2];
+const ABSORBER_BAND_A: [number, number, number] = [0.55, 0.05, 0.035];
+const ABSORBER_BAND_B: [number, number, number] = [0.72, 0.72, 0.7];
+
 /** No old-oval concrete nearer the circuit's centreline than this, m (except where it crosses). */
 const BANKING_CLEARANCE = 32;
 
@@ -1122,9 +1127,12 @@ export function placeTracksideFurniture(options: {
     });
   }
 
+  // Energy-absorbing blocks wear coloured shells (the kit's rubber slot is black), with a
+  // painted band that alternates red and white along a run (instance colour).
   const kitAbsorber = propKit?.lodsFor('absorber-block', {
     maxDistanceScale: distScale,
     distanceCaps: [55, 160, 500],
+    slotColors: { rubber: ABSORBER_SHELL },
   });
   if (kitAbsorber) {
     kitPropsUsed++;
@@ -1642,7 +1650,14 @@ export function placeTracksideFurniture(options: {
     for (let s = c.start - 12; s <= c.end + 16; s += 1.65) {
       const b = atBarrier(s, outSide, -0.45);
       if (foldsAcrossTrack(b, 1.4, 0.22)) continue;
-      props.place('tecpro-block', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
+      props.place('tecpro-block', {
+        x: b.x,
+        y: b.y,
+        z: b.z,
+        yaw: b.yawInward,
+        s: b.s,
+        colour: tecpro % 2 === 0 ? ABSORBER_BAND_A : ABSORBER_BAND_B,
+      });
       tecpro++;
     }
   }

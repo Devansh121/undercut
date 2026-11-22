@@ -9,15 +9,16 @@ import {
 import { hash01, ringArea, type MappedFeature } from './dressing';
 
 /** Roof and wall colours of the region's buildings: plaster, brick and tile (linear-ish sRGB). */
+// Lombardy plaster, ochre and brick, kept below white so facades read as painted render in sun.
 const WALLS = [
-  '#d8cdb8',
-  '#e0d3b4',
-  '#cfb48e',
-  '#c9a27a',
-  '#e6e0d2',
-  '#b9ada0',
-  '#d6c29c',
-  '#a8826a',
+  '#c9b896',
+  '#d0ad7f',
+  '#b98d66',
+  '#c8bba0',
+  '#a89a86',
+  '#c49c6c',
+  '#d3c3a2',
+  '#9a7a62',
 ];
 const ROOFS = ['#8e4b33', '#9a5a3c', '#7d4430', '#5d5a57', '#6b6762', '#8a8580'];
 
@@ -188,8 +189,10 @@ export function facadeMaterial(): MeshStandardMaterial {
           float bay = floor(cell.x);
           float rnd = fract(sin(bay * 12.9898 + floorIdx * 78.233) * 43758.5453);
           float win = step(0.3, f.x) * step(f.x, 0.72) * step(0.28, f.y) * step(f.y, 0.82) * step(0.0, floorIdx);
+          // Where the window grid is finer than a pixel, show its average instead of nothing:
+          // about a fifth of the facade is dark glass and frames.
           float aaw = fwidth(cell.x) * 2.0;
-          win *= 1.0 - smoothstep(0.25, 0.6, aaw);
+          win = mix(win, 0.2 * step(0.0, floorIdx), smoothstep(0.25, 0.6, aaw));
           // Some shutters closed.
           float shut = step(0.72, rnd);
           vec3 glass = vec3(0.035, 0.04, 0.045);
