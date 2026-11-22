@@ -136,6 +136,9 @@ const WOOD_DENSITY = 1 / 42;
  * at 1 they measured 12–15% lighter (by day and under floodlights).
  */
 const NEAR_CONIFER_TONE = 0.8;
+/** Grid cell of the near kit conifers, m, and the distance (cell near edge) of their finest level. */
+const NEAR_CONIFER_CELL = 60;
+const NEAR_CONIFER_HIGH = 20;
 /** Clear ground between the barrier and the first trees, m. */
 const TREE_CLEARANCE = 9;
 
@@ -685,13 +688,15 @@ export class CircuitWorld {
             // Measured against the spruce cards they replace (shots --tree-swap-check).
             colourScale: NEAR_CONIFER_TONE,
             // The finest level only very near; nothing beyond the swap band.
-            distanceCaps: [35, wq.treeCloud + 15, wq.treeCloud + 15],
+            distanceCaps: [NEAR_CONIFER_HIGH, wq.treeCloud + 15, wq.treeCloud + 15],
           });
           if (!lods) continue;
           const nearId = `${k.id}-near-${id}`;
           props.define({
             id: nearId,
-            gridCell: 120,
+            // Small cells: the levels go by a cell's near edge, and each kit conifer is
+            // thousands of triangles, so a cell should not reach far past the swap distance.
+            gridCell: NEAR_CONIFER_CELL,
             // The cards cast every tree's shadow (see treeMaterials).
             castShadow: false,
             shadowMaxDistance: 170,
