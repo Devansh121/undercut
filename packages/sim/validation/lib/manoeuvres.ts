@@ -168,6 +168,11 @@ export interface BrakingResult {
   time: number;
   peakG: number;
   meanG: number;
+  /**
+   * Peak friction brake power, W: the pedal's brake torque at the wheels' rolling speed, less
+   * what the MGU-K harvests on the rear axle (brake-by-wire substitutes it for friction).
+   */
+  peakBrakePower: number;
   trace?: Trace;
 }
 
@@ -214,6 +219,9 @@ export function braking(
   if ((o.profile ?? 'event') === 'event') driver.cap = (v) => trailOffCap(v, o.v1, o.v2);
   const ma = new MovingAverage(PEAK_WINDOW);
   let peak = 0;
+  let peakPower = 0;
+  const capacity = h.car.model.brakeCapacity;
+  const radius = h.car.params.tyre.rollingRadius;
   let prevSpeed = startSpeed;
   let prevDistance = startDistance;
   let prevTime = startTime;
@@ -225,6 +233,9 @@ export function braking(
     h.step();
     const avg = ma.push(-h.tel.longG);
     if (ma.full && avg > peak) peak = avg;
+    const power =
+      (h.car.brakeApplied * capacity * h.car.vx) / radius - Math.max(0, -h.car.mgukPower);
+    if (power > peakPower) peakPower = power;
   }
   // Interpolate the crossing of v2 inside the last step.
   const f = prevSpeed > h.car.vx ? (prevSpeed - o.v2) / (prevSpeed - h.car.vx) : 1;
@@ -238,6 +249,7 @@ export function braking(
     time: prevTime + f * (h.time - prevTime) - startTime,
     peakG: peak,
     meanG: (startSpeed * startSpeed - o.v2 * o.v2) / (2 * distance) / G,
+    peakBrakePower: peakPower,
   };
   if (h.trace) r.trace = h.trace;
   return r;
