@@ -1,50 +1,16 @@
-import type { BrowserContext, Page } from '@playwright/test';
-import { expect, test as base } from './base';
+import type { Page } from '@playwright/test';
+import { expect, test } from './base';
 import { openMenu, watchProblems } from './helpers';
-
-/**
- * One page per worker for the menu tests, opened in the worker's own set-up (under its own
- * fixture timeout, as the drive tests share their session) and reset before each test: the
- * project's viewport, no emulated media, storage cleared, the launch screen loaded. On a busy
- * CI runner, opening a page or a context right after a software-WebGL test can take tens of
- * seconds; these DOM-only tests should not pay that inside their own time.
- */
-const test = base.extend<object, { menuPage: Page }>({
-  menuPage: [
-    async ({ browser }, use, workerInfo) => {
-      const u = workerInfo.project.use;
-      const context: BrowserContext = await browser.newContext({
-        viewport: u.viewport ?? null,
-        deviceScaleFactor: u.deviceScaleFactor ?? 1,
-        isMobile: u.isMobile ?? false,
-        hasTouch: u.hasTouch ?? false,
-        baseURL: u.baseURL ?? `http://127.0.0.1:${process.env.TEST_PORT ?? 4173}`,
-      });
-      const page = await context.newPage();
-      await use(page);
-      await context.close();
-    },
-    { scope: 'worker', timeout: 90_000 },
-  ],
-  page: async ({ menuPage }, use, testInfo) => {
-    const viewport = testInfo.project.use.viewport;
-    if (viewport) await menuPage.setViewportSize(viewport);
-    await menuPage.emulateMedia({ reducedMotion: null });
-    await menuPage.goto('/');
-    await menuPage.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-    await use(menuPage);
-  },
-});
 
 /**
  * The menus with each input device alone: keyboard only, an injected gamepad only, touch only.
  * Every control on a screen is reachable from where focus starts by moving in the four
  * directions; focus is never lost; Back always leads somewhere. Layout fits with nothing
- * clipped at 1440 x 900, 844 x 390 and 1280 x 720. No WebGL: these run on the DOM alone.
+ * clipped at 1440 x 900, 844 x 390 and 1280 x 720. No WebGL: these run on the DOM alone, so
+ * they disable the GPU/SwiftShader process (their own clean worker, immune to software-WebGL
+ * teardown and compositor readback stalls on CI).
  */
+test.use({ launchOptions: { args: ['--disable-gpu'] } });
 
 /** Replace navigator.getGamepads with one scriptable standard pad, driven by window.fakePad. */
 async function installFakePad(page: Page): Promise<void> {
@@ -123,18 +89,13 @@ type Dir = 'up' | 'down' | 'left' | 'right';
 /**
  * In the page: wait `frames` animation frames, read which control has focus (its DOM path),
  * then focus the control at `focus` (a DOM path, or null). One round trip does the read for the
- * previous step and the set-up for the next. With `pad`, it also presses that fake-pad button
- * for one frame after focusing and reads the result two frames later, so a pad step is a single
- * round trip.
+ * previous keyboard press and the set-up for the next.
  */
-/** A pad input for one direction: a D-pad button, or the left stick pushed one way. */
-type PadInput = { button: number } | { axis: number; value: number };
-
 function step(
   page: Page,
-  o: { frames: number; focus: string | null; pad?: PadInput },
-): Promise<{ before: string; after: string }> {
-  return page.evaluate(async ({ frames, focus, pad }) => {
+  o: { frames: number; focus: string | null },
+): Promise<{ before: string }> {
+  return page.evaluate(async ({ frames, focus }) => {
     const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
     const keyOf = (a: Element | null): string => {
       if (!(a instanceof HTMLElement) || a === document.body) return '';
@@ -152,34 +113,96 @@ function step(
       for (const p of focus.split('/')) n = n.children[Number(p.split(':')[1])] as Element;
       (n as HTMLElement).focus();
     }
-    let after = '';
-    if (pad !== undefined) {
-      const fake = (
-        window as unknown as {
-          fakePad: { button(i: number, v: number): void; axis(i: number, v: number): void };
-        }
-      ).fakePad;
-      // Held for one frame (the menus sample it and move focus), then let go. The release is
-      // read in the next step's frame, which presses the other kind of input (button or stick),
-      // so each step costs one frame.
-      if ('button' in pad) fake.button(pad.button, 1);
-      else fake.axis(pad.axis, pad.value);
-      await raf();
-      after = keyOf(document.activeElement);
-      if ('button' in pad) fake.button(pad.button, 0);
-      else fake.axis(pad.axis, 0);
-    }
-    return { before, after };
+    return { before };
   }, o);
 }
 
 /**
  * Explore the screen's navigation graph with real input until every control is reached: from
- * each control reached so far, focus it and press each direction (a key through the browser's input pipeline, or the fake
- * pad's D-pad); record where focus lands. Returns the controls reached and all controls the
- * screen has.
+ * each control reached so far, focus it and press each direction (a key through the browser's
+ * input pipeline, or the fake pad's D-pad and left stick); record where focus lands. Returns
+ * the controls reached and all controls the screen has.
  */
 async function explore(page: Page, device: 'keyboard' | 'gamepad') {
+  if (device === 'gamepad') {
+    const res = await page.evaluate(async (padButtons) => {
+      const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
+      const keyOf = (a: Element | null): string => {
+        if (!(a instanceof HTMLElement) || a === document.body) return '';
+        const path: string[] = [];
+        for (let n: Element | null = a; n && n !== document.body; n = n.parentElement) {
+          const i = n.parentElement ? [...n.parentElement.children].indexOf(n) : 0;
+          path.unshift(`${n.tagName}:${i}`);
+        }
+        return path.join('/');
+      };
+      const focusKey = (path: string): void => {
+        let n: Element = document.body;
+        for (const p of path.split('/')) n = n.children[Number(p.split(':')[1])] as Element;
+        (n as HTMLElement).focus();
+      };
+      const all = [...document.querySelectorAll<HTMLElement>('[data-nav]')]
+        .filter(
+          (el) =>
+            el.getClientRects().length > 0 &&
+            !el.closest('[hidden]') &&
+            !(el as HTMLButtonElement).disabled,
+        )
+        .map((el) => keyOf(el));
+      const allSet = new Set(all);
+      const start = keyOf(document.activeElement);
+      if (!allSet.has(start))
+        return {
+          error: `focus did not start on a control (${start})`,
+          reached: [] as string[],
+          all,
+        };
+      const fake = (
+        window as unknown as {
+          fakePad: { button(i: number, v: number): void; axis(i: number, v: number): void };
+        }
+      ).fakePad;
+      const seen = new Set([start]);
+      const queue = [start];
+      let padSteps = 0;
+      const dirs = ['up', 'down', 'left', 'right'] as const;
+      while (queue.length > 0 && seen.size < all.length) {
+        const key = queue.shift() as string;
+        for (const dir of dirs) {
+          if (seen.size >= all.length) break;
+          focusKey(key);
+          padSteps++;
+          const useButton = padSteps % 2 === 0;
+          const axis = dir === 'left' || dir === 'right' ? 0 : 1;
+          const value = dir === 'left' || dir === 'up' ? -1 : 1;
+          if (useButton) fake.button(padButtons[dir], 1);
+          else fake.axis(axis, value);
+          await raf();
+          const now = keyOf(document.activeElement);
+          if (useButton) fake.button(padButtons[dir], 0);
+          else fake.axis(axis, 0);
+          if (now === '')
+            return { error: `focus lost after ${dir} from ${key}`, reached: [...seen], all };
+          if (!allSet.has(now))
+            return {
+              error: `focus left the screen's controls after ${dir} (${now})`,
+              reached: [...seen],
+              all,
+            };
+          if (!seen.has(now)) {
+            seen.add(now);
+            queue.push(now);
+          }
+        }
+      }
+      // Let the final release frame settle.
+      await raf();
+      return { error: null as string | null, reached: [...seen].sort(), all: [...all].sort() };
+    }, PAD);
+    expect(res.error).toBeNull();
+    return { reached: res.reached, all: res.all };
+  }
+
   const all = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>('[data-nav]')]
       .filter(
@@ -202,7 +225,6 @@ async function explore(page: Page, device: 'keyboard' | 'gamepad') {
   const seen = new Set([start]);
   const queue = [start];
   let pending: { from: string; dir: Dir } | null = null;
-  let padSteps = 0;
   const record = (from: string, dir: Dir, now: string): void => {
     expect(now, `focus lost after ${dir} from ${from}`).not.toBe('');
     expect(all, `focus left the screen's controls after ${dir}`).toContain(now);
@@ -216,20 +238,6 @@ async function explore(page: Page, device: 'keyboard' | 'gamepad') {
     const key = queue.shift() as string;
     for (const dir of ['up', 'down', 'left', 'right'] as const) {
       if (seen.size >= all.length) break;
-      if (device === 'gamepad') {
-        // Alternate the D-pad and the left stick (both are bound to menu directions).
-        padSteps++;
-        const pad: PadInput =
-          padSteps % 2 === 0
-            ? { button: PAD[dir] }
-            : {
-                axis: dir === 'left' || dir === 'right' ? 0 : 1,
-                value: dir === 'left' || dir === 'up' ? -1 : 1,
-              };
-        const r = await step(page, { frames: 0, focus: key, pad });
-        record(key, dir, r.after);
-        continue;
-      }
       // Keyboard: this call reads the previous press's result and focuses for the next.
       const r = await step(page, { frames: pending ? 1 : 0, focus: key });
       if (pending) record(pending.from, pending.dir, r.before);
@@ -394,8 +402,9 @@ test.describe('menus, gamepad only', () => {
 });
 
 test.describe('menus, touch only', () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.skip(test.info().project.name !== 'phone', 'touch runs on the phone project');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
   test('taps reach every screen, the settings dialog and back', async ({ page }) => {
@@ -599,6 +608,7 @@ test('time of day follows the circuit, and each circuit keeps its own choice', a
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await openMenu(page);
   const tod = page.locator('.settings [data-setting=timeOfDay]');
