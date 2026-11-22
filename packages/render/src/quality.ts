@@ -102,7 +102,9 @@ const COST: Record<QualityName, number> = {
   ultra: 1.45,
   high: 1,
   medium: 0.62,
-  mobile: 0.4,
+  // 0.4 at a 1.5 pixel-ratio cap, scaled by the pixel count at the 1.25 cap (x0.69). Counting all
+  // of it as fill keeps Auto from extrapolating Medium headroom out of the cheaper Mobile frame.
+  mobile: 0.28,
   lite: 0.1,
 };
 
