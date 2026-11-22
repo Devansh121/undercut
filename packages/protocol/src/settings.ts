@@ -28,6 +28,14 @@ export interface Assists {
   autoGears: boolean;
   racingLine: boolean;
   steeringAssist: boolean;
+  /**
+   * Stability help (one-wheel braking and engine trim when the car slides or pushes) and
+   * braking help (the brakes applied for the corner ahead when the car is too fast for the
+   * driving line). Optional on the wire so a host from before they existed still validates;
+   * absent means allowed, as every assist was then.
+   */
+  stability?: boolean;
+  brakingHelp?: boolean;
 }
 
 export type GridOrder = 'random' | 'join';
@@ -94,6 +102,8 @@ export const DEFAULT_SETTINGS: RoomSettings = {
     autoGears: true,
     racingLine: true,
     steeringAssist: true,
+    stability: true,
+    brakingHelp: true,
   },
   gridOrder: 'random',
 };
@@ -106,13 +116,16 @@ const circuitCheck: Check<CircuitInfo> = object({
   maxLapMs: int(1000, 3_600_000),
 });
 
-const assistsCheck: Check<Assists> = object({
-  abs: bool,
-  tractionControl: bool,
-  autoGears: bool,
-  racingLine: bool,
-  steeringAssist: bool,
-});
+const assistsCheck: Check<Assists> = object(
+  {
+    abs: bool,
+    tractionControl: bool,
+    autoGears: bool,
+    racingLine: bool,
+    steeringAssist: bool,
+  },
+  { stability: bool, brakingHelp: bool },
+);
 
 const settingsShape = {
   circuit: circuitCheck,

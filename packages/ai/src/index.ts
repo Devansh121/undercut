@@ -90,3 +90,10 @@ export {
   type RaceDriverSetup,
   type ReferenceDriverSetup,
 } from './reference-setup';
+export {
+  DRIVING_LINE_OPTIONS,
+  DRIVING_LINE_SCALE,
+  DrivingLine,
+  LineCue,
+  type DrivingLineOptions,
+} from './advice/driving-line';

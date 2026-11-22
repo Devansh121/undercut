@@ -85,6 +85,7 @@ const PIT_STALL = 3;
 const PIT_SEEN = 3;
 
 function hold(out: ControlInput, steer = 0): void {
+  out.wheelBrake = undefined;
   out.steer = steer;
   out.throttle = 0;
   out.brake = 1;
@@ -321,6 +322,8 @@ export class AiController implements CarController {
     const c = ctx.control;
     const i = ctx.car;
     const tel = ctx.telemetry;
+    // AI drivers never set the per-wheel brake (only the player's stability assist does).
+    out.wheelBrake = undefined;
     this.sense(ctx);
     this.driver.drive(tel, ctx.dt, this.race);
     const phase = c.phase;
@@ -407,6 +410,8 @@ export class InputController implements CarController {
   }
 
   control(ctx: ControlContext, out: ControlInput): void {
+    // Only the player's assists set a per-wheel brake; the assisted pit lane never does.
+    out.wheelBrake = undefined;
     if (this.pit?.drive(ctx, out)) return;
     this.source(ctx, out);
   }
