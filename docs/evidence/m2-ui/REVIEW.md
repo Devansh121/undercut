@@ -41,7 +41,7 @@ Captured with `node tools/screenshots/ui-shots.mjs` against the production build
 
 8. **Three circuits after Spa and Singapore landed (`circuits-1440x900.png`, `circuits-844x390.png`)**
    - On desktop Monza's tall plan widened its card's content past the card edge ("Race laps" and the record cut off): the card's grid track is now pinned to the card width, and the three cards fill the row. On a phone the cards wrapped to a second row below the fold: they now sit three across in a compact form (smaller plan, two facts), with the screen title left to the breadcrumb.
-   - Spa and Singapore carry a "Time Trial only" mark (no AI racing line yet); the race-mode notice says why in one sentence.
+   - Spa and Singapore carried a "Time Trial only" mark until their AI racing lines landed (#32); a circuit without one still gets the mark, and the race-mode notice says why in one sentence. Braking help is disabled, with the reason, where no driving line exists for the player's car (Spa and Singapore for now).
 9. **Tower footer wrapped "Singapore Marina Bay" onto two lines (`hud-drive-1440x900.png`)**
    - The map already names the circuit, so the tower's footer now shows only the ghost: "On track" or "After a valid lap".
 
