@@ -104,11 +104,12 @@ export const DRIVABILITY_GAPS = Object.freeze({
       'slower than the reference.',
   }),
   /** Target: at most 1 spin in 10 laps. */
-  clumsyGamepad: Object.freeze({
-    incidents: 3,
-    meanLap: 95.68,
+  clumsyKeyboard: Object.freeze({
+    incidents: 2,
+    meanLap: 111.09,
     reason:
-      'All three at the first chicane exit: two on the kerb with the rear unloaded, one stopped ' +
-      'against the barrier and reset.',
+      'Two barrier strikes after a wheelspin slide just past the Lesmo exits (57 and 74 km/h), ' +
+      'where the disciplined driver strikes too; the guide cues faster Lesmo speeds since the ' +
+      'car corners harder (docs/physics-validation.md section 7.9). One incident before.',
   }),
 } satisfies Record<string, DrivabilityGap>);

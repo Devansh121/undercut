@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { expectLap, lapTargetName } from '../../ai/validation/expect-lap';
 import { MONZA, referenceLap } from '../../ai/validation/lib/index';
-import { LAP_GAPS, REFERENCE_LAP_EXACT } from '../../ai/validation/lib/targets';
+import { REFERENCE_LAP_EXACT } from '../../ai/validation/lib/targets';
 import { ASSISTS_OFF, DRIVABILITY_GAPS, tally } from './lib/compare';
 import { DISCIPLINED } from './lib/human';
 
@@ -29,9 +29,12 @@ describe('drivability: keyboard', () => {
   const preset = tally('keyboard', {}, 5, 2);
   const noStability = tally('keyboard', { stability: 0 }, 5, 2);
 
-  it('meets the target: at most 1 spin in 10 laps for a clumsy driver on the default assists', () => {
+  it('known gap: a clumsy driver on the default assists, 2 incidents in 10 laps against 1', () => {
+    const gap = DRIVABILITY_GAPS.clumsyKeyboard;
     expect(preset.laps).toBe(10);
-    expect(Math.round(preset.spinsPerLap * preset.laps)).toBeLessThanOrEqual(1);
+    const incidents = Math.round(preset.spinsPerLap * preset.laps);
+    expect(incidents, gap.reason).toBeGreaterThan(1);
+    expect(Math.abs(incidents - gap.incidents), gap.reason).toBeLessThanOrEqual(1);
     expect(preset.spinsPerLap).toBeLessThan(0.25 * noStability.spinsPerLap);
   });
 
@@ -50,7 +53,7 @@ describe('drivability: keyboard', () => {
     expect(incidents, gap.reason).toBeGreaterThan(0);
     expect(Math.abs(incidents - gap.incidents), gap.reason).toBeLessThanOrEqual(1);
     expect(Math.abs(disciplined.meanLap - gap.meanLap) / gap.meanLap).toBeLessThan(0.015);
-    expect(disciplined.meanLap).toBeGreaterThan(1.12 * LAP_GAPS['monza-lap-m1']!.measured);
+    expect(disciplined.meanLap).toBeGreaterThan(1.12 * REFERENCE_LAP_EXACT['monza-lap-m1']!.time);
   });
 
   it('still spins the same driver often with every assist off: the car is not made easy', () => {

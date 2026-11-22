@@ -81,7 +81,8 @@ export const FIT_TARGETS: Readonly<Record<string, string>> = Object.freeze({
   'monza-t1-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
   'spa-t5-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
   'singapore-t7-2025-power': 'brake capacity (master-cylinder bore), one value for the four powers',
-  'singapore-t14-2024-power': 'brake capacity (master-cylinder bore), one value for the four powers',
+  'singapore-t14-2024-power':
+    'brake capacity (master-cylinder bore), one value for the four powers',
 });
 
 /**
@@ -91,12 +92,14 @@ export const FIT_TARGETS: Readonly<Record<string, string>> = Object.freeze({
  * were questioned; the Monza lap (packages/ai) was consulted when choosing the floor share.
  */
 export const SELECTION_TARGETS: Readonly<Record<string, string>> = Object.freeze({
-  'monza-t1-2024-peak': 'floor stall settings (cross-trim braking peaks)',
-  'monza-t1-2023-peak': 'floor stall settings (cross-trim braking peaks)',
-  'spa-t5-2025-peak': 'floor stall settings (cross-trim braking peaks)',
-  'spa-t5-2024-peak': 'floor stall settings (cross-trim braking peaks)',
-  'singapore-t7-2025-peak': 'floor stall settings; an earlier fit of the longitudinal load slope',
-  'singapore-t14-2024-peak': 'floor stall settings (cross-trim braking peaks)',
+  'monza-t1-2024-peak': 'brake capacity and floor stall (cross-trim braking peaks, section 7.9)',
+  'monza-t1-2023-peak': 'brake capacity and floor stall (cross-trim braking peaks, section 7.9)',
+  'spa-t5-2025-peak': 'brake capacity and floor stall (cross-trim braking peaks, section 7.9)',
+  'spa-t5-2024-peak': 'brake capacity and floor stall (cross-trim braking peaks, section 7.9)',
+  'singapore-t7-2025-peak':
+    'brake capacity and floor stall (section 7.9); an earlier load-slope fit',
+  'singapore-t14-2024-peak':
+    'brake capacity and floor stall (cross-trim braking peaks, section 7.9)',
 });
 
 /** Published braking events (doc 2.4) with both speeds known. */
@@ -381,38 +384,44 @@ const BRAKING_TIME =
   'into the corner, which the scripted stop (at the limit to v2; its pedal ceiling is an ' +
   'assumed estimate that barely acts) does not reproduce. Every published time at the ' +
   'medium and high-downforce circuits comes out short.';
-const DOWNFORCE_BRAKING =
-  'In medium and high-downforce trim the car stops shorter than published. Competing ' +
-  'explanations, not separated: more downforce lost under braking pitch than the modelled ' +
-  "floor stall, braking that becomes front-limited as load moves forward, the drivers' " +
-  'pedal build-up in the published events, or tyre load sensitivity stronger than the ' +
-  'cited sets. Spa and Singapore laps with lateral data would separate them.';
-const DOWNFORCE_PEAK =
-  'The high-downforce peak is above the published one with the tyre load slopes set from ' +
-  'the cited tyre data (not fitted to braking). Competing explanations, not separated: aero ' +
-  'loss under braking pitch beyond the modelled floor stall, front-limited braking as load ' +
-  "moves forward, the drivers' pedal build-up and the published peak's filtering, or a " +
-  'tyre more load-sensitive than the cited sets.';
+const SHORT_STOP =
+  'With the brake capacity set from the published powers the 2025 stop at the same corner is ' +
+  'in band; the 2024 one (99 m from 320 km/h) stays 5 % short. Not separated: the 2024 ' +
+  "event's conditions (fuel, wind, tyre) or the published trail-off (see the stop times).";
+const BRAKE_LIMITED_PEAK =
+  'The full-pedal capacity is set from the published peak brake powers, so these stops are ' +
+  'brake-limited at speed and the 50 ms peak (race fuel 50 kg, the doc 2.4 test) is ' +
+  '4.1–4.3 g. The published peak at the published power would need more friction force than ' +
+  'P / v1 allows near v1 with that mass: either it comes later in the stop at lower speed, ' +
+  'with more force than at the start (carbon pads gaining bite as they heat; the model has ' +
+  'one capacity for the whole stop), or the event cars carried less fuel than 50 kg.';
 const MONZA_2023 =
   'The 2023 figure (5.2 g) stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner ' +
   'and speed; the model gives about 4.7–4.8 g for all three.';
+const PARABOLICA =
+  'The band is an estimate derived from the superseded low-trim ClA 3.6 (doc 2.5). With ClA ' +
+  "from the team's top-speed figure [57] the flat limit is 4.7 g; the sourced Monza practice " +
+  'speeds (Lesmo 2, Ascari, [54][55]) ask for more grip at 180 km/h, not less.';
 const POUHON =
   'Flat constant-speed sweep in Spa air; the 5.7 g figure is a single secondary source for a ' +
   'downhill double-apex corner, with no trace, filter or duration.';
 
 export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
-  'monza-t1-2023-peak': { measured: 4.754, reason: MONZA_2023 },
-  'spa-t5-2025-distance': { measured: 77.28, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2025-time': { measured: 1.135, reason: BRAKING_TIME },
-  'spa-t5-2024-distance': { measured: 78.48, reason: DOWNFORCE_BRAKING },
-  'spa-t5-2024-time': { measured: 1.196, reason: BRAKING_TIME },
-  'spa-t5-2024-peak': { measured: 5.054, reason: DOWNFORCE_PEAK },
-  'singapore-t7-2025-distance': { measured: 83.13, reason: DOWNFORCE_BRAKING },
-  'singapore-t7-2025-time': { measured: 1.447, reason: BRAKING_TIME },
-  'singapore-t7-2025-peak': { measured: 5.403, reason: DOWNFORCE_PEAK },
-  'singapore-t14-2024-time': { measured: 1.808, reason: BRAKING_TIME },
-  'singapore-t14-2024-peak': { measured: 5.065, reason: DOWNFORCE_PEAK },
-  'lateral-pouhon': { measured: 4.594, reason: POUHON },
+  'monza-t1-2025-time': { measured: 2.344, reason: BRAKING_TIME },
+  'monza-t1-2025-peak': { measured: 4.209, reason: BRAKE_LIMITED_PEAK },
+  'monza-t1-2024-peak': { measured: 4.171, reason: BRAKE_LIMITED_PEAK },
+  'monza-t1-2023-peak': { measured: 4.196, reason: `${MONZA_2023} ${BRAKE_LIMITED_PEAK}` },
+  'spa-t5-2025-time': { measured: 1.263, reason: BRAKING_TIME },
+  'spa-t5-2025-peak': { measured: 4.218, reason: BRAKE_LIMITED_PEAK },
+  'spa-t5-2024-distance': { measured: 84.924, reason: SHORT_STOP },
+  'spa-t5-2024-time': { measured: 1.295, reason: BRAKING_TIME },
+  'singapore-t7-2025-time': { measured: 1.534, reason: BRAKING_TIME },
+  'singapore-t7-2025-peak': { measured: 4.295, reason: BRAKE_LIMITED_PEAK },
+  'singapore-t14-2024-time': { measured: 1.823, reason: BRAKING_TIME },
+  'singapore-t14-2024-peak': { measured: 4.184, reason: BRAKE_LIMITED_PEAK },
+  'brake-peak-300': { measured: 4.053, reason: BRAKE_LIMITED_PEAK },
+  'lateral-pouhon': { measured: 4.948, reason: POUHON },
+  'lateral-parabolica': { measured: 4.712, reason: PARABOLICA },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';
