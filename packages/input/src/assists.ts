@@ -13,6 +13,7 @@ export type AssistLevel = 'off' | 'low' | 'medium' | 'high';
 
 export interface AssistPreset {
   steering: AssistLevel;
+  stability: boolean;
   braking: AssistLevel;
   abs: 'off' | 'on';
   tractionControl: AssistLevel;
@@ -24,7 +25,8 @@ export const ASSIST_PRESETS: Readonly<Record<DeviceKind, Readonly<AssistPreset>>
   // Digital steering and pedals: help with steering and traction, braking line shown.
   keyboard: Object.freeze({
     steering: 'medium',
-    braking: 'off',
+    stability: true,
+    braking: 'low',
     abs: 'on',
     tractionControl: 'medium',
     gears: 'automatic',
@@ -33,6 +35,7 @@ export const ASSIST_PRESETS: Readonly<Record<DeviceKind, Readonly<AssistPreset>>
   // Analog stick and triggers: the least help.
   gamepad: Object.freeze({
     steering: 'low',
+    stability: true,
     braking: 'off',
     abs: 'on',
     tractionControl: 'low',
@@ -42,6 +45,7 @@ export const ASSIST_PRESETS: Readonly<Record<DeviceKind, Readonly<AssistPreset>>
   // A thumb on glass: the most help.
   touch: Object.freeze({
     steering: 'high',
+    stability: true,
     braking: 'medium',
     abs: 'on',
     tractionControl: 'high',

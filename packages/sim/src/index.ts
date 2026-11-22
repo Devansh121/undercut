@@ -125,6 +125,7 @@ export {
   NO_ASSISTS,
   applyAssists,
   createAssistState,
+  neutralThrottle,
   restoreAssists,
   snapshotAssists,
   speedSensitiveSteer,
