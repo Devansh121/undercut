@@ -267,7 +267,9 @@ if (debugEnabled()) {
   installDebugApi(
     () => drive,
     () => start(),
-    () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
+    () =>
+      driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0, programRefs: 0 },
+    () => driveModule?.rendererPrograms() ?? [],
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),
   );

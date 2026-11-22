@@ -84,6 +84,8 @@ export interface DebugApi {
   pitCar(box: number, livery: number): { x: number; y: number; z: number; yaw: number } | null;
   /** The page renderer's live geometries, textures and programs (works between sessions). */
   rendererInfo(): Record<string, number>;
+  /** The page renderer's live programs: name, cache key and how many materials use each. */
+  rendererPrograms(): { name: string; key: string; used: number; uniforms: string }[];
   /** Known state without a reload, for tests sharing one session. */
   resetForTest(): void;
   /** Start-up phase times of the current session, ms. */
@@ -124,6 +126,7 @@ export function installDebugApi(
   getDrive: () => DriveHandle | null,
   start: () => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
+  rendererPrograms: () => { name: string; key: string; used: number; uniforms: string }[],
   audioStatus: () => string,
   audioCapability: () => { supported: boolean; fallback: string | null },
 ): void {
@@ -219,6 +222,7 @@ export function installDebugApi(
     carScreenRect: () => need().view.carScreenRect(),
     dashboard: () => need().view.dashboard,
     rendererInfo,
+    rendererPrograms,
     loadTimes: () => need().loadTimes(),
     resetForTest: () => need().resetForTest(),
     audioStatus,

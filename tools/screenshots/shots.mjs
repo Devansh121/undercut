@@ -854,6 +854,9 @@ async function lifecycle(browser, report) {
       await page.evaluate(() => ({
         gl: { ...globalThis.__glBalance },
         info: globalThis.__undercut.rendererInfo(),
+        // Which programs outlive the session and how many materials still hold each: a count
+        // that stays level can hide references that grow session after session.
+        programs: globalThis.__undercut.rendererPrograms(),
       })),
     );
   }
