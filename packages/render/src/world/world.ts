@@ -10,7 +10,7 @@ import {
 import type { MeshData, Track } from '@undercut/track';
 import { macroNoise, surfaceMaterial, type PbrSet } from '../materials/surface';
 import type { PropKitAssets } from '../props/catalog';
-import { boardMaterial, type PropRegistry } from '../props/registry';
+import { boardMaterial, type PropPlacement, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
 import { buildBuildingChunks, facadeMaterial } from './buildings';
@@ -53,7 +53,16 @@ import {
 import { buildSurfaceDecals } from './surface-decals';
 import { buildTerrain, TERRAIN_HIGH, TERRAIN_LITE, TERRAIN_MOBILE } from './terrain';
 import { treeAtlas } from './tree-atlas';
-import { treeCards, treeMaterials, type TreeMaterials } from './trees';
+import {
+  BROADLEAF_CLOUD,
+  COLUMNAR_CLOUD,
+  treeCards,
+  treeCloudGeometry,
+  treeCloudMaterials,
+  treeMaterials,
+  type TreeMaterials,
+  type TreeSwap,
+} from './trees';
 
 /** What a preset draws of the world (presets.json, `world`). */
 export interface WorldQuality {
@@ -76,6 +85,8 @@ export interface WorldQuality {
   /** Tree cards drawn near / far (m from the chunk centre). */
   treeNear: number;
   treeFar: number;
+  /** Trees nearer the eye than this are real geometry instead of cards, m (0: cards only). */
+  treeCloud: number;
   /**
    * Build the structures (pit complex, buildings, stands and crowd, trackside furniture,
    * bridges, decals). Off on Lite (software-WebGL tests): ground and a few trees only.
@@ -183,6 +194,8 @@ export class CircuitWorld {
   private readonly textures: Texture[] = [];
   private cover!: CoverMap;
   private readonly trees: TreeMaterials[] = [];
+  /** Per-tree swap between near trees and cards (eye updated every frame). */
+  private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
   private readonly crowdTime = { value: 0 };
   private readonly lap: LapIndex;
   private readonly worldChunks: WorldChunk[] = [];
@@ -553,10 +566,48 @@ export class CircuitWorld {
     const near = treeCards(3);
     const far = treeCards(2);
     this.geometries.push(near, far);
+    // Near trees: real geometry within `treeCloud` of the eye, on small chunks so only the few
+    // around the camera draw; the cards fade out over the same distance per tree.
+    const cloud = wq.treeCloud > 0;
+    const swap: TreeSwap | null = cloud ? this.treeSwap : null;
+    this.treeSwap.distance.value = wq.treeCloud;
+    const clouds = cloud
+      ? {
+          broad: treeCloudGeometry(BROADLEAF_CLOUD, 17),
+          column: treeCloudGeometry(COLUMNAR_CLOUD, 29),
+        }
+      : null;
+    if (clouds) this.geometries.push(clouds.broad, clouds.column);
     for (const k of kinds) {
-      const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage });
+      const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage, swap });
       this.trees.push(mats);
       this.materials.push(mats.material, mats.depth);
+      if (clouds) {
+        const cm = treeCloudMaterials(
+          atlas,
+          k.id,
+          { wind: wq.wind, coverage },
+          mats.time,
+          this.treeSwap,
+        );
+        this.materials.push(cm.material, cm.depth);
+        props.define({
+          id: `${k.id}-near`,
+          gridCell: 120,
+          castShadow: quality.sceneryShadows,
+          shadowMaxDistance: 170,
+          receiveShadow: true,
+          lods: [
+            {
+              geometry: k.id === 'tree-row' ? clouds.column : clouds.broad,
+              material: cm.material,
+              depthMaterial: cm.depth,
+              // Chunk centre distance: the swap distance plus a chunk's reach.
+              maxDistance: wq.treeCloud + 100,
+            },
+          ],
+        });
+      }
       props.define({
         id: k.id,
         gridCell: 320,
@@ -595,7 +646,7 @@ export class CircuitWorld {
       const h1 = hash01(n, 11);
       const h2 = hash01(n, 12);
       const h3 = hash01(n, 13);
-      props.place(kind, {
+      const placement: PropPlacement = {
         x,
         y: this.heightAt(x, z) - 0.25,
         z,
@@ -603,7 +654,9 @@ export class CircuitWorld {
         yaw: hash01(n, 14) * Math.PI * 2,
         scale: size * (0.72 + 0.56 * h1),
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
-      });
+      };
+      props.place(kind, placement);
+      if (cloud) props.place(`${kind}-near`, placement);
       return true;
     };
     const step = Math.sqrt(1 / (WOOD_DENSITY * wq.treeDensity));
@@ -875,6 +928,7 @@ export class CircuitWorld {
   /** Per frame: wind, crowd motion, and chunk distance / shadow-cascade gating. */
   update(time: number, eye?: Vector3): void {
     for (const t of this.trees) t.time.value = time;
+    if (eye) this.treeSwap.eye.value.copy(eye);
     this.crowdTime.value = time;
     if (!eye) return;
     for (const c of this.worldChunks) {
