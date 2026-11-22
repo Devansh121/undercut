@@ -157,7 +157,7 @@ export const S = {
     steeringKeyboard: 'Sticks and touch only',
     stability: 'Stability help',
     braking: 'Braking help',
-    brakingNoLine: 'Needs a driving line: Monza only for now',
+    brakingNoLine: 'Needs a driving line for this car: Monza only for now',
     help: {
       tractionControl: 'Reduces engine drive when the rear tyres slip.',
       abs: 'Eases braking to prevent wheel locking.',

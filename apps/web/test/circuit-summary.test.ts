@@ -7,7 +7,13 @@ import { summarizeTrack, timesOfDayFor, type TrackFileLike } from '../src/ui/dat
 
 describe('circuit summary', () => {
   const data = CIRCUIT_DATA.monza as { timingLine: number; raceLaps: number };
-  const s = summarizeTrack(monza as unknown as TrackFileLike, data.raceLaps, data.timingLine, true);
+  const s = summarizeTrack(
+    monza as unknown as TrackFileLike,
+    data.raceLaps,
+    data.timingLine,
+    true,
+    true,
+  );
 
   it('reads the facts the circuit card shows from the track file', () => {
     expect(s).toMatchObject({
@@ -22,27 +28,31 @@ describe('circuit summary', () => {
       airTemperature: 299.15,
       timesOfDay: ['monza-afternoon', 'overcast-day'],
       raceReady: true,
+      brakingHelp: true,
     });
   });
 
-  it('reads Spa and Singapore (track format 3): direction, corners, the day preset, no race line', () => {
+  it('reads Spa and Singapore (track format 3): direction, corners, the day preset, no braking help line', () => {
     const at = (t: unknown) => {
       const f = t as TrackFileLike & { timingLine: { s: number } };
-      return summarizeTrack(f, 44, f.timingLine.s);
+      // Both have AI racing lines (medium and high downforce), none at the player's low trim.
+      return summarizeTrack(f, 44, f.timingLine.s, true, false);
     };
     expect(at(spa)).toMatchObject({
       id: 'spa',
       direction: 'clockwise',
       length: 7004,
       timesOfDay: ['overcast-day'],
-      raceReady: false,
+      raceReady: true,
+      brakingHelp: false,
     });
     expect(at(singapore)).toMatchObject({
       id: 'singapore',
       direction: 'anticlockwise',
       length: 4927,
       timesOfDay: ['overcast-day'],
-      raceReady: false,
+      raceReady: true,
+      brakingHelp: false,
     });
     expect(at(spa).corners).toBeGreaterThan(10);
     expect(at(singapore).plan.sectorPaths).toHaveLength(3);

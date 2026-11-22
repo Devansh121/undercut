@@ -63,21 +63,22 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * Each service keeps its Durable Object storage in its own temporary directory, removed on
- * stop. With wrangler's default (.wrangler/state beside the config) every runtime on the
- * machine shares the same SQLite files, and two at once (a test run's service beside the
- * servers the tools/serve runtime tests start) fail with "database is locked" (SQLITE_BUSY).
- * Rooms are short-lived; nothing needs to outlive the process. The directory is on /dev/shm
- * (memory) where there is one: the room still awaits its alarm writes behind the runtime's
- * output gate, and on a busy machine a disk write there delays relayed snapshots.
+ * `persistTo` gives the runtime its own state directory. Without it the service makes a private
+ * one of its own, removed on stop, rather than wrangler's default beside the config: every
+ * `wrangler dev` for this config would share that one, and two running at once (the test suite's
+ * service and a server started by another test) collide on its SQLite files (SQLITE_BUSY,
+ * "database is locked"). The private directory is on /dev/shm (memory) where there is one: the
+ * room awaits its alarm writes behind the runtime's output gate, and on a busy machine a disk
+ * write there delays relayed snapshots. Rooms are short-lived; nothing needs to outlive them.
  *
- * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
+ * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
 export function createRoomsService({
   port,
   log = (text) => void process.stdout.write(text),
   quiet = false,
   vars = {},
+  persistTo,
 }) {
   const url = `http://127.0.0.1:${port}`;
   const cancel = new AbortController();
@@ -99,7 +100,8 @@ export function createRoomsService({
     const inspectorPort = await freePort();
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
-    persistDir = fs.mkdtempSync(path.join(stateRoot(), 'undercut-rooms-state-'));
+    // A private state directory, unless the caller gave one (removed on stop only if ours).
+    if (!persistTo) persistDir = fs.mkdtempSync(path.join(stateRoot(), 'undercut-rooms-state-'));
     child = spawn(
       process.execPath,
       [
@@ -114,7 +116,7 @@ export function createRoomsService({
         '--inspector-port',
         String(inspectorPort),
         '--persist-to',
-        persistDir,
+        persistTo ?? persistDir,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',

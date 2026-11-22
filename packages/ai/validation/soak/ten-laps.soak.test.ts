@@ -1,19 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { MONZA, referenceLap } from '../lib/index';
+import { MONZA, SINGAPORE, SPA, referenceLap, type CircuitSetup } from '../lib/index';
 
 /**
  * Nightly soak (`npm run test:soak`): ten consecutive flying laps by the reference driver at
- * Monza. Qualifying fuel cannot cover ten laps, so the car starts with enough for the run-up
- * and ten laps (about 2.2 kg a lap, measured) and gets lighter as it goes; the energy store is
- * whatever the previous lap left. The laps must all be clean and close together.
+ * each circuit. Qualifying fuel cannot cover ten laps, so the car starts with enough for the
+ * run-up and ten laps and gets lighter as it goes; the energy store is whatever the previous
+ * lap left. The laps must all be clean and close together.
+ *
+ * Fuel a lap, measured on the reference lap: Monza 1.71 kg, Spa 2.07 kg, Singapore 1.56 kg;
+ * the loads below carry about 30 % more.
  */
 const LAPS = 10;
-const FUEL = MONZA.fuel + 2.2 * (LAPS + 1);
-/** Largest spread of the ten lap times accepted, s. Measured when written: 0.244 s. */
+const FUEL_PER_LAP: Readonly<Record<string, number>> = { monza: 2.2, spa: 2.7, singapore: 2.0 };
+/** Largest spread of the ten lap times accepted, s. Measured when written: 0.244 s at Monza. */
 const MAX_SPREAD = 0.5;
 
-describe('soak: ten consecutive reference laps, Monza', () => {
-  const { result } = referenceLap(MONZA, { laps: LAPS, fuel: FUEL });
+describe.each([
+  ['Monza', MONZA],
+  ['Spa', SPA],
+  ['Singapore', SINGAPORE],
+] as const)('soak: ten consecutive reference laps, %s', (_name, setup: CircuitSetup) => {
+  const fuel = setup.fuel + FUEL_PER_LAP[setup.id]! * (LAPS + 1);
+  const { result } = referenceLap(setup, { laps: LAPS, fuel });
 
   it('completes every lap without a spin', () => {
     expect(result.spun).toBe(false);
@@ -25,7 +33,6 @@ describe('soak: ten consecutive reference laps, Monza', () => {
   });
 
   it('keeps every tyre off grass and gravel on every lap', () => {
-    // Measured when written: 0 samples on each of the ten laps.
     for (const lap of result.laps) expect(lap.grassSamples).toBe(0);
   });
 

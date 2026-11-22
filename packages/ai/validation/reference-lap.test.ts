@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { lateralLimit, topSpeed } from '../../sim/validation/lib/index';
 import { racingLineSpeeds } from '../src/export/racing-line';
 import {
+  CIRCUIT_REFERENCE,
   MONZA,
+  SINGAPORE,
+  SPA,
+  type CircuitSetup,
   checkArtefacts,
   loadEnvelope,
   loadLine,
@@ -56,6 +60,70 @@ describe('validation: reference lap, Monza (doc 2.1)', () => {
       worst = Math.max(worst, Math.abs(shipped[i]! - plan.profile.v[i]!));
     }
     // Speeds are stored to the cm/s and rebuilt from offsets stored to 0.1 mm.
+    expect(worst).toBeLessThan(0.05);
+    expect(Math.abs(lap!.time - plan.profile.lapTime) / plan.profile.lapTime).toBeLessThan(0.03);
+  });
+});
+
+// Doc 2.1 at Spa (medium trim) and Singapore (high trim), the same way: the committed line and
+// envelope, an out-lap, then a flying lap timed from the circuit's timing line (track format 3),
+// judged against the era's pole (M4 band, ±3 %), the speed trap and each sector against the
+// session best (doc 2.2), with the recorded-gap rule where a target is missed.
+describe.each([
+  ['Spa', SPA],
+  ['Singapore', SINGAPORE],
+] as const)('validation: reference lap, %s (doc 2.1)', (_name, setup: CircuitSetup) => {
+  const ref = CIRCUIT_REFERENCE[setup.id]!;
+  const staleness = checkArtefacts(setup);
+
+  it('uses racing-line and envelope artefacts made from the current car, track and code', () => {
+    expect(staleness.envelope.stale, staleMessage(setup, 'envelope')).toBe(false);
+    expect(staleness.line.stale, staleMessage(setup, 'line')).toBe(false);
+  });
+
+  const { result, plan } = referenceLap(setup);
+  const lap = result.laps[0];
+
+  it('completes the lap without a spin', () => {
+    expect(result.spun).toBe(false);
+    expect(lap).toBeDefined();
+    expect(lap!.maxSideslipDeg).toBeLessThan(15);
+  });
+
+  it(lapTargetName(ref.lapTarget), () => expectLap(ref.lapTarget, lap!.time));
+
+  it(lapTargetName(ref.trapTarget), () => expectLap(ref.trapTarget, lap!.trap));
+
+  ref.sectorTargets!.forEach((id, k) => {
+    it(lapTargetName(id), () => expectLap(id, lap!.sectors[k]!));
+  });
+
+  it('times three sectors that add up to the lap', () => {
+    expect(lap!.sectors).toHaveLength(3);
+    const sum = lap!.sectors.reduce((a, b) => a + b, 0);
+    expect(Math.abs(sum - lap!.time)).toBeLessThan(1e-6);
+  });
+
+  it('stays within track limits: never all four wheels beyond the white lines', () => {
+    expect(lap!.allOffTicks).toBe(0);
+    expect(lap!.maxWheelsOff).toBeLessThan(4);
+  });
+
+  it('keeps every tyre off grass and gravel (centre and both tread edges, every tick)', () => {
+    expect(lap!.grassSamples).toBe(0);
+  });
+
+  it('keeps the MGU-K within its per-lap limits', () => {
+    expect(lap!.deployMJ).toBeLessThanOrEqual(4 + 1e-6);
+    expect(lap!.harvestMJ).toBeLessThanOrEqual(2 + 1e-6);
+  });
+
+  it('drives the profile the shipped racing line describes', () => {
+    const shipped = racingLineSpeeds(loadLine(setup));
+    let worst = 0;
+    for (let i = 0; i < shipped.length; i++) {
+      worst = Math.max(worst, Math.abs(shipped[i]! - plan.profile.v[i]!));
+    }
     expect(worst).toBeLessThan(0.05);
     expect(Math.abs(lap!.time - plan.profile.lapTime) / plan.profile.lapTime).toBeLessThan(0.03);
   });

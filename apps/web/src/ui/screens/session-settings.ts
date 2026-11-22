@@ -145,8 +145,8 @@ export class SettingsPanel {
       value: a().braking,
       onChange: (v) => setAssist('braking', v),
     });
-    // Braking help follows the driving line, built from the AI's racing line: Monza only for now.
-    braking.setDisabled(!circuit.raceReady);
+    // Braking help follows a driving line built for the player's car: Monza only for now.
+    braking.setDisabled(!circuit.brakingHelp);
     const controls: [Control<unknown>, () => unknown][] = [
       [tc as Control<unknown>, () => a().tractionControl],
       [abs as Control<unknown>, () => a().abs > 0],
@@ -165,7 +165,7 @@ export class SettingsPanel {
       settingRow(
         S.setup.braking,
         braking.root,
-        circuit.raceReady ? undefined : S.setup.brakingNoLine,
+        circuit.brakingHelp ? undefined : S.setup.brakingNoLine,
       ),
       settingRow(S.setup.gears, gears.root),
       settingRow(

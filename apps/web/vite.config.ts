@@ -78,6 +78,7 @@ function circuitCatalog(): Plugin {
   const id = 'virtual:undercut/circuits';
   const resolved = `\0${id}`;
   const dir = fileURLToPath(new URL('../../packages/track/data/', import.meta.url));
+  const aiDir = fileURLToPath(new URL('../../packages/ai/data/', import.meta.url));
   return {
     name: 'circuit-catalog',
     resolveId: (source) => (source === id ? resolved : null),
@@ -95,15 +96,17 @@ function circuitCatalog(): Plugin {
           typeof t.timingLine === 'number'
             ? t.timingLine
             : (t.timingLine?.s ?? rules?.timingLine ?? 0);
-        // Race modes need the AI drivers' racing line for the circuit.
-        const aiLine = fileURLToPath(
-          new URL(`../../packages/ai/data/${t.id}-low.line.json`, import.meta.url),
-        );
+        // Race modes need the AI drivers' racing line for the circuit (any downforce level).
+        const lines = fs
+          .readdirSync(aiDir)
+          .filter((f) => f.startsWith(`${t.id}-`) && f.endsWith('.line.json'));
+        // Braking help needs a line built for the player's car (low downforce).
         return summarizeTrack(
           t,
           rules?.raceLaps ?? fullRaceLaps(t.length),
           line,
-          fs.existsSync(aiLine),
+          lines.length > 0,
+          lines.includes(`${t.id}-low.line.json`),
         );
       });
       // Monza first (the default and round 1), then by name.

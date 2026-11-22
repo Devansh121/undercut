@@ -37,6 +37,11 @@ export interface CircuitSummary {
    * Without it the circuit offers Time Trial only.
    */
   raceReady: boolean;
+  /**
+   * There is a driving line for the player's car (an AI line built at its trim): braking help
+   * works here.
+   */
+  brakingHelp: boolean;
   plan: CircuitPlan;
 }
 
@@ -179,6 +184,7 @@ export function summarizeTrack(
   raceLaps: number,
   timingLine: number,
   raceReady = false,
+  brakingHelp = false,
 ): CircuitSummary {
   const corners = new Set(t.corners.map((c) => c.number)).size;
   return {
@@ -197,6 +203,7 @@ export function summarizeTrack(
       typeof t.environment?.airTemperature === 'number' ? t.environment.airTemperature : null,
     timesOfDay: timesOfDayFor(t.id, t.environment?.lighting),
     raceReady,
+    brakingHelp,
     plan: buildPlan(t, 208, 150, 14, timingLine),
   };
 }

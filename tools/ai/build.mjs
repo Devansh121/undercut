@@ -17,7 +17,7 @@ const { module: lib } = await runnerImport(path.join(root, 'packages/ai/validati
   logLevel: 'error',
 });
 const check = process.argv.includes('--check');
-const setups = [lib.MONZA];
+const setups = [lib.MONZA, lib.SPA, lib.SINGAPORE];
 let stale = 0;
 for (const setup of setups) {
   if (check) {

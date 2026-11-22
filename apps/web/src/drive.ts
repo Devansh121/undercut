@@ -47,8 +47,6 @@ import compounds from '../../../design/compounds.json';
 // The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
 // The AI's racing line and measured vehicle envelope, for the rubbered line and the driving
 // line's advised speeds (braking help).
-import monzaLine from '../../../packages/ai/data/monza-low.line.json';
-import monzaEnvelope from '../../../packages/ai/data/monza-low.envelope.json';
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
@@ -237,11 +235,33 @@ async function loadTrack(id: string): Promise<Track> {
   return Track.fromJSON(await load());
 }
 
-function racingLineOffsets(track: Track): Float64Array | null {
-  // The rubbered line is Monza's AI racing line; other circuits have none yet.
-  const raw = monzaLine as { count: number; offsetTenthMm: number[] };
-  if (track.id !== 'monza' || raw.count !== track.lap.count) return null;
-  return Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
+/** The AI's racing lines and measured envelopes per circuit and trim, fetched with a session. */
+const AI_LINES = import.meta.glob<unknown>('../../../packages/ai/data/*.line.json', {
+  import: 'default',
+});
+const AI_ENVELOPES = import.meta.glob<unknown>('../../../packages/ai/data/*.envelope.json', {
+  import: 'default',
+});
+
+/**
+ * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, and the
+ * driving line for braking help. The guide's advised speeds come from the envelope of the car
+ * the line was built for, so it is used only when that is the player's trim (low downforce).
+ */
+async function racingLine(
+  track: Track,
+): Promise<{ offsets: Float64Array; guide: EnvelopeArtefact | null } | null> {
+  const prefix = `../../../packages/ai/data/${track.id}-`;
+  const key = Object.keys(AI_LINES).find((k) => k.startsWith(prefix));
+  const load = key ? AI_LINES[key] : undefined;
+  if (!key || !load) return null;
+  const raw = (await load()) as { count: number; offsetTenthMm: number[] };
+  if (raw.count !== track.lap.count) return null;
+  const offsets = Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
+  const envelope = key.endsWith('-low.line.json')
+    ? AI_ENVELOPES[key.replace('.line.json', '.envelope.json')]
+    : undefined;
+  return { offsets, guide: envelope ? ((await envelope()) as EnvelopeArtefact) : null };
 }
 
 export interface DriveHandle {
@@ -289,14 +309,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const line = racingLineOffsets(track);
-  const drivingLine = line
-    ? new DrivingLine(
-        buildPlan(track, line, decodeEnvelope(monzaEnvelope as EnvelopeArtefact), {
-          scale: DRIVING_LINE_SCALE,
-        }),
-      )
-    : null;
+  const ai = await racingLine(track);
+  const line = ai?.offsets ?? null;
+  const drivingLine =
+    ai && ai.guide
+      ? new DrivingLine(
+          buildPlan(track, ai.offsets, decodeEnvelope(ai.guide), { scale: DRIVING_LINE_SCALE }),
+        )
+      : null;
   const session = new DriveSession({
     track,
     seed: o.seed,
