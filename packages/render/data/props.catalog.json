@@ -1594,80 +1594,80 @@
           "maxDistance": 80,
           "triangleBudget": 4000,
           "triangles": 2904,
-          "bytes": 38880
+          "bytes": 38840
         },
         {
           "file": "assets/props/temporary-grandstand_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 2200,
           "triangles": 1912,
-          "bytes": 28220
+          "bytes": 28252
         },
         {
           "file": "assets/props/temporary-grandstand_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 1800,
           "triangles": 1552,
-          "bytes": 22092
+          "bytes": 22116
         }
       ],
       "bounds": {
-        "min": [-3.2245287895202637, -5.960464477539063e-8, -4],
-        "max": [3.614875078201294, 5.1883320808410645, 4]
+        "min": [-3.624528408050537, -5.960464477539063e-8, -4],
+        "max": [3.2148749828338623, 5.1883320808410645, 4]
       },
       "attachments": [
         {
           "name": "crowd-row-0",
-          "position": [3.08, 1.22, -3.35],
+          "position": [2.68, 1.22, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-1",
-          "position": [2.2800000000000002, 1.64, -3.35],
+          "position": [1.8800000000000003, 1.64, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-2",
-          "position": [1.48, 2.06, -3.35],
+          "position": [1.08, 2.06, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-3",
-          "position": [0.6799999999999998, 2.48, -3.35],
+          "position": [0.2799999999999998, 2.48, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-4",
-          "position": [-0.12, 2.9, -3.35],
+          "position": [-0.52, 2.9, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-5",
-          "position": [-0.9199999999999998, 3.3200000000000003, -3.35],
+          "position": [-1.3199999999999998, 3.3200000000000003, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-6",
-          "position": [-1.7200000000000006, 3.74, -3.35],
+          "position": [-2.1200000000000006, 3.74, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
         },
         {
           "name": "crowd-row-7",
-          "position": [-2.5200000000000005, 4.16, -3.35],
+          "position": [-2.9200000000000004, 4.16, -3.35],
           "axis": [0, 0, 1],
           "spacing": 0.55,
           "count": 12
@@ -1851,28 +1851,28 @@
         {
           "file": "assets/props/forest-spruce_high.glb",
           "maxDistance": 80,
-          "triangleBudget": 1000,
-          "triangles": 316,
-          "bytes": 9728
+          "triangleBudget": 8000,
+          "triangles": 7062,
+          "bytes": 255372
         },
         {
           "file": "assets/props/forest-spruce_mobile.glb",
           "maxDistance": 250,
-          "triangleBudget": 500,
-          "triangles": 124,
-          "bytes": 5596
+          "triangleBudget": 4000,
+          "triangles": 3254,
+          "bytes": 117188
         },
         {
           "file": "assets/props/forest-spruce_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
-          "triangles": 36,
-          "bytes": 4496
+          "triangles": 40,
+          "bytes": 19984
         }
       ],
       "bounds": {
-        "min": [-2.8976798057556152, 0, -2.8711979389190674],
-        "max": [2.8281993865966797, 17.549999237060547, 2.68219256401062]
+        "min": [-2.684535264968872, 0, -2.857219934463501],
+        "max": [2.4514000415802, 18.040000915527344, 2.9413979053497314]
       },
       "attachments": [
         { "name": "foliage", "position": [0, 9, 0], "material": "forest-spruce-needles" }
@@ -1889,28 +1889,28 @@
         {
           "file": "assets/props/forest-fir_high.glb",
           "maxDistance": 80,
-          "triangleBudget": 1000,
-          "triangles": 316,
-          "bytes": 9772
+          "triangleBudget": 8000,
+          "triangles": 5540,
+          "bytes": 206620
         },
         {
           "file": "assets/props/forest-fir_mobile.glb",
           "maxDistance": 250,
-          "triangleBudget": 500,
-          "triangles": 124,
-          "bytes": 5524
+          "triangleBudget": 4000,
+          "triangles": 2564,
+          "bytes": 97684
         },
         {
           "file": "assets/props/forest-fir_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
-          "triangles": 36,
-          "bytes": 4520
+          "triangles": 40,
+          "bytes": 19052
         }
       ],
       "bounds": {
-        "min": [-2.4147331714630127, 0, -2.392664909362793],
-        "max": [2.35683274269104, 14.800000190734863, 2.2402288913726807]
+        "min": [-3.037818431854248, 0, -3.011408805847168],
+        "max": [2.8520002365112305, 15.039999961853027, 3.100247621536255]
       },
       "attachments": [
         { "name": "foliage", "position": [0, 7.5, 0], "material": "forest-fir-needles" }
@@ -1918,5 +1918,5 @@
       "materials": ["forest-bark", "forest-fir-needles"]
     }
   ],
-  "totalBytes": 2854992
+  "totalBytes": 3531272
 }

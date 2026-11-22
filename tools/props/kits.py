@@ -1,7 +1,6 @@
 """Overcast forest and temporary night-race furniture, in author Z-up metres."""
 import math
 import bpy
-import numpy as np
 
 SPECS = [('street-block', 4), ('street-fence', 4), ('street-fence-end', 0),
          ('floodlight-mast', 0), ('lighting-truss', 4), ('temporary-grandstand', 8),
@@ -83,6 +82,14 @@ def build(g, ident):
         if lod < 2:
             for y in (-3.8, 0):
                 rod('rear-cross-brace', (-2.4, y, .1), (-2.4, y+3.8, 3.7), .035, dark)
+        # The tiers step back from the front edge, so the ground footprint (sole boards at
+        # x = -2.4 .. 3.2 plus their pads) is centred 0.4 m forward: shift geometry and
+        # attachments together so the pivot sits at the footprint centre.
+        for ob in g['objects']:
+            ob.location.x -= .4
+        bpy.context.view_layer.update()
+        for anchor in attachments:
+            anchor['position'][0] -= .4
     elif ident.startswith('marina-'):
         variant = ('marina-office', 'marina-hotel', 'marina-pavilion').index(ident)
         width, depth, floors = [(18, 10, 7), (14, 12, 9), (22, 12, 2)][variant]
@@ -125,63 +132,8 @@ def build(g, ident):
 
 
 def forest(g, ident):
-    """Identical albedo and roughness on geometry and unlit-source alpha cards; no baked sun."""
-    fir = ident.endswith('fir')
-    h, radius = (15, 2.5) if fir else (18, 3)
-    colour = (.023, .041, .018)
-    leaf_name = ident + '-needles'
-    leaf = bpy.data.materials.get(leaf_name) or g['material'](leaf_name, colour, .96, double=True)
-    bark = bpy.data.materials.get('forest-bark') or g['material']('forest-bark', (.052, .039, .025), .96, tex_kind='grain')
-    g['tapered_rod']('trunk', (0, 0, 0), (0, 0, 2.5 if g['lod'] == 2 else h*.95), .18, .025, bark, segs=8)
-    if g['lod'] < 2:
-        layers = 12 if g['lod'] == 0 else 8
-        for k in range(layers):
-            z = 2 + k*(h-3)/layers
-            r = radius*(1-(z-2)/(h-1))
-            n = 24 if g['lod'] == 0 else 12
-            verts = [(0, 0, min(h, z+1.8))]
-            for j in range(n):
-                angle = j*math.tau/n
-                rr = r*(.66+.34*(j%2))*(.93+.07*math.sin(j*7+k*3))
-                verts.append((rr*math.cos(angle), rr*math.sin(angle), z+.5*(j%2)+.12*math.sin(j*5)))
-            faces = [(0, j+1, (j+1)%n+1) for j in range(n)]
-            mesh = bpy.data.meshes.new('needle-boughs')
-            mesh.from_pydata(verts, [], faces)
-            ob = bpy.data.objects.new('needle-boughs', mesh)
-            bpy.context.collection.objects.link(ob)
-            g['finish'](ob, 'needle-boughs', leaf, smooth=True)
-    else:
-        size = 256
-        yy, xx = np.mgrid[0:size, 0:size]/(size-1)
-        height = yy*h
-        half = radius*(1-(height-2)/(h-1))
-        edge = half*(.87+.13*np.sin(height*6))
-        mask = (height > 2) & (height < h-.3) & (np.abs((xx-.5)*radius*2) < edge)
-        rgba = np.ones((size, size, 4), dtype=np.float32)
-        rgba[:, :, :3] = g['lin_to_srgb'](np.array(colour))
-        rgba[:, :, 3] = mask
-        image = bpy.data.images.new(f'{ident}-impostor-atlas', width=size, height=size, alpha=True)
-        image.pixels.foreach_set(rgba.ravel())
-        image.pack()
-        nt = leaf.node_tree
-        tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = image
-        bsdf = nt.nodes.get('Principled BSDF')
-        nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
-        cut = nt.nodes.new('ShaderNodeMath'); cut.operation = 'GREATER_THAN'; cut.inputs[1].default_value = .5
-        nt.links.new(tex.outputs['Alpha'], cut.inputs[0])
-        nt.links.new(cut.outputs[0], bsdf.inputs['Alpha'])
-        leaf.surface_render_method = 'DITHERED'
-        leaf.alpha_threshold = .5
-        leaf.use_backface_culling = True
-        for angle in (0, math.pi/2, math.pi, 3*math.pi/2):
-            r = radius
-            verts = [(s*r*math.cos(angle), s*r*math.sin(angle), z) for s,z in [(-1,0),(1,0),(1,h),(-1,h)]]
-            mesh = bpy.data.meshes.new('impostor'); mesh.from_pydata(verts, [], [(0,1,2,3)])
-            ob = bpy.data.objects.new('impostor', mesh); bpy.context.collection.objects.link(ob)
-            uv = mesh.uv_layers.new()
-            for i, xy in enumerate([(0,0),(1,0),(1,1),(0,1)]): uv.data[i].uv = xy
-            g['finish'](ob, 'impostor', leaf, custom_uv=True)
-    g['attachments'].append({'name': 'foliage', 'position': [0, h/2, 0], 'material': leaf_name})
+    from forest import build as build_forest
+    build_forest(g, ident)
 
 
 def facade_panel(g, pos, width, height, material, side):

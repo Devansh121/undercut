@@ -43,6 +43,21 @@ try {
     for (const id of ids.filter((id) => id.startsWith('forest-'))) {
       luma[id] = await page.evaluate((id) => window.treeLuma(id), id);
     }
+    const transition = {};
+    for (const id of ids.filter((id) => id.startsWith('forest-'))) {
+      transition[id] = await page.evaluate((id) => window.treeTransition(id), id);
+      await page.screenshot({
+        path: `docs/evidence/m2-models/${id}-transition.jpg`,
+        type: 'jpeg',
+        quality: 88,
+        clip: { x: 0, y: 360, width: 1600, height: 640 },
+      });
+      await page.evaluate(() => document.getElementById('tree-diff')?.remove());
+    }
+    fs.writeFileSync(
+      'docs/evidence/m2-models/forest-transition.json',
+      JSON.stringify(transition, null, 2) + '\n',
+    );
     fs.writeFileSync(
       'docs/evidence/m2-models/forest-luma.json',
       JSON.stringify(luma, null, 2) + '\n',

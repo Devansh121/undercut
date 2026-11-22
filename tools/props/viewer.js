@@ -446,3 +446,114 @@ window.kitScene = async (forest) => {
   env.update(camera, new T.Vector3(0, 0, 15), true);
   renderer.render(scene, camera);
 };
+
+// LOD transition evidence for a tree: High, Mobile and Far from the same camera on black, with
+// mean luma and silhouette coverage per level and the silhouette overlap (IoU) of each level
+// against the Far card. Leaves a four-panel frame: High | Mobile | Far | Mobile vs Far (red:
+// Mobile only, blue: Far only, white: both).
+window.treeTransition = async (id) => {
+  for (const o of active) scene.remove(o);
+  active = [];
+  const prop = catalog.props.find((p) => p.id === id);
+  const levels = [];
+  for (const lod of prop.lods) {
+    const o = (await loader.loadAsync(`/${lod.file}`)).scene;
+    scene.add(o);
+    env.register(o);
+    levels.push(o);
+    active.push(o);
+  }
+  ground.visible = false;
+  const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
+  for (const o of hidden) o.visible = false;
+  const background = scene.background;
+  const fog = scene.fog;
+  scene.background = new T.Color(0);
+  scene.fog = null;
+  const shadows = renderer.shadowMap.enabled;
+  renderer.shadowMap.enabled = false;
+  const gl = renderer.getContext();
+  const W = 400;
+  const H = 640;
+  const pixels = new Uint8Array(W * H * 4);
+  const render = (level) => {
+    levels.forEach((o, i) => (o.visible = i === level));
+    renderer.setViewport(0, 0, W, H);
+    renderer.setScissor(0, 0, W, H);
+    renderer.setScissorTest(true);
+    renderer.render(scene, camera);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const mask = new Uint8Array(W * H);
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < W * H; i++) {
+      const l = 0.2126 * pixels[i * 4] + 0.7152 * pixels[i * 4 + 1] + 0.0722 * pixels[i * 4 + 2];
+      if (l > 2) {
+        mask[i] = 1;
+        sum += l;
+        count++;
+      }
+    }
+    return { mask, luma: sum / Math.max(count, 1), coverage: count };
+  };
+  const iou = (a, b) => {
+    let inter = 0;
+    let union = 0;
+    for (let i = 0; i < a.length; i++) {
+      inter += a[i] & b[i];
+      union += a[i] | b[i];
+    }
+    return inter / Math.max(union, 1);
+  };
+  const views = [];
+  let last = null;
+  for (const angle of [0, Math.PI / 6, Math.PI / 3]) {
+    frame(prop, angle, W / H, 0.05);
+    const r = [0, 1, 2].map(render);
+    views.push({
+      angle,
+      luma: r.map((x) => x.luma),
+      coverage: r.map((x) => x.coverage),
+      iouHighFar: iou(r[0].mask, r[2].mask),
+      iouMobileFar: iou(r[1].mask, r[2].mask),
+      coverageMobileOverFar: r[1].coverage / r[2].coverage,
+    });
+    last = r;
+  }
+  // The evidence frame for the last view: three renders side by side, then the difference.
+  renderer.setScissorTest(true);
+  for (let level = 0; level < 3; level++) {
+    levels.forEach((o, i) => (o.visible = i === level));
+    renderer.setViewport(level * W, 0, W, H);
+    renderer.setScissor(level * W, 0, W, H);
+    renderer.render(scene, camera);
+  }
+  renderer.setScissorTest(false);
+  const diff = document.createElement('canvas');
+  diff.width = W;
+  diff.height = H;
+  const ctx = diff.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const src = (H - 1 - y) * W + x;
+      const m = last[1].mask[src];
+      const f = last[2].mask[src];
+      const o = (y * W + x) * 4;
+      img.data[o] = m ? 255 : 0;
+      img.data[o + 1] = m && f ? 255 : 0;
+      img.data[o + 2] = f ? 255 : 0;
+      img.data[o + 3] = 255;
+    }
+  ctx.putImageData(img, 0, 0);
+  diff.id = 'tree-diff';
+  diff.style.cssText = `position:fixed;left:${3 * W}px;top:${window.innerHeight - H}px;width:${W}px;height:${H}px;z-index:9`;
+  document.getElementById('tree-diff')?.remove();
+  document.body.appendChild(diff);
+  renderer.shadowMap.enabled = shadows;
+  for (const o of hidden) o.visible = true;
+  scene.background = background;
+  scene.fog = fog;
+  ground.visible = true;
+  return views;
+};
