@@ -101,6 +101,8 @@ const BYPASS_SIDE_BY_SIDE = SIDE_BY_SIDE + 0.3;
 const BASE_CORRECTION = 0.05;
 const SLOW_CORRECTION = 0.15;
 const SLOW_STEER_BELOW = 12;
+/** A car stopped within this far behind another stopped car is in its queue, m. */
+const QUEUE_REACH = 30;
 /** Below this speed, m/s, the steering's yaw-rate integral does not build up. */
 const INTEGRATE_FROM = 2;
 /** Heading toward its lane a car asks for at walking pace, at most, rad. */
@@ -1391,13 +1393,13 @@ export class RaceDriver implements Driver {
     return best;
   }
 
-  /** Car `c` stands still within 30 m behind another car standing still. */
+  /** Car `c` stands still within `QUEUE_REACH` behind another car standing still. */
   private queuedBehind(view: TrafficView, c: TrafficCar): boolean {
     for (let k = 0; k < view.count; k++) {
       const o = view.cars[k]!;
       if (o.id === c.id || o.speed >= 1) continue;
       const ds = this.ahead(c.s, o.s);
-      if (ds > 0 && ds < 30) return true;
+      if (ds > 0 && ds < QUEUE_REACH) return true;
     }
     return false;
   }
@@ -1501,13 +1503,13 @@ export class RaceDriver implements Driver {
    * changes up from first, not out of reverse).
    */
   /**
-   * The line crosses the road faster than `SWEEP_MAX` within 40 m of `s`: across the approach to
-   * a stopped car, or just past it, where a car going round would rejoin the line (a queue into
-   * a chicane stays in single file too).
+   * The line crosses the road faster than `SWEEP_MAX` from 40 m before `s` to 60 m past it:
+   * across the approach to a stopped car, or past it where a car going round would rejoin the
+   * line at walking pace (a queue into a chicane stays in single file too).
    */
   private lineSweeps(s: number): boolean {
     const d = this.plan.line.d;
-    for (let x = s - 40; x <= s + 40; x += 2) {
+    for (let x = s - 40; x <= s + 60; x += 2) {
       if (Math.abs(this.at(d, x + 1) - this.at(d, x - 1)) / 2 > SWEEP_MAX) return true;
     }
     return false;
