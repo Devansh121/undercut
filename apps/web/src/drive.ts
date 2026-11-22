@@ -38,6 +38,7 @@ import {
 } from '@undercut/render';
 import {
   DRIVING_LINE_SCALE,
+  LineCue,
   DrivingLine,
   buildPlan,
   decodeEnvelope,
@@ -886,13 +887,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     }
 
     intro.brakingCue(
-      drivingLine !== null &&
-        session.car.state.u >
-          drivingLine.speedAt(session.position.s + Math.abs(session.car.state.u) * 0.3),
+      drivingLine?.cueAt(session.s, Math.abs(session.car.state.vx)) === LineCue.Brake,
     );
     intro.update(
       session.car.state.brakeApplied > 0.1,
-      !session.timing.valid,
+      !session.timer.valid,
       session.phase === 'paused',
       lastLap !== null,
     );
