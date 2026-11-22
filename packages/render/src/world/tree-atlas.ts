@@ -135,7 +135,7 @@ export const CLUSTER_TILE = 8;
 export const BARK_TILE = 11;
 
 /** Brightness of the three cluster tiles relative to the cards' mean (see matchClustersToCards). */
-const CLUSTER_BRIGHTNESS = [1, 0.9, 1.08];
+const CLUSTER_BRIGHTNESS = [1.03, 0.93, 1.11];
 /** Leaf colours of the three cluster tiles (linear-ish, as the species leaves); calibrated after painting. */
 const CLUSTERS: readonly [number, number, number][] = [
   [0.19, 0.27, 0.1],
