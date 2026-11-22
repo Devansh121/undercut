@@ -139,6 +139,8 @@ const NEAR_CONIFER_TONE = 0.8;
 /** Grid cell of the near kit conifers, m, and the distance (cell near edge) of their finest level. */
 const NEAR_CONIFER_CELL = 60;
 const NEAR_CONIFER_HIGH = 20;
+/** Depth of the wood edge (past the clearance) whose conifers are kit models up close, m. */
+const NEAR_CONIFER_BAND = 30;
 /** Clear ground between the barrier and the first trees, m. */
 const TREE_CLEARANCE = 9;
 
@@ -653,6 +655,11 @@ export class CircuitWorld {
       { id: 'tree-park', tiles: theme.trees.park },
     ];
     if (conifers) kinds.push({ id: 'tree-conifer', tiles: conifers.tiles });
+    // With the kit's conifers up close, only the wood edge facing the track takes them; deeper in
+    // (behind the edge rows) the conifers stay cards at every distance.
+    const kitConifers =
+      wq.treeCloud > 0 && conifers !== null && conifers.kit.some((id) => o.propKit?.has(id));
+    if (conifers && kitConifers) kinds.push({ id: 'tree-conifer-deep', tiles: conifers.tiles });
     // Near conifers from the kit's models where it has them (else the columnar near tree).
     const nearKits: { id: string; height: number }[] = [];
     const near = treeCards(3);
@@ -671,7 +678,12 @@ export class CircuitWorld {
       : null;
     if (clouds) this.geometries.push(clouds.broad, clouds.column);
     for (const k of kinds) {
-      const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage, swap });
+      const deep = k.id === 'tree-conifer-deep';
+      const mats = treeMaterials(atlas, k.tiles, k.id, {
+        wind: wq.wind,
+        coverage,
+        swap: deep ? null : swap,
+      });
       this.trees.push(mats);
       this.materials.push(mats.material, mats.depth);
       const kitIds =
@@ -705,7 +717,7 @@ export class CircuitWorld {
           });
           nearKits.push({ id: nearId, height: o.propKit.entries.get(id)?.bounds?.max[1] ?? 16 });
         }
-      } else if (clouds) {
+      } else if (clouds && !deep) {
         const cm = treeCloudMaterials(
           atlas,
           k.id,
@@ -780,8 +792,12 @@ export class CircuitWorld {
         scale: size * (0.72 + 0.56 * h1),
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
       };
-      props.place(kind, placement);
-      if (cloud) {
+      const deep =
+        kind === 'tree-conifer' &&
+        nearKits.length > 0 &&
+        hit.dist > this.lap.barrierAt(hit.index, hit.d) + TREE_CLEARANCE + NEAR_CONIFER_BAND;
+      props.place(deep ? 'tree-conifer-deep' : kind, placement);
+      if (cloud && !deep) {
         if (kind === 'tree-conifer' && nearKits.length > 0) {
           const nk = nearKits[Math.floor(hash01(n, 15) * nearKits.length)] as (typeof nearKits)[0];
           props.place(nk.id, { ...placement, scale: (placement.scale ?? 1) / nk.height });
