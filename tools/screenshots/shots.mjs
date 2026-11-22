@@ -901,6 +901,11 @@ const SWAP_LIGHTING = {
     ['overcast', '&tod=overcast-day'],
     ['sun', '&tod=monza-afternoon'],
   ],
+  // Raced at night under its own floodlights (the menu's first choice), and a day session.
+  singapore: [
+    ['night', ''],
+    ['overcast', '&tod=overcast-day'],
+  ],
 };
 /** Per circuit: a chase pose through woods and a high view over them. */
 const SWAP_POSES = {
@@ -935,6 +940,24 @@ const SWAP_POSES = {
       u.camera('tv');
       const e = u.trackPoint(5450, -25, 14);
       const a = u.trackPoint(5620, 60, 6);
+      u.tvCamera(e.x, e.y, e.z, 42, a);
+    },
+  },
+  singapore: {
+    // Chase camera along Esplanade Drive, where the mapped park trees stand thickest (standing:
+    // at speed the chase camera shakes and its floodlights' highlights move between captures),
+    // and a view from above the verge across them.
+    esplanade: () => {
+      const u = globalThis.__undercut;
+      u.camera('chase-near');
+      u.teleport(3150, 0, 0);
+      u.setTimeScale(0);
+    },
+    park: () => {
+      const u = globalThis.__undercut;
+      u.camera('tv');
+      const e = u.trackPoint(3180, -20, 14);
+      const a = u.trackPoint(3320, 40, 5);
       u.tvCamera(e.x, e.y, e.z, 42, a);
     },
   },

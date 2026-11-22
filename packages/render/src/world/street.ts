@@ -47,6 +47,13 @@ export interface StreetResult {
 
 /** Light of one mast's lamp bank: warm white, candela, reach (m). Set by eye under NIGHT_FLOODLIT. */
 export const MAST_LIGHT = { colour: '#fff0d8', intensity: 900, distance: 70 };
+/**
+ * Where a bank's point light stands: ahead of the lamps (toward the track) and below them, m.
+ * At the lamps themselves their own housing, centimetres away, would take the inverse-square
+ * peak and bloom out of all proportion.
+ */
+const LIGHT_AHEAD = 1.5;
+const LIGHT_DROP = 0.5;
 /** One local light per this length of lighting truss, m, and its light. */
 const TRUSS_LIGHT_EVERY = 12;
 export const TRUSS_LIGHT = { colour: '#fff4e4', intensity: 500, distance: 45 };
@@ -68,7 +75,7 @@ export function lampMaterial(night: boolean): MeshStandardMaterial {
   const m = new MeshStandardMaterial({
     color: new Color(0.82, 0.83, 0.8),
     emissive: new Color('#fff3df'),
-    emissiveIntensity: night ? 4 : 0,
+    emissiveIntensity: night ? 1.2 : 0,
     roughness: 0.25,
     metalness: 0,
   });
@@ -269,9 +276,9 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
         if (b.folded) continue;
         props.place('floodlight-mast', { x: b.x, y: b.y, z: b.z, yaw: b.yaw, s, scale: mastScale });
         lights.push({
-          x: b.x + b.ix * lampX * mastScale,
-          y: b.y + lampY * mastScale,
-          z: b.z + b.iz * lampX * mastScale,
+          x: b.x + b.ix * (lampX * mastScale + LIGHT_AHEAD),
+          y: b.y + lampY * mastScale - LIGHT_DROP,
+          z: b.z + b.iz * (lampX * mastScale + LIGHT_AHEAD),
           ...MAST_LIGHT,
         });
         masts++;
@@ -368,9 +375,9 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
           sinceLight = 0;
           const lamp = trussLamps[0] as { position: readonly [number, number, number] };
           lights.push({
-            x: b.x + b.ix * lamp.position[0],
-            y: b.y + fenceTop + lamp.position[1],
-            z: b.z + b.iz * lamp.position[0],
+            x: b.x + b.ix * (lamp.position[0] + LIGHT_AHEAD),
+            y: b.y + fenceTop + lamp.position[1] - LIGHT_DROP,
+            z: b.z + b.iz * (lamp.position[0] + LIGHT_AHEAD),
             ...TRUSS_LIGHT,
           });
         }
