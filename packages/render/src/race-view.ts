@@ -467,15 +467,9 @@ export class RaceView {
     this.props.build();
     this.scene.add(this.props.group);
     this.environment.register(this.scene);
-    if (this.quality.name !== 'lite' && !this.contextLost) {
-      const tc = performance.now();
-      this.props.withRepresentativeVisible(() => {
-        const run = () => this.renderer.compile(this.scene, this.camera);
-        if (this.world) this.world.withAllVisible(run);
-        else run();
-      });
-      this.loadTimes.compile = performance.now() - tc;
-    }
+    // No upfront renderer.compile: three.js deletes a program's shaders on its first use, so
+    // programs compiled for objects that are never drawn (levels of detail not reached, a
+    // session quit early) would leave their shaders behind (lifecycle test).
   }
 
   private async finishWorldAsync(options: RaceViewOptions, assets: SessionAssets): Promise<void> {

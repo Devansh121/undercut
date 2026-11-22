@@ -939,27 +939,6 @@ export class CircuitWorld {
     }
   }
 
-  /** Temporarily reveal all world chunks for upfront shader precompilation. */
-  withAllVisible(fn: () => void): void {
-    const saved = this.worldChunks.map((c) => ({
-      mesh: c.mesh,
-      visible: c.mesh.visible,
-      castShadow: c.mesh.castShadow,
-    }));
-    for (const c of this.worldChunks) {
-      c.mesh.visible = true;
-      c.mesh.castShadow = c.castShadow;
-    }
-    try {
-      fn();
-    } finally {
-      for (const s of saved) {
-        s.mesh.visible = s.visible;
-        s.mesh.castShadow = s.castShadow;
-      }
-    }
-  }
-
   dispose(): void {
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials) m.dispose();

@@ -223,32 +223,6 @@ export class PropRegistry {
     }
   }
 
-  /**
-   * Temporarily make one chunk per registered prop kind and LOD visible (for upfront shader
-   * precompilation so chunks entering the frustum mid-lap do not stall), then restore state.
-   */
-  withRepresentativeVisible(fn: () => void): void {
-    const saved: { im: InstancedMesh; visible: boolean; castShadow: boolean }[] = [];
-    for (const [id, chunks] of this.chunks) {
-      const first = chunks[0];
-      if (!first) continue;
-      const casts = this.kinds.get(id)?.castShadow ?? true;
-      for (const im of first.meshes) {
-        saved.push({ im, visible: im.visible, castShadow: im.castShadow });
-        im.visible = true;
-        im.castShadow = casts;
-      }
-    }
-    try {
-      fn();
-    } finally {
-      for (const s of saved) {
-        s.im.visible = s.visible;
-        s.im.castShadow = s.castShadow;
-      }
-    }
-  }
-
   /** Instances placed of one kind (0 when the kind is unknown). */
   count(kindId: string): number {
     return this.placements.get(kindId)?.length ?? 0;
