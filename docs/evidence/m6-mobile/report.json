@@ -1,11 +1,16 @@
 {
-  "sha": "fcb943a",
+  "sha": "c9f5f5a",
   "circuit": "monza",
   "shots": [
     {
       "screen": "onboarding",
       "viewport": "844x390",
       "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/onboarding-844x390.png"
+    },
+    {
+      "screen": "onboarding-step2",
+      "viewport": "844x390",
+      "file": "/home/devansh/.t3/worktrees/undercut/m6-mobile-onboarding-59219fa153e0af75/docs/evidence/m6-mobile/onboarding-step2-844x390.png"
     },
     {
       "screen": "hud",

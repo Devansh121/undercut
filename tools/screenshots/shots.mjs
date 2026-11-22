@@ -411,9 +411,18 @@ async function mobileUi(browser, report) {
         if (screen === 'hud') {
           await page.evaluate(() => globalThis.__undercut.pause());
           await page.locator('[data-action=skip-intro]').click();
+          await page.evaluate(() => globalThis.__undercut.resume());
         }
         if (screen === 'pause' || screen === 'settings')
           await page.evaluate(() => globalThis.__undercut.pause());
+        if (screen === 'pause')
+          // Portrait keeps the menu open from the step before: show it from the top.
+          await page.evaluate(() => {
+            for (const n of globalThis.document.querySelectorAll(
+              '[data-testid=pause-menu], .pause *',
+            ))
+              n.scrollTop = 0;
+          });
         if (screen === 'settings')
           await page.locator('[data-slider=master]').scrollIntoViewIfNeeded();
         await page.waitForTimeout(300);
