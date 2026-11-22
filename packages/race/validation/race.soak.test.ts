@@ -26,6 +26,21 @@ describe('Quick Race on more seeds, with pit stops', () => {
   }
 });
 
+describe('Quick Race clean-start sweep across 20 independent seeds', () => {
+  const SEEDS = Array.from({ length: 20 }, (_, i) => 101 + i);
+  for (const seed of SEEDS) {
+    it(`seed ${seed}: clean start and lap one, no anomalies or barrier breaches`, () => {
+      const run = runRace({ cars: 20, laps: 1, seed, pitLap: null });
+      const r = run.result;
+      expect(r.anomalies).toEqual([]);
+      expect(r.entries.every((e) => e.status === 'finished' && e.laps === 1)).toBe(true);
+      expect(run.cars.filter((c) => c.turnOne === 'clean').length).toBeGreaterThanOrEqual(18);
+      expect(run.cars.every((c) => c.beyondBarrier <= 0)).toBe(true);
+      expect(run.cars.every((c) => c.longestContact < 5)).toBe(true);
+    }, 180_000);
+  }
+});
+
 describe('a race weekend at Monza', () => {
   it('runs practice, qualifying and a ten-lap race with the grid from qualifying', () => {
     const { weekend, runs } = runWeekend({

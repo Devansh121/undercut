@@ -474,6 +474,7 @@ export class RaceDriver implements Driver {
       const owns = cornering && ds >= 0.6 * CAR_LENGTH && c.id !== this.passId;
       const inPath = lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns;
       // Ahead and in the way (or overlapping it already): follow it.
+      const closing = Math.max(0, v - c.speed);
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
         // The queue in this car's lane, further cars included (see `queueLimit`).
         if (nq < this.queue.length) {
@@ -485,10 +486,12 @@ export class RaceDriver implements Driver {
           leaderDs = ds;
           leader = c;
         }
+        // Staggered cars close ahead still bound our lateral room so we do not cut across their
+        // rear quarter while braking into a corner.
+        if (lateral < BODY_HALF_WIDTH || ds >= CAR_LENGTH + 1.5 + closing * 0.25) continue;
+      } else if (ds >= CAR_LENGTH + 1 + closing * 0.6) {
         continue;
       }
-      const closing = Math.max(0, v - c.speed);
-      if (ds >= CAR_LENGTH + 1 + closing * 0.6) continue;
       if (ns < side.length) {
         const e = side[ns++]!;
         e.car = c;
@@ -560,8 +563,9 @@ export class RaceDriver implements Driver {
       const lost = !passCar || this.passTime > 15;
       const done = passCar !== null && passDs < -(CAR_LENGTH + 2);
       const late = cornering && passCar !== null && passDs >= 0.6 * CAR_LENGTH;
-      if (lost || done || late) {
-        if (!done) this.cooldown = 3;
+      const blockedByOther = leader !== null && leader.id !== this.passId && gapAhead < 25;
+      if (lost || done || late || blockedByOther) {
+        if (!done && !blockedByOther) this.cooldown = 3;
         this.passId = -1;
       } else {
         this.passTime += dt;
@@ -573,10 +577,14 @@ export class RaceDriver implements Driver {
           this.passId = -1;
           this.cooldown = 3;
           base = 0;
+        } else if (this.passSide > 0) {
+          base = Math.max(base, Math.min(myO, oMax));
+        } else {
+          base = Math.min(base, Math.max(myO, oMin));
         }
       }
     }
-    const launched = v > LAUNCHED;
+    const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));
     if (
       this.passId < 0 &&
       leader &&
@@ -661,14 +669,27 @@ export class RaceDriver implements Driver {
       const room = gap - STANDSTILL_GAP;
       const vKin =
         room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl - 1;
-      let vOk = Math.min(vSafe, vKin);
+      let aSafe = SPEED_GAIN * (vSafe - v);
+      const aKin = SPEED_GAIN * (vKin - v);
+      // Mid-corner, high lateral load leaves little friction-circle margin for comfort braking:
+      // lift smoothly for the headway gap while keeping full braking for kinematic safety (`aKin`).
+      if (Math.abs(this.at(line.curvature, s0)) * v * v > 6) {
+        const gentle = -Math.max(1.5, plan.model.drag(v, false));
+        if (aSafe < gentle) aSafe = gentle;
+      }
+      let aLim = Math.min(aSafe, aKin);
       // Going round a car that is (nearly) stopped: creep past once the held offset clears it.
       const od = leader.d - this.at(line.d, leader.s);
-      const clear = IN_PATH + leader.halfWidth - BODY_HALF_WIDTH;
-      if (attacking && Math.abs(od - this.o) >= clear && gap > 1.5) {
-        vOk = Math.max(vOk, Math.min(5, gap));
+      const wide = leader.halfWidth - BODY_HALF_WIDTH;
+      const clear = IN_PATH + wide;
+      if (
+        attacking &&
+        Math.abs(od - this.o) >= clear &&
+        (gap > 0.2 || Math.abs(od - myO) >= CAR_WIDTH + wide)
+      ) {
+        aLim = Math.max(aLim, SPEED_GAIN * (Math.min(5, Math.max(1.5, gap)) - v));
       }
-      limit = SPEED_GAIN * (vOk - v);
+      limit = aLim;
     }
     if (nq > 1) limit = Math.min(limit, this.queueLimit(nq, v));
     limit = Math.min(limit, this.offLineLimit(s0, v));
@@ -781,6 +802,20 @@ export class RaceDriver implements Driver {
     return false;
   }
 
+  /**
+   * Traffic across the track width that a spun car turning on track must wait for: any car
+   * approaching at speed within `range` m, or passing close behind/alongside at any speed.
+   */
+  private trackBusy(view: TrafficView, s0: number, range: number): boolean {
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      const ds = this.ahead(s0, c.s);
+      if (ds < 0 && ds > -range && c.speed > 15) return true;
+      if (ds < CAR_LENGTH && ds > -(CAR_LENGTH + 15)) return true;
+    }
+    return false;
+  }
+
   // ---- Recovery after a spin or a crash ----
 
   /**
@@ -821,7 +856,7 @@ export class RaceDriver implements Driver {
     const d = view.self.d;
     const onTrack =
       d < track.halfWidthAt(track.wrap(s0), 0) && -d < track.halfWidthAt(track.wrap(s0), 1);
-    if (onTrack && this.carApproaching(view, s0, d, 150) && Math.abs(err) > 0.8) {
+    if (onTrack && this.trackBusy(view, s0, 150) && Math.abs(err) > 0.8) {
       // Wait for the gap: stopped, out of the way. Waiting is not being stuck.
       this.stillTime = 0;
       out.steer = 0;
@@ -853,6 +888,14 @@ export class RaceDriver implements Driver {
     // the spin left it.
     const shiftable = !tel.shifting && Math.abs(v) < 3;
     if (this.backTime > 0) {
+      if (onTrack && this.trackBusy(view, s0, CAR_LENGTH + 15)) {
+        this.stillTime = 0;
+        out.steer = 0;
+        out.throttle = 0;
+        out.brake = 1;
+        out.gearShift = 0;
+        return;
+      }
       out.steer = -turn;
       out.brake = v > 0.5 || v < -6 ? 0.6 : 0;
       out.gearShift = shiftable && tel.gear >= 0 && (tel.gear > 0 || Math.abs(v) < 1) ? -1 : 0;

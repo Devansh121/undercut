@@ -318,8 +318,9 @@ export class ReferenceDriver implements Driver {
       saturated = yawErr < 0;
     }
     // The rear stepping out: steer toward the slide beyond the sideslip the driver accepts, and
-    // hold the yaw integrator (it would otherwise wind up against the countersteer).
-    const beta = wrapAngle(course - tel.yaw);
+    // hold the yaw integrator (it would otherwise wind up against the countersteer). Below
+    // walking pace (4 m/s) `course - yaw` is kinematic Ackermann geometry, not a tyre slide.
+    const beta = tel.speed > 4 ? wrapAngle(course - tel.yaw) : 0;
     const betaOver = Math.max(0, Math.abs(beta) - g.sideslipLimit);
     if (betaOver > 0) steer += (Math.sign(beta) * g.counterSteer * betaOver) / maxSteer;
     if (!saturated && betaOver === 0) this.yawIntegral = integral;
@@ -356,7 +357,7 @@ export class ReferenceDriver implements Driver {
     const peak = p.tyre.peakSlipRatio;
     // The rear stepping out: combined slip past the peak, or the car sliding (sideslip).
     const spin = spinExcess(tel.slipRatio, tel.slipAngle, peak, p.tyre.peakSlipTan);
-    const sideslip = Math.abs(wrapAngle(course - tel.yaw));
+    const sideslip = Math.abs(beta);
     const slide = sideslip - g.sideslipLimit;
     if (spin > 0 || slide > 0) {
       this.throttleCap -= (g.spinGain * Math.max(spin, 0) + g.slideGain * Math.max(slide, 0)) * dt;

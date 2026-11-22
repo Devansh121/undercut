@@ -273,6 +273,12 @@ describe('race driver: recovery', () => {
     dr.drive(at(s, 0, 0, Math.PI - 0.2, 1), DT, out);
     expect(out.brake).toBe(1);
     expect(out.throttle).toBe(0);
+    // Still waits when a car is passing closely in another lane across the track.
+    const passing = { id: 1, s: s - 6, d: 4, speed: 4 };
+    dr.sense(view({ id: 0, s, d: 0, speed: 0 }, [passing]));
+    dr.drive(at(s, 0, 0, Math.PI - 0.2, 1), DT, out);
+    expect(out.brake).toBe(1);
+    expect(out.throttle).toBe(0);
     coming.s = s + 50;
     dr.sense(view({ id: 0, s, d: 0, speed: 0 }, [coming]));
     dr.drive(at(s, 0, 0, Math.PI - 0.2, 1), DT, out);
