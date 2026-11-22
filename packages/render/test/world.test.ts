@@ -13,6 +13,7 @@ import {
 } from '../src/world/furniture';
 import { buildStands, crowdSeats, fitStand, type StandFrame } from '../src/world/grandstands';
 import { LapIndex } from '../src/world/lap-index';
+import { BROADLEAF_CLOUD, COLUMNAR_CLOUD, treeCloudGeometry } from '../src/world/trees';
 import {
   buildPitBuilding,
   pitCrewGeometry,
@@ -255,5 +256,28 @@ describe('start light mask', () => {
     expect(startLightMask(3)).toBe(0b00111);
     expect(startLightMask(5)).toBe(0b11111);
     expect(startLightMask(7)).toBe(0b11111);
+  });
+});
+
+describe('near trees', () => {
+  it('builds a trunk, limbs and leaf cards with uv inside the cluster and bark tiles', () => {
+    for (const shape of [BROADLEAF_CLOUD, COLUMNAR_CLOUD]) {
+      const g = treeCloudGeometry(shape, 7);
+      const pos = g.getAttribute('position');
+      const uv = g.getAttribute('uv');
+      // Six-sided trunk and four limbs (12 triangles each) plus two triangles per leaf card.
+      expect((g.index?.count ?? 0) / 3).toBe(5 * 12 + shape.cards * 2);
+      let top = 0;
+      for (let i = 0; i < pos.count; i++) {
+        top = Math.max(top, pos.getY(i));
+        // Row 2 of the atlas (clusters and bark): v between 2/3 and 1.
+        expect(uv.getY(i)).toBeGreaterThanOrEqual(2 / 3 - 1e-6);
+        expect(uv.getY(i)).toBeLessThanOrEqual(1 + 1e-6);
+      }
+      // Unit height, as the cards it replaces near the eye.
+      expect(top).toBeGreaterThan(0.85);
+      expect(top).toBeLessThan(1.1);
+      g.dispose();
+    }
   });
 });
