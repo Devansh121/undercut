@@ -5,7 +5,7 @@ const catalog = JSON.parse(fs.readFileSync('packages/render/data/props.catalog.j
 const first = JSON.parse(fs.readFileSync('apps/web/dist/first-race.json'));
 const index = JSON.parse(fs.readFileSync('apps/web/public/assets/index.json'));
 const kit = catalog.props.filter((p) =>
-  /^(street-|floodlight-|lighting-|temporary-|marina-|hill-|forest-)/.test(p.id),
+  /^(street-|floodlight-|lighting-|temporary-|marina-|hill-)/.test(p.id),
 );
 const bytes = kit.flatMap((p) => p.lods).reduce((n, l) => n + l.bytes, 0);
 const skies = ['overcast', 'night'].flatMap((id) =>

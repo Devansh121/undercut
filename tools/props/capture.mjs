@@ -38,58 +38,10 @@ try {
       });
       console.log(`${id} ${mode}`);
     }
-  if (ids.some((id) => id.startsWith('forest-'))) {
-    const luma = {};
-    for (const id of ids.filter((id) => id.startsWith('forest-'))) {
-      luma[id] = await page.evaluate((id) => window.treeLuma(id), id);
-    }
-    const transition = {};
-    for (const id of ids.filter((id) => id.startsWith('forest-'))) {
-      transition[id] = await page.evaluate((id) => window.treeTransition(id), id);
-      await page.screenshot({
-        path: `docs/evidence/m2-models/${id}-transition.jpg`,
-        type: 'jpeg',
-        quality: 88,
-        clip: { x: 0, y: 360, width: 1600, height: 640 },
-      });
-      await page.evaluate(() => document.getElementById('tree-diff')?.remove());
-    }
-    const transitionFile = 'docs/evidence/m2-models/forest-transition.json';
-    fs.writeFileSync(
-      transitionFile,
-      await format(JSON.stringify(transition), {
-        ...(await resolveConfig(transitionFile)),
-        parser: 'json',
-      }),
-    );
-    fs.writeFileSync(
-      'docs/evidence/m2-models/forest-luma.json',
-      JSON.stringify(luma, null, 2) + '\n',
-    );
-    if (
-      Object.values(luma)
-        .flat()
-        .some((r) => !Number.isFinite(r.relativeDelta) || r.relativeDelta > 0.15)
-    )
-      throw new Error('Tree LOD luminance changes by more than 15%');
-    // The Far cards come from the authored triangles: their silhouette must cover about what
-    // the Mobile tree covers and overlap it, from every view between the card planes.
-    for (const [id, views] of Object.entries(transition))
-      for (const v of views)
-        if (
-          v.coverageMobileOverFar < 0.85 ||
-          v.coverageMobileOverFar > 1.2 ||
-          v.iouMobileFar < 0.6 ||
-          v.iouHighFar < 0.6
-        )
-          throw new Error(
-            `${id}: Far silhouette departs from the authored tree (${JSON.stringify(v)})`,
-          );
-  }
   if (process.env.PROP_ASSEMBLY) {
     await page.evaluate(
-      (forest) => window.kitScene(forest),
-      process.env.PROP_ASSEMBLY === 'forest',
+      (overcast) => window.kitScene(overcast),
+      process.env.PROP_ASSEMBLY === 'overcast',
     );
     await page.screenshot({
       path: `docs/evidence/m2-models/kit-${process.env.PROP_ASSEMBLY}.jpg`,
