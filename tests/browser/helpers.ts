@@ -24,11 +24,24 @@ export async function viewPixels(
   page: Page,
   rows: { from: number; to: number } = { from: 0, to: 1 },
 ): Promise<{ colours: number; lumaStdDev: number; meanLuma: number }> {
-  const png = await page
-    .locator('#view')
-    .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+  const style = '#app, .ut-touch { visibility: hidden; }';
+  let png: Buffer;
+  let clipped = false;
+  if (rows.from > 0 || rows.to < 1) {
+    const box = await page.locator('#view').boundingBox();
+    if (!box) throw new Error('no #view bounding box');
+    const y0 = Math.floor(box.height * rows.from);
+    const y1 = Math.max(y0 + 1, Math.floor(box.height * rows.to));
+    png = await page.screenshot({
+      clip: { x: box.x, y: box.y + y0, width: box.width, height: y1 - y0 },
+      style,
+    });
+    clipped = true;
+  } else {
+    png = await page.locator('#view').screenshot({ style });
+  }
   return page.evaluate(
-    async ({ b64, from, to }) => {
+    async ({ b64, from, to, clipped }) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
       await img.decode();
@@ -36,8 +49,8 @@ export async function viewPixels(
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('no 2d context');
       ctx.drawImage(img, 0, 0);
-      const y0 = Math.floor(img.height * from);
-      const y1 = Math.max(y0 + 1, Math.floor(img.height * to));
+      const y0 = clipped ? 0 : Math.floor(img.height * from);
+      const y1 = clipped ? img.height : Math.max(y0 + 1, Math.floor(img.height * to));
       const { data } = ctx.getImageData(0, y0, img.width, y1 - y0);
       const colours = new Set<number>();
       let sum = 0;
@@ -59,6 +72,6 @@ export async function viewPixels(
         meanLuma: mean,
       };
     },
-    { b64: png.toString('base64'), from: rows.from, to: rows.to },
+    { b64: png.toString('base64'), from: rows.from, to: rows.to, clipped },
   );
 }

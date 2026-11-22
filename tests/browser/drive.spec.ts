@@ -110,7 +110,7 @@ test.describe('drive', () => {
       // 72 m before Monza's timing line (the control line, s = 5472.5).
       u?.teleport(5400, 0, 250);
       u?.autopilot(true);
-      u?.setTimeScale(4);
+      u?.setTimeScale(8);
     });
     await page.waitForFunction(() => window.__undercut?.state().running === true, null, {
       timeout: 30_000,
@@ -495,7 +495,7 @@ test.describe('drive', () => {
   test('draws the driving line, toggles from pause and shifts braking with speed', async ({
     drive: { page, problems },
   }, info) => {
-    const waitFrames = async (n = 4): Promise<void> => {
+    const waitFrames = async (n = 2): Promise<void> => {
       await page.evaluate(
         (count) =>
           new Promise<void>((resolve) => {
@@ -510,9 +510,18 @@ test.describe('drive', () => {
       );
     };
     const countWarmPixels = async (): Promise<number> => {
-      const png = await page
-        .locator('#view')
-        .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+      const box = await page.locator('#view').boundingBox();
+      if (!box) throw new Error('no #view bounding box');
+      const clip = {
+        x: box.x + Math.floor(box.width * 0.25),
+        y: box.y + Math.floor(box.height * 0.42),
+        width: Math.max(1, Math.ceil(box.width * 0.5)),
+        height: Math.max(1, Math.ceil(box.height * 0.43)),
+      };
+      const png = await page.screenshot({
+        clip,
+        style: '#app, .ut-touch { visibility: hidden; }',
+      });
       return page.evaluate(async (b64) => {
         const img = new Image();
         img.src = `data:image/png;base64,${b64}`;
@@ -523,18 +532,11 @@ test.describe('drive', () => {
         ctx.drawImage(img, 0, 0);
         const { data } = ctx.getImageData(0, 0, img.width, img.height);
         let warm = 0;
-        const yMin = Math.floor(img.height * 0.42);
-        const yMax = Math.floor(img.height * 0.85);
-        const xMin = Math.floor(img.width * 0.25);
-        const xMax = Math.floor(img.width * 0.75);
-        for (let y = yMin; y < yMax; y++) {
-          for (let x = xMin; x < xMax; x++) {
-            const i = (y * img.width + x) * 4;
-            const r = data[i] ?? 0;
-            const g = data[i + 1] ?? 0;
-            const b = data[i + 2] ?? 0;
-            if (r > 135 && r > g + 45 && r > b + 45) warm++;
-          }
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i] ?? 0;
+          const g = data[i + 1] ?? 0;
+          const b = data[i + 2] ?? 0;
+          if (r > 135 && r > g + 45 && r > b + 45) warm++;
         }
         return warm;
       }, png.toString('base64'));
@@ -548,7 +550,7 @@ test.describe('drive', () => {
       const cdp = await page.context().newCDPSession(page);
       const pt = { x: pedal.x + pedal.width / 2, y: pedal.y + pedal.height * 0.5, id: 1 };
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
-      await waitFrames(3);
+      await waitFrames(2);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt] });
     }
     await waitFrames();
@@ -562,11 +564,11 @@ test.describe('drive', () => {
     await expect(menu).toBeVisible();
     const lineRow = menu.locator('[data-setting=line]');
     await lineRow.getByRole('radio', { name: 'Off' }).click();
-    await waitFrames();
+    await waitFrames(1);
     expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.mode).toBe('off');
     expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.visible).toBe(false);
     await lineRow.getByRole('radio', { name: 'Full' }).click();
-    await waitFrames();
+    await waitFrames(1);
     expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.mode).toBe('full');
     await lineRow.getByRole('radio', { name: 'Braking' }).click();
     await page.getByRole('button', { name: 'Resume' }).click();
@@ -600,13 +602,13 @@ test.describe('drive', () => {
       window.__undercut?.teleport(460, 0, 300);
       window.__undercut?.drivingLine('braking');
     });
-    await waitFrames(5);
+    await waitFrames(2);
     const warmOn = await countWarmPixels();
 
     await page.evaluate(() => {
       window.__undercut?.drivingLine('off');
     });
-    await waitFrames(5);
+    await waitFrames(2);
     const warmOff = await countWarmPixels();
 
     expect(warmOn).toBeGreaterThan(warmOff + 80);
@@ -615,7 +617,8 @@ test.describe('drive', () => {
 
   test('a clumsy keyboard lap on the default assists completes without a spin', async ({
     drive: { page, problems },
-  }) => {
+  }, info) => {
+    test.skip(info.project.name !== 'desktop', 'keyboard autopilot runs on the desktop project');
     // The keyboard autopilot as a clumsy player (late and early braking, flooring the throttle
     // before the exits, slow feet), through the real key events, shaping and assists. The same
     // seed spins with the stability assist off (apps/web/test/clumsy-lap.test.ts).
