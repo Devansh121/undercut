@@ -860,38 +860,18 @@ for ident, module in specs:
             # Lateral reflection reverses winding; recalculate normals preserving per-face smoothness.
             bm = bmesh.new()
             bm.from_mesh(ob.data)
-            if ident.startswith('forest-') and lod == 2 and 'needles' in key:
-                # Opposing coplanar card faces have intentional winding. Volume-based
-                # normal recalculation can turn one inward and erase half the crown.
-                # Applying the reflected object transform has already reversed these faces.
-                # A second reversal swaps front/back atlas hemispheres. Keep their winding.
-                pass
-            else:
-                bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
             bm.to_mesh(ob.data)
             bm.free()
             merged.append(ob)
         bake(merged, rays=8 if lod == 0 else 4, max_dist=.3, floor=.65)
-        if ident.startswith('forest-') and lod < 2:
+        if ident.startswith('forest-'):
             for ob in merged:
                 tint = ob.data.color_attributes.get('foliageTint')
                 if tint:
                     ao = ob.data.color_attributes['AO']
                     for base, colour in zip(ao.data, tint.data):
                         base.color = tuple(base.color[i] * colour.color[i] for i in range(3)) + (1.0,)
-        if ident.startswith('forest-') and lod == 0:
-            import forest
-            # The Far atlas is projected from the exported High tree: needles, trunk and limbs.
-            forest.record_source(ident, merged)
-        if ident.startswith('forest-') and lod == 2:
-            # Atlas albedo already contains the source tree's per-vertex AO. Intersecting
-            # card planes are a representation, not extra branch occlusion to bake twice.
-            for ob in merged:
-                if ob.data.materials[0].name.endswith('-needles'):
-                    for c in ob.data.color_attributes['AO'].data:
-                        c.color = (1, 1, 1, 1)
-        # Far cards keep their geometric normals; their normal atlas (forest.py) carries the
-        # near foliage's own normals, so no upward tilt is faked here.
         if ident.startswith('crew-engineer'):
             skin_tone(merged, head_pos, SKIN_TONE[ident])
         points = [v.co for ob in merged for v in ob.data.vertices]
@@ -922,14 +902,10 @@ for ident, module in specs:
             use_selection=True,
             export_yup=True,
             export_extras=True,
-            export_tangents=ident.startswith('forest-') and lod == 2,
             export_vertex_color='ACTIVE',
             export_draco_mesh_compression_enable=True,
             export_draco_mesh_compression_level=7,
             export_image_format='WEBP',
-            # Lossy WebP's 4:2:0 chroma blurs the red/blue (lateral) channels of the far cards'
-            # normal atlas and flattens their lighting response; quality 100 is lossless.
-            export_image_quality=100 if ident.startswith('forest-') and lod == 2 else 75,
             export_animations=False,
             export_cameras=False,
             export_lights=False,
@@ -937,7 +913,7 @@ for ident, module in specs:
         entry['lods'].append({
             'file': f'assets/props/{filename}',
             'maxDistance': (80, 250, 1200)[lod],
-            'triangleBudget': ((8000, 4000, 100) if ident.startswith('forest-') else (4000, 2200, 1800) if ident == 'temporary-grandstand' else (30000, 12000, 2500))[lod],
+            'triangleBudget': ((8000, 4000, 4000) if ident.startswith('forest-') else (4000, 2200, 1800) if ident == 'temporary-grandstand' else (30000, 12000, 2500))[lod],
         })
     catalog['props'].append(entry)
 

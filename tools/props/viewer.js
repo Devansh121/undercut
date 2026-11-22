@@ -317,14 +317,16 @@ window.artwork = async (id) => {
   renderer.render(scene, camera);
 };
 
-// High | Mobile | Far in the full scene (sky, fog, shadows) from a 1.5 m eye at 50 m (top) and
-// 260 m (bottom), all aimed at mid-crown: how the LOD swap reads from trackside.
-window.treeDistances = async (id, angle) => {
+// The swap as it happens in the game: Mobile against Far in the full scene (sky, fog, ground,
+// shadows) from a 1.5 m eye at `distance`, aimed at mid-crown, with the chase camera's 60 degree
+// field of view. Tree pixels differ from a tree-less frame; solid pixels are those the sky does
+// not show through (by day under 40% of the sky behind them, at night 6 levels above it).
+window.treeSwap = async (id, angle, distance, fov = 60) => {
   for (const o of active) scene.remove(o);
   active = [];
   scene.remove(car);
   const prop = catalog.props.find((p) => p.id === id);
-  for (const lod of prop.lods) {
+  for (const lod of prop.lods.slice(1)) {
     const o = (await loader.loadAsync(`/${lod.file}`)).scene;
     o.traverse((n) => {
       if (n.isMesh) n.castShadow = n.receiveShadow = true;
@@ -333,26 +335,91 @@ window.treeDistances = async (id, angle) => {
     env.register(o);
     active.push(o);
   }
-  const aim = new T.Vector3(0, prop.bounds.max[1] / 2, 0);
-  camera.aspect = 533 / 500;
+  const W = 1600;
+  const H = 1000;
+  camera.fov = fov;
+  camera.aspect = W / H;
   camera.updateProjectionMatrix();
-  renderer.setScissorTest(true);
-  for (const [row, distance] of [50, 260].entries())
-    for (let col = 0; col < 3; col++) {
-      camera.position.set(Math.cos(angle) * distance, 1.5, Math.sin(angle) * distance);
-      camera.lookAt(aim);
-      env.update(camera, aim, true);
-      active.forEach((o, i) => (o.visible = i === col));
-      renderer.setViewport(col * 533, (1 - row) * 500, 533, 500);
-      renderer.setScissor(col * 533, (1 - row) * 500, 533, 500);
-      renderer.render(scene, camera);
-    }
+  const aim = new T.Vector3(0, prop.bounds.max[1] / 2, 0);
+  camera.position.set(Math.cos(angle) * distance, 1.5, Math.sin(angle) * distance);
+  camera.lookAt(aim);
+  env.update(camera, aim, true);
   renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
+  const gl = renderer.getContext();
+  const grab = (level) => {
+    active.forEach((o, i) => (o.visible = i === level));
+    renderer.render(scene, camera);
+    const p = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, p);
+    return p;
+  };
+  const sky = grab(-1);
+  const frames = [grab(0), grab(1)];
+  const luma = (p, i) => 0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2];
+  const tree = frames.map((p) => {
+    const m = new Uint8Array(W * H);
+    for (let i = 0, k = 0; i < W * H; i++, k += 4)
+      m[i] =
+        Math.abs(p[k] - sky[k]) +
+          Math.abs(p[k + 1] - sky[k + 1]) +
+          Math.abs(p[k + 2] - sky[k + 2]) >
+        6
+          ? 1
+          : 0;
+    return m;
+  });
+  const night = lightMode === 'night';
+  const solid = frames.map((p, l) => {
+    const m = new Uint8Array(W * H);
+    for (let i = 0, k = 0; i < W * H; i++, k += 4) {
+      const y = luma(p, k);
+      const b = luma(sky, k);
+      m[i] = tree[l][i] && (night ? y > b + 6 : y < 0.4 * b) ? 1 : 0;
+    }
+    return m;
+  });
+  const count = (m) => m.reduce((n, v) => n + v, 0);
+  const mean = (l, keep) => {
+    let s = 0;
+    let n = 0;
+    for (let i = 0; i < W * H; i++)
+      if (keep(i)) {
+        s += luma(frames[l], i * 4);
+        n++;
+      }
+    return { mean: s / Math.max(n, 1), n };
+  };
+  const both = (i) => solid[0][i] && solid[1][i];
+  const union = (i) => tree[0][i] || tree[1][i];
+  const interior = [mean(0, both), mean(1, both)];
+  const region = [mean(0, union), mean(1, union)];
+  active.forEach((o) => (o.visible = true));
+  camera.fov = 35;
+  camera.updateProjectionMatrix();
+  return {
+    angle,
+    distance,
+    coverage: tree.map(count),
+    solid: solid.map(count),
+    interior: { mobile: interior[0].mean, far: interior[1].mean, pixels: interior[0].n },
+    region: { mobile: region[0].mean, far: region[1].mean, pixels: region[0].n },
+  };
+};
+
+// Redraw the last `treeSwap` view with one level (0 Mobile, 1 Far) for a capture.
+window.treeSwapShow = (level, fov = 35) => {
+  active.forEach((o, i) => (o.visible = i === level));
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  camera.fov = 35;
+  camera.updateProjectionMatrix();
 };
 
 // Isolate the crown against black and compare the same view with the LOD swap disabled/enabled.
-// Twelve azimuths, 30 degrees apart; with `snapshotAngle`, also draws High and Far side by side.
-window.treeLuma = async (id, snapshotAngle = null) => {
+// Twelve azimuths, 30 degrees apart.
+window.treeLuma = async (id) => {
   await window.inspect(id, 'sheet');
   ground.visible = false;
   const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
@@ -397,23 +464,6 @@ window.treeLuma = async (id, snapshotAngle = null) => {
       card: values[1],
       relativeDelta: Math.abs(values[0] - values[1]) / values[0],
     });
-  }
-  if (snapshotAngle !== null) {
-    for (let level = 0; level < 2; level++) {
-      active[0].visible = level === 0;
-      active[1].visible = level === 1;
-      renderer.setViewport(level * 800, 0, 800, 1000);
-      renderer.setScissor(level * 800, 0, 800, 1000);
-      renderer.setScissorTest(true);
-      frame(
-        catalog.props.find((p) => p.id === id),
-        snapshotAngle,
-        0.8,
-        0.05,
-      );
-      renderer.render(scene, camera);
-    }
-    renderer.setScissorTest(false);
   }
   renderer.shadowMap.enabled = shadows;
   for (const o of hidden) o.visible = true;
