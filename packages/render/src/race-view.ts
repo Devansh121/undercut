@@ -217,7 +217,7 @@ export class RaceView {
   private readonly canvas: HTMLCanvasElement;
   private readonly trackView: TrackView;
   /** The place around the circuit, when the session has a dressing file. */
-  readonly world: CircuitWorld | null;
+  world: CircuitWorld | null = null;
   private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
@@ -257,12 +257,19 @@ export class RaceView {
   /** Milliseconds spent building each part of the view (start-up budget checks). */
   readonly loadTimes: Record<string, number>;
 
-  /** Fetch what the session needs (progress by bytes), then build the view. */
+  /** Fetch what the session needs (progress by bytes), then build the view cooperatively. */
   static async load(canvas: HTMLCanvasElement, options: RaceViewOptions): Promise<RaceView> {
     const t0 = performance.now();
     const assets = await RaceView.fetchAssets(options);
     const t1 = performance.now();
-    const view = new RaceView(canvas, options, assets);
+    const view = new RaceView(canvas, options, assets, true);
+    try {
+      await view.finishWorldAsync(options, assets);
+    } catch (error) {
+      // A failed world build must not leave the half-built view's GPU objects behind.
+      view.dispose();
+      throw error;
+    }
     view.loadTimes.fetch = t1 - t0;
     return view;
   }
@@ -339,7 +346,12 @@ export class RaceView {
     return { index, sky: { meta: skyMeta, image: skyImage }, sets, car, dressing, propKit };
   }
 
-  constructor(canvas: HTMLCanvasElement, options: RaceViewOptions, assets: SessionAssets) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    options: RaceViewOptions,
+    assets: SessionAssets,
+    deferWorld = false,
+  ) {
     this.canvas = canvas;
     // The preset as this GPU can run it (no renderable half float: the direct path).
     const preset = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
@@ -376,21 +388,21 @@ export class RaceView {
       this.environment.register(root),
     );
     const tw = performance.now();
-    this.world = assets.dressing
-      ? new CircuitWorld({
-          track: options.track,
-          dressing: assets.dressing,
-          quality: q,
-          drivable: this.trackView.drivable,
-          grass: assets.sets.grass,
-          grassColour: GRASS_COLOUR,
-          props: this.props,
-          garageTeams: options.garageTeams,
-          brands: options.brands,
-          propKit: assets.propKit,
-        })
-      : null;
-    if (this.world) this.scene.add(this.world.group);
+    if (!deferWorld && assets.dressing) {
+      this.world = new CircuitWorld({
+        track: options.track,
+        dressing: assets.dressing,
+        quality: q,
+        drivable: this.trackView.drivable,
+        grass: assets.sets.grass,
+        grassColour: GRASS_COLOUR,
+        props: this.props,
+        garageTeams: options.garageTeams,
+        brands: options.brands,
+        propKit: assets.propKit,
+      });
+      this.scene.add(this.world.group);
+    }
     const lineOffsets =
       options.racingLine && options.racingLine.length === options.track.lap.count
         ? options.racingLine
@@ -427,10 +439,7 @@ export class RaceView {
     const contactOpacity = contactShadowOpacity(q, this.environment.csm !== null);
     this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity) : null;
     if (this.contact) this.scene.add(this.contact.mesh);
-    this.props.build();
     this.checkRegistration = options.checkRegistration ?? false;
-    this.scene.add(this.props.group);
-    this.environment.register(this.scene);
     this.pipeline = new RenderPipeline(
       this.renderer,
       q,
@@ -444,11 +453,55 @@ export class RaceView {
       world: t2 - tw,
       cars: performance.now() - t2,
     };
+    if (!deferWorld) {
+      this.finalizeWorldScene();
+    }
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.resize();
     canvas.addEventListener('webglcontextlost', this.onContextLost);
+  }
+
+  private finalizeWorldScene(): void {
+    this.props.build();
+    this.scene.add(this.props.group);
+    this.environment.register(this.scene);
+    // No upfront renderer.compile: three.js deletes a program's shaders on its first use, so
+    // programs compiled for objects that are never drawn (levels of detail not reached, a
+    // session quit early) would leave their shaders behind (lifecycle test).
+  }
+
+  private async finishWorldAsync(options: RaceViewOptions, assets: SessionAssets): Promise<void> {
+    if (assets.dressing) {
+      const tw = performance.now();
+      const world = await CircuitWorld.buildAsync({
+        track: options.track,
+        dressing: assets.dressing,
+        quality: this.quality,
+        drivable: this.trackView.drivable,
+        grass: assets.sets.grass,
+        grassColour: GRASS_COLOUR,
+        props: this.props,
+        garageTeams: options.garageTeams,
+        brands: options.brands,
+        propKit: assets.propKit,
+      });
+      // The view may have been released while the world was building (a lost context).
+      if (this.disposed) {
+        world.dispose();
+        // The caller listens for context loss only after load resolves: fail the load so its
+        // retry path builds a fresh view instead of keeping a released one.
+        throw new Error('The view was released while its world was building (lost context)');
+      }
+      this.world = world;
+      this.scene.add(world.group);
+      this.loadTimes.world = performance.now() - tw;
+      if (this.world.buildTimes.maxSlice !== undefined) {
+        this.loadTimes.worldMaxSlice = this.world.buildTimes.maxSlice;
+      }
+    }
+    this.finalizeWorldScene();
   }
 
   /**
@@ -740,7 +793,7 @@ export class RaceView {
     this.environment.update(this.camera, this.focus, true);
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
-    this.world?.update(frame.time);
+    this.world?.update(frame.time, this.camera.position);
     if (this.contact) {
       const c = this.contact;
       c.begin();
