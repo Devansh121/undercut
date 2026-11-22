@@ -1,5 +1,5 @@
 {
-  "$comment": "Invented trackside brands. Every name, wordmark style and colour pairing is original and audited against real motorsport sponsors, tyre makers, watchmakers, airlines, oil companies, banks, beverage brands and tech companies. Renamed after review for being too close to real companies or sponsors: SOLVANT, TELMARK, FINVEX, ALPENGRID and MARETTI; teal-on-dark schemes removed (close to a real title sponsor).",
+  "$comment": "Invented trackside brands. Every name, wordmark style and colour pairing is original and audited against real motorsport sponsors, tyre makers, watchmakers, airlines, oil companies, banks, beverage brands and tech companies. Renamed after review for being too close to real companies or sponsors: SOLVANT, TELMARK, FINVEX, ALPENGRID and MARETTI; teal-on-dark schemes removed (close to a real title sponsor); SOVERA moved off black and gold (a well-known cigarette-era livery).",
   "version": 1,
   "brands": [
     {
@@ -114,9 +114,9 @@
       "id": "sovera",
       "name": "SOVERA",
       "sub": "GENEVE",
-      "bg": "#111316",
-      "fg": "#EFECE4",
-      "accent": "#C6A45B",
+      "bg": "#E9E5DC",
+      "fg": "#1B2533",
+      "accent": "#4E6E95",
       "style": "horology"
     },
     {

@@ -42,7 +42,8 @@ export const MONZA_AFTERNOON: TimeOfDay = Object.freeze({
   shadowSoftness: 1,
   exposure: 0.78,
   fogDensity: 0.00028,
-  fogColour: '#ddd6c8',
+  // Warm afternoon haze over the Lombardy plain (was a near-neutral grey).
+  fogColour: '#dad0bd',
   localLightSlots: 0,
 });
 

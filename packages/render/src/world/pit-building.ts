@@ -65,8 +65,15 @@ export interface PitWallSpot {
   teamIndex: number;
 }
 
+export interface PitBuildingChunk {
+  geometry: BufferGeometry;
+  centre: [number, number, number];
+  radius: number;
+}
+
 export interface PitComplexData {
   geometry: BufferGeometry;
+  chunks: PitBuildingChunk[];
   bays: PitBayPlacement[];
   pitWallSpots: PitWallSpot[];
   /** Track-side pit wall segment points for catch fencing and sponsor boards. */
@@ -130,10 +137,20 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     front.push({ x: p.x, y: track.groundHeightAt(p.x, p.z), z: p.z, ox, oz, tx, tz, u, sPit: sc });
   }
 
-  const pos: number[] = [];
-  const nor: number[] = [];
-  const fac: number[] = [];
-  const idx: number[] = [];
+  const CHUNK_COUNT = 5;
+  interface ChunkBuf {
+    pos: number[];
+    nor: number[];
+    fac: number[];
+    idx: number[];
+  }
+  const chunkBufs: ChunkBuf[] = Array.from({ length: CHUNK_COUNT }, () => ({
+    pos: [],
+    nor: [],
+    fac: [],
+    idx: [],
+  }));
+  let activeChunk = 0;
   const quad = (
     a: readonly number[],
     b: readonly number[],
@@ -142,16 +159,17 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     n: readonly number[],
     fa: readonly (readonly number[])[],
   ): void => {
-    const base = pos.length / 3;
+    const cb = chunkBufs[activeChunk] as ChunkBuf;
+    const base = cb.pos.length / 3;
     for (const [i, v] of [a, b, c, d].entries()) {
-      pos.push(v[0] as number, v[1] as number, v[2] as number);
-      nor.push(n[0] as number, n[1] as number, n[2] as number);
-      fac.push(
+      cb.pos.push(v[0] as number, v[1] as number, v[2] as number);
+      cb.nor.push(n[0] as number, n[1] as number, n[2] as number);
+      cb.fac.push(
         (fa[i] as readonly number[])[0] as number,
         (fa[i] as readonly number[])[1] as number,
       );
     }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    cb.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   };
 
   const B = PIT_BUILDING;
@@ -185,6 +203,10 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
   // (B - A) x (0, 1, 0) = (-tz, 0, tx), which equals -ox when gs > 0 (left) and +ox when gs < 0 (right).
   const flip = gs > 0;
   for (let i = 0; i + 1 < front.length; i++) {
+    activeChunk = Math.min(
+      CHUNK_COUNT - 1,
+      Math.floor((i * CHUNK_COUNT) / Math.max(1, front.length - 1)),
+    );
     const a = front[i] as (typeof front)[number];
     const b = front[i + 1] as (typeof front)[number];
     const y0 = floor;
@@ -274,6 +296,7 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     [1, front[front.length - 1]],
   ] as const) {
     if (!f) continue;
+    activeChunk = k === 0 ? 0 : CHUNK_COUNT - 1;
     const D = B.depth;
     const a0 = [f.x, floor, f.z];
     const a1 = [f.x, floor + top, f.z];
@@ -297,6 +320,10 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     const y0 = floor + top;
     const y1 = y0 + rcH;
     for (let i = rc0; i < rc1; i++) {
+      activeChunk = Math.min(
+        CHUNK_COUNT - 1,
+        Math.floor((i * CHUNK_COUNT) / Math.max(1, front.length - 1)),
+      );
       const a = front[i] as (typeof front)[number];
       const b = front[i + 1] as (typeof front)[number];
       const fn = [-(a.ox + b.ox) / 2, 0, -(a.oz + b.oz) / 2];
@@ -333,6 +360,10 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
       [1, front[rc1]],
     ] as const) {
       if (!f) continue;
+      activeChunk = Math.min(
+        CHUNK_COUNT - 1,
+        Math.floor(((k === 0 ? rc0 : rc1) * CHUNK_COUNT) / Math.max(1, front.length - 1)),
+      );
       const a0 = [f.x + f.ox * 1.5, y0, f.z + f.oz * 1.5];
       const a1 = [f.x + f.ox * 1.5, y1, f.z + f.oz * 1.5];
       const b0 = [f.x + f.ox * (1.5 + rcD), y0, f.z + f.oz * (1.5 + rcD)];
@@ -450,13 +481,24 @@ export function buildPitBuilding(track: Track, lap: LapIndex, teamCount = 10): P
     });
   });
 
-  const g = new BufferGeometry();
-  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
-  g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
-  g.setAttribute('facade', new BufferAttribute(new Float32Array(fac), 2));
-  g.setIndex(idx.length > 65535 ? new BufferAttribute(new Uint32Array(idx), 1) : idx);
-  g.computeBoundingSphere();
-  return { geometry: g, bays, pitWallSpots, pitWallLine, footprint };
+  const chunks: PitBuildingChunk[] = [];
+  for (const cb of chunkBufs) {
+    if (cb.pos.length === 0) continue;
+    const cg = new BufferGeometry();
+    cg.setAttribute('position', new BufferAttribute(new Float32Array(cb.pos), 3));
+    cg.setAttribute('normal', new BufferAttribute(new Float32Array(cb.nor), 3));
+    cg.setAttribute('facade', new BufferAttribute(new Float32Array(cb.fac), 2));
+    cg.setIndex(cb.idx.length > 65535 ? new BufferAttribute(new Uint32Array(cb.idx), 1) : cb.idx);
+    cg.computeBoundingSphere();
+    const bs = cg.boundingSphere;
+    chunks.push({
+      geometry: cg,
+      centre: bs ? [bs.center.x, bs.center.y, bs.center.z] : [0, 0, 0],
+      radius: bs ? bs.radius : 1,
+    });
+  }
+  const g = chunks[0]?.geometry ?? new BufferGeometry();
+  return { geometry: g, chunks, bays, pitWallSpots, pitWallLine, footprint };
 }
 
 /**
@@ -869,4 +911,102 @@ export function teamTintedMaterial(
   };
   m.customProgramCacheKey = () => `team-tinted-${name}`;
   return m;
+}
+
+/**
+ * Consolidated atlas containing every team's garage fascia board in one texture (2 columns ×
+ * ceil(N/2) rows), replacing N separate textures and draw calls with a single draw call.
+ */
+export function garageBoardAtlas(teams: readonly GarageTeam[], anisotropy = 8): CanvasTexture {
+  const cols = 2;
+  const rows = Math.max(1, Math.ceil(teams.length / cols));
+  const tileW = 512;
+  const tileH = 96;
+  const c = document.createElement('canvas');
+  c.width = cols * tileW;
+  c.height = rows * tileH;
+  const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+  ctx.fillStyle = '#0d0f13';
+  ctx.fillRect(0, 0, c.width, c.height);
+  teams.forEach((team, ti) => {
+    const col = ti % cols;
+    const row = Math.floor(ti / cols);
+    const ox = col * tileW;
+    const oy = row * tileH;
+    ctx.fillStyle = '#0d0f13';
+    ctx.fillRect(ox, oy, tileW, tileH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(ox + 1, oy + 1, tileW - 2, tileH - 2);
+    ctx.fillStyle = team.primary;
+    ctx.fillRect(ox, oy + tileH - 16, tileW, 16);
+    ctx.fillStyle = team.secondary;
+    ctx.fillRect(ox, oy + tileH - 20, tileW, 4);
+    ctx.fillStyle = '#f0efe9';
+    ctx.font = '600 42px "Barlow Semi Condensed", Archivo, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(team.name.toUpperCase(), ox + 22, oy + (tileH - 20) / 2 + 2, tileW - 140);
+    ctx.font = '700 38px "Barlow Semi Condensed", Archivo, sans-serif';
+    ctx.fillStyle = team.primary;
+    const code = team.code;
+    ctx.fillText(code, ox + tileW - 22 - ctx.measureText(code).width, oy + (tileH - 20) / 2 + 2);
+  });
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = anisotropy;
+  return t;
+}
+
+/**
+ * Single merged BufferGeometry for all garage fascia boards mapped into `garageBoardAtlas`.
+ */
+export function buildGarageBoardsGeometry(
+  bays: readonly PitBayPlacement[],
+  teamCount: number,
+): BufferGeometry {
+  const cols = 2;
+  const rows = Math.max(1, Math.ceil(Math.max(1, teamCount) / cols));
+  const hw = (PIT_BUILDING.bay - 0.6) * 0.5;
+  const hh = (PIT_BUILDING.fascia - 0.25) * 0.5;
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+
+  for (const bay of bays) {
+    const ti = bay.teamIndex % Math.max(1, teamCount);
+    const col = ti % cols;
+    const row = Math.floor(ti / cols);
+    const u0 = col / cols;
+    const u1 = (col + 1) / cols;
+    const v1 = 1 - row / rows;
+    const v0 = 1 - (row + 1) / rows;
+    const tx = bay.nz;
+    const tz = -bay.nx;
+    const b = pos.length / 3;
+    pos.push(
+      bay.x - tx * hw,
+      bay.y - hh,
+      bay.z - tz * hw,
+      bay.x + tx * hw,
+      bay.y - hh,
+      bay.z + tz * hw,
+      bay.x + tx * hw,
+      bay.y + hh,
+      bay.z + tz * hw,
+      bay.x - tx * hw,
+      bay.y + hh,
+      bay.z - tz * hw,
+    );
+    for (let k = 0; k < 4; k++) nor.push(bay.nx, 0, bay.nz);
+    uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
+  g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  return g;
 }
