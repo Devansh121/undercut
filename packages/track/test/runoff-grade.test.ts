@@ -1,3 +1,4 @@
+import { SurfaceKind } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
 import monza from '../data/monza.json';
 import singapore from '../data/singapore.json';
@@ -29,8 +30,6 @@ const PROBE = 0.35;
 const NEAR = 50;
 /** Allowance on top of grade, bank and drainage fall (fixed before measuring): 5 %. */
 const ALLOWANCE = 0.05;
-const KERB = 2;
-const OUT_OF_BOUNDS = 7;
 
 describe.each(CIRCUITS)('run-off ground at $name', ({ data, open }) => {
   const track = Track.fromJSON(data);
@@ -65,8 +64,8 @@ describe.each(CIRCUITS)('run-off ground at $name', ({ data, open }) => {
       if (track.pitBlend(x, z, s, d, { index: -1 }, pit) > 0) return false;
       track.ground(s, d, g);
       return (
-        g.kind !== OUT_OF_BOUNDS &&
-        g.kind !== KERB &&
+        g.kind !== SurfaceKind.OutOfBounds &&
+        g.kind !== SurfaceKind.Kerb &&
         Math.abs(d) > track.halfWidthAt(s, d >= 0 ? 0 : 1)
       );
     };
@@ -78,7 +77,7 @@ describe.each(CIRCUITS)('run-off ground at $name', ({ data, open }) => {
           lap.pointAt(s, side * a, p);
           track.project(p.x, p.z, { index: -1 }, q);
           track.ground(q.s, q.d, g);
-          if (g.kind === OUT_OF_BOUNDS) break;
+          if (g.kind === SurfaceKind.OutOfBounds) break;
           if (!runoff(p.x + PROBE, p.z) || !runoff(p.x, p.z + PROBE) || !runoff(p.x, p.z)) {
             continue;
           }

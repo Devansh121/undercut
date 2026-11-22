@@ -79,7 +79,7 @@ const FIXED = new Set([
 ]);
 /**
  * Regressions: these passed with the strike fix before the merge with #17's contact patch and
- * fail after it (the patch changes each run's path; they end on the same open run-off ramps).
+ * fail after it (the patch changes each run's path; they strike the chicane sausage kerbs).
  * Listed on their own so they are not mistaken for cases that never passed.
  */
 export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
@@ -93,7 +93,7 @@ describe('flat-out kerb strikes in the game never need the safety net (review of
       session.teleport(s, d, 300 / 3.6);
       session.setAssist('tractionControl', tc);
       // The physics under test, not the stability assist: with it on, its wheel braking keeps
-      // some of these runs off the open run-off ramps and they would pass for that reason.
+      // some of these runs off the chicane sausage kerbs and they would pass for that reason.
       session.setAssist('stability', 0);
       const input = { ...NEUTRAL_INPUT, throttle: 1, steer };
       for (let k = 0; k < 240 * 15 && session.safetyResets === 0; k++)
