@@ -10,6 +10,14 @@ import {
   type Side,
   type TrackData,
 } from './data';
+import {
+  FOLD_STRETCH,
+  FoldGround,
+  NodeKind,
+  type Box,
+  type FoldSample,
+  type NodeClass,
+} from './fold-ground';
 import { TrackPath, createPathPoint, createVec3, type PathPoint, type Vec3 } from './path';
 
 /**
@@ -121,6 +129,13 @@ export interface Ground {
   tz: number;
   curvature: number;
   d: number;
+  /**
+   * Where the frame folds (`FoldGround`) the slope is carried as a world gradient instead
+   * (gx, gz, m/m): the frame's stretch there can be near or below zero.
+   */
+  world: boolean;
+  gx: number;
+  gz: number;
 }
 
 export function createGround(): Ground {
@@ -135,6 +150,9 @@ export function createGround(): Ground {
     tz: 0,
     curvature: 0,
     d: 0,
+    world: false,
+    gx: 0,
+    gz: 0,
   };
 }
 
@@ -353,6 +371,7 @@ export class Track {
     this.speedTrap = data.timing.speedTrap;
     this.drsZones = data.timing.drs.map((z) => ({ ...z }));
     this.pitSide = data.pit.side === 'left' ? LEFT : RIGHT;
+    this.fold = this.buildFoldGround();
 
     const p = createVec3();
     const t = createVec3();
@@ -589,6 +608,9 @@ export class Track {
   }
 
   private readonly groundScratch = createGround();
+  /** The solved base where the frame folds (`FoldGround`); null while it is being built. */
+  private fold: FoldGround | null = null;
+  private readonly foldSample: FoldSample = { weight: 0, wx: 0, wz: 0, height: 0, gx: 0, gz: 0 };
 
   /**
    * The ground cross-section at (s, d) on the lap: height, slopes and surface kind from the
@@ -626,6 +648,7 @@ export class Track {
     out.d = d;
     out.sample = i;
     out.highKerb = false;
+    out.world = false;
     if (a <= hw) {
       out.height = yc + d * tb;
       out.slopeD = tb;
@@ -678,7 +701,139 @@ export class Track {
     out.slopeD = sign * slope;
     out.slopeS = grade + sign * hw * dtb + kerbSlopeS;
     out.kind = kind;
+    if (this.fold)
+      this.foldBase(
+        lap,
+        i0,
+        j,
+        f,
+        d,
+        sign,
+        u,
+        yc + sign * hw * tb,
+        slope + VERGE_FALL,
+        kerbSlopeS,
+        out,
+      );
     return out;
+  }
+
+  /**
+   * Where the frame folds, replace the base under the kerb profile with the solved one
+   * (`FoldGround`), blended by its weight, and carry the slope as a world gradient.
+   */
+  private foldBase(
+    lap: TrackPath,
+    i0: number,
+    j: number,
+    f: number,
+    d: number,
+    sign: number,
+    u: number,
+    edge: number,
+    kerbSlopeU: number,
+    kerbSlopeS: number,
+    out: Ground,
+  ): void {
+    const nx = lap.nx[i0]! + (lap.nx[j]! - lap.nx[i0]!) * f;
+    const nz = lap.nz[i0]! + (lap.nz[j]! - lap.nz[i0]!) * f;
+    const x = lap.x[i0]! + (lap.x[j]! - lap.x[i0]!) * f + d * nx;
+    const z = lap.z[i0]! + (lap.z[j]! - lap.z[i0]!) * f + d * nz;
+    const fs = this.fold!.sample(x, z, this.foldSample);
+    if (fs.weight <= 0) return;
+    const w = fs.weight;
+    const base = edge - VERGE_FALL * u;
+    const diff = fs.height - base;
+    // World gradient of the unfolded base: along s a metre of s is a world step of m.
+    const m = Math.max(1 - out.curvature * d, 0.05);
+    const tx = out.tx;
+    const tz = out.tz;
+    const baseS = out.slopeS - kerbSlopeS;
+    const baseD = -VERGE_FALL * sign;
+    const bx = (baseS / m) * tx + baseD * nx;
+    const bz = (baseS / m) * tz + baseD * nz;
+    // The kerb profile on top, unchanged.
+    const kx = (kerbSlopeS / m) * tx + sign * kerbSlopeU * nx;
+    const kz = (kerbSlopeS / m) * tz + sign * kerbSlopeU * nz;
+    out.height += w * diff;
+    out.world = true;
+    out.gx = (1 - w) * bx + w * fs.gx + fs.wx * diff + kx;
+    out.gz = (1 - w) * bz + w * fs.gz + fs.wz * diff + kz;
+  }
+
+  /**
+   * Build the solved base for every place the frame folds inside the barriers: wherever the
+   * stretch at the barrier on the inside of a bend falls below FOLD_STRETCH, the box around that
+   * stretch of lap out to its barrier, padded.
+   */
+  private buildFoldGround(): FoldGround | null {
+    const lap = this.lap;
+    const n = lap.count;
+    const PAD = 4;
+    const boxes: Box[] = [];
+    for (const side of [LEFT, RIGHT] as const) {
+      const sign = side === LEFT ? 1 : -1;
+      const folds = (i: number): boolean =>
+        1 - lap.curvature[i]! * sign * this.barrier[side][i]! < FOLD_STRETCH;
+      let start = -1;
+      for (let i = 0; i < n; i++)
+        if (folds(i) && !folds((i + n - 1) % n)) start = start < 0 ? i : start;
+      if (start < 0 && folds(0)) start = 0;
+      if (start < 0) continue;
+      for (let m = 0; m < n; m++) {
+        const i = (start + m) % n;
+        if (!folds(i) || folds((i + n - 1) % n)) continue;
+        // A run of folding samples from i: its box, out to the barrier, padded.
+        let x0 = Infinity;
+        let z0 = Infinity;
+        let x1 = -Infinity;
+        let z1 = -Infinity;
+        for (let k = 0; k < n && folds((i + k) % n); k++) {
+          const q = (i + k) % n;
+          for (const a of [0, this.barrier[side][q]!]) {
+            const px = lap.x[q]! + sign * a * lap.nx[q]!;
+            const pz = lap.z[q]! + sign * a * lap.nz[q]!;
+            x0 = Math.min(x0, px);
+            z0 = Math.min(z0, pz);
+            x1 = Math.max(x1, px);
+            z1 = Math.max(z1, pz);
+          }
+        }
+        boxes.push({ x0: x0 - PAD, z0: z0 - PAD, x1: x1 + PAD, z1: z1 + PAD });
+      }
+    }
+    if (boxes.length === 0) return null;
+    const folding = [new Uint8Array(n), new Uint8Array(n)] as const;
+    for (const side of [LEFT, RIGHT] as const) {
+      const sign = side === LEFT ? 1 : -1;
+      for (let i = 0; i < n; i++) {
+        folding[side][i] =
+          1 - lap.curvature[i]! * sign * this.barrier[side][i]! < FOLD_STRETCH ? 1 : 0;
+      }
+    }
+    const q = createPathPoint();
+    const hint = { index: -1 };
+    const g = createGround();
+    return new FoldGround(boxes, (x: number, z: number, c: NodeClass) => {
+      this.project(x, z, hint, q);
+      this.ground(q.s, q.d, g);
+      const side: SideIndex = q.d >= 0 ? LEFT : RIGHT;
+      const a = Math.abs(q.d);
+      const hw = this.halfWidthAt(q.s, side);
+      const yc = this.lap.interpolate(this.lap.y, q.s);
+      const tb = this.lap.interpolate(this.tanBank, q.s);
+      // Every node carries the unfolded base (behind the barrier too: a blend near it reads it).
+      if (a <= hw) {
+        c.kind = NodeKind.Fixed;
+        c.height = yc + q.d * tb;
+        return;
+      }
+      c.height = yc + (side === LEFT ? 1 : -1) * hw * tb - VERGE_FALL * (a - hw);
+      if (g.kind === SurfaceKind.OutOfBounds) c.kind = NodeKind.Outside;
+      // The zone is the whole run-off inside a bend that folds before its barrier, from the
+      // track edge out: its heights are then joined across the full width of the bend.
+      else c.kind = folding[side][g.sample] ? NodeKind.Zone : NodeKind.Fixed;
+    });
   }
 
   /**
@@ -687,6 +842,13 @@ export class Track {
    * the tangent across it.
    */
   groundNormal(g: Ground, out: Vec3): Vec3 {
+    if (g.world) {
+      const len = Math.sqrt(g.gx * g.gx + 1 + g.gz * g.gz);
+      out.x = -g.gx / len;
+      out.y = 1 / len;
+      out.z = -g.gz / len;
+      return out;
+    }
     let m = 1 - g.curvature * g.d;
     if (m < 0.05) m = 0.05;
     const nx = g.tz;
