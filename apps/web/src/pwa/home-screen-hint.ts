@@ -3,6 +3,16 @@ import { iconButton } from '../ui/kit/components';
 import { S } from '../ui/strings';
 
 const KEY = 'hint.homeScreen.v1';
+/** On screen this long counts as seen, ms (a player who taps Start at once sees it again). */
+const SEEN_MS = 4000;
+
+function remember(): void {
+  try {
+    localStorage.setItem(KEY, 'seen');
+  } catch {
+    // Blocked storage: it shows again next visit.
+  }
+}
 
 interface Env {
   userAgent: string;
@@ -26,7 +36,10 @@ export function needsHomeScreen(env: Env): boolean {
   return ios && !installed;
 }
 
-/** Once per browser, on the launch screen only (styles.css), dismissible. */
+/**
+ * Until seen once per browser (closed, or 4 s on the launch screen), on the launch screen only
+ * (styles.css), dismissible.
+ */
 export function showHomeScreenHint(): void {
   const env: Env = {
     userAgent: navigator.userAgent,
@@ -38,7 +51,6 @@ export function showHomeScreenHint(): void {
   if (!needsHomeScreen(env)) return;
   try {
     if (localStorage.getItem(KEY)) return;
-    localStorage.setItem(KEY, 'shown');
   } catch {
     // Blocked storage would show it on every visit: leave it out.
     return;
@@ -50,8 +62,25 @@ export function showHomeScreenHint(): void {
     icon: 'close',
     label: S.homeScreen.close,
     action: 'home-hint-close',
-    onClick: () => bar.remove(),
+    onClick: () => {
+      remember();
+      stop();
+      bar.remove();
+    },
   });
   bar.append(el('span', 'home-hint__text', S.homeScreen.hint), close);
   document.body.append(bar);
+  // Count time only while it is actually on screen (the launch screen shows it).
+  let seen = 0;
+  const timer = window.setInterval(() => {
+    if (document.documentElement.dataset.screen !== 'launch' || document.hidden) return;
+    seen += 500;
+    if (seen >= SEEN_MS) {
+      remember();
+      stop();
+    }
+  }, 500);
+  function stop(): void {
+    window.clearInterval(timer);
+  }
 }
