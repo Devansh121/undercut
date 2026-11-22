@@ -150,6 +150,17 @@ export class ReferenceDriver implements Driver {
   /** How fast that offset changes along the lap, m/m: steered for, so the car keeps up with it. */
   offsetSlope = 0;
   accelLimit = Number.POSITIVE_INFINITY;
+  /**
+   * The least share of the brake pedal kept whatever the lock-up feel says (0 to 1). At walking
+   * pace a wheel light on a kerb reads as locked at a touch of brake, and a car that has to stop
+   * for traffic stops all the same.
+   */
+  brakeFloor = 0;
+  /**
+   * The most curvature the lateral feedback may add to the line's, 1/m. At walking pace a car
+   * turns far tighter than this, and a racing driver pulling away off the line uses it.
+   */
+  maxCorrection = 0.05;
 
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
   readonly last = {
@@ -291,7 +302,7 @@ export class ReferenceDriver implements Driver {
     const w = Math.max(g.lateralOmegaMin, Math.min(g.lateralOmegaMax, g.lateralOmegaSpeed / v));
     let correction = -(w * w * e) / (v * v) - (2 * g.lateralDamping * w * Math.sin(ePsi)) / v;
     // At walking pace the feedback would ask for more curvature than the car has; keep it sane.
-    const maxCorr = 0.05;
+    const maxCorr = this.maxCorrection;
     correction = Math.max(-maxCorr, Math.min(maxCorr, correction));
     const kCmd = kAhead + correction;
     const yawTarget = v * kCmd;
@@ -377,7 +388,7 @@ export class ReferenceDriver implements Driver {
     else this.brakeCap += g.lockRecover * dt;
     this.brakeCap = Math.max(0, Math.min(1, this.brakeCap));
     throttle = Math.min(throttle, this.throttleCap);
-    brake = Math.min(brake, this.brakeCap);
+    brake = Math.min(brake, Math.max(this.brakeCap, this.brakeFloor));
     if (betaOver > 0) brake *= Math.max(0, 1 - g.slideBrakeRelease * betaOver);
     // Sliding with the brakes off: never let engine braking act on the rear (lift-off
     // oversteer). Hold at least the throttle that cancels the engine's drag.
