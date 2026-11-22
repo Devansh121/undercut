@@ -83,7 +83,7 @@ describe('near-tree models', () => {
   it('load without their far level, which the cards replace', () => {
     expect([...nearTreePropIds('spa')].sort()).toEqual(['forest-fir', 'forest-spruce']);
     expect(nearTreePropIds('monza').size).toBe(0);
-    const spruce = (catalogJson as { props: PropCatalogEntry[] }).props.find(
+    const spruce = (catalogJson as unknown as { props: PropCatalogEntry[] }).props.find(
       (p) => p.id === 'forest-spruce',
     )!;
     const all = selectCatalogLods(spruce, { name: 'high' });

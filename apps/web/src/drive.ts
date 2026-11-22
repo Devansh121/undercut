@@ -145,11 +145,12 @@ export function rendererPrograms(): {
 }[] {
   const gl = pageRenderer?.getContext();
   return (pageRenderer?.info.programs ?? []).map((p) => {
+    const program = p.program as WebGLProgram;
     // The program's own uniforms (three's built-ins left out) say whose shader it is.
     const names: string[] = [];
-    const n = gl ? (gl.getProgramParameter(p.program, gl.ACTIVE_UNIFORMS) as number) : 0;
+    const n = gl ? (gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number) : 0;
     for (let i = 0; i < n; i++) {
-      const u = gl?.getActiveUniform(p.program, i);
+      const u = gl?.getActiveUniform(program, i);
       if (u && (p.usedTimes > 1 || /^u[A-Z]/.test(u.name)))
         names.push(u.name.replace(/\[0\]$/, ''));
     }
