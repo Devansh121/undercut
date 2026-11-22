@@ -103,4 +103,12 @@ export const DRIVABILITY_GAPS = Object.freeze({
       'Ascari over the kerb with the rear unloaded; about 42 s a lap off the asphalt, 35 % ' +
       'slower than the reference.',
   }),
+  /** Target: at most 1 spin in 10 laps. */
+  clumsyGamepad: Object.freeze({
+    incidents: 3,
+    meanLap: 95.68,
+    reason:
+      'All three at the first chicane exit: two on the kerb with the rear unloaded, one stopped ' +
+      'against the barrier and reset.',
+  }),
 } satisfies Record<string, DrivabilityGap>);

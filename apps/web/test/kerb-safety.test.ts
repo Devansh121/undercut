@@ -63,18 +63,13 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
  * red the moment it starts passing and must then move into this list.
  */
 const FIXED = new Set([
-  '300,-8,0,0',
-  '300,-8,0,2',
   '300,8,-0.1,2',
-  '300,8,0,0',
-  '540,0,0.1,0',
-  '540,8,0.1,0',
+  '540,8,-0.1,0',
+  '540,8,-0.1,2',
+  '540,8,0,0',
   '610,0,0.1,0',
-  '610,8,-0.1,0',
   '650,8,-0.1,0',
   '650,8,-0.1,2',
-  '650,8,0.1,0',
-  '650,8,0.1,2',
   '650,8,0,0',
   '650,8,0,2',
   '5600,0,0,0',
@@ -85,14 +80,7 @@ const FIXED = new Set([
  * fail after it (the patch changes each run's path; they end on the same open run-off ramps).
  * Listed on their own so they are not mistaken for cases that never passed.
  */
-export const REGRESSED_WITH_PATCH = ['610,8,-0.1,2', '5600,8,0,2'];
-
-/**
- * Passed before the brake and downforce identification (docs/physics-validation.md section
- * 7.9) and fail after it: the changed path ends on the same open run-off ramps. Eight other open
- * cases started passing with that change (one of them, 540,8,0.1,0, had regressed with #17).
- */
-export const REGRESSED_WITH_7_9 = ['540,8,-0.1,0', '540,8,-0.1,2', '540,8,0,0'];
+export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
 
 describe('flat-out kerb strikes in the game never need the safety net (review of PR 19)', () => {
   for (const [s, d, steer, tc, tick] of CASES) {

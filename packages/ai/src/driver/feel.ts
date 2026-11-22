@@ -13,13 +13,8 @@
  * allowance: one that locks while light (over a kerb on the way in) is still locked when its
  * load comes back, and a sliding rear takes the car round. With slip angles given, the threshold
  * follows each tyre's combined slip: it shrinks to the friction ellipse's longitudinal room, and
- * the light inside front's extra allowance fades out as it starts to turn. A front wheel lifted
- * off the ground (under a tenth of the other front's load, an estimate) is not felt at all: it
- * carries neither braking nor cornering force, and a driver does not come off the pedal for it.
+ * the light inside front's extra allowance fades out as it starts to turn.
  */
-/** A front wheel below this share of the other front's load is lifted (estimate). */
-const LIFTED = 0.1;
-
 export function lockExcess(
   slipRatio: ArrayLike<number>,
   load: ArrayLike<number>,
@@ -31,7 +26,6 @@ export function lockExcess(
   for (let k = 0; k < 4; k++) {
     const other = load[k ^ 1]!;
     const own = Math.max(load[k]!, 1);
-    if (k < 2 && own < LIFTED * other) continue;
     // Sideways slip as a share of the peak: a tyre already turning has less left to brake with
     // (the friction ellipse), and a light inside front that is turning gets no extra allowance.
     const sy = slipTan ? Math.min(1, Math.abs(slipTan[k]!) / peakTan) : 0;

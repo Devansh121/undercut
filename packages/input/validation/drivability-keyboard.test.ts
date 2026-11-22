@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { expectLap, lapTargetName } from '../../ai/validation/expect-lap';
 import { MONZA, referenceLap } from '../../ai/validation/lib/index';
-import { REFERENCE_LAP_EXACT } from '../../ai/validation/lib/targets';
+import { LAP_GAPS, REFERENCE_LAP_EXACT } from '../../ai/validation/lib/targets';
 import { ASSISTS_OFF, DRIVABILITY_GAPS, tally } from './lib/compare';
 import { DISCIPLINED } from './lib/human';
 
@@ -50,7 +50,7 @@ describe('drivability: keyboard', () => {
     expect(incidents, gap.reason).toBeGreaterThan(0);
     expect(Math.abs(incidents - gap.incidents), gap.reason).toBeLessThanOrEqual(1);
     expect(Math.abs(disciplined.meanLap - gap.meanLap) / gap.meanLap).toBeLessThan(0.015);
-    expect(disciplined.meanLap).toBeGreaterThan(1.12 * REFERENCE_LAP_EXACT['monza-lap-m1']!.time);
+    expect(disciplined.meanLap).toBeGreaterThan(1.12 * LAP_GAPS['monza-lap-m1']!.measured);
   });
 
   it('still spins the same driver often with every assist off: the car is not made easy', () => {

@@ -152,21 +152,43 @@ export interface LapGap {
  * recorded and why (docs/physics-validation.md section 5 and 7.6).
  */
 export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
-  'spa-lap-m4': {
-    measured: 107.357,
+  'monza-lap-m1': {
+    measured: 84.872,
     reason:
-      'Spa reference lap (medium trim): 6.8 % over the 2025 pole after the brake and downforce ' +
-      'identification (section 7.9). Most of it is sector 2 (+10.8 % on the session best), ' +
-      'through the medium-speed corners (Les Combes, Malmedy, Bruxelles, Campus) and Pouhon. ' +
-      'docs/physics-validation.md sections 7.8 and 7.9.',
+      'On the footprint-checked legal corridor, with DRS zone 2 opening 12 m after the timing ' +
+      'line, the lap is 2.14 s outside the M1 band. The ' +
+      'full-envelope profile on that line is a quasi-steady prediction of 83.45 s; the rest is ' +
+      'the car and the track as modelled. docs/physics-validation.md section 7.6.',
+  },
+  'spa-lap-m4': {
+    measured: 109.072,
+    reason:
+      'First reference lap on the Spa line (medium trim): 8.5 % over the 2025 pole. The gap is ' +
+      'mostly in sector 2, the downforce sector (+14 % on the session best), as at Monza the ' +
+      "car is slower than the era's cars in fast corners. docs/physics-validation.md section 7.8.",
   },
   'spa-s1': {
-    measured: 31.584,
-    reason: 'Sector 1 on the Spa reference lap, 6.1 % over the session best (section 7.9).',
+    measured: 31.75,
+    reason: 'Sector 1 on the first Spa reference lap, 6.7 % over the session best (section 7.8).',
   },
   'spa-s2': {
-    measured: 47.133,
-    reason: 'Sector 2 on the Spa reference lap, 10.8 % over the session best (section 7.9).',
+    measured: 48.486,
+    reason: 'Sector 2 on the first Spa reference lap, 14 % over the session best (section 7.8).',
+  },
+  'spa-s3': {
+    measured: 28.836,
+    reason: 'Sector 3 on the first Spa reference lap, 3.5 % over the session best (section 7.8).',
+  },
+  'singapore-s1': {
+    measured: 27.234,
+    reason:
+      'Sector 1 on the first Singapore reference lap, 3.1 % over the session best, while the ' +
+      'lap is inside its band (section 7.8).',
+  },
+  'singapore-s3': {
+    measured: 26.257,
+    reason:
+      'Sector 3 on the first Singapore reference lap, 4.1 % over the session best (section 7.8).',
   },
 });
 
@@ -183,11 +205,7 @@ export interface ExactLap {
 }
 
 export const REFERENCE_LAP_EXACT: Readonly<Record<string, ExactLap>> = Object.freeze({
-  'monza-lap-m1': Object.freeze({
-    time: 82.45467836214588,
-    trap: 348.74138129128346,
-    ticks: 39617,
-  }),
+  'monza-lap-m1': Object.freeze({ time: 84.87247777781505, trap: 349.0184403531988, ticks: 40775 }),
 });
 
 export { gapSlack, outside };

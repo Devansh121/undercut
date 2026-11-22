@@ -71,9 +71,9 @@ describe('car parameters', () => {
   });
 
   it('builds each trim from the doc 1.4 table', () => {
-    expect(createCarParams('low').aero.clA).toBe(5.15); // [57]: 3.5 × weight at top speed
+    expect(createCarParams('low').aero.clA).toBe(3.6);
     expect(createCarParams('low').aero.cdA).toBe(1.16); // inside 1.05–1.25, fitted to the trap
-    expect(createCarParams('medium').aero.clA).toBe(5.55);
+    expect(createCarParams('medium').aero.clA).toBe(4.6);
     expect(createCarParams('high').aero.balance).toBe(0.45);
     expect(createCarParams('high', { tyre: { muY: 1.9 } }).tyre.muY).toBe(1.9);
   });
@@ -176,12 +176,11 @@ describe('brakes', () => {
     const front = 2 * 2 * b.padFriction * pressurePerBias * b.frontPistonArea * b.frontRadius;
     const capacity = createCarModel(REFERENCE_CAR).brakeCapacity;
     expect(capacity).toBeCloseTo(front, 6);
-    // Set from the published peak brake powers (doc 1.5): about 30 kN at the tyres.
-    expect(capacity).toBeGreaterThan(10e3);
-    expect(capacity).toBeLessThan(11.5e3);
+    expect(capacity).toBeGreaterThan(17e3);
+    expect(capacity).toBeLessThan(19e3);
   });
 
-  it('limit a full-pedal stop from 330 km/h in high-downforce trim, not the tyres', () => {
+  it('can lock the tyres at full pedal from 330 km/h in high-downforce trim', () => {
     const car = createCarState(createCarParams('high'), {
       speed: 330 / 3.6,
       fuel: 50,
@@ -192,18 +191,7 @@ describe('brakes', () => {
       stepCar(car, input({ brake: 1 }), FLAT_SURFACE, DT, env);
       for (let w = 0; w < 4; w++) lowest = Math.min(lowest, car.slipRatio[w]!);
     }
-    // The published brake powers bound the friction force at speed below what the tyres carry
-    // under high-trim downforce, so no wheel reaches the 10 % slip peak.
-    expect(lowest).toBeGreaterThan(-0.1);
-  });
-
-  it('lock the tyres at full pedal once the downforce has bled off', () => {
-    const car = createCarState(createCarParams('high'), { speed: 120 / 3.6, fuel: 50 });
-    let lowest = 0;
-    for (let i = 0; i < 0.4 / DT; i++) {
-      stepCar(car, input({ brake: 1 }), FLAT_SURFACE, DT, env);
-      for (let w = 0; w < 4; w++) lowest = Math.min(lowest, car.slipRatio[w]!);
-    }
+    // Past the peak at 10 % slip: the tyres, not the brakes, limit the stop.
     expect(lowest).toBeLessThan(-0.3);
   });
 });
