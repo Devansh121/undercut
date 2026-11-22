@@ -70,6 +70,7 @@ declare global {
     worldCounts(): Record<string, number> | null;
     /** Control the 5 red start-gantry lights (bits 0..4) and green light (bit 5). */
     setStartLights(mask: number): void;
+    treeSwap(distance?: number): number;
   }
 
   interface Window {

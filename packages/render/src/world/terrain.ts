@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry } from 'three';
+import { BufferAttribute, BufferGeometry, Sphere, Vector3 } from 'three';
 import type { MeshData, Track } from '@undercut/track';
 import { gridHeight, type TerrainGrid } from './dressing';
 import type { LapIndex } from './lap-index';
@@ -103,7 +103,11 @@ export function buildTerrain(
   lapIndex: LapIndex,
   drivable: readonly MeshData[],
   o: TerrainOptions,
-): { geometry: BufferGeometry; heightAt: (x: number, z: number) => number } {
+): {
+  geometry: BufferGeometry;
+  chunks: BufferGeometry[];
+  heightAt: (x: number, z: number) => number;
+} {
   const lap = track.lap;
   let minX = Infinity;
   let minZ = Infinity;
@@ -120,8 +124,8 @@ export function buildTerrain(
   const cols = xs.length;
   const rows = zs.length;
 
-  // Centreline samples for the near-track height (every 5th, as the track package).
-  const every = 5;
+  // Centreline samples for the near-track height (every 8th: smooth IDW, faster startup).
+  const every = 8;
   const m = Math.ceil(lap.count / every);
   const sx = new Float64Array(m);
   const sz = new Float64Array(m);
@@ -206,26 +210,71 @@ export function buildTerrain(
       uvs.set([x, z], i * 2);
     }
   }
-  const index = new Uint32Array((cols - 1) * (rows - 1) * 6);
-  let t = 0;
-  for (let r = 0; r + 1 < rows; r++) {
-    for (let c = 0; c + 1 < cols; c++) {
-      const a = r * cols + c;
-      // Rows run south (+z), columns east (+x): (a, a+cols, a+1) is counter-clockwise from above.
-      index[t++] = a;
-      index[t++] = a + cols;
-      index[t++] = a + 1;
-      index[t++] = a + 1;
-      index[t++] = a + cols;
-      index[t++] = a + cols + 1;
+  const posAttr = new BufferAttribute(positions, 3);
+  const norAttr = new BufferAttribute(normals, 3);
+  const uvAttr = new BufferAttribute(uvs, 2);
+
+  // Split the grid into spatial tiles sharing the same vertex buffers so frustum culling
+  // drops off-screen terrain without duplicating vertex memory.
+  const tileN = cols > 48 && rows > 48 ? 6 : 2;
+  const chunks: BufferGeometry[] = [];
+  for (let tr = 0; tr < tileN; tr++) {
+    const r0 = Math.floor((tr * (rows - 1)) / tileN);
+    const r1 = Math.floor(((tr + 1) * (rows - 1)) / tileN);
+    if (r1 <= r0) continue;
+    for (let tc = 0; tc < tileN; tc++) {
+      const c0 = Math.floor((tc * (cols - 1)) / tileN);
+      const c1 = Math.floor(((tc + 1) * (cols - 1)) / tileN);
+      if (c1 <= c0) continue;
+      const tileIdx = new Uint32Array((r1 - r0) * (c1 - c0) * 6);
+      let k = 0;
+      for (let r = r0; r < r1; r++) {
+        for (let c = c0; c < c1; c++) {
+          const a = r * cols + c;
+          // Rows run south (+z), columns east (+x): (a, a+cols, a+1) is counter-clockwise from above.
+          tileIdx[k++] = a;
+          tileIdx[k++] = a + cols;
+          tileIdx[k++] = a + 1;
+          tileIdx[k++] = a + 1;
+          tileIdx[k++] = a + cols;
+          tileIdx[k++] = a + cols + 1;
+        }
+      }
+      const cg = new BufferGeometry();
+      cg.setAttribute('position', posAttr);
+      cg.setAttribute('normal', norAttr);
+      cg.setAttribute('uv', uvAttr);
+      cg.setIndex(new BufferAttribute(tileIdx, 1));
+      // Exact tile bounding sphere (computeBoundingSphere iterates all vertices, not just indexed ones).
+      let minX = Infinity;
+      let minY = Infinity;
+      let minZ = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      let maxZ = -Infinity;
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const vi = (r * cols + c) * 3;
+          const vx = positions[vi] as number;
+          const vy = positions[vi + 1] as number;
+          const vz = positions[vi + 2] as number;
+          if (vx < minX) minX = vx;
+          if (vx > maxX) maxX = vx;
+          if (vy < minY) minY = vy;
+          if (vy > maxY) maxY = vy;
+          if (vz < minZ) minZ = vz;
+          if (vz > maxZ) maxZ = vz;
+        }
+      }
+      const cx = (minX + maxX) * 0.5;
+      const cy = (minY + maxY) * 0.5;
+      const cz = (minZ + maxZ) * 0.5;
+      const rad = Math.hypot(maxX - cx, maxY - cy, maxZ - cz);
+      cg.boundingSphere = new Sphere(new Vector3(cx, cy, cz), rad);
+      chunks.push(cg);
     }
   }
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new BufferAttribute(normals, 3));
-  geometry.setAttribute('uv', new BufferAttribute(uvs, 2));
-  geometry.setIndex(new BufferAttribute(index, 1));
-  geometry.computeBoundingSphere();
+  const geometry = chunks[0] as BufferGeometry;
 
   /** Height of the built ground at (x, z): bilinear on the grid (what the mesh shows, nearly). */
   const heightAt = (x: number, z: number): number => {
@@ -245,5 +294,5 @@ export function buildTerrain(
       ((h[i + cols] as number) * (1 - ax) + (h[i + cols + 1] as number) * ax) * az
     );
   };
-  return { geometry, heightAt };
+  return { geometry, chunks, heightAt };
 }
