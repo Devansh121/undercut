@@ -4,7 +4,7 @@ import type { DrivingPlan } from '../../src/profile/plan';
 import { loadEnvelope, loadLine } from './artefacts';
 import type { CircuitSetup } from './circuits';
 import { runLaps, type LapRecord, type LapRunResult, type LapRunOptions } from './lap';
-import { LAP_TARGETS, MONZA_M4_BAND, MONZA_PUBLISHED, MONZA_REFERENCE_LAP } from './targets';
+import { CIRCUIT_REFERENCE, LAP_TARGETS, MONZA_PUBLISHED } from './targets';
 
 export interface ReferenceLapOptions {
   onSample?: LapRunOptions['onSample'];
@@ -38,7 +38,7 @@ export function referenceLap(setup: CircuitSetup, o: ReferenceLapOptions = {}): 
     fuel: o.fuel ?? setup.fuel,
     laps: o.laps ?? 1,
     recordEvery: o.recordEvery ?? 0,
-    stops: { 1: [MONZA_PUBLISHED.t1.v1, MONZA_PUBLISHED.t1.v2] },
+    ...(setup.stops ? { stops: setup.stops } : {}),
     timingLine: setup.controlLine,
     ...(o.clock ? { clock: o.clock } : {}),
     driver: (params) =>
@@ -86,6 +86,12 @@ export interface CornerGeometryRow {
 }
 
 export interface LapReport {
+  circuit: string;
+  /** The lap target's band ('M1' at Monza, 'M4' elsewhere). */
+  bandName: string;
+  /** Fastest speed published at the timing line, km/h, and what the sector columns are. */
+  finishPublished: number;
+  sectorsAre: string;
   lap: number;
   plan: number;
   reference: number;
@@ -139,7 +145,20 @@ function planCornerMin(plan: DrivingPlan, start: number, end: number): number {
 }
 
 export function monzaLapReport(lap: LapRecord, plan: DrivingPlan, timing = 0): LapReport {
-  const m1 = [LAP_TARGETS['monza-lap-m1']!.low, LAP_TARGETS['monza-lap-m1']!.high] as const;
+  return circuitLapReport('monza', lap, plan, timing);
+}
+
+/** The lap against the circuit's published figures (`CIRCUIT_REFERENCE`). */
+export function circuitLapReport(
+  circuit: string,
+  lap: LapRecord,
+  plan: DrivingPlan,
+  timing = 0,
+): LapReport {
+  const ref = CIRCUIT_REFERENCE[circuit];
+  if (!ref) throw new Error(`no published reference for ${circuit}`);
+  const target = LAP_TARGETS[ref.lapTarget]!;
+  const m1 = [target.low, target.high] as const;
   const out = (x: number, [lo, hi]: readonly [number, number]): number =>
     x < lo ? lo - x : x > hi ? x - hi : 0;
   const planSectors = planSectorTimes(plan, timing);
@@ -148,20 +167,21 @@ export function monzaLapReport(lap: LapRecord, plan: DrivingPlan, timing = 0): L
     sector: k + 1,
     time: t,
     plan: planSectors[k]!,
-    pole: pub.poleSectors[k]!,
-    best: pub.bestSectors[k]!,
-    delta: t - pub.poleSectors[k]!,
-    percent: ((t - pub.poleSectors[k]!) / pub.poleSectors[k]!) * 100,
+    pole: ref.sectors[k]!,
+    best: ref.best[k]!,
+    delta: t - ref.sectors[k]!,
+    percent: ((t - ref.sectors[k]!) / ref.sectors[k]!) * 100,
   }));
   const corners = lap.corners.map((c, k) => {
     const cd = plan.track.corners[k]!;
     let published = '';
-    if (c.number === 1 && c.stop) {
+    if (circuit === 'monza' && c.number === 1 && c.stop) {
       published =
         `${pub.t1.v1}→${pub.t1.v2} km/h: ${pub.t1.distance} m, ${pub.t1.time} s published; ` +
         `${c.stop.distance.toFixed(0)} m, ${c.stop.time.toFixed(2)} s here`;
     }
-    if (c.number === 4) published = `braking ${pub.t4.distance} m, ${pub.t4.time} s published`;
+    if (circuit === 'monza' && c.number === 4)
+      published = `braking ${pub.t4.distance} m, ${pub.t4.time} s published`;
     return {
       number: c.number,
       name: c.name,
@@ -194,18 +214,22 @@ export function monzaLapReport(lap: LapRecord, plan: DrivingPlan, timing = 0): L
     };
   });
   return {
+    circuit,
+    bandName: circuit === 'monza' ? 'M1' : 'M4',
+    finishPublished: ref.finishLine,
+    sectorsAre: ref.sectorsAre,
     geometry,
     lap: lap.time,
     plan: plan.profile.lapTime,
-    reference: MONZA_REFERENCE_LAP,
-    margin: lap.time - MONZA_REFERENCE_LAP,
-    marginPercent: ((lap.time - MONZA_REFERENCE_LAP) / MONZA_REFERENCE_LAP) * 100,
+    reference: ref.reference,
+    margin: lap.time - ref.reference,
+    marginPercent: ((lap.time - ref.reference) / ref.reference) * 100,
     m1,
-    m4: MONZA_M4_BAND,
+    m4: ref.m4,
     outsideM1: out(lap.time, m1),
-    outsideM4: out(lap.time, MONZA_M4_BAND),
+    outsideM4: out(lap.time, ref.m4),
     trap: lap.trap,
-    trapTarget: LAP_TARGETS['monza-trap']!.stated,
+    trapTarget: LAP_TARGETS[ref.trapTarget]!.stated,
     finish: lap.finish,
     sectors,
     corners,
@@ -229,13 +253,15 @@ export function formatLapReport(r: LapReport): string {
     `Lap ${fixed3(r.lap)} s (plan ${fixed3(r.plan)} s); reference ${fixed3(r.reference)} s: ` +
       `${r.margin >= 0 ? '+' : ''}${fixed3(r.margin)} s (${r.marginPercent >= 0 ? '+' : ''}${fixed1(r.marginPercent)} %)`,
   );
+  const m4 = `M4 band ${fixed3(r.m4[0])}–${fixed3(r.m4[1])} s: ${r.outsideM4 > 0 ? `outside by ${fixed3(r.outsideM4)} s` : 'inside'}`;
   lines.push(
-    `M1 band ${fixed3(r.m1[0])}–${fixed3(r.m1[1])} s: ${r.outsideM1 > 0 ? `outside by ${fixed3(r.outsideM1)} s` : 'inside'}; ` +
-      `M4 band ${fixed3(r.m4[0])}–${fixed3(r.m4[1])} s: ${r.outsideM4 > 0 ? `outside by ${fixed3(r.outsideM4)} s` : 'inside'}`,
+    r.bandName === 'M4'
+      ? m4
+      : `${r.bandName} band ${fixed3(r.m1[0])}–${fixed3(r.m1[1])} s: ${r.outsideM1 > 0 ? `outside by ${fixed3(r.outsideM1)} s` : 'inside'}; ${m4}`,
   );
   lines.push(
     `Speed trap ${fixed1(r.trap)} km/h (target ${r.trapTarget}); timing line ${fixed1(r.finish)} km/h ` +
-      `(published fastest ${MONZA_PUBLISHED.finishLine}); ERS deployed ${r.deployMJ.toFixed(2)} MJ, ` +
+      `(published fastest ${r.finishPublished}); ERS deployed ${r.deployMJ.toFixed(2)} MJ, ` +
       `harvested ${r.harvestMJ.toFixed(2)} MJ`,
   );
   lines.push(
@@ -243,7 +269,11 @@ export function formatLapReport(r: LapReport): string {
       `line error max ${r.maxLateralError.toFixed(2)} m, RMS ${r.rmsLateralError.toFixed(2)} m`,
   );
   lines.push('');
-  lines.push('| Sector | Lap | Plan | Pole lap | Session best | Lap − pole |');
+  lines.push(
+    r.sectorsAre === 'pole lap'
+      ? '| Sector | Lap | Plan | Pole lap | Session best | Lap − pole |'
+      : '| Sector | Lap | Plan | Session best | Session best | Lap − best |',
+  );
   lines.push('| --- | --- | --- | --- | --- | --- |');
   for (const s of r.sectors) {
     lines.push(
