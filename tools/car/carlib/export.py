@@ -36,7 +36,7 @@ def write(objs, car, out_dir, tris, stats_dir):
         export_draco_mesh_compression_level=7,
         export_draco_position_quantization=14,
         export_draco_normal_quantization=10,
-        export_draco_texcoord_quantization=12,
+        export_draco_texcoord_quantization=14,
         export_cameras=False,
         export_lights=False,
         export_animations=False,

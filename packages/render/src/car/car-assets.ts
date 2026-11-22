@@ -157,7 +157,11 @@ function prepare(root: Object3D, quality: Quality): void {
     mesh.castShadow = !(o.name === 'suspension_links' || o.parent?.name === 'suspension_links');
     mesh.receiveShadow = true;
     for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      if (m instanceof MeshPhysicalMaterial && !quality.clearcoat) m.clearcoat = 0;
+      if (m instanceof MeshPhysicalMaterial && !quality.clearcoat) {
+        // Presets without the clear coat also drop the carbon's fibre anisotropy (shader cost).
+        m.clearcoat = 0;
+        m.anisotropy = 0;
+      }
       if (m instanceof MeshStandardMaterial) {
         if (!m.map && !FLOOR_EXEMPT.has(m.name)) liftAlbedo(m.color, ALBEDO_FLOOR);
         for (const t of [

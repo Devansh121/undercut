@@ -37,10 +37,27 @@ export const CAR_COLOR_GLSL = /* glsl */ `
       diffuseColor.rgb *= mix( vec3( 1.0 ), vColor, ${BAKED_AO_ALBEDO_STRENGTH.toFixed(2)} );
     #endif`;
 
+/**
+ * The carbon's fibre anisotropy needs a tangent frame, which three.js derives from the UV
+ * derivatives of the normal map's UVs. A triangle whose UVs have no area (a sliver, or UVs
+ * collapsed by mesh compression) gives a zero frame, the anisotropic environment term then
+ * normalises a zero vector, and the NaN spreads over the whole image through bloom. Such a
+ * triangle gets an arbitrary frame around its normal instead; it is too small to show which.
+ */
+export const CAR_TANGENT_GUARD_GLSL = /* glsl */ `#include <normal_fragment_begin>
+    #if defined( USE_ANISOTROPY ) && ! defined( USE_TANGENT )
+      if ( dot( tbn[ 0 ], tbn[ 0 ] ) < 1e-12 || dot( tbn[ 1 ], tbn[ 1 ] ) < 1e-12 ) {
+        vec3 helper = abs( normal.y ) < 0.99 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 );
+        tbn[ 0 ] = normalize( cross( helper, normal ) );
+        tbn[ 1 ] = cross( normal, tbn[ 0 ] );
+      }
+    #endif`;
+
 export function patchCarShader(shader: WebGLProgramParametersWithUniforms): void {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <color_fragment>', CAR_COLOR_GLSL)
-    .replace('#include <aomap_fragment>', CAR_AO_GLSL);
+    .replace('#include <aomap_fragment>', CAR_AO_GLSL)
+    .replace('#include <normal_fragment_begin>', CAR_TANGENT_GUARD_GLSL);
 }
 
 const patched = new WeakSet<object>();

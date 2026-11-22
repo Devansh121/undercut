@@ -22,7 +22,7 @@ STEER_REF = 0.35  # radians of road-wheel steer represented by a steer morph tar
 # Materials merged per level of detail, to keep draw calls down (High about 40, Mobile about 20)
 _MINOR = {"soot": "dark", "plank": "dark", "tcam": "dark", "headrest": "dark", "interior": "dark",
           "boot": "dark", "paint_edge": "paint", "metal_satin": "metal_dark", "caliper": "metal_dark",
-          "grip": "carbon", "nut": "rim"}
+          "grip": "dark", "nut": "rim"}
 REMAP = {
     "high": dict(_MINOR),
     "mobile": dict(_MINOR, **{"carbon_matte": "carbon", "mirror_glass": "dark", "metal_dark": "dark",
@@ -86,6 +86,7 @@ def build(lod):
         cockpit.build_mirrors(paint, carbon, dark, car.patches, q)
         cockpit.build_tcam(dark, q)
         cockpit.build_driver(paint, dark, q)
+        cockpit.build_cockpit_padding(dark, q)
     for label, m in (("paint", paint), ("carbon", carbon), ("dark", dark)):
         car.count("body_" + label, m)
         car.static.merge(m)
