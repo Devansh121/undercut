@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RACE_SKILL,
+  REFERENCE_SKILL,
   createRaceDriver,
+  createReferenceDriver,
   type Driver,
   type RaceSkill,
   type TrafficView,
@@ -80,6 +82,25 @@ function race(drivers: Driver[], laps: number, seed: number): RaceSession {
   });
 }
 
+/**
+ * A car that is slow only in corners, the way a new player is: it plans with 60 % of the car's
+ * cornering and braking grip and all of its traction, so it is at full speed on the straights.
+ * A lap driver: it ignores the traffic, as a player who does not look in the mirrors would.
+ */
+function cornerSlow(seed: number): Driver {
+  return createReferenceDriver({
+    track,
+    line,
+    envelope,
+    params,
+    skill: {
+      ...REFERENCE_SKILL,
+      envelope: { lateral: 0.6, brake: 0.6, traction: REFERENCE_SKILL.envelope.traction },
+      seed,
+    },
+  });
+}
+
 const flags = (events: readonly RaceEvent[]) =>
   events.filter((e) => e.type === 'flag' && e.flag === 'blue' && e.on);
 
@@ -93,6 +114,32 @@ describe('race driver on the sim', () => {
     expect(run.racing.overtakes).toBeGreaterThanOrEqual(1);
     expect(run.cars.every((c) => c.longestContact < 0.5 && c.spins === 0)).toBe(true);
   }, 180_000);
+
+  it('a car slow only in corners, on pole, is passed within two laps without contact', () => {
+    const s = race([cornerSlow(41), racer({ pace: 1, braking: 1 }, 42)], 3, 7);
+    const c = s.control;
+    let passedOnLap: number | null = null;
+    let contactTicks = 0;
+    const laps: number[][] = [[], []];
+    while (!s.ended && s.time < 600) {
+      for (const e of s.tick()) {
+        if (e.type === 'lap') laps[e.car]!.push(e.result.time);
+      }
+      for (const i of [0, 1]) if (s.worldCar(i).state.carContacts > 0) contactTicks++;
+      // Passed: the racing driver a clear car length ahead on the road, once the race is on.
+      const green = c.lightsOutAt !== null && s.time > c.lightsOutAt + 5;
+      if (passedOnLap === null && green && c.cars[1]!.dist > c.cars[0]!.dist + 8) {
+        passedOnLap = c.timer(0).lap;
+      }
+    }
+    // The slow car is far off the pace: its flying lap over 10 s slower than the racing AI's
+    // 86.5 s in free air (packages/race/validation/quick-race.test.ts, every seed).
+    expect(laps[0]![1]!).toBeGreaterThan(96.5);
+    expect(passedOnLap).not.toBeNull();
+    expect(passedOnLap!).toBeLessThanOrEqual(2);
+    expect(contactTicks).toBe(0);
+    expect(s.result().entries[0]!.car).toBe(1);
+  }, 300_000);
 
   it('a car being lapped is shown the blue flag, moves over and lets the leader by', () => {
     const s = race([racer({ pace: 1, braking: 1 }, 21), new Hobbled(racer({}, 22), 0.3)], 5, 5);
