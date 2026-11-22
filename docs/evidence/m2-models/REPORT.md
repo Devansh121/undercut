@@ -1,6 +1,6 @@
 # Circuit kit delivery — Slice 1
 
-31 original props, 93 Draco GLBs, 2,385,804 bytes (2.28 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
+31 original props, 93 Draco GLBs, 2,422,416 bytes (2.31 MiB) including all three levels. No third-party assets were added. Rebuild with `npm run props:build`.
 
 ## Measurements
 
@@ -17,16 +17,16 @@
 | pit-garage | 1240 / 584 / 380 | 34032 / 18160 / 15804 |
 | pit-wall | 1556 / 720 / 404 | 34952 / 20440 / 13084 |
 | start-gantry | 3904 / 2000 / 1500 | 52220 / 31996 / 27132 |
-| crew-mechanic-standing | 5882 / 456 / 456 | 71416 / 13904 / 13940 |
-| crew-mechanic-crouched | 5882 / 456 / 456 | 74384 / 13500 / 13532 |
-| crew-engineer-standing | 5634 / 468 / 468 | 74568 / 15336 / 15344 |
-| crew-engineer-seated | 5634 / 468 / 468 | 76768 / 15340 / 15340 |
-| crowd-seated-0 | 732 / 368 / 368 | 19204 / 12992 / 12992 |
-| crowd-seated-1 | 732 / 368 / 368 | 19160 / 13080 / 13080 |
-| crowd-seated-2 | 732 / 368 / 368 | 19160 / 12780 / 12780 |
-| crowd-standing-0 | 732 / 368 / 368 | 19164 / 13084 / 13112 |
-| crowd-standing-1 | 732 / 368 / 368 | 19096 / 13044 / 13036 |
-| crowd-standing-2 | 732 / 368 / 368 | 19072 / 12972 / 13012 |
+| crew-mechanic-standing | 5306 / 456 / 456 | 65344 / 13940 / 13908 |
+| crew-mechanic-crouched | 10154 / 456 / 456 | 91304 / 13500 / 13512 |
+| crew-engineer-standing | 7075 / 468 / 468 | 87708 / 15468 / 15456 |
+| crew-engineer-seated | 7029 / 468 / 468 | 88528 / 15648 / 15648 |
+| crowd-seated-0 | 732 / 368 / 368 | 19204 / 12992 / 12984 |
+| crowd-seated-1 | 732 / 368 / 368 | 19160 / 13080 / 13088 |
+| crowd-seated-2 | 732 / 368 / 368 | 19148 / 12780 / 12784 |
+| crowd-standing-0 | 732 / 368 / 368 | 19160 / 13116 / 13096 |
+| crowd-standing-1 | 732 / 368 / 368 | 19096 / 13040 / 13048 |
+| crowd-standing-2 | 732 / 368 / 368 | 19068 / 12976 / 13020 |
 | braking-board | 232 / 72 / 72 | 9588 / 5884 / 5884 |
 | zone-board | 232 / 72 / 72 | 9132 / 5780 / 5780 |
 | corner-board | 232 / 72 / 72 | 9188 / 5828 / 5828 |
@@ -68,3 +68,7 @@ Inspected all 62 individual images through contact sheets, with the pit garage a
 The inspected dressing branch remains at `08e87417758aa8e534985379874da996fad23ffa` and has no catalogue consumer. Version 1 uses the requested GLB and catalogue paths, metres, ground origin, +Y up, +X front and +Z tiling. Crowd rows match its 0.85 m depth, 0.42 m rise, 0.55 m seat spacing. Board UV carriers, individual lamp nodes and crew role anchors are explicit. Clothing tint belongs on the clothing material/instances while keeping vertex AO. No renderer placement files were changed. Trees stay with its impostor pipeline.
 
 The next integration step is to load each material group into the prop registry, register lit materials with Environment, apply the dressing atlas, choose LODs/culling by projected size, then measure the full twenty-car race and moving-camera fence appearance. Slice 2 is the separate cockpit task.
+
+## Follow-up: crouched garment
+
+The crouched High mechanic now has a single connected cloth surface across the torso, pelvis and thigh roots, with a tapered lower back. Local voxel union removes the intersecting caps; smoothing and a 6,000-triangle surface limit keep the transition round within the original prop budget. Boots, arms, seams and helmet remain separate.

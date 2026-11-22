@@ -13,6 +13,31 @@ describe('shipped car levels', () => {
       expect(triangles).toBeLessThanOrEqual(budget);
     });
 
+    if (lod !== 'far')
+      it(`${lod}: gauntlet rear caps sit inside the sleeves`, () => {
+        for (const side of [-1, 1]) {
+          const cap = [];
+          for (const p of prims) {
+            if (p.material !== 'glove') continue;
+            for (let i = 0; i < p.POSITION.values.length / 3; i++) {
+              const v = p.POSITION.values.slice(i * 3, i * 3 + 3);
+              if (v[0] < -0.06 && v[2] * side > 0.1 && p.NORMAL.values[i * 3] < -0.8) cap.push(v);
+            }
+          }
+          expect(cap.length).toBeGreaterThanOrEqual(8);
+          const center = [0, 1, 2].map(
+            (i) => (Math.min(...cap.map((v) => v[i])) + Math.max(...cap.map((v) => v[i]))) / 2,
+          );
+          // Car frame relative to the wheel pivot. Sleeve end and previous sleeve section are
+          // measured hard points; the closed glove cap must be 20 mm inside this segment.
+          const end = [-0.075, -0.023, side * 0.151];
+          const direction = [-0.085, 0.013, side * 0.015];
+          const length = Math.hypot(...direction);
+          const expected = end.map((v, i) => v + (direction[i] / length) * 0.02);
+          expect(Math.hypot(...center.map((v, i) => v - expected[i]))).toBeLessThan(0.001);
+        }
+      });
+
     // The carbon's normal and anisotropy maps take their tangent frame from TEXCOORD_1. A
     // triangle whose metric UVs have no area gives a zero frame, and three.js's anisotropic
     // environment lighting then returns NaN, which bloom spreads over the whole frame. The shader

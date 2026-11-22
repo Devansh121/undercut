@@ -3,7 +3,7 @@ stalks, T-camera. And the suspension links, which share the streamlined-leg help
 
 import math
 
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from . import dims as D
 from .geom import Mesh, arm, clamp, lerp, loft, naca4, smoothstep, superellipse_half, tube
@@ -225,6 +225,10 @@ def build_steering_wheel(q):
     n = q.n(28, 12)
     rows = [_outline(n, 0.95, -0.032), _outline(n, 1.0, -0.027), _outline(n, 1.0, -0.005), _outline(n, 0.97, 0.0)]
     loft(m, rows, "carbon", closed=True, cap0=True, cap1=True)
+    if q.lod == "high":
+        # Printed legends and switch indices on the existing front polygon; no decal geometry.
+        m.mat[-1] = "wheel_controls"
+        m.uv0[-1] = [(m.v[i].y / (.24) + .5, m.v[i].z / (.156) + .5) for i in m.f[-1]]
     # screen bezel standing proud of the face, and the screen itself (UV1 0..1 across it; u runs
     # from the driver's left to right once the wheel faces the driver, v from bottom to top)
     hw, hh = DISPLAY_HALF
@@ -262,6 +266,9 @@ def build_steering_wheel(q):
                 ring.append(Vector((x, y + r * rr * knurl * math.cos(a), z + r * rr * knurl * math.sin(a))))
             rings.append(ring)
         loft(m, rings, "metal_dark", closed=True, cap0=True, cap1=True)
+        if q.lod == "high":
+            m.mat[-1] = "wheel_controls"
+            m.uv0[-1] = [(m.v[i].y / .24 + .5, m.v[i].z / .156 + .5) for i in m.f[-1]]
     # grips: moulded rubber, fuller in the palm, with finger ridges on the back
     ng, nr = q.n(12, 8), q.n(10, 5)
     for side in (1, -1):
@@ -308,6 +315,23 @@ def build_cockpit_padding(mesh_dark, q):
     mesh_dark.merge(m.with_mirror())
 
 
+def sleeve_path(side):
+    return [Vector((.20, side * .176, .622)), Vector((.27, side * .178, .632)),
+            Vector((.37, side * .166, .630)), Vector((.455, side * .151, .617))]
+
+
+def wrist_join(side):
+    transform = Matrix.Rotation(math.radians(D.STEERING_COLUMN_PITCH_DEG), 3, "Y") @ Matrix.Rotation(math.pi, 3, "Z")
+    sleeve = sleeve_path(-side)
+    endpoint = sleeve[-1]
+    inside = endpoint + (sleeve[-2] - endpoint).normalized() * .020
+    origin = Vector(D.STEERING_WHEEL_CENTRE)
+    local = transform.transposed()
+    # Closed gauntlet cap stays buried inside the final sleeve segment, even after export.
+    assert (transform @ (local @ (endpoint - origin)) + origin - endpoint).length < 1e-8
+    return local @ (endpoint - origin), local @ (inside - origin)
+
+
 def build_gloves(q):
     """Gloved hands round the grips, in the wheel's frame so they turn with it: a closed fist
     with knuckles over the grip, the thumb along the faceplate towards the buttons, and the
@@ -337,8 +361,10 @@ def build_gloves(q):
             rows.append(ring if side > 0 else list(reversed(ring)))
         loft(m, rows, "glove", closed=True, cap0=True, cap1=True)
         # thumb: from the inside of the fist across the face towards the upper buttons
-        path = [Vector((0.006, side * (GRIP_Y - 0.020), 0.022)), Vector((0.010, side * (GRIP_Y - 0.040), 0.030)),
-                Vector((0.0105, side * (GRIP_Y - 0.058), 0.033)), Vector((0.009, side * (GRIP_Y - 0.068), 0.033))]
+        path = [Vector((0.006, side * (GRIP_Y - 0.020), 0.022)),
+                Vector((0.020, side * (GRIP_Y - 0.035), 0.028)),
+                Vector((0.027, side * (GRIP_Y - 0.034), 0.009)),
+                Vector((0.015, side * (GRIP_Y - 0.020), -0.004))]
         radii = (0.0105, 0.0092, 0.0084, 0.0055)
         nt = q.n(12, 6)
         rings = []
@@ -349,12 +375,20 @@ def build_gloves(q):
             rings.append([p + (u * math.cos(2 * math.pi * k / nt) + w * math.sin(2 * math.pi * k / nt) * 0.8) * r
                           for k in range(nt)])
         loft(m, rings, "glove", closed=True, cap0=True, cap1=True, flip=side > 0)
-        # gauntlet and wrist strap
+        # Derive the join in wheel-local coordinates from the actual sleeve end. Local hand
+        # side is reversed by the assembly's half-turn. The closed rear cap is 20 mm inside
+        # the sleeve; the flared middle ring overlaps its open mouth.
+        sleeve, inside = wrist_join(side)
         a = Vector((cx + 0.026, cy + side * 0.012, -0.004))
-        b = Vector((cx + 0.092, cy + side * 0.024, -0.020))
+        axis = (inside - a).normalized()
+        u = axis.cross(Vector((0, 0, 1))).normalized()
+        w = axis.cross(u)
         ng = q.n(20, 10)
-        tube(m, a, b, 0.031, ng, "glove", radius_b=0.034)
-        tube(m, a.lerp(b, 0.30), a.lerp(b, 0.52), 0.0335, ng, "dark")
+        grid = [[p + (u * math.cos(2 * math.pi * k / ng) + w * math.sin(2 * math.pi * k / ng)) * r
+                 for k in range(ng)] for p, r in ((a, .031), (sleeve, .035), (inside, .026))]
+        loft(m, grid, "glove", closed=True, cap0=True, cap1=True)
+        tube(m, a.lerp(sleeve, .30), a.lerp(sleeve, .52), .034, ng, "dark")
+    _planar_metric_uv(m, {"glove"})
     return m
 
 
@@ -478,8 +512,7 @@ def build_driver(mesh_paint, mesh_dark, q):
     arms = Mesh()
     na = q.n(12, 6)
     for side in (1, -1):
-        path = [Vector((0.20, side * 0.176, 0.622)), Vector((0.27, side * 0.178, 0.632)),
-                Vector((0.37, side * 0.166, 0.630)), Vector((0.455, side * 0.151, 0.617))]
+        path = sleeve_path(side)
         radii = (0.040, 0.041, 0.036, 0.031)
         rings = []
         for k, (p, r) in enumerate(zip(path, radii)):
@@ -488,7 +521,7 @@ def build_driver(mesh_paint, mesh_dark, q):
             w = tang.cross(u)
             rings.append([p + (u * math.cos(2 * math.pi * i / na) * 1.05 + w * math.sin(2 * math.pi * i / na) * 0.95) * r
                           for i in range(na)])
-        loft(arms, rings, "paint_edge", closed=True, cap0=True, cap1=True)
+        loft(arms, rings, "paint_edge", closed=True, cap0=True, cap1=False)
     mesh_paint.merge(arms)
     # harness: two straps over the shoulders, converging at the chest
     hn = Mesh()

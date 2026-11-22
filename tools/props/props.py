@@ -680,7 +680,7 @@ for ident, module in specs:
                 from crew import build as build_crew
                 pose = 'crouched' if 'crouched' in ident else 'seated' if 'seated' in ident else 'standing'
                 head_pos = build_crew(pose, mechanic, finish, cloth, fabric, rubber, skin, glass,
-                                      glasses=ident == 'crew-engineer-standing')
+                                      glasses=ident == 'crew-engineer-standing', objects=objects)
             elif 'crouched' in ident:
                 head_pos = person('crouched', 0, footwear=rubber, trousers=cloth)
             elif 'seated' in ident:

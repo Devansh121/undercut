@@ -175,7 +175,17 @@ def build(textures, base_colour="#8C9096", livery=None):
     b.inputs["Emission Strength"].default_value = 1.0
     principled("grip", srgb("#1A1A1B"), 0.9)
     # driver's gloves: light grey suede, so the hands read against the black wheel by day and night
-    principled("glove", srgb("#AEB2B7"), 0.92)
+    m, nt, b = principled("glove", srgb("#AEB2B7"), 0.92)
+    if "glove_suede" in T:
+        t = _tex(nt, T["glove_suede"], "UVMetric", scale=8)
+        nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
+    if "wheel_controls" in T:
+        m, nt, b = principled("wheel_controls", srgb("#FFFFFF"), .60, coat=.2)
+        t = _tex(nt, T["wheel_controls"], "UVMap")
+        nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
+        if "carbon_normal" in T:
+            t = _tex(nt, T["carbon_normal"], "UVMetric", non_color=True, scale=CARBON_SCALE)
+            _normal(nt, b, t, .4)
     principled("mirror_glass", srgb("#C8CCD0"), 0.02, metal=1.0)
     principled("tcam", srgb("#101112"), 0.5)
     principled("boot", srgb("#121212"), 0.8)

@@ -187,3 +187,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
 - Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
 - Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.
+
+### Decided for you — cockpit review follow-up
+
+- The gauntlet joins are derived from the steering-column transform and the sleeve endpoints; rear caps sit inside the sleeve and the thumbs curl around the grips. High wheel legends and rotary indicators use a texture on existing polygons; glove seam and restrained wear detail use a small suede texture.
+- The crouched mechanic uses one connected garment surface across the torso, pelvis and thigh roots, replacing the overlapping hip shell.
+- Track separately: the Mobile HUD obscures the wheel display, the mirrors remain dark in some lighting, and the halo weave reads as coarse zigzags at Mobile resolution. These need HUD/render review; this asset correction keeps their existing pipelines.

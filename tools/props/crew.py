@@ -7,13 +7,18 @@ import bpy
 from mathutils import Vector
 
 
-def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=False):
+def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=False, objects=None):
+    garments = []
+
     def mesh(name, verts, faces, mat):
         data = bpy.data.meshes.new(name)
         data.from_pydata(verts, [], faces)
         ob = bpy.data.objects.new(name, data)
         bpy.context.collection.objects.link(ob)
-        return finish(ob, name, mat, smooth=True)
+        finish(ob, name, mat, smooth=True)
+        if name in ('overall-hips', 'overall-torso', 'overall-trouser'):
+            garments.append(ob)
+        return ob
 
     def rings(name, sections, mat, n=16):
         # Each section: centre, forward/back half-depth, lateral half-width.
@@ -66,10 +71,9 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
         hips = [(-.148,.07,.115,0),(-.135,.092,.145,0),(-.10,.106,.157,0),(-.05,.11,.16,0),(0,.11,.158,0),
                 (.06,.104,.150,0),(.10,.096,.140,0)]
     elif crouched:
-        # Crouched: the rump pushes back and down behind the hip line instead of a narrowing bowl.
-        # the underside rounds off over a long run into the thighs: no ledge under the rump
-        hips = [(-.24,.012,.02,-.01),(-.215,.04,.07,-.015),(-.18,.065,.11,-.02),(-.14,.085,.135,-.022),
-                (-.10,.094,.146,-.016),(-.05,.103,.153,-.008),(0,.106,.153,0),(.06,.104,.150,0),(.10,.096,.140,0)]
+        # The lower back tapers into the crotch rather than bulging into a separate pouch.
+        hips = [(-.26,.018,.025,0),(-.20,.046,.075,0),(-.13,.070,.115,0),
+                (-.07,.089,.140,0),(0,.103,.151,0),(.07,.106,.151,0),(.10,.109,.153,0)]
     else:
         # Standing: the thigh tops form the seat; the hips stay inside them below the waist.
         hips = [(-.13,.012,.02,0),(-.10,.05,.08,0),(-.05,.085,.13,0),(0,.104,.152,0),(.06,.11,.156,0),
@@ -239,4 +243,28 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
             faces.append((n+d,n+c,n+b,n+a))
             faces.append((b,n+b,n+c,c))
         mesh('cap-brim',verts,faces,cloth)
+    if crouched:
+        # Union the intersecting garment panels and thigh roots. This removes both internal
+        # caps and the horizontal seam under the lower back; boots, seams and skin stay separate.
+        bpy.ops.object.select_all(action='DESELECT')
+        for ob in garments:
+            ob.select_set(True)
+            objects.remove(ob)
+        bpy.context.view_layer.objects.active = garments[0]
+        bpy.ops.object.join()
+        body = bpy.context.object
+        body.name = 'continuous-overall'
+        body.data.remesh_voxel_size = .009
+        bpy.ops.object.voxel_remesh()
+        smooth = body.modifiers.new('cloth-transition', 'SMOOTH')
+        smooth.factor = .65
+        smooth.iterations = 4
+        bpy.ops.object.modifier_apply(modifier=smooth.name)
+        body.data.calc_loop_triangles()
+        reduce = body.modifiers.new('garment-budget', 'DECIMATE')
+        reduce.ratio = min(1, 6000 / max(1, len(body.data.loop_triangles)))
+        bpy.ops.object.modifier_apply(modifier=reduce.name)
+        for polygon in body.data.polygons:
+            polygon.use_smooth = True
+        objects.append(body)
     return tuple(head)

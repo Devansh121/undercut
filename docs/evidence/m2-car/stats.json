@@ -1,12 +1,12 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1404712,
-    "triangles": 119526,
-    "draw_calls": 39,
+    "bytes": 1427732,
+    "triangles": 119582,
+    "draw_calls": 40,
     "nodes": {
       "body": {
-        "triangles": 74750,
+        "triangles": 74726,
         "primitives": 7,
         "materials": [
           "paint",
@@ -53,10 +53,11 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 3610,
-        "primitives": 6,
+        "triangles": 3690,
+        "primitives": 7,
         "materials": [
           "carbon",
+          "wheel_controls",
           "dark",
           "display",
           "paint",
@@ -172,6 +173,16 @@
         "bytes": 2862
       },
       {
+        "name": "wheel_controls",
+        "mimeType": "image/webp",
+        "bytes": 4624
+      },
+      {
+        "name": "glove_suede",
+        "mimeType": "image/webp",
+        "bytes": 11930
+      },
+      {
         "name": "disc_glow",
         "mimeType": "image/webp",
         "bytes": 178
@@ -220,12 +231,12 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 648328,
-    "triangles": 39922,
+    "bytes": 654436,
+    "triangles": 39950,
     "draw_calls": 25,
     "nodes": {
       "body": {
-        "triangles": 21826,
+        "triangles": 21814,
         "primitives": 3,
         "materials": [
           "paint",
@@ -268,7 +279,7 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 1434,
+        "triangles": 1474,
         "primitives": 4,
         "materials": [
           "carbon",
@@ -375,6 +386,11 @@
         "name": "carbon_base",
         "mimeType": "image/webp",
         "bytes": 1018
+      },
+      {
+        "name": "glove_suede",
+        "mimeType": "image/webp",
+        "bytes": 3338
       },
       {
         "name": "disc_glow",
@@ -595,5 +611,5 @@
       "bytes": 24276
     }
   },
-  "total_bytes": 2646293
+  "total_bytes": 2675421
 }

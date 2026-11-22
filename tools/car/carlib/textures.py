@@ -217,9 +217,71 @@ def disc_glow(size=256):
     return np.clip(rgb, 0, 1)
 
 
+def wheel_controls(size=512):
+    """Original block legends and index strokes over a restrained carbon-coloured face."""
+    yy, xx = np.mgrid[0:size, 0:size]
+    grain = ((xx * 37 + yy * 61) % 97) / 96
+    rgb = np.ones((size, size, 3)) * (.026 + grain[..., None] * .006)
+    glyphs = {
+        "N": ["10001","11001","10101","10011","10001","10001","10001"],
+        "P": ["11110","10001","10001","11110","10000","10000","10000"],
+        "R": ["11110","10001","10001","11110","10100","10010","10001"],
+        "A": ["01110","10001","10001","11111","10001","10001","10001"],
+        "B": ["11110","10001","10001","11110","10001","10001","11110"],
+        "D": ["11110","10001","10001","10001","10001","10001","11110"],
+        "E": ["11111","10000","10000","11110","10000","10000","11111"],
+        "S": ["01111","10000","10000","01110","00001","00001","11110"],
+        "L": ["10000","10000","10000","10000","10000","10000","11111"],
+    }
+    def label(text,y,z,scale=2):
+        x0=int((y/.24+.5)*size)-len(text)*6*scale//2
+        z0=int((z/.156+.5)*size)-7*scale//2
+        for c in text:
+            for row,bits in enumerate(glyphs[c]):
+                for col,bit in enumerate(bits):
+                    if bit == '1':
+                        u=x0+col*scale; v=z0+(6-row)*scale
+                        rgb[max(v,0):min(v+scale,size),max(u,0):min(u+scale,size)] = (.62,.64,.62)
+            x0+=6*scale
+    buttons=[(.078,.042),(.084,.016),(.080,-.010),(.064,-.034),(.030,-.036),(.062,.056),(.092,-.032)]
+    for k,(y,z) in enumerate(buttons):
+        for side in (-1,1):
+            label(('N','P','R','A','B','D','S')[k],side*y,z+.0105,1)
+    for text,y,z,r in [('B',.052,-.052,.0115),('D',-.052,-.052,.0115),('E',0,-.060,.0095)]:
+        label(text,y,z-r-.004,1)
+        # White pointer stroke on the rotary cap and short registration ticks around its collar.
+        u=(xx/size-.5)*.24-y; v=(yy/size-.5)*.156-z
+        rgb[(np.abs(u)<.0008)&(v>.002)&(v<r*.82)] = (.8,.77,.65)
+        for ang in (-1.0,-.5,0,.5,1.0):
+            a=ang+math.pi/2
+            along=u*math.cos(a)+v*math.sin(a)
+            across=-u*math.sin(a)+v*math.cos(a)
+            rgb[(np.abs(across)<.0005)&(along>r*1.15)&(along<r*1.35)] = (.4,.42,.4)
+    # Sparse edge scuffs, not a uniform dirt overlay.
+    edge=(np.abs((xx/size-.5)*.24)>.108)&(grain>.97)
+    rgb[edge]=(.09,.09,.085)
+    return rgb
+
+
+def glove_suede(size=256):
+    y,x=np.mgrid[0:size,0:size]/size
+    noise=((x*size*73+y*size*151)%101)/100
+    base=.40+noise*.07
+    seam=(np.abs(x-.22)<.009)|(np.abs(x-.78)<.009)
+    stitches=seam&((np.floor(y*60)%2)==0)
+    base[seam]*=.72
+    base[stitches]*=1.35
+    base[(noise>.985)&(x>.3)&(x<.7)]*=1.12
+    return np.stack([base*.96,base*.98,base],axis=2)
+
+
 def build_all(lod, tyre_profile_v):
     big = lod == "high"
     out = {}
+    if big:
+        out["wheel_controls"] = to_image("wheel_controls", wheel_controls())
+    if lod != "far":
+        out["glove_suede"] = to_image("glove_suede", glove_suede(256 if big else 128))
     n, b = carbon(512 if big else 256)
     out["carbon_normal"] = to_image("carbon_normal", n, non_color=True)
     out["carbon_base"] = to_image("carbon_base", b)

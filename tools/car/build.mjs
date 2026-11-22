@@ -58,6 +58,8 @@ function run(bin, args) {
     [
       '-b',
       '--factory-startup',
+      '-t',
+      '2',
       '-noaudio',
       '--python-exit-code',
       '1',
@@ -251,6 +253,29 @@ if (check) {
     path.join(root, 'docs/evidence/m2-car/stats.json'),
     `${JSON.stringify(stats, null, 2)}\n`,
   );
+  // Publish measured shipped counts with the build so documentation cannot retain old estimates.
+  const contractPath = path.join(root, 'docs/car-asset.md');
+  let contract = fs.readFileSync(contractPath, 'utf8');
+  for (const lod of LODS) {
+    const measured = stats[lod];
+    const prefix = `| \`car_${lod}.glb\``;
+    contract = contract
+      .split('\n')
+      .map((line) => {
+        if (!line.startsWith(prefix)) return line;
+        const cells = line.split('|');
+        cells[3] = ` ${measured.triangles.toLocaleString('en-US')} `;
+        cells[4] = ` ${measured.draw_calls} `;
+        cells[5] = ` ${(measured.bytes / 1e6).toFixed(2)} MB `;
+        return cells.join('|');
+      })
+      .join('\n');
+  }
+  contract = contract.replace(
+    /Everything together is [\d.]+ MB/,
+    `Everything together is ${(stats.total_bytes / 1e6).toFixed(1)} MB`,
+  );
+  fs.writeFileSync(contractPath, contract);
   fs.rmSync(statsDir, { recursive: true, force: true });
   console.log(
     `Wrote ${entries.length} files (${stats.total_bytes} bytes) and updated the manifest`,
