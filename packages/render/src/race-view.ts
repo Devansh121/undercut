@@ -531,6 +531,19 @@ export class RaceView {
     this.dispose();
   };
 
+  /**
+   * Every car shader has been compiled by a drawn frame, so a remote car appearing or changing
+   * level of detail compiles nothing (see CarFleet). Until then a ready signal would be early.
+   */
+  get carsWarm(): boolean {
+    return this.fleet.warm;
+  }
+
+  /** Other cars will join this session: compile their shaders from the next drawn frame. */
+  warmCars(): void {
+    this.fleet.requestWarm();
+  }
+
   /** True once the WebGL context was lost under this view. */
   get lost(): boolean {
     return this.contextLost;
@@ -896,6 +909,7 @@ export class RaceView {
     this.gpu.end();
     this.pacer.submitted();
     this.drawnFrames++;
+    this.fleet.drawn();
   }
 
   private skyProbePath: 'hdr' | 'direct' | null = null;

@@ -228,9 +228,12 @@ export class OnlineRace implements DriveExtension {
     if (room?.phase !== 'grid' || this.loadedSent) return;
     const me = room.members.find((m) => m.seat === this.seat);
     const peers = room.members.filter((m) => m.seat !== this.seat && m.connected).length;
-    // Remote-car materials compile on their first draw too. A ready car must have
-    // rendered the other connected players, not just its own body and the track.
-    if (me && !me.loaded && this.report.remote.length >= peers)
+    // Remote-car materials compile on their first draw too. A ready car must have the other
+    // connected players in its view and a drawn frame with every car shader in it: a frame can
+    // skip its draw while the GPU is behind (FramePacer), and a first compile after the lights
+    // holds the page for seconds on a slow GPU, long enough for the room to mark it away.
+    const warm = this.ctx?.view().carsWarm ?? false;
+    if (me && !me.loaded && this.report.remote.length >= peers && warm)
       this.loadedSent = this.client.markLoaded();
   }
 
@@ -365,6 +368,8 @@ export class OnlineRace implements DriveExtension {
       remote.push({ seat: v.seat, x: v.x, z: v.z, opacity: v.opacity, mode: v.mode });
     }
     const view: RaceView = ctx.view();
+    // Every view, including one rebuilt for a quality switch or a context restore.
+    view.warmCars();
     view.setRemoteCars(drawn);
     this.report.remote = remote;
 

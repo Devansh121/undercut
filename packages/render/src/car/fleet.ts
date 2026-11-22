@@ -106,6 +106,22 @@ export class CarFleet {
   private readonly thresholds: number[];
   /** Scratch for `update`, reused every frame. */
   private readonly counts: Int32Array;
+  /**
+   * Levels not yet drawn. Their shaders compile on first draw, and three.js checks a new program
+   * with a synchronous call that waits for the GPU to finish everything queued: on software WebGL
+   * that held a page for 6 to 10 s when the first remote car appeared or first dropped to `far`
+   * mid-race, long enough for the room to mark the driver away. So once cars are on the fleet, or
+   * from the first frame when the session asks (`requestWarm`: other cars will come), each cold
+   * level gets one fully dithered-out instance (fade code 0: no pixels) of a placeholder car until
+   * a frame with it has been drawn. A session with no other cars warms nothing: the instanced
+   * shadow pass would leave a variant of the renderer's shared depth material behind.
+   */
+  private readonly cold = new Set<number>();
+  private warmWanted = false;
+  /** Last `update` wrote warm-up instances; the next one must drop them. */
+  private warming = false;
+  private readonly warmCar: FleetCar;
+  private readonly warmLivery: CarLivery;
   private readonly scratchColour = new Color();
 
   constructor(
@@ -155,6 +171,26 @@ export class CarFleet {
 
     for (const lod of this.lodLevels) this.sets.push(this.buildSet(lod));
     this.counts = new Int32Array(this.sets.length);
+    this.sets.forEach((_, i) => this.cold.add(i));
+    this.warmLivery = {
+      team: patterns[0] ?? '',
+      primary: '#000000',
+      secondary: '#000000',
+      accent: '#000000',
+      number: 0,
+      code: '',
+    };
+    this.warmCar = {
+      pose: createCarPose(),
+      livery: 0,
+      drs: 0,
+      opacity: 1,
+      level: -1,
+      from: -1,
+      fade: 1,
+      posed: new Map(),
+      dirty: true,
+    };
   }
 
   private buildSet(lod: CarLod): LodSet {
@@ -379,10 +415,13 @@ export class CarFleet {
     this.atlas.needsUpdate = true;
   }
 
-  private posed(car: FleetCar, lod: CarLod): { model: CarModel; meshes: Mesh[] } {
+  private posed(
+    car: FleetCar,
+    lod: CarLod,
+    livery: CarLivery,
+  ): { model: CarModel; meshes: Mesh[] } {
     let p = car.posed.get(lod);
     if (!p) {
-      const livery = this.liveries[car.livery] as CarLivery;
       const model = new CarModel(this.assets, lod, livery, this.quality, this.geo, 'none');
       const meshes: Mesh[] = [];
       model.root.traverse((o) => {
@@ -430,11 +469,13 @@ export class CarFleet {
       }
       changed ||= car.dirty;
     }
+    const warm = this.cold.size > 0 && (this.warmWanted || this.cars.length > 0);
+    changed ||= warm || this.warming;
+    this.warming = warm;
     // Nothing moved, switched or faded: keep last frame's instances (no uploads).
     if (!changed) return;
     const counts = this.counts;
     counts.fill(0);
-    const c = this.scratchColour;
     for (const car of this.cars) {
       if (car.opacity <= 0) {
         car.dirty = false;
@@ -447,27 +488,14 @@ export class CarFleet {
       for (let d = 0; d < n; d++) {
         const level = n === 2 && d === 0 ? car.from : car.level;
         const code = n === 1 ? car.opacity : ditherCode(car.fade, d === 1);
-        const set = this.sets[level] as LodSet;
-        const posed = this.posed(car, set.lod);
-        const slot = counts[level] as number;
-        counts[level] = slot + 1;
-        set.fade.setX(slot, code);
-        c.set(l.primary);
-        set.primary.setXYZ(slot, c.r, c.g, c.b);
-        c.set(l.secondary);
-        set.secondary.setXYZ(slot, c.r, c.g, c.b);
-        c.set(l.accent);
-        set.accent.setXYZ(slot, c.r, c.g, c.b);
-        set.mask.setX(slot, this.teamIndex.get(l.team) ?? 0);
-        const x = (car.livery % PER_ROW) * CELL_W;
-        const y = Math.floor(car.livery / PER_ROW) * CELL_H;
-        set.decal.setXYZW(slot, x / ATLAS_W, y / ATLAS_H, 0, 0);
-        for (let mi = 0; mi < set.meshes.length; mi++) {
-          const src = posed.meshes[mi];
-          if (src) (set.meshes[mi] as InstancedMesh).setMatrixAt(slot, src.matrixWorld);
-        }
+        this.writeSlot(car, l, level, code);
       }
       car.dirty = false;
+    }
+    if (warm) {
+      for (const level of this.cold) {
+        if (counts[level] === 0) this.writeSlot(this.warmCar, this.warmLivery, level, 0);
+      }
     }
     this.sets.forEach((set, si) => {
       const count = counts[si] as number;
@@ -482,6 +510,52 @@ export class CarFleet {
     });
   }
 
+  /** One instance of `car` at `level`, with dither code `code` (see `ditherCode`). */
+  private writeSlot(car: FleetCar, l: CarLivery, level: number, code: number): void {
+    const counts = this.counts;
+    const c = this.scratchColour;
+    const set = this.sets[level] as LodSet;
+    const posed = this.posed(car, set.lod, l);
+    const slot = counts[level] as number;
+    counts[level] = slot + 1;
+    set.fade.setX(slot, code);
+    c.set(l.primary);
+    set.primary.setXYZ(slot, c.r, c.g, c.b);
+    c.set(l.secondary);
+    set.secondary.setXYZ(slot, c.r, c.g, c.b);
+    c.set(l.accent);
+    set.accent.setXYZ(slot, c.r, c.g, c.b);
+    set.mask.setX(slot, this.teamIndex.get(l.team) ?? 0);
+    const x = (car.livery % PER_ROW) * CELL_W;
+    const y = Math.floor(car.livery / PER_ROW) * CELL_H;
+    set.decal.setXYZW(slot, x / ATLAS_W, y / ATLAS_H, 0, 0);
+    for (let mi = 0; mi < set.meshes.length; mi++) {
+      const src = posed.meshes[mi];
+      if (src) (set.meshes[mi] as InstancedMesh).setMatrixAt(slot, src.matrixWorld);
+    }
+  }
+
+  /**
+   * The view drew a frame with the instances of the last `update`: every level that had any is
+   * compiled now. Call after each drawn frame (a frame can skip its draw, see FramePacer).
+   */
+  drawn(): void {
+    if (this.cold.size === 0) return;
+    this.counts.forEach((count, level) => {
+      if (count > 0) this.cold.delete(level);
+    });
+  }
+
+  /** Other cars will join: compile every level from the next drawn frame, before they do. */
+  requestWarm(): void {
+    this.warmWanted = true;
+  }
+
+  /** Every level has been drawn once: no car shader is left to compile. */
+  get warm(): boolean {
+    return this.cold.size === 0;
+  }
+
   /** Meshes to hook into the cascaded shadows. */
   get root(): Object3D {
     return this.group;
@@ -489,6 +563,8 @@ export class CarFleet {
 
   dispose(): void {
     this.clear();
+    for (const { model } of this.warmCar.posed.values()) model.dispose();
+    this.warmCar.posed.clear();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials) m.dispose();
     for (const t of this.textures) t.dispose();
