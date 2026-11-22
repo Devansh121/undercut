@@ -31,6 +31,34 @@ test('two players race, rematch, leave and migrate the host', async ({
   const errors: string[] = [];
   for (const page of [host, guest]) page.on('pageerror', (e) => errors.push(e.message));
   const state = (p: Page) => p.evaluate(() => window.__undercut!.online());
+  // The start lights are on for about 3.5 s, often while the page is busy. A browser-side
+  // observer records the most lit lamps ever visible on screen, so the check after the release
+  // sees what was displayed (a lamp in a hidden or detached HUD does not count).
+  const watchLamps = (p: Page) =>
+    p.evaluate(() => {
+      const w = window as unknown as { litLampsSeen: number };
+      w.litLampsSeen = 0;
+      const count = (): void => {
+        let n = 0;
+        for (const lamp of document.querySelectorAll('.online-lights__lamp.is-lit')) {
+          const box = lamp.getBoundingClientRect();
+          const shown = lamp.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+          if (shown && box.width > 0 && box.height > 0) n++;
+        }
+        w.litLampsSeen = Math.max(w.litLampsSeen, n);
+      };
+      new MutationObserver(count).observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['class', 'hidden', 'style'],
+      });
+    });
+  const litLampsSeen = (p: Page) =>
+    p.evaluate(() => (window as unknown as { litLampsSeen: number }).litLampsSeen);
+  // Who each page is, as the room reports it.
+  const members = async (p: Page) =>
+    ((await state(p)).state?.members ?? []).map((m) => m.name + (m.you ? ' (you)' : '')).sort();
   try {
     await host.goto('/?debug=1&quality=lite');
     // Online Rooms is a mode of the main menu; its start button opens the lobby.
@@ -38,13 +66,17 @@ test('two players race, rematch, leave and migrate the host', async ({
     await host.locator('[data-action=mode-online]').click();
     await host.locator('[data-action=start]').click();
     await host.getByLabel('Driver name').fill('Host');
+    await expect(host.getByLabel('Driver name')).toHaveValue('Host');
     await host.getByRole('button', { name: 'Create room', exact: true }).click();
     await expect(host.getByTestId('invite')).toBeVisible();
     const invite = await host.getByTestId('invite').getAttribute('href');
     await guest.goto(invite! + '&debug=1&quality=lite');
     await guest.getByLabel('Driver name').fill('Guest');
+    await expect(guest.getByLabel('Driver name')).toHaveValue('Guest');
     await guest.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect.poll(async () => (await state(host)).state?.members.length).toBe(2);
+    await expect.poll(() => members(host)).toEqual(['Guest', 'Host (you)']);
+    await expect.poll(() => members(guest)).toEqual(['Guest (you)', 'Host']);
     await host.getByLabel('Laps', { exact: true }).fill('1');
     expect((await state(host)).state!.room!.settings.circuit).toEqual(DEFAULT_CIRCUIT);
     // Shorten only the lap timing floor for this 1-lap test segment (lengthM stays Monza's so
@@ -61,15 +93,15 @@ test('two players race, rematch, leave and migrate the host', async ({
       .toBe(2000);
     await host.screenshot({ path: info.outputPath('lobby-desktop.png') });
     await guest.screenshot({ path: info.outputPath('lobby-phone.png') });
+    for (const page of [host, guest]) await watchLamps(page);
     await guest.getByRole('button', { name: 'Ready', exact: true }).click();
     await host.getByRole('button', { name: 'Ready to start', exact: true }).click();
-    // The lights are on for about 3.5 s: wait for the release, which stays true, and read back
-    // how many lamps each HUD showed rather than trying to catch a lit lamp live.
+    // Wait for the release, which stays true, then read what the observers saw during the lights.
     for (const page of [host, guest]) {
       await expect
         .poll(async () => (await state(page)).race?.released, { timeout: 90_000 })
         .toBe(true);
-      expect((await state(page)).race?.lightsShownMax).toBeGreaterThanOrEqual(1);
+      expect(await litLampsSeen(page)).toBeGreaterThanOrEqual(1);
       await expect(page.locator('.online-race__net')).toBeHidden();
       await expect(page.locator('.online-lights')).toBeHidden();
       await expect(page.locator('.online-standing')).toBeVisible();
