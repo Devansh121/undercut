@@ -61,6 +61,10 @@ declare global {
     resetFrameTimes(): void;
     /** The view's frame statistics: draw calls, render path, environment bakes and more. */
     renderStats(): Record<string, unknown>;
+    /** Counts of placed circuit-dressing objects and props. */
+    worldCounts(): Record<string, number> | null;
+    /** Control the 5 red start-gantry lights (bits 0..4) and green light (bit 5). */
+    setStartLights(mask: number): void;
   }
 
   interface Window {

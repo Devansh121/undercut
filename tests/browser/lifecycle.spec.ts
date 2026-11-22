@@ -56,7 +56,7 @@ for (const quality of ['mobile'] as const) {
         };
       }
     });
-    await page.goto(`/?debug=1&quality=${quality}`);
+    await page.goto(`/?debug=1&quality=${quality}&world=lite`);
     await page.waitForFunction(() => Boolean(window.__undercut));
 
     const after: { gl: Record<string, number>; info: Record<string, number> }[] = [];

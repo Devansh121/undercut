@@ -27,6 +27,11 @@ test.describe('launch screen', () => {
     await expect(page.locator('.launch__build code')).toHaveText(
       /^([0-9a-f]{7}(\+dirty)?|unversioned)$/,
     );
+    // The map data's licence asks for a credit where the game is seen.
+    await expect(page.getByRole('link', { name: '© OpenStreetMap contributors' })).toHaveAttribute(
+      'href',
+      'https://www.openstreetmap.org/copyright',
+    );
     // No debug API without ?debug=1 in a production build.
     expect(await page.evaluate(() => typeof window.__undercut !== 'undefined')).toBe(false);
     expect(errors).toEqual([]);
