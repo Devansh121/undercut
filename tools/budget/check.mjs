@@ -9,7 +9,9 @@
 // - First-race transfer, per circuit and quality preset: what a player downloads from opening the
 //   page to the first frame of a race at that circuit on that preset. The page, code, styles and
 //   fonts (and the menu's team car images, all of them, though the menu shows one at a time),
-//   less the other circuits' own chunks (track, racing lines, envelopes, dressing); the asset
+//   and the chunks the page and the drive import for that circuit, following the bundler's
+//   chunk graph (dist/.vite/manifest.json: other circuits' track, lines, envelopes and dressing
+//   are left out, whatever their names); the asset
 //   index; the circuit's first sky and every track texture set at the preset's tiers
 //   (packages/render/src/presets.json, apps/web/dist/assets/index.json); the car levels of detail
 //   the preset loads and every livery mask (a full grid wears all of them); the Draco decoder;
@@ -40,8 +42,6 @@ const presets = JSON.parse(
  */
 const CIRCUIT_SKY = { monza: 'monza_afternoon', spa: 'overcast', singapore: 'overcast' };
 const CIRCUITS = Object.keys(CIRCUIT_SKY);
-/** A circuit's own build outputs (track, racing lines, envelopes, dressing), by file name. */
-const ownedBy = (f) => CIRCUITS.find((c) => new RegExp(`^assets/${c}[-.]`).test(f)) ?? null;
 const CAR_FILES = {
   high: 'car/car_high.glb',
   mobile: 'car/car_mobile.glb',
@@ -95,6 +95,7 @@ function sent(rel) {
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
+    !f.startsWith('.vite/') &&
     !/^assets\/(tex|env|car|draco|props)\//.test(f) &&
     f !== 'assets/index.json' &&
     !/input-?lab/i.test(f) &&
@@ -104,6 +105,42 @@ const code = all.filter(
 const index = JSON.parse(fs.readFileSync(path.join(dist, 'assets/index.json'), 'utf8'));
 const masks = all.filter((f) => /^assets\/car\/livery\/.*\.png$/.test(f));
 const draco = all.filter((f) => f.startsWith('assets/draco/'));
+
+/**
+ * The chunk graph from the bundler's manifest (dist/.vite/manifest.json): a race at `circuit`
+ * fetches what the page imports, statically or on the way to a race (the drive), but of the
+ * per-circuit data modules (track, racing lines, envelopes, dressing: packages/<pkg>/data/<id>…)
+ * only its own. Chunks are judged by their source path, not their file name: Monza's track is
+ * imported by the page itself, so every circuit fetches it.
+ */
+const graph = JSON.parse(fs.readFileSync(path.join(dist, '.vite/manifest.json'), 'utf8'));
+const dataCircuit = (src) =>
+  /packages\/(?:track|ai|render)\/data\/([a-z0-9]+)[-.]/.exec(src)?.[1] ?? null;
+const fileCircuit = new Map(
+  Object.entries(graph).map(([key, e]) => [e.file, dataCircuit(e.src ?? key)]),
+);
+function chunksFor(circuit) {
+  const out = new Set();
+  const seen = new Set();
+  const visit = (key) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    const e = graph[key];
+    const owner = dataCircuit(e.src ?? key);
+    if (owner && owner !== circuit) return;
+    out.add(e.file);
+    for (const f of [...(e.css ?? []), ...(e.assets ?? [])]) {
+      const o = fileCircuit.get(f) ?? null;
+      if (!o || o === circuit) out.add(f);
+    }
+    for (const k of [...(e.imports ?? []), ...(e.dynamicImports ?? [])]) visit(k);
+  };
+  visit('index.html');
+  return out;
+}
+// Outside the graph: the page's own files at the root, and the menu's images (by URL).
+const pageFiles = code.filter((f) => !f.startsWith('assets/') || f.startsWith('assets/ui/'));
+const chunkFiles = new Set(code.filter((f) => !pageFiles.includes(f)));
 
 let jsSent = 0;
 for (const f of code) if (/\.m?js$/.test(f)) jsSent += sent(f) ?? 0;
@@ -123,6 +160,8 @@ function worldPropIds(circuit, q) {
     ...((q.world?.treeCloud ?? 0) > 0 ? (own.nearTrees ?? []) : []),
   ];
 }
+/** Near-tree models load without their far level (catalog.ts: cards draw beyond the swap). */
+const nearOnly = (circuit) => new Set(worldProps.circuits?.[circuit]?.nearTrees ?? []);
 const mb = (n) => `${(n / 1024 / 1024).toFixed(2)} MiB`;
 let failed = false;
 const missing = [];
@@ -130,9 +169,11 @@ const results = [];
 for (const circuit of CIRCUITS)
   for (const [name, q] of Object.entries(presets)) {
     if (name.startsWith('$') || name === 'lite') continue;
-    const own = code.filter((f) => [null, circuit].includes(ownedBy(f)));
+    const chunks = [...chunksFor(circuit)].filter((f) => chunkFiles.has(f));
+    const dressed = chunks.some((f) => fileCircuit.get(f) === circuit && f.endsWith('.json'));
     const files = new Set([
-      ...own,
+      ...pageFiles,
+      ...chunks,
       'manifest.webmanifest',
       'assets/index.json',
       ...masks,
@@ -143,12 +184,15 @@ for (const circuit of CIRCUITS)
     for (const t of Object.values(index.textures))
       for (const f of Object.values(t[q.textureTier])) files.add(`assets/${f}`);
     for (const lod of new Set([...q.carLods, q.playerLod])) files.add(`assets/${CAR_FILES[lod]}`);
-    // The catalogue props the world places, at the levels this preset loads (catalog.ts).
-    const ids = worldPropIds(circuit, q);
+    // The catalogue props the world places, at the levels this preset loads (catalog.ts); a
+    // circuit without a dressing has no world and fetches none.
+    const ids = dressed ? worldPropIds(circuit, q) : [];
+    const near = nearOnly(circuit);
     for (const entry of propCatalogue.props) {
       if (!ids.includes(entry.id)) continue;
       const light = entry.lods.filter((l) => !/_high\.glb$/i.test(l.file));
-      const lods = (name === 'mobile' || name === 'lite') && light.length > 0 ? light : entry.lods;
+      let lods = (name === 'mobile' || name === 'lite') && light.length > 0 ? light : entry.lods;
+      if (near.has(entry.id)) lods = lods.filter((l) => !/_far\.glb$/i.test(l.file));
       for (const l of lods) files.add(l.file);
     }
     const groups = { code: 0, sky: 0, textures: 0, car: 0, props: 0, draco: 0, menu: 0, other: 0 };
