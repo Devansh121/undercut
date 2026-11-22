@@ -19,9 +19,13 @@ const scope = globalThis as unknown as WorkletScope;
 
 export class CarAudioProcessor extends scope.AudioWorkletProcessor {
   private readonly core: AudioCore;
+  private readonly profile: boolean;
+  private profileMs = 0;
+  private profileBlocks = 0;
 
   constructor(options?: { processorOptions?: ProcessorOptions }) {
     super();
+    this.profile = options?.processorOptions?.profile ?? false;
     this.core = new AudioCore({
       sampleRate: scope.sampleRate,
       seed: options?.processorOptions?.seed ?? 1,
@@ -58,7 +62,20 @@ export class CarAudioProcessor extends scope.AudioWorkletProcessor {
   /** Called by the browser for every render quantum (128 frames). Allocates nothing. */
   process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     const out = outputs[0];
+    const start = this.profile ? Date.now() : 0;
     if (out && out.length > 0) this.core.process(out, (out[0] as Float32Array).length);
+    if (this.profile) {
+      this.profileMs += Date.now() - start;
+      this.profileBlocks++;
+      if (this.profileBlocks % 4096 === 0)
+        this.port.postMessage({
+          type: 'profile',
+          blocks: this.profileBlocks,
+          processMs: this.profileMs,
+          audioMs: ((this.profileBlocks * 128) / scope.sampleRate) * 1000,
+          clock: 'Date.now (coarse aggregate)',
+        });
+    }
     return true;
   }
 }

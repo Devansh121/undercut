@@ -34,15 +34,22 @@ const server = http.createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const browser = await chromium.launch({
+  args: ['--mute-audio', '--autoplay-policy=no-user-gesture-required'],
+});
 let failed;
 try {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 844, height: 390 }, isMobile: true });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   const result = await page.evaluate(() => globalThis.result);
   console.log(JSON.stringify(result, null, 2));
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  await mkdir('artifacts/audio', { recursive: true });
+  await writeFile('artifacts/audio/worklet-mobile.json', JSON.stringify(result, null, 2) + '\n');
   const o = result.offline;
   failed =
+    !result.budget ||
+    result.budget.cpuPercent >= 10 ||
     !o ||
     !(o.peak > 0.01 && o.peak < 1) ||
     Math.abs(o.firingHz - o.expectedHz) / o.expectedHz > 0.001 ||

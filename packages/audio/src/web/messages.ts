@@ -17,6 +17,8 @@ export type ToProcessor =
 /** Options passed to the processor at construction. */
 export interface ProcessorOptions {
   seed: number;
+  /** Opt-in offline benchmark; never enabled by the game. */
+  profile?: boolean;
   /** Start silent (paused) until a `{ type: 'pause', paused: false }` message. */
   startPaused?: boolean;
 }
