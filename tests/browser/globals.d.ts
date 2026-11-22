@@ -19,6 +19,7 @@ declare global {
         timing: { status: string }[];
       } | null;
     };
+    onlineSettings(patch: Record<string, unknown>): boolean;
     start(): Promise<void>;
     startQuickRace(
       laps?: number,

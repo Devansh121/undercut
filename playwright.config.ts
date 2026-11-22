@@ -10,6 +10,13 @@ const roomsPort = Number(process.env.TEST_ROOMS_PORT ?? 4787);
 
 // Software WebGL (SwiftShader): identical on CI and on a laptop, and it keeps tests
 // off the shared GPU.
+/**
+ * The two longest scenarios (five Mobile sessions on one page, and a context loss with a full
+ * Mobile rebake) form their own project. CI runs it in the `build` job, in parallel with the
+ * `browser` job that runs desktop and phone; a plain `playwright test` runs all three.
+ */
+const LIFECYCLE = /\/(lifecycle|context-loss)\.spec\.ts$/;
+
 const launchOptions = {
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 };
@@ -19,6 +26,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
+  // Two workers on CI as on a laptop. Timed twice on one CI runner (4 vCPUs) each, the desktop
+  // and phone suite took the same wall time at 2 and 3 workers (4.2 and 3.5 min), and every
+  // long test ran slower at 3 (cold start up to 60 s of its 90 s limit): SwiftShader already
+  // uses several threads per browser.
   workers: 2,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
@@ -30,6 +41,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
+      testIgnore: LIFECYCLE,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -39,12 +51,23 @@ export default defineConfig({
     },
     {
       name: 'phone',
+      testIgnore: LIFECYCLE,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },
         deviceScaleFactor: 3,
         isMobile: true,
         hasTouch: true,
+        launchOptions,
+      },
+    },
+    {
+      name: 'lifecycle',
+      testMatch: LIFECYCLE,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
         launchOptions,
       },
     },
@@ -58,6 +81,17 @@ export default defineConfig({
     gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
     timeout: 120_000,
     stdout: 'pipe',
-    env: { PORT: String(port), HTTPS_PORT: String(httpsPort), ROOMS_PORT: String(roomsPort) },
+    env: {
+      PORT: String(port),
+      HTTPS_PORT: String(httpsPort),
+      ROOMS_PORT: String(roomsPort),
+      ROOM_TIMINGS: JSON.stringify({
+        readyCountdownMs: 500,
+        formationMs: 600,
+        lightIntervalMs: 700,
+        holdMinMs: 100,
+        holdMaxMs: 300,
+      }),
+    },
   },
 });
