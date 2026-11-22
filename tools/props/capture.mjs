@@ -6,6 +6,7 @@ import { chromium } from '@playwright/test';
 
 const server = await createServer({
   configFile: false,
+  optimizeDeps: { noDiscovery: true },
   root: process.cwd(),
   publicDir: 'apps/web/public',
   server: { host: '127.0.0.1', port: 0 },
@@ -18,23 +19,52 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   page.on('pageerror', (e) => console.error(e));
-  await page.goto(`${server.resolvedUrls.local[0]}tools/props/index.html`);
+  await page.goto(
+    `${server.resolvedUrls.local[0]}tools/props/index.html?light=${process.env.PROP_LIGHT ?? 'overcast'}`,
+  );
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   // Optional prefix filter (`npm run props:preview -- crew-`) recaptures only those sheets.
   const only = process.argv[2];
   const ids = (await page.evaluate(() => window.catalog.props.map((p) => p.id))).filter(
-    (id) => !only || id.startsWith(only),
+    (id) => !only || only.split(',').some((prefix) => id.startsWith(prefix)),
   );
   for (const id of ids)
     for (const mode of id.startsWith('crew-') ? ['sheet', 'scale', 'close'] : ['sheet', 'scale']) {
       await page.evaluate(([id, mode]) => window.inspect(id, mode), [id, mode]);
       await page.screenshot({
-        path: `docs/evidence/m2-models/${id}-${mode}.jpg`,
+        path: `docs/evidence/m2-models/${id}-${mode}${process.env.PROP_SUFFIX ?? ''}.jpg`,
         type: 'jpeg',
         quality: 85,
       });
       console.log(`${id} ${mode}`);
     }
+  if (ids.some((id) => id.startsWith('forest-'))) {
+    const luma = {};
+    for (const id of ids.filter((id) => id.startsWith('forest-'))) {
+      luma[id] = await page.evaluate((id) => window.treeLuma(id), id);
+    }
+    fs.writeFileSync(
+      'docs/evidence/m2-models/forest-luma.json',
+      JSON.stringify(luma, null, 2) + '\n',
+    );
+    if (
+      Object.values(luma)
+        .flat()
+        .some((r) => !Number.isFinite(r.relativeDelta) || r.relativeDelta > 0.25)
+    )
+      throw new Error('Tree LOD luminance changes by more than 25%');
+  }
+  if (process.env.PROP_ASSEMBLY) {
+    await page.evaluate(
+      (forest) => window.kitScene(forest),
+      process.env.PROP_ASSEMBLY === 'forest',
+    );
+    await page.screenshot({
+      path: `docs/evidence/m2-models/kit-${process.env.PROP_ASSEMBLY}.jpg`,
+      type: 'jpeg',
+      quality: 90,
+    });
+  }
   if (!only) {
     const boards = [
       'braking-board',

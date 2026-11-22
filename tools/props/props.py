@@ -855,11 +855,27 @@ for ident, module in specs:
             # Lateral reflection reverses winding; recalculate normals preserving per-face smoothness.
             bm = bmesh.new()
             bm.from_mesh(ob.data)
-            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+            if ident.startswith('forest-') and lod == 2 and 'needles' in key:
+                # Opposing coplanar card faces have intentional winding. Volume-based
+                # normal recalculation can turn one inward and erase half the crown.
+                bmesh.ops.reverse_faces(bm, faces=list(bm.faces))
+            else:
+                bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
             bm.to_mesh(ob.data)
             bm.free()
             merged.append(ob)
         bake(merged, rays=8 if lod == 0 else 4, max_dist=.3, floor=.65)
+        if ident.startswith('forest-') and lod == 2:
+            # Cards represent upward-facing needle boughs, not vertical walls. Each direction
+            # has an explicitly wound face so backface normal inversion cannot darken it.
+            for ob in merged:
+                if 'needles' in ob.data.materials[0].name:
+                    normals = [(0, 0, 1)] * len(ob.data.loops)
+                    for poly in ob.data.polygons:
+                        n = Vector((poly.normal.x * .6, poly.normal.y * .6, .8)).normalized()
+                        for i in poly.loop_indices:
+                            normals[i] = n
+                    ob.data.normals_split_custom_set(normals)
         if ident.startswith('crew-engineer'):
             skin_tone(merged, head_pos, SKIN_TONE[ident])
         points = [v.co for ob in merged for v in ob.data.vertices]

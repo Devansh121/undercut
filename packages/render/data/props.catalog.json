@@ -1866,8 +1866,8 @@
           "file": "assets/props/forest-spruce_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
-          "triangles": 32,
-          "bytes": 4412
+          "triangles": 36,
+          "bytes": 4496
         }
       ],
       "bounds": {
@@ -1904,8 +1904,8 @@
           "file": "assets/props/forest-fir_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
-          "triangles": 32,
-          "bytes": 4420
+          "triangles": 36,
+          "bytes": 4520
         }
       ],
       "bounds": {
@@ -1918,5 +1918,5 @@
       "materials": ["forest-bark", "forest-fir-needles"]
     }
   ],
-  "totalBytes": 2854808
+  "totalBytes": 2854992
 }

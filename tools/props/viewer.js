@@ -3,23 +3,40 @@ import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { Environment } from '../../packages/render/src/environment.ts';
-import { MONZA_AFTERNOON } from '../../packages/render/src/lighting/time-of-day.ts';
+import {
+  MONZA_AFTERNOON,
+  OVERCAST_DAY,
+  NIGHT_FLOODLIT,
+} from '../../packages/render/src/lighting/time-of-day.ts';
 import { QUALITY } from '../../packages/render/src/quality.ts';
 
+const lightMode = new URLSearchParams(window.location.search).get('light');
+const lighting =
+  lightMode === 'night'
+    ? NIGHT_FLOODLIT
+    : lightMode === 'overcast'
+      ? OVERCAST_DAY
+      : MONZA_AFTERNOON;
 const renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(1600, 1000);
 renderer.toneMapping = T.NeutralToneMapping;
-renderer.toneMappingExposure = MONZA_AFTERNOON.exposure;
+renderer.toneMappingExposure = lighting.exposure;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 document.body.append(renderer.domElement);
 const scene = new T.Scene();
 const camera = new T.PerspectiveCamera(35, 1.6, 0.05, 2000);
 const index = await (await fetch('/assets/index.json')).json();
-const meta = index.skies[MONZA_AFTERNOON.sky];
+const meta = index.skies[lighting.sky];
 const image = await createImageBitmap(await (await fetch(`/assets/${meta.hi}`)).blob());
-const env = new Environment(scene, camera, MONZA_AFTERNOON, { meta, image }, QUALITY.high);
+const env = new Environment(scene, camera, lighting, { meta, image }, QUALITY.high);
 env.bake(renderer);
+if (lightMode === 'night') {
+  const key = new T.DirectionalLight('#ffe5c4', 3);
+  key.position.set(15, 20, 8);
+  scene.add(new T.HemisphereLight('#aabdd5', '#20252a', 0.3));
+  scene.add(key);
+}
 const ground = new T.Mesh(
   new T.PlaneGeometry(400, 400).rotateX(-Math.PI / 2),
   new T.MeshStandardMaterial({ color: '#62615b', roughness: 0.95 }),
@@ -297,5 +314,135 @@ window.artwork = async (id) => {
   camera.updateProjectionMatrix();
   renderer.setViewport(0, 0, 1600, 1000);
   env.update(camera, center, true);
+  renderer.render(scene, camera);
+};
+
+// Isolate the crown against black and compare the same view with the LOD swap disabled/enabled.
+window.treeLuma = async (id) => {
+  await window.inspect(id, 'sheet');
+  ground.visible = false;
+  const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
+  for (const o of hidden) o.visible = false;
+  const background = scene.background;
+  scene.background = new T.Color(0);
+  const fog = scene.fog;
+  scene.fog = null;
+  renderer.setViewport(0, 0, 1600, 1000);
+  const shadows = renderer.shadowMap.enabled;
+  renderer.shadowMap.enabled = false;
+  const gl = renderer.getContext();
+  const pixels = new Uint8Array(1600 * 1000 * 4);
+  const results = [];
+  for (const angle of [0, Math.PI / 4, Math.PI / 2]) {
+    const values = [];
+    for (const level of [0, 1]) {
+      active[0].visible = level === 0;
+      active[1].visible = level === 1;
+      frame(
+        catalog.props.find((p) => p.id === id),
+        angle,
+        1.6,
+        0.05,
+      );
+      renderer.render(scene, camera);
+      gl.readPixels(0, 0, 1600, 1000, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let sum = 0,
+        count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const luma = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2];
+        if (luma > 2) {
+          sum += luma;
+          count++;
+        }
+      }
+      values.push(sum / count);
+    }
+    results.push({
+      angle,
+      near: values[0],
+      card: values[1],
+      relativeDelta: Math.abs(values[0] - values[1]) / values[0],
+    });
+  }
+  renderer.shadowMap.enabled = shadows;
+  for (const o of hidden) o.visible = true;
+  scene.background = background;
+  scene.fog = fog;
+  ground.visible = true;
+  return results;
+};
+
+window.kitScene = async (forest) => {
+  for (const o of active) scene.remove(o);
+  active = [];
+  const group = new T.Group();
+  scene.add(group);
+  active.push(group);
+  const cache = new Map();
+  const place = async (id, x, z, yaw = 0) => {
+    if (!cache.has(id))
+      cache.set(
+        id,
+        (await loader.loadAsync('/' + catalog.props.find((p) => p.id === id).lods[0].file)).scene,
+      );
+    const o = cache.get(id).clone(true);
+    o.position.set(x, 0, z);
+    o.rotation.y = yaw;
+    group.add(o);
+  };
+  for (let z = -16; z < 80; z += 4) {
+    for (const sign of [-1, 1]) {
+      await place('street-block', sign * 7, z, sign === -1 ? 0 : Math.PI);
+      await place('street-fence', sign * 7, z, sign === -1 ? 0 : Math.PI);
+    }
+    if (z % 16 === 0) {
+      await place('floodlight-mast', -9, z);
+      await place('floodlight-mast', 9, z, Math.PI);
+    }
+  }
+  for (let z = 0; z < 65; z += 8) await place('temporary-grandstand', -16, z);
+  if (forest) {
+    for (let z = -10; z < 74; z += 6) await place('hill-pit-garage', 18, z, Math.PI);
+    for (let z = -30; z < 100; z += 7)
+      for (let x = -45; x < -25; x += 6)
+        await place((x + z) % 3 ? 'forest-spruce' : 'forest-fir', x, z, z);
+  } else {
+    for (let z = 0; z < 85; z += 25)
+      await place(z % 2 ? 'marina-hotel' : 'marina-office', 28, z, Math.PI);
+    await place('marina-pavilion', -34, 10);
+  }
+  const road = new T.Mesh(
+    new T.PlaneGeometry(14, 180).rotateX(-Math.PI / 2),
+    new T.MeshStandardMaterial({ color: '#26292b', roughness: 0.7 }),
+  );
+  road.position.set(0, 0.006, 30);
+  road.receiveShadow = true;
+  group.add(road);
+  group.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
+  if (lightMode === 'night') {
+    for (const z of [0, 28, 56])
+      for (const x of [-8, 8]) {
+        const lamp = new T.SpotLight('#fff0dc', 2600, 65, 0.85, 0.5, 2);
+        lamp.position.set(x, 12.8, z);
+        lamp.target.position.set(0, 0, z + 5);
+        group.add(lamp, lamp.target);
+      }
+  }
+  env.register(group);
+  scene.add(car);
+  car.position.set(0, 0, -8);
+  car.rotation.y = -Math.PI / 2;
+  renderer.setViewport(0, 0, 1600, 1000);
+  camera.aspect = 1.6;
+  camera.fov = 46;
+  camera.position.set(2, 2.8, -25);
+  camera.lookAt(-1, 5, 30);
+  camera.updateProjectionMatrix();
+  env.update(camera, new T.Vector3(0, 0, 15), true);
   renderer.render(scene, camera);
 };

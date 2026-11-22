@@ -36,6 +36,49 @@ it('ships alpha-tested forest cards with the same physical albedo as near needle
       near.pbrMetallicRoughness.roughnessFactor,
     );
     expect(card.emissiveFactor).toBeUndefined();
-    expect(card.doubleSided).toBe(true);
+    expect(card.doubleSided ?? false).toBe(false);
+  }
+});
+
+it('keeps opposing forest card faces visible from every quadrant', async () => {
+  const { decodeGlb } = await import('./draco.mjs');
+  for (const id of ['forest-spruce', 'forest-fir']) {
+    const mesh = decodeGlb('apps/web/public/' + prop(id).lods[2].file).find((m) =>
+      m.material.includes('needles'),
+    );
+    const signs = new Set();
+    const p = mesh.POSITION.values;
+    for (let i = 0; i < mesh.indices.length; i += 3) {
+      const [a, b, c] = mesh.indices.slice(i, i + 3).map((v) => v * 3);
+      const u = [0, 1, 2].map((j) => p[b + j] - p[a + j]);
+      const v = [0, 1, 2].map((j) => p[c + j] - p[a + j]);
+      const x = u[1] * v[2] - u[2] * v[1];
+      const z = u[0] * v[1] - u[1] * v[0];
+      if (Math.abs(x) > 0.01) signs.add(x > 0 ? '+X' : '-X');
+      if (Math.abs(z) > 0.01) signs.add(z > 0 ? '+Z' : '-Z');
+    }
+    expect([...signs].sort()).toEqual(['+X', '+Z', '-X', '-Z']);
+    for (let i = 1; i < mesh.NORMAL.values.length; i += 3) {
+      expect(mesh.NORMAL.values[i]).toBeGreaterThan(0.6);
+      expect(mesh.NORMAL.values[i]).toBeLessThan(0.8);
+    }
+  }
+});
+
+it('preserves lit window masks through backdrop LOD changes', () => {
+  for (const id of ['marina-office', 'marina-hotel', 'marina-pavilion']) {
+    let panes;
+    for (const lod of prop(id).lods) {
+      const j = gltf(lod);
+      const index = j.materials.findIndex((m) => m.name === 'window-emissive-mask');
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(j.materials[index].emissiveFactor[0]).toBeGreaterThan(0);
+      const count = j.meshes
+        .flatMap((m) => m.primitives)
+        .filter((p) => p.material === index)
+        .reduce((s, p) => s + j.accessors[p.indices].count / 3, 0);
+      if (panes === undefined) panes = count;
+      expect(count).toBe(panes);
+    }
   }
 });

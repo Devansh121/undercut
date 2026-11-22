@@ -172,7 +172,8 @@ def forest(g, ident):
         nt.links.new(cut.outputs[0], bsdf.inputs['Alpha'])
         leaf.surface_render_method = 'DITHERED'
         leaf.alpha_threshold = .5
-        for angle in (0, math.pi/2):
+        leaf.use_backface_culling = True
+        for angle in (0, math.pi/2, math.pi, 3*math.pi/2):
             r = radius
             verts = [(s*r*math.cos(angle), s*r*math.sin(angle), z) for s,z in [(-1,0),(1,0),(1,h),(-1,h)]]
             mesh = bpy.data.meshes.new('impostor'); mesh.from_pydata(verts, [], [(0,1,2,3)])
