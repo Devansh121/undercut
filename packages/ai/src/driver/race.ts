@@ -101,6 +101,10 @@ const BYPASS_SIDE_BY_SIDE = SIDE_BY_SIDE + 0.3;
 const BASE_CORRECTION = 0.05;
 const SLOW_CORRECTION = 0.15;
 const SLOW_STEER_BELOW = 12;
+/** Below this speed, m/s, the steering's yaw-rate integral does not build up. */
+const INTEGRATE_FROM = 2;
+/** Heading toward its lane a car asks for at walking pace, at most, rad. */
+const SLOW_HEADING = 0.5;
 /** Below this speed, m/s, a car stopping for traffic keeps this share of the brake pedal. */
 const SLOW_STOP_BELOW = 12;
 const SLOW_STOP_BRAKE = 0.6;
@@ -152,6 +156,8 @@ const CORNER_CURVATURE = 1 / 150;
 const LAUNCHED = 25;
 /** Room to the edge a car turning round keeps before it changes direction, m. */
 const TURN_ROOM = 3.5;
+/** Recovery: each direction (forward, back) is held at least this long once its gear is in, s. */
+const DIR_HOLD = 1;
 
 const TWO_PI = 2 * Math.PI;
 const wrapAngle = (a: number): number => a - TWO_PI * Math.floor((a + Math.PI) / TWO_PI);
@@ -219,6 +225,10 @@ export class RaceDriver implements Driver {
   private rejoinTime = 0;
   private stillTime = 0;
   private backTime = 0;
+  /** Recovery: time in the present direction, s; back up straight; direction changes made. */
+  private dirHeld = 0;
+  private backStraight = false;
+  private flips = 0;
   private wasActive = false;
   private blueSide = 0;
   /** The car being passed as last seen (speed, m/s; -1 none) and its deceleration, m/s². */
@@ -300,6 +310,9 @@ export class RaceDriver implements Driver {
     this.rejoinTime = 0;
     this.stillTime = 0;
     this.backTime = 0;
+    this.dirHeld = 0;
+    this.backStraight = false;
+    this.flips = 0;
     this.wasActive = false;
     this.blueSide = 0;
     this.passSeenV = -1;
@@ -333,6 +346,9 @@ export class RaceDriver implements Driver {
     out.rejoinTime = this.rejoinTime;
     out.stillTime = this.stillTime;
     out.backTime = this.backTime;
+    out.dirHeld = this.dirHeld;
+    out.backStraight = this.backStraight;
+    out.flips = this.flips;
     out.wasActive = this.wasActive;
     out.blueSide = this.blueSide;
     out.passSeenV = this.passSeenV;
@@ -384,6 +400,9 @@ export class RaceDriver implements Driver {
     this.rejoinTime = num('rejoinTime');
     this.stillTime = num('stillTime');
     this.backTime = num('backTime');
+    this.dirHeld = num('dirHeld');
+    this.backStraight = m.backStraight === true;
+    this.flips = num('flips');
     this.wasActive = m.wasActive === true;
     this.blueSide = typeof m.blueSide === 'number' ? m.blueSide : 0;
     this.passSeenV = typeof m.passSeenV === 'number' ? m.passSeenV : -1;
@@ -416,6 +435,8 @@ export class RaceDriver implements Driver {
       inner.accelLimit = Number.POSITIVE_INFINITY;
       inner.brakeFloor = 0;
       inner.maxCorrection = BASE_CORRECTION;
+      inner.headingLimit = Number.POSITIVE_INFINITY;
+      inner.integrateFrom = 0;
       this.last.accelLimit = Number.POSITIVE_INFINITY;
       this.last.leader = -1;
     }
@@ -1090,6 +1111,12 @@ export class RaceDriver implements Driver {
         ? BASE_CORRECTION +
           (SLOW_CORRECTION - BASE_CORRECTION) * (1 - Math.max(0, v) / SLOW_STEER_BELOW)
         : BASE_CORRECTION;
+    // And no more than half a radian across the road toward its lane: going round a car at
+    // walking pace on full lock, a car turned a radian across the road and drove off it.
+    this.inner.headingLimit = v < SLOW_STEER_BELOW ? SLOW_HEADING : Number.POSITIVE_INFINITY;
+    // Standing in a queue the steering does not wind up (it held full lock as the car pulled
+    // away, off the road). Not on the grid: the launch is the reference driver's own.
+    this.inner.integrateFrom = view.launching ? 0 : INTEGRATE_FROM;
 
     const last = this.last;
     last.target = target;
@@ -1555,12 +1582,19 @@ export class RaceDriver implements Driver {
         this.recovering = true;
         this.backTime = 1.5;
       }
+      if (this.recovering) {
+        this.dirHeld = 0;
+        this.flips = 0;
+        this.backStraight = false;
+      }
       // (A back-up round a stopped car is over: the recovery has the car and its gears now.)
       if (this.recovering) this.reverseTime = 0;
     }
     if (this.recovering && Math.abs(err) < 0.35 && v > 2) {
       this.recovering = false;
       this.backTime = 0;
+      this.flips = 0;
+      this.backStraight = false;
       // Rejoin from where the car is, easing back to the line.
       this.o = view.self.d - this.at(line.d, s0);
       this.rejoinTime = 4;
@@ -1593,15 +1627,34 @@ export class RaceDriver implements Driver {
     const lat = Math.sin(err);
     const ahead = lat > 0.3 ? roomLeft : lat < -0.3 ? roomRight : Infinity;
     const behind = lat > 0.3 ? roomRight : lat < -0.3 ? roomLeft : Infinity;
+    // Each direction is held until its gear is in and it has had time to move the car: a
+    // change on the next tick restarted the gear change every time, and the car sat between
+    // first and neutral. Going nowhere while pointing the right way, or after two changes of
+    // direction, the car backs straight.
+    this.dirHeld += dt;
     if (this.backTime > 0) {
       this.backTime -= dt;
-      if (behind < TURN_ROOM || Math.abs(err) < 0.5 || this.stillTime > 1.5) {
+      const settled = tel.gear < 0 && this.dirHeld > DIR_HOLD;
+      const pointed = Math.abs(err) < 0.5 && !this.backStraight;
+      if (settled && (behind < TURN_ROOM || pointed || this.stillTime > 1.5)) {
+        this.backTime = 0;
+      }
+      if (this.backTime <= 0) {
         this.backTime = 0;
         this.stillTime = 0;
+        this.dirHeld = 0;
+        this.flips++;
       }
-    } else if (ahead < TURN_ROOM || this.stillTime > 1.5) {
+    } else if (
+      tel.gear >= 1 &&
+      this.dirHeld > DIR_HOLD &&
+      (ahead < TURN_ROOM || this.stillTime > 1.5)
+    ) {
       this.backTime = 4;
       this.stillTime = 0;
+      this.dirHeld = 0;
+      this.backStraight = Math.abs(err) < 0.5 || this.flips >= 2;
+      this.flips++;
     }
     // Gears: first to go forward, reverse to back, stepping down through the box from wherever
     // the spin left it.
@@ -1615,7 +1668,7 @@ export class RaceDriver implements Driver {
         out.gearShift = 0;
         return;
       }
-      out.steer = -turn;
+      out.steer = this.backStraight ? 0 : -turn;
       out.brake = v > 0.5 || v < -6 ? 0.6 : 0;
       out.gearShift = shiftable && tel.gear >= 0 && (tel.gear > 0 || Math.abs(v) < 1) ? -1 : 0;
       out.throttle = tel.gear < 0 && v > -4 ? 0.35 : 0;

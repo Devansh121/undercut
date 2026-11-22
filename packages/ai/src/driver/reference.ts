@@ -161,6 +161,14 @@ export class ReferenceDriver implements Driver {
    * turns far tighter than this, and a racing driver pulling away off the line uses it.
    */
   maxCorrection = 0.05;
+  /**
+   * The most heading toward the path the lateral feedback asks for, rad (infinite: no limit).
+   * A car far off its path at walking pace otherwise turns ever more across the road, on full
+   * lock, and off it.
+   */
+  headingLimit = Number.POSITIVE_INFINITY;
+  /** Below this speed, m/s, the yaw-rate integral does not build up (0: always does). */
+  integrateFrom = 0;
 
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
   readonly last = {
@@ -296,10 +304,16 @@ export class ReferenceDriver implements Driver {
       this.wander += this.rng.range(-1, 1) * this.skill.lineWander * Math.sqrt(dt);
       this.wander = Math.max(-this.skill.lineWander, Math.min(this.skill.lineWander, this.wander));
     }
-    const e = q.d - lineD - this.wander - this.offset;
+    const eRaw = q.d - lineD - this.wander - this.offset;
     const ePsi = wrapAngle(course - heading - Math.atan(this.offsetSlope));
     const kAhead = this.sampleAhead(line.curvature, s, v * g.steerPreview);
     const w = Math.max(g.lateralOmegaMin, Math.min(g.lateralOmegaMax, g.lateralOmegaSpeed / v));
+    // With a heading limit, the lateral error counts only up to the error whose steady heading
+    // toward the path is that limit (the feedback balances at sin(ePsi) = -w e / (2 zeta v)).
+    const eMax = Number.isFinite(this.headingLimit)
+      ? (2 * g.lateralDamping * v * Math.sin(this.headingLimit)) / w
+      : Number.POSITIVE_INFINITY;
+    const e = Math.max(-eMax, Math.min(eMax, eRaw));
     let correction = -(w * w * e) / (v * v) - (2 * g.lateralDamping * w * Math.sin(ePsi)) / v;
     // At walking pace the feedback would ask for more curvature than the car has; keep it sane.
     const maxCorr = this.maxCorrection;
@@ -309,10 +323,13 @@ export class ReferenceDriver implements Driver {
     const L = p.geometry.wheelbase;
     const maxSteer = p.geometry.maxSteerAngle;
     const yawErr = yawTarget - yawRate;
-    const integral = Math.max(
-      -0.5,
-      Math.min(0.5, this.yawIntegral + ((g.yawKi * yawErr) / v) * dt),
-    );
+    // Standing still the car cannot turn, and the yaw error it cannot correct would wind the
+    // integral up to full lock (held there as it pulls away): below `integrateFrom` it bleeds
+    // away instead.
+    const integral =
+      tel.speed < this.integrateFrom
+        ? this.yawIntegral * Math.max(0, 1 - dt / 0.5)
+        : Math.max(-0.5, Math.min(0.5, this.yawIntegral + ((g.yawKi * yawErr) / v) * dt));
     let steer = (L * kCmd) / maxSteer + (g.yawKp * yawErr) / v + integral;
     // Past the front tyres' peak slip angle more lock only scrubs: the wheel goes light. Hold
     // the road-wheel angle within the peak of where the front axle is pointing, and do not wind
