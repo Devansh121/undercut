@@ -30,6 +30,7 @@ import { unregisteredLitMaterials } from './lighting/registration';
 import type { LocalLight } from './lighting/light-pool';
 import { nextLift } from './framing';
 import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
+import { addLampLight, bakeLampMap, type LampMap } from './lighting/lamp-map';
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { FramePacer, webglFences } from './pipeline/frame-pacer';
@@ -67,6 +68,10 @@ import { CircuitWorld } from './world/world';
  * state cache) lives as long as the page. It is preset-independent: anti-aliasing happens in the
  * pipeline's own targets, so a session can change preset without a new context.
  */
+
+/** The baked lamp map: its cell (m) and how far it reaches past the lap's box (m). */
+const LAMP_MAP_CELL = 2;
+const LAMP_MAP_MARGIN = 120;
 export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   const renderer = new WebGLRenderer({
     canvas,
@@ -234,6 +239,8 @@ export class RaceView {
   private readonly trackView: TrackView;
   /** The place around the circuit, when the session has a dressing file. */
   world: CircuitWorld | null = null;
+  /** The circuit's lamp banks baked for the static scenery at night (lighting/lamp-map.ts). */
+  private lampMap: LampMap | null = null;
   private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
@@ -439,6 +446,7 @@ export class RaceView {
         garageTeams: options.garageTeams,
         brands: options.brands,
         propKit: assets.propKit,
+        night: (options.timeOfDay ?? MONZA_AFTERNOON).localLightSlots > 0,
       });
       this.scene.add(this.world.group);
     }
@@ -503,8 +511,34 @@ export class RaceView {
   }
 
   private finalizeWorldScene(): void {
+    // A circuit that places its own floodlights lights the night from them (street.ts), not from
+    // the stand-in plan.
+    const lamps = this.world?.localLights ?? [];
+    if (this.world && lamps.length > 0) this.environment.setLocalLights(lamps);
     this.props.build();
     this.scene.add(this.props.group);
+    // At night the banks beyond the pooled lights' reach light the scenery from a baked map.
+    if (this.world && lamps.length > 0 && this.environment.pool) {
+      const lap = this.track.lap;
+      let x0 = Infinity;
+      let z0 = Infinity;
+      let x1 = -Infinity;
+      let z1 = -Infinity;
+      for (let i = 0; i < lap.count; i++) {
+        x0 = Math.min(x0, lap.x[i] as number);
+        x1 = Math.max(x1, lap.x[i] as number);
+        z0 = Math.min(z0, lap.z[i] as number);
+        z1 = Math.max(z1, lap.z[i] as number);
+      }
+      const m = LAMP_MAP_MARGIN;
+      this.lampMap = bakeLampMap(
+        lamps,
+        [x0 - m, z0 - m, x1 + m, z1 + m],
+        LAMP_MAP_CELL,
+        this.world.heightAt,
+      );
+      addLampLight([this.trackView.group, this.world.group, this.props.group], this.lampMap);
+    }
     this.environment.register(this.scene);
     // No upfront renderer.compile: three.js deletes a program's shaders on its first use, so
     // programs compiled for objects that are never drawn (levels of detail not reached, a
@@ -525,6 +559,7 @@ export class RaceView {
         garageTeams: options.garageTeams,
         brands: options.brands,
         propKit: assets.propKit,
+        night: (options.timeOfDay ?? MONZA_AFTERNOON).localLightSlots > 0,
       });
       // The view may have been released while the world was building (a lost context).
       if (this.disposed) {
@@ -874,6 +909,7 @@ export class RaceView {
     }
     this.focus.set(frame.pose.x, frame.pose.y, frame.pose.z);
     this.environment.update(this.camera, this.focus, true);
+    this.lampMap?.update(this.camera.position, this.environment.pool?.reach ?? 0);
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
     this.world?.update(frame.time, this.camera.position);
@@ -1080,6 +1116,7 @@ export class RaceView {
     this.contact?.dispose();
     this.props.dispose();
     this.world?.dispose();
+    this.lampMap?.dispose();
     this.environment.dispose();
     for (const s of Object.values(this.assets.sets)) disposeSet(s);
     this.assets.car.dispose();

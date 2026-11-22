@@ -73,9 +73,13 @@ export class LightPool {
     return edge;
   }
 
+  /** Distance from the eye of the farthest light in a slot after `update`, m (0: none). */
+  reach = 0;
+
   update(eye: Vector3): void {
     const edge = LightPool.pick(this.lights, eye, this.slots.length, this.order, this.scores);
     const picked = this.order;
+    this.reach = 0;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i] as PointLight;
       const k = picked[i];
@@ -88,6 +92,7 @@ export class LightPool {
       const fade =
         edge === Infinity ? 1 : Math.min(1, Math.max(0, (edge - s) / Math.max(0.05, edge * 0.25)));
       slot.position.set(l.x, l.y, l.z);
+      this.reach = Math.max(this.reach, Math.hypot(l.x - eye.x, l.y - eye.y, l.z - eye.z));
       slot.color.set(l.colour);
       slot.intensity = l.intensity * fade;
       slot.distance = l.distance;
