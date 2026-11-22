@@ -1025,6 +1025,8 @@ export function placeTracksideFurniture(options: {
 
   const farDist = mobile ? 450 : 950;
   const distScale = mobile ? 0.55 : 1;
+  // Mobile loads no top-level kit models, so short chunks would only add draw calls there.
+  const smallChunk = mobile ? undefined : SMALL_PROP_CHUNK;
 
   const kitHoardMat = brandHoardingMaterial(brandAtlasTex, true);
   materials.push(kitHoardMat);
@@ -1037,7 +1039,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'hoarding-front',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: castShadows,
       shadowMaxDistance: 160,
       receiveShadow: true,
@@ -1049,14 +1051,14 @@ export function placeTracksideFurniture(options: {
     geometries.push(hoardFrontGeo, hoardFrameGeo);
     props.define({
       id: 'hoarding-front',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: hoardFrontGeo, material: hoardMat, maxDistance: farDist }],
     });
     props.define({
       id: 'hoarding-frame',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: hoardFrameGeo, material: steelMat, maxDistance: farDist * 0.65 }],
@@ -1090,7 +1092,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'catch-fence-post',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: kitFence,
@@ -1101,14 +1103,14 @@ export function placeTracksideFurniture(options: {
     geometries.push(fencePostGeo, fenceMeshGeo);
     props.define({
       id: 'catch-fence-post',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: fencePostGeo, material: steelMat, maxDistance: mobile ? 300 : 650 }],
     });
     props.define({
       id: 'catch-fence-mesh',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: false,
       lods: [{ geometry: fenceMeshGeo, material: fenceMeshMat, maxDistance: mobile ? 220 : 480 }],
@@ -1148,7 +1150,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'tecpro-block',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: castShadows,
       shadowMaxDistance: 120,
       receiveShadow: true,
@@ -1159,7 +1161,7 @@ export function placeTracksideFurniture(options: {
     geometries.push(tecproGeo);
     props.define({
       id: 'tecpro-block',
-      chunkLength: SMALL_PROP_CHUNK,
+      chunkLength: smallChunk,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: tecproGeo, material: steelMat, maxDistance: farDist * 0.8 }],

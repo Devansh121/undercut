@@ -51,7 +51,7 @@ export interface PropKind {
    * Lap chunk length for this kind, m (default the registry's): short chunks for small props
    * along the barriers, so only those really near the eye switch to their top level.
    */
-  chunkLength?: number;
+  chunkLength?: number | undefined;
 }
 
 /** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
