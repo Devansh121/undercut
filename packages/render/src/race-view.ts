@@ -197,6 +197,10 @@ export interface ViewStats {
   drawnFrames: number;
   /** Frames that skipped their draw because the GPU was still two frames behind. */
   skippedDraws: number;
+  /** Frames drawn anyway after a second waiting on the GPU (FramePacer). */
+  forcedDraws: number;
+  /** Frame pacing switched off for the session: GPU fences stopped completing. */
+  pacingDisabled: boolean;
 }
 
 /** Everything a session fetches before it can draw, for one preset. */
@@ -242,6 +246,8 @@ export class RaceView {
   /** Frame time since the last drawn frame, ms: dynamic resolution's sample when draws skip. */
   private sinceDrawMs = 0;
   private drawnFrames = 0;
+  /** Real time between the last two drawn frames, ms (a skipped draw makes it longer). */
+  private drawIntervalMs = 0;
   private contextLost = false;
   private readonly fleetLiveries: readonly CarLivery[];
   private readonly track: Track;
@@ -380,7 +386,15 @@ export class RaceView {
     this.renderer.toneMapping = q.post ? NoToneMapping : NeutralToneMapping;
     this.renderer.shadowMap.enabled = q.shadow.cascades > 0;
     this.renderer.shadowMap.needsUpdate = true;
-    this.dynamic = new DynamicResolution(q.dynamicResolution);
+    // Above the cap only up to the screen's own pixel ratio: the buffer never exceeds the screen.
+    const dpr = window.devicePixelRatio || 1;
+    this.dynamic = new DynamicResolution({
+      ...q.dynamicResolution,
+      max: Math.max(
+        1,
+        Math.min(q.dynamicResolution.max ?? 1, dpr / Math.min(dpr, q.pixelRatioCap)),
+      ),
+    });
     this.gpu = new GpuTimer(this.renderer.getContext() as WebGL2RenderingContext);
     this.pacer = new FramePacer(webglFences(this.renderer.getContext() as WebGL2RenderingContext));
 
@@ -564,6 +578,16 @@ export class RaceView {
     this.pipeline.setSize(Math.round(w * ratio), Math.round(h * ratio));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Frames drawn so far (an animation frame may skip its draw). Per frame: no allocation. */
+  get drawnCount(): number {
+    return this.drawnFrames;
+  }
+
+  /** Real time between the last two drawn frames, ms: what the player saw, not rAF. */
+  get lastDrawIntervalMs(): number {
+    return this.drawIntervalMs;
   }
 
   get cameraName(): CameraName {
@@ -770,7 +794,7 @@ export class RaceView {
     this.sinceDrawMs += frame.frameMs ?? 0;
     // Draw only while the GPU is at most a frame behind (FramePacer); the CPU side below runs
     // every frame either way, so cameras, poses and screen-space queries stay current.
-    const draw = !this.contextLost && this.pacer.ready();
+    const draw = !this.contextLost && this.pacer.ready(frame.frameMs ?? 0);
     if (draw) {
       // GPU time where the browser measures it (CPU-side stalls are not GPU load), else the time
       // since the last drawn frame (the frame time, unless the GPU made this frame wait).
@@ -779,8 +803,9 @@ export class RaceView {
         : frame.frameMs === undefined
           ? null
           : this.sinceDrawMs;
+      this.drawIntervalMs = this.sinceDrawMs;
       this.sinceDrawMs = 0;
-      if (sample !== null && this.dynamic.update(sample)) this.resize(true);
+      if (sample !== null && this.dynamic.update(sample, this.gpu.available)) this.resize(true);
     }
     this.camera.clearViewOffset();
     this.camera.aspect = this.width / Math.max(1, this.height);
@@ -1019,6 +1044,8 @@ export class RaceView {
       environmentBakes: this.environment.bakes,
       drawnFrames: this.drawnFrames,
       skippedDraws: this.pacer.skipped,
+      forcedDraws: this.pacer.forcedDraws,
+      pacingDisabled: this.pacer.disabled,
     };
   }
 

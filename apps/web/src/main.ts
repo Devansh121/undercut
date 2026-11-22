@@ -1,4 +1,5 @@
 import { registerOffline } from './pwa/register';
+import { showHomeScreenHint } from './pwa/home-screen-hint';
 import '../../../design/mock/tokens.css';
 import './styles/kit.css';
 import './styles/menu.css';
@@ -280,3 +281,4 @@ if (debugEnabled()) {
 }
 
 registerOffline();
+showHomeScreenHint();

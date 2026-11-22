@@ -1,11 +1,11 @@
-"""Street, floodlight, temporary stand, marina and hill pit furniture, in author Z-up metres."""
+"""Overcast forest and temporary night-race furniture, in author Z-up metres."""
 import math
 import bpy
 
 SPECS = [('street-block', 4), ('street-fence', 4), ('street-fence-end', 0),
          ('floodlight-mast', 0), ('lighting-truss', 4), ('temporary-grandstand', 8),
          ('marina-office', 0), ('marina-hotel', 0), ('marina-pavilion', 0),
-         ('hill-pit-garage', 6)]
+         ('hill-pit-garage', 6), ('forest-spruce', 0), ('forest-fir', 0)]
 
 
 def build(g, ident):
@@ -127,6 +127,13 @@ def build(g, ident):
             for z in (5.1, 5.5, 5.9, 6.3):
                 box('rear-cladding-seam', (-5.01, 0, z), (.025, 6, .03), dark, bevel=0)
         box('roof-service', (-2.5, 0, 7.6), (2.5, 3.5, 1), steel)
+    elif ident.startswith('forest-'):
+        forest(g, ident)
+
+
+def forest(g, ident):
+    from forest import build as build_forest
+    build_forest(g, ident)
 
 
 def facade_panel(g, pos, width, height, material, side):

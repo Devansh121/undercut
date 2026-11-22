@@ -76,6 +76,9 @@ const ICONS = [
   { src: 'icon-maskable-512.png', size: 512, scale: 0.95, purpose: 'maskable' },
 ];
 for (const i of ICONS) fs.writeFileSync(`${dir}/${i.src}`, icon(i.size, i.scale));
+// iOS ignores manifest icons for Add to Home Screen and reads this one (index.html links it).
+const APPLE_ICON = 'apple-touch-icon.png';
+fs.writeFileSync(`${dir}/${APPLE_ICON}`, icon(180, 1.3));
 fs.writeFileSync(
   `${dir}/manifest.webmanifest`,
   JSON.stringify({
@@ -84,7 +87,10 @@ fs.writeFileSync(
     short_name: GAME_NAME,
     start_url: './',
     scope: './',
-    display: 'standalone',
+    // A game: no browser bars where the platform allows (Android); iOS treats it as standalone,
+    // which with the black-translucent status bar meta is edge to edge.
+    display: 'fullscreen',
+    display_override: ['fullscreen', 'standalone'],
     orientation: 'landscape',
     background_color: '#0d0f12',
     theme_color: '#0d0f12',
@@ -110,6 +116,7 @@ const files = [
     './',
     'manifest.webmanifest',
     ...ICONS.map((i) => i.src),
+    APPLE_ICON,
     ...Object.keys(inventory.presets.mobile.files).filter((f) => f.startsWith('assets/')),
   ]),
 ];

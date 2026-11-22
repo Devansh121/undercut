@@ -110,6 +110,20 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npm run test:browser:lifecycle
+      # The phone menu sweep on WebKit, the engine of every iPhone browser (DOM only, quick).
+      - name: Cache WebKit
+        id: wk-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright/webkit-*
+          key: playwright-webkit-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install WebKit
+        if: steps.wk-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps webkit
+      - name: Install WebKit system libraries
+        if: steps.wk-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps webkit
+      - run: npm run test:browser:webkit
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
