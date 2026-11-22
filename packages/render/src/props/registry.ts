@@ -37,6 +37,12 @@ export interface PropKind {
   castShadow?: boolean;
   receiveShadow?: boolean;
   /**
+   * Maximum distance (m, to the chunk's near edge) at which this kind casts shadows into the
+   * sun shadow cascades. Beyond this distance `castShadow` is cleared per chunk so distant
+   * scenery skips the shadow passes while staying visible in the main pass.
+   */
+  shadowMaxDistance?: number;
+  /**
    * Chunk by a square world grid of this cell size (m) instead of by lap distance: for scenery
    * spread over the land around the circuit (woods), where lap chunks would be long and thin.
    */
@@ -86,6 +92,7 @@ export function chunkLod(dist: number, lods: readonly Pick<PropLod, 'maxDistance
 
 interface Chunk {
   centre: Vector3;
+  radius: number;
   meshes: InstancedMesh[];
 }
 
@@ -161,9 +168,11 @@ export class PropRegistry {
         }
         centre.multiplyScalar(1 / indices.length);
         let radius = 0;
+        let maxScale = 1;
         for (const i of indices) {
           const p = list[i] as PropPlacement;
           radius = Math.max(radius, centre.distanceTo(pos.set(p.x, p.y, p.z)));
+          if (p.scale !== undefined && p.scale > maxScale) maxScale = p.scale;
         }
         const meshes = kind.lods.map((lod) => {
           const im = new InstancedMesh(lod.geometry, lod.material, indices.length);
@@ -177,29 +186,65 @@ export class PropRegistry {
           if (lod.depthMaterial) im.customDepthMaterial = lod.depthMaterial;
           im.castShadow = kind.castShadow ?? true;
           im.receiveShadow = kind.receiveShadow ?? true;
-          // Culling on the chunk's bounds (geometry radius added generously).
+          // Exact chunk bounds including scaled prop geometry radius for frustum culling.
           lod.geometry.computeBoundingSphere();
-          const r = (lod.geometry.boundingSphere?.radius ?? 1) * 2 + radius;
+          const r = (lod.geometry.boundingSphere?.radius ?? 1) * maxScale + radius;
           im.boundingSphere = new Sphere(centre.clone(), r);
           im.visible = false;
+          im.matrixAutoUpdate = false;
           im.name = `prop:${id}`;
           this.group.add(im);
           return im;
         });
-        chunks.push({ centre, meshes });
+        chunks.push({ centre, radius: radius + maxScale, meshes });
       }
       this.chunks.set(id, chunks);
     }
     this.register(this.group);
   }
 
-  /** Per frame: pick each chunk's level by its distance from the camera. */
+  /** Per frame: pick each chunk's level and shadow state by its distance from the camera. */
   update(eye: Vector3): void {
     for (const [id, chunks] of this.chunks) {
       const kind = this.kinds.get(id) as PropKind;
+      const casts = kind.castShadow ?? true;
+      const shadowMax = kind.shadowMaxDistance ?? Infinity;
       for (const c of chunks) {
-        const lod = chunkLod(c.centre.distanceTo(eye), kind.lods);
-        c.meshes.forEach((im, i) => (im.visible = i === lod));
+        const dist = c.centre.distanceTo(eye);
+        const lod = chunkLod(dist, kind.lods);
+        const castNow = casts && dist - c.radius < shadowMax;
+        for (let i = 0; i < c.meshes.length; i++) {
+          const im = c.meshes[i] as InstancedMesh;
+          const active = i === lod;
+          im.visible = active;
+          im.castShadow = active && castNow;
+        }
+      }
+    }
+  }
+
+  /**
+   * Temporarily make one chunk per registered prop kind and LOD visible (for upfront shader
+   * precompilation so chunks entering the frustum mid-lap do not stall), then restore state.
+   */
+  withRepresentativeVisible(fn: () => void): void {
+    const saved: { im: InstancedMesh; visible: boolean; castShadow: boolean }[] = [];
+    for (const [id, chunks] of this.chunks) {
+      const first = chunks[0];
+      if (!first) continue;
+      const casts = this.kinds.get(id)?.castShadow ?? true;
+      for (const im of first.meshes) {
+        saved.push({ im, visible: im.visible, castShadow: im.castShadow });
+        im.visible = true;
+        im.castShadow = casts;
+      }
+    }
+    try {
+      fn();
+    } finally {
+      for (const s of saved) {
+        s.im.visible = s.visible;
+        s.im.castShadow = s.castShadow;
       }
     }
   }

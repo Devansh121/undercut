@@ -727,8 +727,12 @@ export function buildTrackBridges(
 
   if (bridgeS.length === 0) return { group, geometries, materials, count: 0 };
 
-  const sb = new PropBuilder();
-  const bb = new PropBuilder();
+  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
+  sm.name = 'track-bridge-struct';
+  const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
+  bm.name = 'track-bridge-banner';
+  materials.push(sm, bm);
+
   const steel = [0.3, 0.32, 0.34];
   const concrete = [0.25, 0.25, 0.245];
   const dark = [0.075, 0.08, 0.09];
@@ -736,6 +740,8 @@ export function buildTrackBridges(
   const t = createVec3();
 
   bridgeS.forEach((s, bi) => {
+    const sb = new PropBuilder();
+    const bb = new PropBuilder();
     const idxS = Math.min(track.lap.count - 1, Math.round(s / track.lap.step));
     const leftBar = Math.abs(track.barrier[0][idxS] ?? 11) + 2.2;
     const rightBar = Math.abs(track.barrier[1][idxS] ?? 11) + 2.2;
@@ -826,23 +832,21 @@ export function buildTrackBridges(
       [1, 1, 1],
       uvRect,
     );
+
+    const sg = sb.build(true);
+    const bg = bb.build(false);
+    geometries.push(sg, bg);
+    const sMesh = new Mesh(sg, sm);
+    sMesh.name = `world:bridge-struct-${bi}`;
+    sMesh.castShadow = true;
+    sMesh.receiveShadow = true;
+    sMesh.matrixAutoUpdate = false;
+    const bMesh = new Mesh(bg, bm);
+    bMesh.name = `world:bridge-banner-${bi}`;
+    bMesh.receiveShadow = true;
+    bMesh.matrixAutoUpdate = false;
+    group.add(sMesh, bMesh);
   });
-
-  const sg = sb.build(true);
-  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
-  sm.name = 'track-bridge-struct';
-  const bg = bb.build(false);
-  const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
-  bm.name = 'track-bridge-banner';
-  geometries.push(sg, bg);
-  materials.push(sm, bm);
-
-  const sMesh = new Mesh(sg, sm);
-  sMesh.castShadow = true;
-  sMesh.receiveShadow = true;
-  const bMesh = new Mesh(bg, bm);
-  bMesh.receiveShadow = true;
-  group.add(sMesh, bMesh);
 
   return { group, geometries, materials, count: bridgeS.length };
 }
@@ -1016,6 +1020,7 @@ export function placeTracksideFurniture(options: {
   const kitHoarding = propKit?.lodsFor('hoarding', {
     materialOverrides: { 'board-face': kitHoardMat },
     maxDistanceScale: distScale,
+    distanceCaps: [60, 180, 750],
   });
   const hasKitHoarding = Boolean(kitHoarding);
   if (kitHoarding) {
@@ -1023,6 +1028,7 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'hoarding-front',
       castShadow: castShadows,
+      shadowMaxDistance: 160,
       receiveShadow: true,
       lods: kitHoarding,
     });
@@ -1056,11 +1062,15 @@ export function placeTracksideFurniture(options: {
   props.define({
     id: 'verge-board-frame',
     castShadow: castShadows,
+    shadowMaxDistance: 140,
     receiveShadow: true,
     lods: [{ geometry: vergeFrameGeo, material: steelMat, maxDistance: farDist * 0.55 }],
   });
 
-  const kitFence = propKit?.lodsFor('catch-fence', { maxDistanceScale: distScale });
+  const kitFence = propKit?.lodsFor('catch-fence', {
+    maxDistanceScale: distScale,
+    distanceCaps: [55, 160, 650],
+  });
   const hasKitFence = Boolean(kitFence);
   if (kitFence) {
     kitPropsUsed++;
@@ -1088,12 +1098,16 @@ export function placeTracksideFurniture(options: {
     });
   }
 
-  const kitMarshal = propKit?.lodsFor('marshal-post', { maxDistanceScale: distScale });
+  const kitMarshal = propKit?.lodsFor('marshal-post', {
+    maxDistanceScale: distScale,
+    distanceCaps: [60, 180, 650],
+  });
   if (kitMarshal) {
     kitPropsUsed++;
     props.define({
       id: 'marshal-post',
       castShadow: castShadows,
+      shadowMaxDistance: 160,
       receiveShadow: true,
       lods: kitMarshal,
     });
@@ -1108,12 +1122,16 @@ export function placeTracksideFurniture(options: {
     });
   }
 
-  const kitAbsorber = propKit?.lodsFor('absorber-block', { maxDistanceScale: distScale });
+  const kitAbsorber = propKit?.lodsFor('absorber-block', {
+    maxDistanceScale: distScale,
+    distanceCaps: [55, 160, 500],
+  });
   if (kitAbsorber) {
     kitPropsUsed++;
     props.define({
       id: 'tecpro-block',
       castShadow: castShadows,
+      shadowMaxDistance: 120,
       receiveShadow: true,
       lods: kitAbsorber,
     });
@@ -1131,12 +1149,14 @@ export function placeTracksideFurniture(options: {
   const kitScreen = propKit?.lodsFor('screen-tower', {
     materialOverrides: { 'screen-face': screenMat },
     maxDistanceScale: distScale,
+    distanceCaps: [80, 240, 950],
   });
   if (kitScreen) {
     kitPropsUsed++;
     props.define({
       id: 'big-screen-frame',
       castShadow: castShadows,
+      shadowMaxDistance: 220,
       receiveShadow: true,
       lods: kitScreen,
     });
@@ -1186,12 +1206,16 @@ export function placeTracksideFurniture(options: {
     });
   }
 
-  const kitCamera = propKit?.lodsFor('camera-tower', { maxDistanceScale: distScale });
+  const kitCamera = propKit?.lodsFor('camera-tower', {
+    maxDistanceScale: distScale,
+    distanceCaps: [80, 240, 950],
+  });
   if (kitCamera) {
     kitPropsUsed++;
     props.define({
       id: 'camera-tower',
       castShadow: castShadows,
+      shadowMaxDistance: 220,
       receiveShadow: true,
       lods: kitCamera,
     });
@@ -1211,8 +1235,9 @@ export function placeTracksideFurniture(options: {
   props.define({
     id: 'truss-tower',
     castShadow: castShadows,
+    shadowMaxDistance: 220,
     receiveShadow: true,
-    lods: [{ geometry: trussTowerGeo, material: steelMat, maxDistance: farDist * 1.5 }],
+    lods: [{ geometry: trussTowerGeo, material: steelMat, maxDistance: farDist * 1.3 }],
   });
 
   // Register braking & DRS board slots (0:150, 1:100, 2:50, 4:DRS, 5:DRS det).
@@ -1244,6 +1269,7 @@ export function placeTracksideFurniture(options: {
       const lods = propKit.lodsFor(catId, {
         materialOverrides: { 'board-face': slotMat },
         maxDistanceScale: distScale,
+        distanceCaps: [60, 180, 500],
       });
       if (lods) {
         kitSigns.add(id);
@@ -1251,6 +1277,7 @@ export function placeTracksideFurniture(options: {
         props.define({
           id: `${id}-face`,
           castShadow: castShadows,
+          shadowMaxDistance: 140,
           receiveShadow: true,
           lods,
         });

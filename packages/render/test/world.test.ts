@@ -186,9 +186,9 @@ describe('grandstands, start gantry, and over-track bridges', () => {
     const tex = dummyTexture();
     const bridges = buildTrackBridges(track, monzaDressing, lap, tex);
     expect(bridges.count).toBeGreaterThanOrEqual(2);
-    expect(bridges.geometries.length).toBe(2);
+    expect(bridges.geometries.length).toBe(bridges.count * 2);
     for (const g of bridges.geometries) {
-      expect(g.getAttribute('position').count).toBeGreaterThan(20);
+      expect(g.getAttribute('position').count).toBeGreaterThanOrEqual(8);
       g.dispose();
     }
     for (const m of bridges.materials) m.dispose();

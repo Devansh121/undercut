@@ -524,3 +524,28 @@ export function crowdSeats(
   }
   return out;
 }
+
+/**
+ * Build one chunked geometry per grandstand (exact bounding sphere) so frustum culling and
+ * distance-gated shadow casting skip stands outside the view or beyond the shadow cascades.
+ */
+export function buildStandChunks(
+  frames: readonly StandFrame[],
+): { geometry: BufferGeometry; centre: [number, number, number]; radius: number }[] {
+  const out: { geometry: BufferGeometry; centre: [number, number, number]; radius: number }[] = [];
+  for (const f of frames) {
+    const geometry = buildStands([f]);
+    geometry.computeBoundingSphere();
+    const bs = geometry.boundingSphere;
+    if (!bs || bs.radius <= 0) {
+      geometry.dispose();
+      continue;
+    }
+    out.push({
+      geometry,
+      centre: [bs.center.x, bs.center.y, bs.center.z],
+      radius: bs.radius,
+    });
+  }
+  return out;
+}
