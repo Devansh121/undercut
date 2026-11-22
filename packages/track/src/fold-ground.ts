@@ -66,6 +66,8 @@ export interface Box {
 }
 
 const SOR = 1.85;
+/** Smoothing passes over the shares after the steepness rule (each spreads it by a cell). */
+const SHARE_SMOOTHING = 4;
 /** Rings of nodes behind a barrier given ghost values (a blend cell is one cell wide). */
 const GHOST_RINGS = 2;
 const MAX_SWEEPS = 4000;
@@ -131,6 +133,7 @@ export class FoldGround {
       }
     }
     this.zoneNodes = zone;
+    const original = Float64Array.from(this.heights);
     // Each connected zone is filled as a hillside: the least-squares plane through the fixed
     // heights around it (the track edges, the unfolded run-off where the zone ends), plus the
     // smoothest correction that meets them (Laplace's equation for the departure from the plane,
@@ -251,8 +254,46 @@ export class FoldGround {
     // Beyond the barrier the ground is never driven on, but a blend cell straddling the barrier
     // reads it: give the first rings of nodes behind it the values a free edge implies (the mean
     // of their neighbours inside) and their weight, so the solved ground reaches the barrier.
-    this.weights = new Float64Array(n);
-    for (let j = 0; j < n; j++) this.weights[j] = this.kinds[j] === NodeKind.Zone ? share[j]! : 0;
+    // The fill never makes the ground steeper than it was: where its slope at a node exceeds the
+    // original ground's, its share there is scaled down by the ratio. The shares are then
+    // smoothed over the zone so the rule leaves no seams.
+    const slope = (h: Float64Array, j: number): number => {
+      const g = (a: number, b: number): number => {
+        const ma = nb[4 * j + a]!;
+        const mb = nb[4 * j + b]!;
+        const okA = ma >= 0 && this.kinds[ma] !== NodeKind.Outside;
+        const okB = mb >= 0 && this.kinds[mb] !== NodeKind.Outside;
+        if (okA && okB) return (h[mb]! - h[ma]!) / (2 * FOLD_CELL);
+        if (okB) return (h[mb]! - h[j]!) / FOLD_CELL;
+        if (okA) return (h[j]! - h[ma]!) / FOLD_CELL;
+        return 0;
+      };
+      return Math.hypot(g(0, 1), g(2, 3));
+    };
+    let w = new Float64Array(n);
+    for (let j = 0; j < n; j++) {
+      if (this.kinds[j] !== NodeKind.Zone) continue;
+      const filledSlope = slope(this.heights, j);
+      const before = slope(original, j);
+      w[j] = share[j]! * (filledSlope > before ? before / filledSlope : 1);
+    }
+    for (let pass = 0; pass < SHARE_SMOOTHING; pass++) {
+      const next = new Float64Array(n);
+      for (let j = 0; j < n; j++) {
+        if (this.kinds[j] !== NodeKind.Zone) continue;
+        let sum = w[j]!;
+        let count = 1;
+        for (let q = 0; q < 4; q++) {
+          const m = nb[4 * j + q]!;
+          if (m < 0 || this.kinds[m] === NodeKind.Outside) continue;
+          sum += w[m]!;
+          count++;
+        }
+        next[j] = sum / count;
+      }
+      w = next;
+    }
+    this.weights = w;
     const filled = new Uint8Array(n);
     for (let j = 0; j < n; j++) if (this.kinds[j] !== NodeKind.Outside) filled[j] = 1;
     for (let ring = 0; ring < GHOST_RINGS; ring++) {
