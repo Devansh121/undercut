@@ -13,11 +13,12 @@
  *   10 % a step. The asymmetry (fast down, slow up, a wide dead
  *   band) stops it hunting between two sizes, which would show as shimmer.
  * - Scales snap to 1/40 steps so the drawing buffer size, and its render targets, change rarely.
- * - Above the preset's cap (`max` > 1, for a phone whose screen has more pixels than the cap):
- *   measured headroom climbs as above. With only a vsync-capped frame interval (no GPU timer, as
- *   on iPhone Safari) headroom cannot be measured, so it probes: after 3 s held at the target it
- *   steps up 10 %. A probe that misses the target steps back down at once and becomes the ceiling
- *   for 30 s (doubling after each miss), so a phone never hunts visibly.
+ * - Probing: a vsync-capped frame interval (no GPU timer, as on every iOS browser) never shows
+ *   headroom, so after 3 s held at the target the scale steps up 0.1, from any scale below the
+ *   top (back up after a heavy moment, or above the preset's cap when `max` > 1). A probe that
+ *   misses steps straight back to the size that held, which becomes the ceiling for 30 s
+ *   (doubling after each miss), so a phone never hunts visibly. With measured GPU time the
+ *   cost of the next size is predicted instead, and a probe that would miss is not made.
  */
 export interface DynamicResolutionOptions {
   /** Target frame time, ms; 0 turns the controller off. */
@@ -55,8 +56,11 @@ export class DynamicResolution {
 
   constructor(private readonly options: DynamicResolutionOptions) {}
 
-  /** Feed the last frame's time; returns true when the scale changed. */
-  update(frameMs: number): boolean {
+  /**
+   * Feed the last frame's time; returns true when the scale changed. `measured`: the sample is
+   * GPU time (a timer query), not a frame interval, so it predicts a larger size's cost.
+   */
+  update(frameMs: number, measured = false): boolean {
     const target = this.options.targetMs;
     if (target <= 0 || frameMs <= 0) return false;
     if (this.warmup > 0) {
@@ -82,15 +86,18 @@ export class DynamicResolution {
       this.held = 0;
       if (this.over > 500) {
         if (this.probedFrom !== null) {
-          // The larger size missed: it is the ceiling for a while, longer after each miss.
+          // The larger size missed: back to the size that held, which is the ceiling for a
+          // while, longer after each miss.
           this.ceiling = this.probedFrom;
           this.ceilingUntil = this.clock + HOLD_OFF * 2 ** Math.min(this.misses, 4);
           this.misses++;
+          this.set(this.probedFrom);
           this.probedFrom = null;
+        } else {
+          const ratio = Math.sqrt(target / this.smoothed) * 0.98;
+          const next = Math.max(this.scale * Math.max(0.85, ratio), this.options.min);
+          this.set(Math.floor(next / STEP) * STEP);
         }
-        const ratio = Math.sqrt(target / this.smoothed) * 0.98;
-        const next = Math.max(this.scale * Math.max(0.85, ratio), this.options.min);
-        this.set(Math.floor(next / STEP) * STEP);
         this.over = 0;
         // Expect the next frames to be cheaper: restart the average near the target.
         this.smoothed = target;
@@ -112,12 +119,14 @@ export class DynamicResolution {
       this.under = 0;
       this.held += frameMs;
       if (this.held > HOLD) {
-        // Held at the target: a probe that got here has passed; try the next size above the cap.
+        // Held at the target: a probe that got here has passed; try the next size up.
         this.held = 0;
         this.probedFrom = null;
-        if (this.scale >= 1 && this.scale < top) {
+        const next = Math.min(top, Math.ceil((this.scale + PROBE) / STEP) * STEP);
+        const fits = !measured || this.smoothed * (next / this.scale) ** 2 <= target;
+        if (next > this.scale && fits) {
           this.probedFrom = this.scale;
-          this.set(Math.min(top, Math.ceil((this.scale + PROBE) / STEP) * STEP));
+          this.set(next);
         }
       }
     }

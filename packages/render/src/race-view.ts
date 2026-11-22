@@ -775,7 +775,7 @@ export class RaceView {
           ? null
           : this.sinceDrawMs;
       this.sinceDrawMs = 0;
-      if (sample !== null && this.dynamic.update(sample)) this.resize(true);
+      if (sample !== null && this.dynamic.update(sample, this.gpu.available)) this.resize(true);
     }
     this.camera.clearViewOffset();
     this.camera.aspect = this.width / Math.max(1, this.height);
