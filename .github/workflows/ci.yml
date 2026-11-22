@@ -161,12 +161,7 @@ jobs:
           fi
           npm run build
           if [ -n "$deps" ]; then wait "$deps"; fi
-      # Measurement only (to be reverted): the same suite at 3 and then 2 workers on one runner.
-      - name: Desktop and phone, 3 workers
-        run: npm run test:browser:views -- --workers=3
-      - name: Desktop and phone, 2 workers
-        if: success() || failure()
-        run: npm run test:browser:views -- --workers=2
+      - run: npm run test:browser:views
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
