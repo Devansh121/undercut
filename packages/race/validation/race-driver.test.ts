@@ -87,7 +87,7 @@ function race(drivers: Driver[], laps: number, seed: number): RaceSession {
  * cornering and braking grip and all of its traction, so it is at full speed on the straights.
  * A lap driver: it ignores the traffic, as a player who does not look in the mirrors would.
  */
-function cornerSlow(seed: number): Driver {
+function cornerSlow(seed: number) {
   return createReferenceDriver({
     track,
     line,
@@ -99,6 +99,49 @@ function cornerSlow(seed: number): Driver {
       seed,
     },
   });
+}
+
+/**
+ * The same car slow only in corners, driven down the middle of the track the way a new player
+ * keeps off the kerbs: it holds the centreline (d = 0) instead of the racing line, so a car
+ * coming past has to choose a side of it, inside or outside, into every braking zone.
+ */
+class Centreline implements Driver {
+  readonly name = 'centreline';
+  constructor(private readonly inner: ReturnType<typeof createReferenceDriver>) {}
+  get ersMode() {
+    return this.inner.ersMode;
+  }
+  reset(): void {
+    this.inner.reset();
+  }
+  snapshot() {
+    return this.inner.snapshot();
+  }
+  restore(m: ReturnType<Driver['snapshot']>): void {
+    this.inner.restore(m);
+  }
+  drive(t: CarTelemetry, dt: number, out: ControlInput): ControlInput {
+    // The line where the car was a tick ago: hold the centreline against it.
+    this.inner.offset = -this.inner.last.lineD;
+    return this.inner.drive(t, dt, out);
+  }
+}
+
+function centreSlow(seed: number): Driver {
+  return new Centreline(
+    createReferenceDriver({
+      track,
+      line,
+      envelope,
+      params,
+      skill: {
+        ...REFERENCE_SKILL,
+        envelope: { lateral: 0.6, brake: 0.6, traction: REFERENCE_SKILL.envelope.traction },
+        seed,
+      },
+    }),
+  );
 }
 
 const flags = (events: readonly RaceEvent[]) =>
@@ -139,6 +182,45 @@ describe('race driver on the sim', () => {
     expect(passedOnLap!).toBeLessThanOrEqual(2);
     expect(contactTicks).toBe(0);
     expect(s.result().entries[0]!.car).toBe(1);
+  }, 300_000);
+
+  it('a centreline car slow in corners, on pole, is passed by a small pack: no contact, all on track', () => {
+    // Pole: the slow car down the middle of the road. Behind it, three racing drivers.
+    const s = race(
+      [centreSlow(51), racer({ pace: 1, braking: 1 }, 52), racer({}, 53), racer({}, 54)],
+      4,
+      8,
+    );
+    const c = s.control;
+    const n = s.cars.length;
+    const passedOnLap: (number | null)[] = new Array(n).fill(null);
+    const allOff = new Array<number>(n).fill(0);
+    let contactTicks = 0;
+    const laps: number[][] = Array.from({ length: n }, () => []);
+    while (!s.ended && s.time < 900) {
+      for (const e of s.tick()) {
+        if (e.type === 'lap') laps[e.car]!.push(e.result.time);
+      }
+      if (c.lightsOutAt === null || s.time < c.lightsOutAt + 5) continue;
+      for (let i = 0; i < n; i++) {
+        if (s.worldCar(i).state.carContacts > 0) contactTicks++;
+        const f = s.carFacts(i);
+        if (i > 0 && f.wheelsOff >= 4 && f.speed > 5) allOff[i]!++;
+        if (i > 0 && passedOnLap[i] === null && c.cars[i]!.dist > c.cars[0]!.dist + 8) {
+          passedOnLap[i] = c.timer(0).lap;
+        }
+      }
+    }
+    // Far off the pace, all of it in the corners.
+    expect(laps[0]![1]!).toBeGreaterThan(96.5);
+    // The racing driver behind it is by within two laps; the others follow it past.
+    expect(passedOnLap[1]).not.toBeNull();
+    expect(passedOnLap[1]!).toBeLessThanOrEqual(2);
+    expect(passedOnLap.slice(1).every((l) => l !== null)).toBe(true);
+    // No touching, and no car past it with four wheels off the road.
+    expect(contactTicks).toBe(0);
+    expect(allOff.slice(1)).toEqual([0, 0, 0]);
+    expect(s.result().entries[0]!.car).not.toBe(0);
   }, 300_000);
 
   it('a car being lapped is shown the blue flag, moves over and lets the leader by', () => {

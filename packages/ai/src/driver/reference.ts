@@ -147,6 +147,8 @@ export class ReferenceDriver implements Driver {
    * defaults leave the reference driver exactly as it is.
    */
   offset = 0;
+  /** How fast that offset changes along the lap, m/m: steered for, so the car keeps up with it. */
+  offsetSlope = 0;
   accelLimit = Number.POSITIVE_INFINITY;
 
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
@@ -284,7 +286,7 @@ export class ReferenceDriver implements Driver {
       this.wander = Math.max(-this.skill.lineWander, Math.min(this.skill.lineWander, this.wander));
     }
     const e = q.d - lineD - this.wander - this.offset;
-    const ePsi = wrapAngle(course - heading);
+    const ePsi = wrapAngle(course - heading - Math.atan(this.offsetSlope));
     const kAhead = this.sampleAhead(line.curvature, s, v * g.steerPreview);
     const w = Math.max(g.lateralOmegaMin, Math.min(g.lateralOmegaMax, g.lateralOmegaSpeed / v));
     let correction = -(w * w * e) / (v * v) - (2 * g.lateralDamping * w * Math.sin(ePsi)) / v;
