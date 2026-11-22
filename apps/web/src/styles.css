@@ -1526,6 +1526,9 @@ body {
     min-height: 0;
     overflow-y: auto;
     padding-right: var(--sp-1);
+    /* In a height-limited scroll box, auto rows shrink to each row's 44 px min-height and the
+       help text runs into the next row; size every row to its content instead. */
+    grid-auto-rows: max-content;
   }
   /* Touch targets 44 px or more on a phone. */
   .pause__action {
@@ -1735,5 +1738,163 @@ body {
 @media (max-height: 500px) {
   .race-status {
     max-height: calc(100vh - 200px);
+  }
+}
+html[data-screen='drive']:not([data-paused]) {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+html[data-screen='drive']:not([data-paused]) #view {
+  touch-action: none;
+}
+/* The first-lap coach: under the timing tower (drive.ts sets --coach-top), clear of the lap
+   timer, the sectors and the invalid-lap flag. */
+.onboarding {
+  position: fixed;
+  z-index: 11;
+  top: var(--coach-top, calc(var(--safe-t) + 160px));
+  left: var(--safe-l);
+  width: min(320px, 40vw);
+  padding: 10px 12px;
+  background: var(--hud-panel-solid, var(--c-ink-1));
+  border-left: 3px solid var(--c-accent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: var(--c-text-1);
+}
+.onboarding p {
+  margin: 4px 0 0;
+}
+.onboarding__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.onboarding .btn {
+  min-height: 44px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.pause__command[hidden] {
+  display: none;
+}
+.pause__run {
+  justify-self: end;
+  white-space: nowrap;
+}
+.update-bar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: var(--safe-b, 16px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 16px;
+  background: var(--c-ink-1);
+  border-left: 3px solid var(--c-accent);
+  box-shadow: var(--e-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  color: var(--c-text-1);
+}
+html[data-screen='drive']:not([data-paused]) .update-bar {
+  display: none;
+}
+[data-paused] .onboarding {
+  display: none;
+}
+.rotate-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-content: center;
+  text-align: center;
+  padding: 24px;
+  background: var(--c-ink-0);
+  color: var(--c-text-1);
+}
+.rotate-prompt[hidden],
+.onboarding[hidden] {
+  display: none;
+}
+[data-portrait] .ut-touch {
+  display: none;
+}
+.onboarding.is-braking {
+  border-left-color: var(--c-time-invalid);
+}
+@media (orientation: portrait) {
+  .rotate-prompt {
+    bottom: auto;
+    padding: 12px;
+    border-bottom: 1px solid var(--c-line-strong);
+  }
+  .rotate-prompt h2 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .rotate-prompt p {
+    font-size: 12px;
+    margin: 0;
+  }
+  [data-portrait] .pause {
+    padding-top: 100px;
+  }
+}
+@media (max-height: 500px) {
+  .pause__actions {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  /* Phone landscape: a compact card under the tower that lets touches through to the steering
+     zone; each tip moves on by itself, and Skip lives in the pause menu. */
+  .onboarding {
+    width: min(270px, 34vw);
+    padding: 6px 10px;
+    font-size: var(--fs-11);
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  .onboarding p {
+    margin-top: 2px;
+  }
+  .onboarding__actions {
+    display: none;
+  }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .pause__card {
+    min-width: 0;
+    padding: 16px;
+  }
+  .pause__head {
+    flex-wrap: wrap;
+  }
+  .pause__body {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: 16px;
+  }
+  .pause__setting {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .pause__setting .seg {
+    flex-wrap: wrap;
+  }
+  .pause__setting .seg__opt {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .pause__controls {
+    display: none;
   }
 }

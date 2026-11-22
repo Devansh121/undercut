@@ -55,7 +55,8 @@ declare global {
     /** Audio engine status, or 'none' before it is created. */
     audioStatus(): string;
     /** What the steering-wheel display last drew, or null before the cockpit was shown. */
-    dashboard(): { gear: string; speed: string; revs: number } | null;
+    dashboard(): { gear: string; speed: string; revs: number; unit: string } | null;
+
     /** The player's car's projected bounding box in CSS pixels. */
     carScreenRect(): { left: number; top: number; right: number; bottom: number };
     /** The page's renderer: live geometries, textures and compiled programs. */

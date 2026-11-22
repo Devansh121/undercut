@@ -38,6 +38,7 @@ import {
 } from '@undercut/render';
 import {
   DRIVING_LINE_SCALE,
+  LineCue,
   DrivingLine,
   buildPlan,
   decodeEnvelope,
@@ -68,6 +69,7 @@ const propCatalog: unknown = Object.values(
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
+import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
   AutopilotControlSource,
@@ -88,14 +90,23 @@ import {
 import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
 import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
-import { PauseMenu } from './ui/pause';
+import { PauseMenu, type PauseCommand } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
-import { saveQuality } from './game/quality-setting';
-import type { AssistConfig } from './game/assists';
+import {
+  OFFLINE_PRESET,
+  autoSwitchAllowed,
+  loadAutoPick,
+  saveAutoPick,
+  saveQuality,
+} from './game/quality-setting';
+import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
+import { speedUnit, setSpeedUnit } from './ui/player-settings';
+import { Onboarding } from './ui/onboarding';
+import { phoneSession } from './ui/phone-session';
 
 /** The team whose colours the player's car wears when the menu chose none. */
 const DEFAULT_TEAM = 'calder';
@@ -396,7 +407,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     trackRear: params.geometry.trackRear,
     tyreRadius: params.tyre.rollingRadius,
   };
-  const loadView = async (quality: QualityName, screen: LoadingScreen): Promise<RaceView> => {
+  /** `quiet`: a failure throws instead of asking the player to retry (Auto's own changes). */
+  const loadView = async (
+    quality: QualityName,
+    screen: LoadingScreen,
+    quiet = false,
+  ): Promise<RaceView> => {
     for (;;) {
       try {
         return await RaceView.load(o.canvas, {
@@ -430,6 +446,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         });
       } catch (error) {
         console.warn('Loading failed', error);
+        if (quiet) throw error;
         const what =
           error instanceof AssetError
             ? `Could not download ${error.path}.`
@@ -450,7 +467,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const loading = mountLoadingScreen(o.host, track.name, modeLabel);
   let view: RaceView;
   try {
-    view = await loadView(quality, loading);
+    // Auto's saved pick may be a preset the offline cache does not hold: fall back to that one.
+    const fallback = (o.autoQuality ?? false) && quality !== OFFLINE_PRESET;
+    try {
+      view = await loadView(quality, loading, fallback);
+    } catch (error) {
+      if (!fallback) throw error;
+      quality = OFFLINE_PRESET;
+      loading.reset();
+      view = await loadView(quality, loading);
+    }
   } finally {
     loading.remove();
   }
@@ -503,6 +529,64 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (o.onRestartRace) o.onRestartRace();
     else quit();
   };
+  const intro = new Onboarding({
+    bindings: () => input.profile.bindings,
+    device: () => input.activeDevice,
+  });
+  let autoQuality = o.autoQuality ?? false;
+  // Rows at the end of the pause settings, so Resume, Restart and Reset stay in view.
+  const commands: PauseCommand[] = [
+    {
+      id: 'skip-intro',
+      label: S.intro.row,
+      button: S.intro.skip,
+      run: () => intro.finish(),
+      visible: () => intro.active,
+    },
+    {
+      id: 'replay-intro',
+      label: S.intro.row,
+      button: S.intro.replay,
+      run: () => {
+        intro.replay();
+        resume();
+      },
+      visible: () => !intro.active,
+    },
+    ...(o.touch
+      ? [
+          {
+            id: 'fullscreen',
+            label: S.intro.display,
+            button: S.intro.fullscreen,
+            run: () => {
+              void document.documentElement.requestFullscreen?.().catch(() => {});
+            },
+            // Absent on iPhone Safari; pointless once fullscreen.
+            visible: () =>
+              Boolean(document.fullscreenEnabled && document.documentElement.requestFullscreen) &&
+              !document.fullscreenElement,
+          },
+        ]
+      : []),
+    {
+      id: 'reset-settings',
+      label: S.pause.defaults,
+      button: S.pause.resetDefaults,
+      run: () => {
+        for (const [key, value] of Object.entries(assistsFor(session.device, {})) as [
+          keyof AssistConfig,
+          never,
+        ][])
+          setAssist(key, value);
+        view.setDrivingLine(session.assists.racingLine ?? 'off');
+        setSpeedUnit('kmh');
+        for (const key of ['master', 'engine', 'effects', 'ui', 'ambience'] as const)
+          o.audio?.setVolume(key, AUDIO_DEFAULTS[key]);
+        chooseAuto();
+      },
+    },
+  ];
   const actions = {
     resume: () => resume(),
     ...(ext
@@ -528,6 +612,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     actions,
     [
       {
+        id: 'units',
+        label: S.pause.units,
+        choices: [
+          { value: 'kmh', label: S.hud.kmh },
+          { value: 'mph', label: S.pause.mph },
+        ],
+        get: speedUnit,
+        set: (v) => setSpeedUnit(v as 'kmh' | 'mph'),
+      },
+      {
         id: 'camera',
         label: S.pause.camera,
         choices: CAMERA_ORDER.map((c) => ({
@@ -540,9 +634,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       {
         id: 'quality',
         label: S.pause.graphics,
-        choices: PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
-        get: () => quality,
+        choices: [
+          { value: 'auto', label: S.pause.autoGraphics },
+          ...PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
+        ],
+        get: () => (autoQuality ? 'auto' : quality),
         set: (v) => {
+          if (v === 'auto') {
+            chooseAuto();
+            return;
+          }
+          autoQuality = false;
           saveQuality(v as QualityName);
           void setQuality(v as QualityName);
         },
@@ -631,6 +733,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             ['master', S.pause.volume],
             ['engine', S.pause.engine],
             ['effects', S.pause.effects],
+            ['ui', S.pause.uiAudio],
+            ['ambience', S.pause.ambience],
           ] as const
         ).map(([id, label]) => ({
           id,
@@ -640,12 +744,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         }))
       : [],
     { bindings: () => input.profile.bindings, device: () => input.activeDevice },
+    commands,
   );
-  o.host.replaceChildren(hud.root, results.root, pause.root);
+  o.host.replaceChildren(hud.root, results.root, pause.root, intro.root);
+  const phone = o.touch ? phoneSession(doPause) : null;
+  if (phone) o.host.append(phone.root);
   // The chase cameras keep the car clear of the driver cluster (it sits bottom centre on a
   // phone). Measured when the layout changes, not every frame.
   const cluster = hud.root.querySelector<HTMLElement>('.hud-drive');
+  const tower = hud.root.querySelector<HTMLElement>('.hud-tower');
   const measureCluster = (): void => {
+    // The coach sits under the timing tower, clear of the lap timer and the invalid-lap flag.
+    const t = tower?.getBoundingClientRect();
+    if (t && t.height > 0)
+      intro.root.style.setProperty('--coach-top', `${Math.round(t.bottom + 8)}px`);
     if (!cluster) return;
     const r = cluster.getBoundingClientRect();
     view.setAvoidRect(
@@ -654,9 +766,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   };
   const clusterObserver = new ResizeObserver(measureCluster);
   if (cluster) clusterObserver.observe(cluster);
+  if (tower) clusterObserver.observe(tower);
   window.addEventListener('resize', measureCluster);
   measureCluster();
   document.documentElement.dataset.screen = 'drive';
+  // The preset running now (Auto shows only "auto" in the menu): support and offline tests.
+  document.documentElement.dataset.quality = quality;
 
   let overlay: TouchOverlay | null = null;
   if (o.touch) {
@@ -672,18 +787,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     messageLeft = seconds;
   };
   // The storage warning goes first; the first-start controls hint follows it.
-  let queued: HudMessage | null = takeFirstStartHint()
-    ? {
-        tag: S.controls.hintTag,
-        text: controlsHint(input.profile.bindings, input.activeDevice),
-        tone: 'info',
-      }
-    : null;
+  let queued: HudMessage | null =
+    takeFirstStartHint() && intro.root.hidden
+      ? {
+          tag: S.controls.hintTag,
+          text: controlsHint(input.profile.bindings, input.activeDevice),
+          tone: 'info',
+        }
+      : null;
   if (!records.persistent)
     say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
+  /** Laps completed this session (the coach finishes on the first one after it starts). */
+  let lapsDone = 0;
   let invalidReason: string = S.hud.trackLimits;
   function onEvents(events: readonly SessionEvent[]): void {
     for (const e of events) {
@@ -693,6 +811,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         case 'lap':
           results.show(e.result);
           lastLap = { time: e.result.time, cls: e.result.class };
+          lapsDone++;
           invalidReason = S.hud.trackLimits;
           break;
         case 'record':
@@ -724,6 +843,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   function openPause(): void {
     o.audio?.setActive(false);
+    phone?.active(false);
     if (!pause.open) {
       input.setContext('menu');
       pause.show();
@@ -735,6 +855,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     openPause();
   }
   function resume(): void {
+    if (o.touch && innerHeight > innerWidth) return;
+    phone?.active(true);
     pause.hide();
     delete document.documentElement.dataset.paused;
     input.setContext('driving');
@@ -936,6 +1058,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       setGlyphContext(lastHudDevice, input.profile.bindings);
     }
 
+    if (intro.active) {
+      const car = session.car.state;
+      intro.update({
+        dt,
+        running: session.phase === 'running',
+        driving:
+          car.throttleApplied > 0.1 || car.brakeApplied > 0.1 || Math.abs(car.steerAngle) > 0.02,
+        cue: drivingLine?.cueAt(session.s, Math.abs(car.vx)) === LineCue.Brake,
+        braking: car.brakeApplied > 0.1,
+        invalid: !session.timer.valid,
+        paused: session.phase === 'paused',
+        laps: lapsDone,
+      });
+    }
     const playing = session.phase === 'running';
     const realDt = playing ? dt : 0;
     clock += realDt;
@@ -1002,6 +1138,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       lookBack,
       gear: t.gear,
       revLights,
+      speedUnit: speedUnit(),
     });
 
     // HUD.
@@ -1113,6 +1250,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   });
   input.setContext('driving');
   loop.start();
+  phone?.active(true);
   o.audio?.setActive(true);
   const loadTimes: Record<string, number> = {
     ...view.loadTimes,
@@ -1153,38 +1291,59 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   }
 
   /** Rebuild the view at another preset; the session waits (paused) while it loads. */
-  let switching: Promise<void> | null = null;
-  async function setQuality(next: QualityName): Promise<void> {
-    if (next === quality || quitting) return;
+  let switching: Promise<boolean> | null = null;
+  /** `quiet`: on failure keep the current preset without asking (Auto). Resolves true if `next` is running. */
+  async function setQuality(next: QualityName, quiet = false): Promise<boolean> {
+    if (quitting) return false;
     if (switching) await switching;
+    if (next === quality) return true;
     switching = (async () => {
       const wasRunning = session.phase === 'running';
       if (wasRunning) loop.pause();
       const screen = mountLoadingScreen(o.host, track.name, `Graphics: ${QUALITY[next].label}`);
       try {
-        const nv = await loadView(next, screen);
+        const nv = await loadView(next, screen, quiet);
         const camera = view.cameraName;
         view.dispose();
         view = nv;
         viewBuilds++;
         quality = next;
+        document.documentElement.dataset.quality = next;
         view.setCamera(camera);
         measureCluster();
+        return true;
       } catch (error) {
         if (!(error instanceof LoadCancelled))
           console.warn('Could not change graphics quality', error);
+        return false;
       } finally {
         screen.remove();
         if (wasRunning && !pause.open) resume();
         pause.sync();
       }
     })();
-    await switching;
+    const done = await switching;
     switching = null;
+    return done;
   }
 
-  // First run without a saved preset: time a few seconds of driving and settle on a preset.
-  if (o.autoQuality) {
+  /** Auto settles on `pick`, saving it only once it runs (offline it stays put; see autoSwitchAllowed). */
+  async function applyAutoPick(pick: QualityName): Promise<void> {
+    if (!autoQuality || quitting) return;
+    if (pick !== quality && !autoSwitchAllowed(pick, quality, navigator.onLine)) return;
+    if ((await setQuality(pick, true)) && autoQuality) saveAutoPick(pick);
+  }
+
+  /** Auto chosen in the pause menu (or by Reset settings): measure again from the current preset. */
+  function chooseAuto(): void {
+    autoQuality = true;
+    saveQuality('auto');
+    saveAutoPick(null);
+    benchmark();
+  }
+
+  // Auto without a saved pick: time a few seconds of driving and settle on a preset, once.
+  function benchmark(): void {
     const measured = quality;
     window.setTimeout(() => {
       if (quitting) return;
@@ -1196,11 +1355,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         const median = times[Math.floor(times.length / 2)] as number;
         const gpu = view.stats().gpuMs;
         const pick = benchmarkPick(measured, { gpuMs: gpu, frameMs: median }, o.touch);
-        saveQuality(pick);
-        if (pick !== quality) void setQuality(pick);
+        void applyAutoPick(pick);
       }, 3000);
     }, 2500);
   }
+
+  if (autoQuality && loadAutoPick() === null) benchmark();
 
   function quit(): void {
     if (quitting) return;
@@ -1215,11 +1375,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.quit();
     ext?.detach?.();
     overlay?.destroy();
+    phone?.destroy();
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     view.dispose();
     input.setContext('menu');
     delete document.documentElement.dataset.ready;
     delete document.documentElement.dataset.paused;
     delete document.documentElement.dataset.screen;
+    delete document.documentElement.dataset.quality;
     o.host.replaceChildren();
     o.onQuit();
   }
@@ -1255,7 +1418,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     get viewBuilds() {
       return viewBuilds;
     },
-    setQuality,
+    setQuality: async (name) => {
+      await setQuality(name);
+    },
     gridCars: (count) => view.setGridCars(count, pose),
     records,
     frameTimes: () => frameLog.slice(),
@@ -1326,6 +1491,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     quit,
     loadTimes: () => ({ ...loadTimes }),
     resetForTest: () => {
+      autoQuality = false;
       // Drop any key or touch press that arrived after the previous test's last frame.
       input.setContext('menu');
       input.releaseAll();
