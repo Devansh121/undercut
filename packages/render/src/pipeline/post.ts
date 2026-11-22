@@ -269,7 +269,12 @@ export class RenderPipeline {
       this.gtao.gtaoMaterial.dispose();
       this.gtao.blendMaterial.dispose();
     }
-    this.bloom?.dispose();
+    if (this.bloom) {
+      this.bloom.dispose();
+      // UnrealBloomPass.dispose() leaves its bright-pass material behind: one more material on
+      // the same program every session.
+      this.bloom.materialHighPassFilter.dispose();
+    }
     this.smaa?.dispose();
     this.final?.dispose();
     this.quad?.dispose();
