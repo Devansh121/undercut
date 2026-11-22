@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "tolerance": 0.1,
+  "cases": [
+    {
+      "tod": "night",
+      "pose": "esplanade",
+      "swap": 95,
+      "nearLuma": 81.8,
+      "cardLuma": 77.9,
+      "ratio": 1.05,
+      "changedPct": 6.9
+    },
+    {
+      "tod": "night",
+      "pose": "park",
+      "swap": 95,
+      "nearLuma": 43.6,
+      "cardLuma": 41.8,
+      "ratio": 1.044,
+      "changedPct": 3.3
+    },
+    {
+      "tod": "overcast",
+      "pose": "esplanade",
+      "swap": 95,
+      "nearLuma": 105.7,
+      "cardLuma": 114.7,
+      "ratio": 0.921,
+      "changedPct": 8.5
+    },
+    {
+      "tod": "overcast",
+      "pose": "park",
+      "swap": 95,
+      "nearLuma": 106.9,
+      "cardLuma": 101.3,
+      "ratio": 1.055,
+      "changedPct": 4.9
+    }
+  ],
+  "problems": []
+}

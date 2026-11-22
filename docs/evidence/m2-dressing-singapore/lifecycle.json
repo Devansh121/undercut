@@ -1,0 +1,97 @@
+{
+  "quality": "high",
+  "ok": true,
+  "after": [
+    {
+      "gl": {
+        "Texture": 5,
+        "Framebuffer": 3,
+        "Program": 0,
+        "Shader": 0,
+        "Buffer": 0,
+        "Renderbuffer": 0,
+        "VertexArray": 0
+      },
+      "info": {
+        "geometries": 0,
+        "textures": 1,
+        "programs": 0,
+        "programRefs": 0
+      },
+      "programs": []
+    },
+    {
+      "gl": {
+        "Texture": 5,
+        "Framebuffer": 3,
+        "Program": 0,
+        "Shader": 0,
+        "Buffer": 0,
+        "Renderbuffer": 0,
+        "VertexArray": 0
+      },
+      "info": {
+        "geometries": 0,
+        "textures": 1,
+        "programs": 0,
+        "programRefs": 0
+      },
+      "programs": []
+    },
+    {
+      "gl": {
+        "Texture": 5,
+        "Framebuffer": 3,
+        "Program": 0,
+        "Shader": 0,
+        "Buffer": 0,
+        "Renderbuffer": 0,
+        "VertexArray": 0
+      },
+      "info": {
+        "geometries": 0,
+        "textures": 1,
+        "programs": 0,
+        "programRefs": 0
+      },
+      "programs": []
+    },
+    {
+      "gl": {
+        "Texture": 5,
+        "Framebuffer": 3,
+        "Program": 0,
+        "Shader": 0,
+        "Buffer": 0,
+        "Renderbuffer": 0,
+        "VertexArray": 0
+      },
+      "info": {
+        "geometries": 0,
+        "textures": 1,
+        "programs": 0,
+        "programRefs": 0
+      },
+      "programs": []
+    },
+    {
+      "gl": {
+        "Texture": 5,
+        "Framebuffer": 3,
+        "Program": 0,
+        "Shader": 0,
+        "Buffer": 0,
+        "Renderbuffer": 0,
+        "VertexArray": 0
+      },
+      "info": {
+        "geometries": 0,
+        "textures": 1,
+        "programs": 0,
+        "programRefs": 0
+      },
+      "programs": []
+    }
+  ],
+  "problems": []
+}
