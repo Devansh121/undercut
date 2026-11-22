@@ -58,6 +58,28 @@ const DEFAULT_STEP = 2;
 const DEFAULT_HALF_WIDTH = 0.9;
 const DEFAULT_LIFT = 0.045;
 
+/**
+ * Chevron and tick periods along the track, m: lift chevrons, brake chevrons, throttle ticks.
+ * Written into the shader from here so the two never disagree.
+ */
+export const CHEVRON_PERIODS = Object.freeze({ lift: 9.5, brake: 6.2, throttle: 11 });
+
+/**
+ * A length every period divides (lcm of 95, 62 and 110 dm). The along-track coordinate runs on
+ * across the start line, a lap length further each lap, and is reduced by this so it stays
+ * small enough for float32 without moving any chevron on the asphalt. A circuit's length is
+ * not a multiple of the periods, so wrapping at the line would shift them once a lap.
+ */
+export const CHEVRON_REPEAT = 6479;
+
+/** A number as a GLSL float literal. */
+function glslFloat(n: number): string {
+  return Number.isInteger(n) ? n.toFixed(1) : String(n);
+}
+const P_LIFT = glslFloat(CHEVRON_PERIODS.lift);
+const P_BRAKE = glslFloat(CHEVRON_PERIODS.brake);
+const P_THROTTLE = glslFloat(CHEVRON_PERIODS.throttle);
+
 // Design-token palette (design/mock/tokens.css): --c-flag-green, --c-flag-yellow, --c-flag-red, --c-ink-0.
 const COLOR_THROTTLE = new Color('#2fbf62').convertSRGBToLinear();
 const COLOR_LIFT = new Color('#f6c90e').convertSRGBToLinear();
@@ -134,9 +156,9 @@ void main() {
 
   // Forward-pointing chevron coordinate: tip at au=0 leads outer wings (au=1).
   // Generous longitudinal spacing keeps chevrons individually readable at low cockpit angles.
-  float chevLift = bandPattern(s + au * 2.6, 9.5, 0.42);
-  float chevBrake = bandPattern(s + au * 2.3, 6.2, 0.50);
-  float tickThrottle = bandPattern(s + au * 1.4, 11.0, 0.25);
+  float chevLift = bandPattern(s + au * 2.6, ${P_LIFT}, 0.42);
+  float chevBrake = bandPattern(s + au * 2.3, ${P_BRAKE}, 0.50);
+  float tickThrottle = bandPattern(s + au * 1.4, ${P_THROTTLE}, 0.25);
 
   // Shape mask per cue:
   // Throttle: solid slim core (0.82) + subtle brighter tick.
@@ -153,8 +175,8 @@ void main() {
   float fillAlpha = shapeMask * innerFill;
   float outlineAlpha = clamp(shapeMask * outerEdge - fillAlpha, 0.0, 1.0);
   // Thin dark shadow border along each chevron edge for high luminance separation on sunlit track.
-  float chevBorderL = bandPattern(s + au * 2.6 + 0.35, 9.5, 0.50);
-  float chevBorderB = bandPattern(s + au * 2.3 + 0.32, 6.2, 0.60);
+  float chevBorderL = bandPattern(s + au * 2.6 + 0.35, ${P_LIFT}, 0.50);
+  float chevBorderB = bandPattern(s + au * 2.3 + 0.32, ${P_BRAKE}, 0.60);
   float barBack = ((maskT * wT + chevBorderL * wL + max(chevBorderB, railB) * wB) / max(visWeight, 0.001)) * outerEdge;
   float frameAlpha = max(outlineAlpha, clamp(barBack - fillAlpha, 0.0, 1.0));
 
@@ -211,6 +233,9 @@ export class DrivingLineRibbon {
     brakeCount: 0,
     firstBrakeDistance: null,
   };
+  /** Where this lap starts on the continuous chevron coordinate (see `CHEVRON_REPEAT`). */
+  private lapBase = 0;
+  private lastS = -1;
   private modeValue: DrivingLineMode = 'off';
   private source: DrivingLineSource | null = null;
   private disposed = false;
@@ -342,6 +367,14 @@ export class DrivingLineRibbon {
     const q = this.track.project(x, z, this.hint, this.proj);
     const carS = q.s;
     const cues = this.source.fill(carS, Math.max(0, speed), this.from, this.step, this.cues);
+    // Across the start line the coordinate carries on a lap length further (or back, reversing).
+    const L = this.track.length;
+    if (this.lastS >= 0) {
+      if (carS - this.lastS < -L / 2) this.lapBase = (this.lapBase + L) % CHEVRON_REPEAT;
+      else if (carS - this.lastS > L / 2)
+        this.lapBase = (((this.lapBase - L) % CHEVRON_REPEAT) + CHEVRON_REPEAT) % CHEVRON_REPEAT;
+    }
+    this.lastS = carS;
 
     let throttleCount = 0;
     let liftCount = 0;
@@ -373,10 +406,12 @@ export class DrivingLineRibbon {
       pos[po + 4] = pR.y + lift;
       pos[po + 5] = pR.z;
 
-      // World-locked v coordinate (metres along track) keeps chevrons fixed to the asphalt.
+      // World-locked v coordinate (metres along track, continuous across the start line) keeps
+      // chevrons fixed to the asphalt.
       const uo = k * 4;
-      uvs[uo + 1] = worldS;
-      uvs[uo + 3] = worldS;
+      const v = this.lapBase + worldS;
+      uvs[uo + 1] = v;
+      uvs[uo + 3] = v;
 
       const cue = cues[k]!;
       let wT = 0;
