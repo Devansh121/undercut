@@ -197,6 +197,8 @@
   display: grid;
   align-content: end;
   padding: 0 var(--safe-r) 10vh var(--safe-l);
+  /* The small viewport (toolbars shown): Safari's toolbars never push the title off-screen. */
+  padding-bottom: 10svh;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(11, 12, 14, 0) 30%, var(--c-ink-0) 92%),
@@ -207,6 +209,7 @@
   content: '';
   position: absolute;
   inset: 12vh 0 36vh 26vw;
+  inset: 12svh 0 36svh 26vw;
   clip-path: polygon(12% 0, 100% 0, 100% 100%, 0 100%);
   background: repeating-linear-gradient(108deg, rgba(255, 90, 31, 0.9) 0 6px, transparent 6px 26px);
   opacity: 0.18;
@@ -216,7 +219,9 @@
 .launch__title {
   position: relative;
   margin: 0;
-  font-size: clamp(56px, 11vw, 168px);
+  /* The name is about 7.3 em wide (wide stretch, 0.06 em tracking): never wider than the
+     space between the safe edges, however narrow the phone. */
+  font-size: clamp(28px, min(11vw, (100vw - var(--safe-l) - var(--safe-r)) / 7.6), 168px);
   line-height: 0.86;
   font-weight: 850;
   font-stretch: var(--wdth-wide);
@@ -260,6 +265,13 @@
 .launch__press:focus-visible,
 :root[data-focus-ring] .launch__press:focus {
   box-shadow: none;
+}
+
+/* A touch-only phone has no Enter key to show. */
+@media (hover: none) and (pointer: coarse) {
+  .launch__press .glyph {
+    display: none;
+  }
 }
 
 .launch__press-text {
@@ -970,7 +982,8 @@
 
 /* ================= Phone landscape ================= */
 
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
   .shell {
     grid-template-rows: 44px minmax(0, 1fr);
   }
@@ -1016,9 +1029,10 @@
 
   .launch__stage {
     padding-bottom: 6vh;
+    padding-bottom: 6svh;
   }
   .launch__title {
-    font-size: clamp(48px, 11vw, 96px);
+    font-size: clamp(28px, min(11vw, (100vw - var(--safe-l) - var(--safe-r)) / 7.6), 96px);
   }
   .launch__tagline {
     font-size: var(--fs-14);
@@ -1331,7 +1345,8 @@
   }
 }
 
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
   .controls__card {
     width: min(780px, 100%);
   }
@@ -1350,5 +1365,103 @@
   .shell__controls {
     height: 44px;
     padding: 0 var(--sp-2);
+  }
+}
+
+/* ================= Phone portrait ================= */
+/* The compact phone rules above apply; the menu becomes one scrolling column. Driving itself
+   asks for landscape (the rotate prompt), but every menu works upright. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .crumbs,
+  .device-chip {
+    display: none;
+  }
+  .hub__body {
+    grid-template-columns: minmax(0, 1fr);
+    /* Rows as tall as their cards: in a scroll box, auto rows would shrink to min-height 0. */
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hub__col--centre .circuit__hero {
+    grid-template-columns: minmax(0, 1fr) 112px;
+  }
+  /* Circuit select: one card per row, the plan beside the name. */
+  .circuits__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ccard {
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    align-items: start;
+  }
+  .ccard__art {
+    grid-row: span 3;
+    height: 112px;
+  }
+
+  /* Launch: the stripes become a band above the name, and the name, line and start prompt sit
+     together in the lower middle instead of at the very bottom. */
+  .launch__stage {
+    align-content: center;
+    padding-top: 34svh;
+    padding-bottom: 8svh;
+  }
+  .launch__stage::before {
+    inset: 8vh 0 auto 30vw;
+    inset: 8svh 0 auto 30vw;
+    height: 22svh;
+  }
+  .launch__title {
+    font-size: calc((100vw - var(--safe-l) - var(--safe-r)) / 7.6);
+  }
+  .launch__tagline {
+    font-size: var(--fs-14);
+  }
+  .launch__credit {
+    left: var(--safe-l);
+    text-align: left;
+  }
+}
+
+/* Phone landscape narrower than about 720 px (a small phone, or Safari with its toolbars):
+   modes on the left, the circuit and team cards stacked and scrolling on the right. */
+@media (max-height: 500px) and (max-width: 720px) and (orientation: landscape) {
+  .hub__body {
+    grid-template-columns: 184px minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hub__col--modes {
+    grid-row: span 2;
+  }
+  .hub__col--centre,
+  .hub__col--team {
+    grid-column: 2;
+  }
+}
+
+/* Phone landscape: the map credit sits under the tagline instead of in the stage's corner, where
+   its 44 px link ran into the tagline's second line. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .launch__credit {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    margin-top: var(--sp-1);
+    text-align: left;
+  }
+}
+
+/* Short landscape (a small phone with Safari's bars): the mode badges stay on one line. */
+@media (max-height: 360px) and (orientation: landscape) {
+  .lrow__tag {
+    white-space: nowrap;
+    letter-spacing: 0.06em;
+    padding: 1px 4px;
   }
 }

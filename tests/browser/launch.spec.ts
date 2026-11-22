@@ -17,14 +17,17 @@ function watchErrors(page: Page): string[] {
 test.describe('launch screen', () => {
   test('renders the name, the start prompt and the build, and opens the main menu', async ({
     page,
-  }) => {
+  }, info) => {
     const errors = watchErrors(page);
     await page.goto('/');
 
     await expect(page).toHaveTitle(GAME_NAME);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(GAME_NAME);
     const press = page.locator('[data-action=press-start]');
-    await expect(press).toContainText(/press any key or tap to start/i);
+    // A touch-only phone has no keys: it says tap.
+    await expect(press).toContainText(
+      info.project.name === 'phone' ? /^tap to start$/i : /press any key or tap to start/i,
+    );
     await expect(page.locator('.launch__build code')).toHaveText(
       /^([0-9a-f]{7}(\+dirty)?|unversioned)$/,
     );
