@@ -11,6 +11,7 @@ import {
   type TrackData,
 } from './data';
 import {
+  FOLD_CELL,
   FOLD_STRETCH,
   FoldGround,
   foldShare,
@@ -18,6 +19,7 @@ import {
   type Box,
   type FoldSample,
   type NodeClass,
+  type OriginalGround,
 } from './fold-ground';
 import { TrackPath, createPathPoint, createVec3, type PathPoint, type Vec3 } from './path';
 
@@ -64,15 +66,51 @@ function smoothOpen(values: ArrayLike<number>, sigmaSamples: number): Float64Arr
 export const VERGE_FALL = 0.02;
 /**
  * The folded run-off's fill (`FoldGround`) leaves the kerb and this much beyond it as it is
- * (estimate: the strip a kerb's installation is laid in), and grows in over FOLD_RAMP, m.
+ * (estimate: the strip a kerb's installation is laid in), and grows in over FOLD_RAMP, m. At
+ * 0.5 m the disciplined keyboard driver brushes the fill's edge inside the first chicane's second
+ * turn and its recorded drivability gap widens (docs/track-data.md 5.8).
  */
-export const FOLD_KERB_MARGIN = 0.5;
+export const FOLD_KERB_MARGIN = 1;
 export const FOLD_RAMP = 1;
+/**
+ * How far along the lap the track's grade and bank count as "nearby" for the slope the fill may
+ * always reach (the run-off contract's distance, docs/track-data.md 5.6), m.
+ */
+export const FOLD_NEAR = 50;
+/** The run-off contract's allowance on top of grade, bank and drainage fall (5.6), as a slope. */
+export const FOLD_SLOPE_ALLOWANCE = 0.05;
+/**
+ * The fill stays this far under the contract's bound, as a slope: the build checks the final
+ * slope at points an eighth of a cell apart, and the original ground's slope changes between
+ * them (it is piecewise along the lap).
+ */
+export const FOLD_SLOPE_RESERVE = 0.01;
+/** A grid cell's diagonal: how far a query can be from the nodes it reads, m. */
+const FOLD_CELL_DIAGONAL = FOLD_CELL * Math.SQRT2;
 /**
  * A fold is filled only where the track's edge itself is compressed by the bend (its stretch below
  * this; estimate): a pocket the bend wraps around, not a wide run-off inside a gentle bend.
  */
 export const FOLD_EDGE_STRETCH = 0.8;
+
+/**
+ * World gradient of a cross-section from `ground` before any fill: along the lap a metre of s is
+ * a world step of m = 1 − κd; across it, d grows along the left normal (tz, −tx).
+ */
+function originalGradient(g: Ground, out: { gx: number; gz: number }): void {
+  const m = Math.max(1 - g.curvature * g.d, 0.05);
+  const along = g.slopeS / m;
+  out.gx = along * g.tx + g.slopeD * g.tz;
+  out.gz = along * g.tz - g.slopeD * g.tx;
+}
+
+export interface TrackOptions {
+  /**
+   * Fill the run-off where the track's frame folds (`FoldGround`; default true). Off, the ground
+   * is the original one everywhere: the reference the fill is checked against.
+   */
+  fillFolds?: boolean;
+}
 
 export const LEFT = 0;
 export const RIGHT = 1;
@@ -308,11 +346,11 @@ export class Track {
 
   private readonly tmp = createVec3();
 
-  static fromJSON(raw: unknown): Track {
-    return new Track(validateTrackData(raw));
+  static fromJSON(raw: unknown, options: TrackOptions = {}): Track {
+    return new Track(validateTrackData(raw), options);
   }
 
-  constructor(data: TrackData) {
+  constructor(data: TrackData, options: TrackOptions = {}) {
     this.data = data;
     this.id = data.id;
     this.name = data.name;
@@ -383,7 +421,7 @@ export class Track {
     this.speedTrap = data.timing.speedTrap;
     this.drsZones = data.timing.drs.map((z) => ({ ...z }));
     this.pitSide = data.pit.side === 'left' ? LEFT : RIGHT;
-    this.fold = this.buildFoldGround();
+    this.fold = options.fillFolds === false ? null : this.buildFoldGround();
 
     const p = createVec3();
     const t = createVec3();
@@ -622,7 +660,15 @@ export class Track {
   private readonly groundScratch = createGround();
   /** The solved base where the frame folds (`FoldGround`); null while it is being built. */
   private fold: FoldGround | null = null;
-  private readonly foldSample: FoldSample = { weight: 0, wx: 0, wz: 0, height: 0, gx: 0, gz: 0 };
+  private readonly foldSample: FoldSample = {
+    weight: 0,
+    wx: 0,
+    wz: 0,
+    height: 0,
+    gx: 0,
+    gz: 0,
+    active: false,
+  };
 
   /**
    * The ground cross-section at (s, d) on the lap: height, slopes and surface kind from the
@@ -713,100 +759,31 @@ export class Track {
     out.slopeD = sign * slope;
     out.slopeS = grade + sign * hw * dtb + kerbSlopeS;
     out.kind = kind;
-    if (this.fold)
-      this.foldBase(
-        lap,
-        i0,
-        j,
-        f,
-        s,
-        d,
-        sign,
-        u,
-        yc + sign * hw * tb,
-        slope + VERGE_FALL,
-        kerbSlopeS,
-        out,
-      );
+    if (this.fold) this.foldBase(lap, i0, j, f, d, out);
     return out;
   }
 
   /**
-   * Where the frame folds, replace the base under the kerb profile with the solved one
-   * (`FoldGround`), blended by its weight, and carry the slope as a world gradient.
+   * Where the frame folds, blend the solved height (`FoldGround`) into the original ground by its
+   * weight, and carry the slope as a world gradient.
    */
-  private foldBase(
-    lap: TrackPath,
-    i0: number,
-    j: number,
-    f: number,
-    s: number,
-    d: number,
-    sign: number,
-    u: number,
-    edge: number,
-    kerbSlopeU: number,
-    kerbSlopeS: number,
-    out: Ground,
-  ): void {
+  private foldBase(lap: TrackPath, i0: number, j: number, f: number, d: number, out: Ground): void {
     const nx = lap.nx[i0]! + (lap.nx[j]! - lap.nx[i0]!) * f;
     const nz = lap.nz[i0]! + (lap.nz[j]! - lap.nz[i0]!) * f;
     const x = lap.x[i0]! + (lap.x[j]! - lap.x[i0]!) * f + d * nx;
     const z = lap.z[i0]! + (lap.z[j]! - lap.z[i0]!) * f + d * nz;
     const fs = this.fold!.sample(x, z, this.foldSample);
-    if (fs.weight <= 0) return;
-    // The kerb and a margin beyond it keep the original ground (a kerb is laid along the track
-    // edge and follows it); the fill grows in beyond that over FOLD_RAMP.
-    const side: SideIndex = sign > 0 ? LEFT : RIGHT;
-    // The kerb's width tapers with its profile at a kerb's ends, so the fill's start is continuous
-    // along the lap.
-    let kerbWidth = 0;
-    let kerbRate = 0; // d(kerbWidth)/ds
-    const kp = this.kerb[side][out.sample]!;
-    if (kp >= 0) {
-      const prof = this.kerbProfiles[kp]!;
-      const i = out.sample;
-      const along = this.lap.wrap(s - this.kerbStart[side][i]!);
-      const left = this.kerbEnd[side][i]! - this.kerbStart[side][i]! - along;
-      let t = 1;
-      if (along < prof.taper && along <= left) {
-        t = along / prof.taper;
-        kerbRate = prof.width / prof.taper;
-      } else if (left < prof.taper) {
-        t = left / prof.taper;
-        kerbRate = -prof.width / prof.taper;
-      }
-      kerbWidth = Math.max(0, t) * prof.width;
-    }
-    const from = kerbWidth + FOLD_KERB_MARGIN;
-    const tr = Math.min(1, Math.max(0, (u - from) / FOLD_RAMP));
-    if (tr <= 0) return;
-    const ramp = tr * tr * (3 - 2 * tr);
-    const dRamp = tr < 1 ? (6 * tr * (1 - tr)) / FOLD_RAMP : 0; // per metre of u
-    const w = fs.weight * ramp;
-    const base = edge - VERGE_FALL * u;
-    const diff = fs.height - base;
-    // World gradient of the unfolded base: along s a metre of s is a world step of m.
-    const m = Math.max(1 - out.curvature * d, 0.05);
-    const tx = out.tx;
-    const tz = out.tz;
-    const baseS = out.slopeS - kerbSlopeS;
-    const baseD = -VERGE_FALL * sign;
-    const bx = (baseS / m) * tx + baseD * nx;
-    const bz = (baseS / m) * tz + baseD * nz;
-    // The kerb profile on top, unchanged.
-    const kx = (kerbSlopeS / m) * tx + sign * kerbSlopeU * nx;
-    const kz = (kerbSlopeS / m) * tz + sign * kerbSlopeU * nz;
+    if (!fs.active) return;
+    originalGradient(out, this.gradient);
+    const w = fs.weight;
+    const diff = fs.height - out.height;
     out.height += w * diff;
     out.world = true;
-    // The ramp's start moves along the lap at a kerb's ends: d(ramp)/ds = −dRamp · kerbRate,
-    // a world step of m per metre of s.
-    const rampS = (-fs.weight * dRamp * kerbRate) / m;
-    const wx = fs.wx * ramp + fs.weight * dRamp * sign * nx + rampS * tx;
-    const wz = fs.wz * ramp + fs.weight * dRamp * sign * nz + rampS * tz;
-    out.gx = (1 - w) * bx + w * fs.gx + wx * diff + kx;
-    out.gz = (1 - w) * bz + w * fs.gz + wz * diff + kz;
+    out.gx = (1 - w) * this.gradient.gx + w * fs.gx + diff * fs.wx;
+    out.gz = (1 - w) * this.gradient.gz + w * fs.gz + diff * fs.wz;
   }
+
+  private readonly gradient = { gx: 0, gz: 0 };
 
   /**
    * Does the run-off beside lap sample i fold: the frame folds before the barrier, and the
@@ -866,10 +843,21 @@ export class Track {
     for (const side of [LEFT, RIGHT] as const) {
       for (let i = 0; i < n; i++) folding[side][i] = this.foldsHere(side, i) ? 1 : 0;
     }
+    // The steepest grade plus bank within FOLD_NEAR of each sample.
+    const near = new Float64Array(n);
+    const window = Math.ceil(FOLD_NEAR / lap.step);
+    for (let i = 0; i < n; i++) {
+      let most = 0;
+      for (let k = -window; k <= window; k++) {
+        const j = (i + k + n) % n;
+        most = Math.max(most, Math.abs(lap.grade[j]!) + Math.abs(this.tanBank[j]!));
+      }
+      near[i] = most;
+    }
     const q = createPathPoint();
     const hint = { index: -1 };
     const g = createGround();
-    return new FoldGround(boxes, (x: number, z: number, c: NodeClass) => {
+    const classify = (x: number, z: number, c: NodeClass): void => {
       this.project(x, z, hint, q);
       this.ground(q.s, q.d, g);
       const side: SideIndex = q.d >= 0 ? LEFT : RIGHT;
@@ -877,6 +865,7 @@ export class Track {
       const hw = this.halfWidthAt(q.s, side);
       const yc = this.lap.interpolate(this.lap.y, q.s);
       const tb = this.lap.interpolate(this.tanBank, q.s);
+      c.ramp = 0;
       // Every node carries the unfolded base (behind the barrier too: a blend near it reads it).
       if (a <= hw) {
         c.kind = NodeKind.Fixed;
@@ -889,13 +878,31 @@ export class Track {
       // The zone is the whole run-off inside a bend that folds before its barrier, from the
       // track edge out: its heights are then joined across the full width of the bend.
       else {
+        // The kerb and FOLD_KERB_MARGIN beyond it keep the original ground exactly: a zone node
+        // is at least a cell's diagonal further out, so no cell the strip lies in has one.
         const kp = this.kerb[side][g.sample]!;
-        const kerb = (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN;
-        c.kind = folding[side][g.sample] && a - hw > kerb ? NodeKind.Zone : NodeKind.Fixed;
+        const from =
+          (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN + FOLD_CELL_DIAGONAL;
+        c.kind = folding[side][g.sample] && a - hw > from ? NodeKind.Zone : NodeKind.Fixed;
         const sign = side === LEFT ? 1 : -1;
         c.weight = foldShare(1 - lap.curvature[g.sample]! * sign * this.barrier[side][g.sample]!);
+        const tr = Math.min(1, Math.max(0, (a - hw - from) / FOLD_RAMP));
+        c.ramp = tr * tr * (3 - 2 * tr);
       }
-    });
+    };
+    // The unfilled ground at a world point, as a query reads it (the fill is not built yet), and
+    // the slope the fill may always reach there: the run-off contract's bound, the track's grade
+    // and bank nearby plus the drainage fall plus its allowance.
+    const original = (x: number, z: number, o: OriginalGround): boolean => {
+      this.project(x, z, hint, q);
+      this.ground(q.s, q.d, g);
+      if (g.kind === SurfaceKind.OutOfBounds) return false;
+      o.height = g.height;
+      originalGradient(g, o);
+      o.floor = near[g.sample]! + VERGE_FALL + FOLD_SLOPE_ALLOWANCE - FOLD_SLOPE_RESERVE;
+      return true;
+    };
+    return new FoldGround(boxes, classify, original);
   }
 
   /**

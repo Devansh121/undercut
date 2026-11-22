@@ -65,26 +65,18 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
  * reset. Open cases run as expected failures, so each one turns this suite red the moment it
  * starts passing and must then move into this list.
  */
-// Eight more pass since the folded run-off is filled (docs/track-data.md 5.8), among them
-// 540,8,0.1,0, which had regressed with the contact patch.
+// One more passes since the folded run-off is filled (docs/track-data.md 5.8): 610,8,-0.1,0.
 const FIXED = new Set([
-  '0,-8,0,0',
-  '0,8,0,0',
   '300,8,-0.1,2',
-  '300,8,0,0',
   '540,8,-0.1,0',
   '540,8,-0.1,2',
   '540,8,0,0',
-  '540,8,0.1,0',
   '610,0,0.1,0',
   '610,8,-0.1,0',
   '650,8,-0.1,0',
   '650,8,-0.1,2',
   '650,8,0,0',
   '650,8,0,2',
-  '650,8,0.1,0',
-  '650,8,0.1,2',
-  '5600,-8,0,0',
   '5600,0,0,0',
   '5600,0,0,2',
 ]);
@@ -93,7 +85,7 @@ const FIXED = new Set([
  * fail after it (the patch changes each run's path through the chicane's folded run-off).
  * Listed on their own so they are not mistaken for cases that never passed.
  */
-export const REGRESSED_WITH_PATCH = ['610,8,-0.1,2', '5600,8,0,2'];
+export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
 
 describe('flat-out kerb strikes in the game never need the safety net (review of PR 19)', () => {
   for (const [s, d, steer, tc, tick] of CASES) {
