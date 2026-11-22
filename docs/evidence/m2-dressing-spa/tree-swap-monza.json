@@ -6,37 +6,37 @@
       "tod": "day",
       "pose": "lesmo",
       "swap": 95,
-      "nearLuma": 51.6,
-      "cardLuma": 55.1,
-      "ratio": 0.937,
-      "changedPct": 22.8
+      "nearLuma": 48.6,
+      "cardLuma": 52.6,
+      "ratio": 0.923,
+      "changedPct": 19.4
     },
     {
       "tod": "day",
       "pose": "park",
       "swap": 95,
-      "nearLuma": 65.3,
-      "cardLuma": 68.4,
-      "ratio": 0.955,
-      "changedPct": 10.9
+      "nearLuma": 64.9,
+      "cardLuma": 68.1,
+      "ratio": 0.954,
+      "changedPct": 10.7
     },
     {
       "tod": "night",
       "pose": "lesmo",
       "swap": 95,
-      "nearLuma": 20.4,
-      "cardLuma": 22,
-      "ratio": 0.929,
-      "changedPct": 17.8
+      "nearLuma": 19.1,
+      "cardLuma": 20.4,
+      "ratio": 0.936,
+      "changedPct": 17
     },
     {
       "tod": "night",
       "pose": "park",
       "swap": 95,
-      "nearLuma": 17.3,
-      "cardLuma": 16.3,
-      "ratio": 1.062,
-      "changedPct": 4.4
+      "nearLuma": 17.2,
+      "cardLuma": 16.2,
+      "ratio": 1.059,
+      "changedPct": 4.5
     }
   ],
   "problems": []

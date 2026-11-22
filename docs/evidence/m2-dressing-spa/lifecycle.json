@@ -1,0 +1,266 @@
+{
+  "spa": {
+    "quality": "high",
+    "ok": true,
+    "after": [
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      }
+    ],
+    "problems": []
+  },
+  "monza": {
+    "quality": "high",
+    "ok": true,
+    "after": [
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      },
+      {
+        "gl": {
+          "Texture": 5,
+          "Framebuffer": 3,
+          "Program": 1,
+          "Shader": 0,
+          "Buffer": 0,
+          "Renderbuffer": 0,
+          "VertexArray": 0
+        },
+        "info": {
+          "geometries": 0,
+          "textures": 1,
+          "programs": 1,
+          "programRefs": 1
+        },
+        "programs": [
+          {
+            "name": "",
+            "key": "depth,highp,srgb-linear,false,false,,,uv\u2026lse,false,false,false,false,false,false,false,false,false,false,,false,false,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,3200,8388608,8532992,srgb,onBeforeCompile(){}",
+            "used": 1,
+            "uniforms": ""
+          }
+        ]
+      }
+    ],
+    "problems": []
+  }
+}
