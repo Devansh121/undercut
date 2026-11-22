@@ -18,7 +18,9 @@
  * nodes. The fill may make the ground no steeper than the original ground, or than the slope the
  * caller allows there (the run-off contract's bound, docs/track-data.md 5.6), whichever is
  * higher; that rule is enforced on the final blended field, every term of its gradient
- * included, at points an eighth of a cell apart (`enforceCap`).
+ * included, at check points a quarter of a cell (12.5 cm) apart (`enforceCap`). It holds at those
+ * points and at the run-off contract's 0.35 m probe scale; between check points the point-scale
+ * slope can exceed it by up to about 1.5 percentage points.
  *
  * Solved once, on a grid, when the track is built: deterministic and independent of queries.
  */

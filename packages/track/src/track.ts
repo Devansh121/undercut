@@ -81,8 +81,8 @@ export const FOLD_NEAR = 50;
 export const FOLD_SLOPE_ALLOWANCE = 0.05;
 /**
  * The fill stays this far under the contract's bound, as a slope: the build checks the final
- * slope at points an eighth of a cell apart, and the original ground's slope changes between
- * them (it is piecewise along the lap).
+ * slope at points a quarter of a cell (12.5 cm) apart, and the original ground's slope changes
+ * between them (it is piecewise along the lap).
  */
 export const FOLD_SLOPE_RESERVE = 0.01;
 /** A grid cell's diagonal: how far a query can be from the nodes it reads, m. */

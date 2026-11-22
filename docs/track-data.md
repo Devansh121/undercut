@@ -427,13 +427,18 @@ section 5.7 records the first version). The model:
   centre, which is harmonic). Normals come from the world gradient.
 - **The steepness rule, on the final ground.** A query reads H = O + W (F − O), with O the
   original ground and W, F the bilinear weight and solved height, so
-  ∇H = ∇O + W (∇F − ∇O) + (F − O) ∇W. When the track is built, H is checked at points an eighth
-  of a cell (6.25 cm) apart in every cell the fill reaches, with O and ∇O read there exactly as
+  ∇H = ∇O + W (∇F − ∇O) + (F − O) ∇W. When the track is built, H is checked at points a quarter
+  of a cell (12.5 cm) apart in every cell the fill reaches, with O and ∇O read there exactly as
   a query reads them: H may be no steeper than O, or than the run-off contract's bound there
   (5.6) less 1 %, whichever is higher. The 1 % covers the original's slope changing between the
   check points (it is piecewise along the lap). The weights are first scaled down until every
   point holds, then grown back towards their targets in steps, each kept only if every point
-  around the node still holds.
+  around the node still holds. The rule holds at the check points and at the contract's 0.35 m
+  probe scale on all three circuits (zero probes broken on a dense 5 cm lattice). Measured at a
+  single point between check points, the slope can exceed it by up to about 1.5 percentage points
+  (Monza 30 of 79 275 lattice points, worst 11.65 % against 10.10 %; Spa 28 of 39 202; Singapore
+  none). Halving the spacing still leaves about 1.3 points, because the original ground's gradient
+  is piecewise, and adds about 20 ms to the build, so it stays at 12.5 cm.
 - **The pit lane** is its own surface, built from the original ground under it before the fill;
   its blend band joins the two.
 
