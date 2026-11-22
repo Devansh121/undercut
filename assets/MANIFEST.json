@@ -501,7 +501,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Authored list of catalogue props the circuit world loads",
-    "sha256": "2d4e8d2c8fa8efb25a1d8185e8fb907047594288481d3577d7b0c31a6bb89ab8"
+    "sha256": "2af19a96f8965517d7b5a9198058955035c14dbc275aac8ef3eed20da1908178"
   },
   {
     "file": "apps/web/public/assets/car/car_far.glb",
