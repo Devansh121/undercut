@@ -193,6 +193,9 @@ export class DriveSession {
     const limits = options.limits;
     const line = this.quickRace ? decodeRacingLine(raceLine) : null;
     this.lineOffsets = line ? racingLineOffsets(line) : null;
+    const gridSlot = this.quickRace
+      ? Math.max(0, Math.min(19, Math.round(options.quickRace?.gridPosition ?? 10) - 1))
+      : 0;
     const field = line
       ? createAiField({
           track: this.track,
@@ -207,13 +210,14 @@ export class DriveSession {
             ? { spread: options.quickRace.skillSpread }
             : {}),
           ...(options.quickRace?.fieldStartDelay !== undefined
-            ? { startDelay: options.quickRace.fieldStartDelay, jumpStartChance: 0 }
+            ? {
+                startDelay: options.quickRace.fieldStartDelay,
+                noDelay: gridSlot,
+                jumpStartChance: 0,
+              }
             : {}),
         })
       : [];
-    const gridSlot = this.quickRace
-      ? Math.max(0, Math.min(19, Math.round(options.quickRace?.gridPosition ?? 10) - 1))
-      : 0;
     this.playerPilot = field[gridSlot] ?? null;
     const aiField = this.quickRace
       ? [...field.slice(0, gridSlot), ...field.slice(gridSlot + 1)]

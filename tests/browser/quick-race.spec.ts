@@ -52,15 +52,15 @@ test('Quick Race: provisional standings after the player takes the flag, then th
   await page.goto('/?debug=1&quality=lite&world=lite');
   await page.waitForFunction(() => !!window.__undercut);
   // One lap from pole, the field held on the grid for 55 s after lights out (under the 60 s
-  // after which a car standing still is retired): the player on the autopilot (about 125 s
-  // for a standing lap, the field about 93 s) takes the flag some 20 s of race time before
-  // the first of the others, which at four times real time is several seconds to look.
+  // after which a car standing still is retired). The player's car on its racing driver, which
+  // drives in the sim step whatever the frame rate, takes the flag some 45 s of race time
+  // before the first of the others: several seconds to look at eight times real time.
   await page.evaluate(() =>
     window.__undercut!.startQuickRace(1, { gridPosition: 1, fieldStartDelay: 55 }),
   );
   await page.evaluate(() => {
-    window.__undercut!.autopilot(true);
-    window.__undercut!.setTimeScale(4);
+    window.__undercut!.raceDriver(true);
+    window.__undercut!.setTimeScale(8);
   });
   // The standings take the screen then: provisional, Skip to results inside the viewport (a
   // landscape phone is 390 px tall), the driving cluster gone and the first-lap coach finished
@@ -71,7 +71,7 @@ test('Quick Race: provisional standings after the player takes the flag, then th
       const rows = st.standings as { status: string }[];
       const skip = document.querySelector<HTMLElement>('[data-testid="skip-results"]');
       if (st.provisional !== true || !skip || skip.hidden) return null;
-      // Hold the moment: the field would come home at four times real time.
+      // Hold the moment: the field would come home at eight times real time.
       window.__undercut!.setTimeScale(0.25);
       const cluster = document.querySelector<HTMLElement>('.hud-cluster');
       const coach = document.querySelector<HTMLElement>('[data-testid="onboarding"]');

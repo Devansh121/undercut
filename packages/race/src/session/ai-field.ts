@@ -44,6 +44,8 @@ export interface AiFieldOptions {
   jumpStartChance?: number;
   /** Seconds every car waits after lights out on top of its reaction (test fixtures). Default 0. */
   startDelay?: number;
+  /** A car index that starts without `startDelay` (the player's own pilot). */
+  noDelay?: number;
   rules?: Partial<RaceRules>;
 }
 
@@ -103,7 +105,10 @@ export function createAiField(o: AiFieldOptions): AiController[] {
       lag = skill.reaction;
     }
     const reaction =
-      rules.reactionBase + lag + rng.range(0, rules.reactionSpread) + (o.startDelay ?? 0);
+      rules.reactionBase +
+      lag +
+      rng.range(0, rules.reactionSpread) +
+      (k === o.noDelay ? 0 : (o.startDelay ?? 0));
     const jumpAfter = rng.next() < jumpChance ? rng.range(0.3, 1.5) : null;
     out.push(new AiController({ driver, params: o.params, reaction, jumpAfter }));
   }
