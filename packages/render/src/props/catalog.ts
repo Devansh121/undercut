@@ -67,6 +67,28 @@ export interface PropCatalog {
  */
 export const WORLD_CATALOG_PROP_IDS: readonly string[] = Object.freeze([...worldProps.ids]);
 
+interface CircuitProps {
+  ids?: readonly string[];
+  nearTrees?: readonly string[];
+}
+const CIRCUIT_PROPS: Readonly<Record<string, CircuitProps>> = worldProps.circuits;
+
+/**
+ * The catalogue ids one circuit's world places on a preset: the common ones, the circuit's own,
+ * and its near-tree models where the preset draws near trees as geometry.
+ */
+export function worldCatalogPropIds(
+  circuit: string,
+  quality: { world: { treeCloud: number } },
+): string[] {
+  const own = CIRCUIT_PROPS[circuit] ?? {};
+  return [
+    ...WORLD_CATALOG_PROP_IDS,
+    ...(own.ids ?? []),
+    ...(quality.world.treeCloud > 0 ? (own.nearTrees ?? []) : []),
+  ];
+}
+
 /** Material names that receive per-instance colour tinting by default (team colours / crowd clothes). */
 const DEFAULT_TINTABLE_SLOTS = new Set(['clothing', 'paint-band', 'seat', 'team-tint']);
 
@@ -449,6 +471,8 @@ export interface PropLodOptions {
   slotColors?: Readonly<Record<string, readonly [number, number, number]>>;
   /** Optional replacement unified material for non-overridden slots (e.g. swaying crowd). */
   baseMaterial?: Material;
+  /** Multiplier on every slot's colour (calibrating a model against what it stands in for). */
+  colourScale?: number;
 }
 
 /**
@@ -564,6 +588,7 @@ export class PropKitAssets {
     const caps = options.distanceCaps;
     const tintSet = options.tintSlots ? new Set(options.tintSlots) : DEFAULT_TINTABLE_SLOTS;
     const slotColors = options.slotColors;
+    const k = options.colourScale ?? 1;
     const baseMat = options.baseMaterial ?? this.getSharedMaterial();
 
     return list.map((lod, lodIdx) => {
@@ -597,9 +622,9 @@ export class PropKitAssets {
         const c = slotColors?.[s.name] ?? s.color;
         for (let i = 0; i < count; i++) {
           const k3 = (vOff + i) * 3;
-          col[k3] = c[0];
-          col[k3 + 1] = c[1];
-          col[k3 + 2] = c[2];
+          col[k3] = c[0] * k;
+          col[k3 + 1] = c[1] * k;
+          col[k3 + 2] = c[2] * k;
           pbr[k3] = s.roughness;
           pbr[k3 + 1] = s.metalness;
           pbr[k3 + 2] = tintMask;

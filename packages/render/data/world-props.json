@@ -1,5 +1,5 @@
 {
-  "$comment": "Prop catalogue ids the circuit world loads and places (packages/render/src/props/catalog.ts). Read by tools/budget/check.mjs to count the first race. Kinds not listed keep their procedural stand-ins. Mobile and Lite skip each prop's _high level.",
+  "$comment": "Prop catalogue ids the circuit world loads and places (packages/render/src/props/catalog.ts). `ids` on every circuit; `circuits.<id>.ids` on that circuit as well; `circuits.<id>.nearTrees` only on presets that draw near trees as geometry (world.treeCloud > 0). Read by tools/budget/check.mjs to count each circuit's first race. Kinds not listed keep their procedural stand-ins. Mobile and Lite skip each prop's _high level.",
   "ids": [
     "hoarding",
     "catch-fence",
@@ -9,5 +9,11 @@
     "absorber-block",
     "screen-tower",
     "camera-tower"
-  ]
+  ],
+  "circuits": {
+    "spa": {
+      "ids": ["hill-pit-garage"],
+      "nearTrees": ["forest-spruce", "forest-fir"]
+    }
+  }
 }

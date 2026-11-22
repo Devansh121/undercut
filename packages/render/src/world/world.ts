@@ -43,6 +43,7 @@ import {
   buildGarageBoardsGeometry,
   buildPitBuilding,
   garageBoardAtlas,
+  PIT_BUILDING,
   pitCrewGeometry,
   pitFacadeMaterial,
   pitWallCanopyGeometry,
@@ -52,12 +53,14 @@ import {
 } from './pit-building';
 import { buildSurfaceDecals } from './surface-decals';
 import { buildTerrain, TERRAIN_HIGH, TERRAIN_LITE, TERRAIN_MOBILE } from './terrain';
+import { coniferShare, worldTheme, type WorldTheme } from './theme';
 import { treeAtlas } from './tree-atlas';
 import {
   BROADLEAF_CLOUD,
   COLUMNAR_CLOUD,
   treeCards,
   treeCloudGeometry,
+  nearKitTreeMaterial,
   treeCloudMaterials,
   treeMaterials,
   type TreeMaterials,
@@ -128,6 +131,11 @@ const FAR_DECALS = 900;
 
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
 const WOOD_DENSITY = 1 / 42;
+/**
+ * The kit conifers' colour against the spruce cards they take over from at the swap distance:
+ * at 1 they measured 12–15% lighter (by day and under floodlights).
+ */
+const NEAR_CONIFER_TONE = 0.8;
 /** Clear ground between the barrier and the first trees, m. */
 const TREE_CLEARANCE = 9;
 
@@ -212,6 +220,8 @@ export class CircuitWorld {
   private readonly worldChunks: WorldChunk[] = [];
   private pitComplex: PitComplexData | null = null;
   private startGantry: StartGantry | null = null;
+  /** The circuit's regional look (theme.ts), from the track's id. */
+  readonly theme: WorldTheme;
 
   /** Milliseconds per build step (start-up budget). */
   readonly buildTimes: Record<string, number> = {};
@@ -219,6 +229,7 @@ export class CircuitWorld {
   constructor(o: CircuitWorldOptions, deferBuild = false) {
     this.group.name = 'world';
     this.lap = new LapIndex(o.track);
+    this.theme = worldTheme(o.track.id);
     if (!deferBuild) {
       this.buildSync(o);
     }
@@ -441,21 +452,66 @@ export class CircuitWorld {
         ? o.garageTeams
         : [{ name: 'Kestrel Grand Prix', code: 'KST', primary: '#1F4FBF', secondary: '#C3C8D0' }];
 
-    const pit = buildPitBuilding(track, this.lap, teams.length);
+    const built = buildPitBuilding(track, this.lap, teams.length);
+    const garageLods =
+      this.theme.pit === 'kit-garages' && built.bays.length > 0
+        ? (o.propKit?.lodsFor('hill-pit-garage', {
+            // Its own board panel stays dark behind the team boards placed on it.
+            slotColors: { 'board-face': [0.018, 0.019, 0.021] },
+            maxDistanceScale: 2.6,
+            distanceCaps: [80, 300, FAR_STANDS],
+          }) ?? null)
+        : null;
+    let pit = built;
+    if (garageLods) {
+      // A row of the kit's garage modules, one per bay, instead of the built-up block: each is
+      // stretched along the row to the bay pitch, its front wall on the garage line, and the
+      // team boards move onto the panel the module carries for them.
+      for (const ch of built.chunks) ch.geometry.dispose();
+      const entry = o.propKit?.entries.get('hill-pit-garage');
+      const board = entry?.attachments?.find((a) => a.name === 'team-board');
+      const k = PIT_BUILDING.bay / (entry?.moduleLength || 6);
+      const wallX = (board?.position[0] ?? 4.98) * k;
+      const boardY = (board?.position[1] ?? 4.18) * k;
+      pit = {
+        ...built,
+        chunks: [],
+        bays: built.bays.map((b) => ({ ...b, y: b.groundY + boardY })),
+      };
+      props.define({
+        id: 'pit-garage',
+        castShadow: quality.sceneryShadows,
+        shadowMaxDistance: 240,
+        receiveShadow: true,
+        lods: garageLods,
+      });
+      for (const b of built.bays) {
+        props.place('pit-garage', {
+          x: b.x - b.nx * (0.08 + wallX),
+          y: b.groundY,
+          z: b.z - b.nz * (0.08 + wallX),
+          yaw: b.yaw,
+          s: b.s,
+          scale: k,
+        });
+      }
+      this.counts.pitGarages = built.bays.length;
+    }
     this.pitComplex = pit;
-    const mat = pitFacadeMaterial(teams.map((t) => t.primary));
-    this.materials.push(mat);
-
-    pit.chunks.forEach((ch, ci) => {
-      this.geometries.push(ch.geometry);
-      const mesh = new Mesh(ch.geometry, mat);
-      mesh.name = ci === 0 ? 'world:pit-building' : `world:pit-building-${ci}`;
-      mesh.castShadow = quality.sceneryShadows;
-      mesh.receiveShadow = true;
-      mesh.matrixAutoUpdate = false;
-      this.group.add(mesh);
-      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
-    });
+    if (!garageLods) {
+      const mat = pitFacadeMaterial(teams.map((t) => t.primary));
+      this.materials.push(mat);
+      pit.chunks.forEach((ch, ci) => {
+        this.geometries.push(ch.geometry);
+        const mesh = new Mesh(ch.geometry, mat);
+        mesh.name = ci === 0 ? 'world:pit-building' : `world:pit-building-${ci}`;
+        mesh.castShadow = quality.sceneryShadows;
+        mesh.receiveShadow = true;
+        mesh.matrixAutoUpdate = false;
+        this.group.add(mesh);
+        this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
+      });
+    }
 
     // Garage team fascia boards consolidated into one atlas texture and one draw call.
     if (pit.bays.length > 0) {
@@ -583,14 +639,19 @@ export class CircuitWorld {
     if (wq.treeDensity <= 0) return;
     const cover = this.cover;
     if (!cover) throw new Error('trees are placed after the ground');
-    const atlas = treeAtlas(wq.treeTile, quality.anisotropy);
+    const atlas = treeAtlas(wq.treeTile, quality.anisotropy, this.theme.species);
     this.textures.push(atlas);
     const coverage = quality.msaa > 0;
-    const kinds: { id: string; tiles: number[] }[] = [
-      { id: 'tree-wood', tiles: [0, 1, 3, 6, 1, 0, 7, 5] },
-      { id: 'tree-row', tiles: [4, 4, 1, 2] },
-      { id: 'tree-park', tiles: [2, 0, 3, 6] },
+    const theme = this.theme;
+    const conifers = theme.conifers;
+    const kinds: { id: string; tiles: readonly number[] }[] = [
+      { id: 'tree-wood', tiles: theme.trees.wood },
+      { id: 'tree-row', tiles: theme.trees.row },
+      { id: 'tree-park', tiles: theme.trees.park },
     ];
+    if (conifers) kinds.push({ id: 'tree-conifer', tiles: conifers.tiles });
+    // Near conifers from the kit's models where it has them (else the columnar near tree).
+    const nearKits: { id: string; height: number }[] = [];
     const near = treeCards(3);
     const far = treeCards(2);
     this.geometries.push(near, far);
@@ -610,7 +671,36 @@ export class CircuitWorld {
       const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage, swap });
       this.trees.push(mats);
       this.materials.push(mats.material, mats.depth);
-      if (clouds) {
+      const kitIds =
+        clouds && k.id === 'tree-conifer' && conifers
+          ? conifers.kit.filter((id) => o.propKit?.has(id))
+          : [];
+      if (kitIds.length > 0 && o.propKit) {
+        const kitMat = nearKitTreeMaterial(this.treeSwap);
+        this.materials.push(kitMat);
+        for (const id of kitIds) {
+          const lods = o.propKit.lodsFor(id, {
+            baseMaterial: kitMat,
+            tintSlots: [`${id}-needles`],
+            // Measured against the spruce cards they replace (shots --tree-swap-check).
+            colourScale: NEAR_CONIFER_TONE,
+            // The finest level only very near; nothing beyond the swap band.
+            distanceCaps: [35, wq.treeCloud + 15, wq.treeCloud + 15],
+          });
+          if (!lods) continue;
+          const nearId = `${k.id}-near-${id}`;
+          props.define({
+            id: nearId,
+            gridCell: 120,
+            // The cards cast every tree's shadow (see treeMaterials).
+            castShadow: false,
+            shadowMaxDistance: 170,
+            receiveShadow: true,
+            lods,
+          });
+          nearKits.push({ id: nearId, height: o.propKit.entries.get(id)?.bounds?.max[1] ?? 16 });
+        }
+      } else if (clouds) {
         const cm = treeCloudMaterials(
           atlas,
           k.id,
@@ -628,7 +718,8 @@ export class CircuitWorld {
           receiveShadow: true,
           lods: [
             {
-              geometry: k.id === 'tree-row' ? clouds.column : clouds.broad,
+              geometry:
+                k.id === 'tree-row' || k.id === 'tree-conifer' ? clouds.column : clouds.broad,
               material: cm.material,
               depthMaterial: cm.depth,
               // Near-edge distance of the chunk: the swap distance plus the dither band.
@@ -685,20 +776,32 @@ export class CircuitWorld {
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
       };
       props.place(kind, placement);
-      if (cloud) props.place(`${kind}-near`, placement);
+      if (cloud) {
+        if (kind === 'tree-conifer' && nearKits.length > 0) {
+          const nk = nearKits[Math.floor(hash01(n, 15) * nearKits.length)] as (typeof nearKits)[0];
+          props.place(nk.id, { ...placement, scale: (placement.scale ?? 1) / nk.height });
+        } else props.place(`${kind}-near`, placement);
+      }
       return true;
     };
     const step = Math.sqrt(1 / (WOOD_DENSITY * wq.treeDensity));
+    let coniferCount = 0;
     const fillArea = (f: MappedFeature, density: number, size: number, salt: number): number => {
       const [x0, z0, x1, z1] = bounds(f.p);
       const sp = step / Math.sqrt(density);
+      // Conifers by the wood's mapped leaf type (none where the theme has no conifers).
+      const share = coniferShare(theme, f.t);
       let placed = 0;
       for (let j = 0, z = z0; z < z1; j++, z += sp) {
         for (let i = 0, x = x0; x < x1; i++, x += sp) {
           const px = x + (hash01(i, j, salt) - 0.5) * sp * 0.9;
           const pz = z + (hash01(i, j, salt + 1) - 0.5) * sp * 0.9;
           if (!inRing(f.p, px, pz)) continue;
-          if (place('tree-wood', px, pz, size)) placed++;
+          const conifer = share > 0 && hash01(i, j, salt + 2) < share;
+          if (place(conifer ? 'tree-conifer' : 'tree-wood', px, pz, size)) {
+            placed++;
+            if (conifer) coniferCount++;
+          }
         }
       }
       return placed;
@@ -747,7 +850,9 @@ export class CircuitWorld {
           const jitter = 0.92 + hash01(ring, i, 42) * 0.24;
           const px = cx + Math.cos(ang) * rx * scaleR * jitter;
           const pz = cz + Math.sin(ang) * rz * scaleR * jitter;
-          if (place('tree-wood', px, pz, 28 + ring * 6, false)) skyline++;
+          const conifer = conifers !== null && hash01(ring, i, 43) < conifers.untyped;
+          if (place(conifer ? 'tree-conifer' : 'tree-wood', px, pz, 28 + ring * 6, false))
+            skyline++;
         }
       }
     }
@@ -755,6 +860,7 @@ export class CircuitWorld {
     this.counts.treesRow = rows;
     this.counts.treesSingle = singles;
     this.counts.treesSkyline = skyline;
+    if (conifers) this.counts.treesConifer = coniferCount;
   }
 
   private placeBuildings(o: CircuitWorldOptions): void {
@@ -778,6 +884,8 @@ export class CircuitWorld {
         }
         return false;
       },
+      320,
+      this.theme.buildings,
     );
     this.counts.buildings = count;
     const mat = facadeMaterial();

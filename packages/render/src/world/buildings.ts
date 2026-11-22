@@ -7,20 +7,7 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from 'three';
 import { hash01, ringArea, type MappedFeature } from './dressing';
-
-/** Roof and wall colours of the region's buildings: plaster, brick and tile (linear-ish sRGB). */
-// Lombardy plaster, ochre and brick, kept below white so facades read as painted render in sun.
-const WALLS = [
-  '#c9b896',
-  '#d0ad7f',
-  '#b98d66',
-  '#c8bba0',
-  '#a89a86',
-  '#c49c6c',
-  '#d3c3a2',
-  '#9a7a62',
-];
-const ROOFS = ['#8e4b33', '#9a5a3c', '#7d4430', '#5d5a57', '#6b6762', '#8a8580'];
+import { DEFAULT_THEME, type BuildingPalette } from './theme';
 
 export interface BuildingStyle {
   /** Default height when the map gives none, by footprint area. */
@@ -67,14 +54,16 @@ function ring(p: readonly number[]): number[] {
 /**
  * Every mapped building around the circuit as one merged mesh: footprints extruded from the
  * ground (sunk below its lowest corner) to a height from the map's tags or the footprint size,
- * walls in the region's plaster and brick colours with window bands in the shader, flat roofs in
+ * walls in the region's colours (the circuit's theme) with window bands in the shader, flat roofs in
  * tile or grey. uv: walls (metres along the wall, metres above the base), roofs (-1, -1).
  */
 export function buildBuildings(
   features: readonly MappedFeature[],
   heightAt: (x: number, z: number) => number,
   skip: (f: MappedFeature) => boolean = () => false,
+  palette: BuildingPalette = DEFAULT_THEME.buildings,
 ): { geometry: BufferGeometry; count: number } {
+  const { walls, roofs } = palette;
   const pos: number[] = [];
   const nor: number[] = [];
   const col: number[] = [];
@@ -97,8 +86,8 @@ export function buildBuildings(
     }
     const base = gmin - 0.4;
     const top = gmax + buildingHeight(area, f.t);
-    const wall = hexRgb(WALLS[Math.floor(hash01(n, 1) * WALLS.length)] as string);
-    const roof = hexRgb(ROOFS[Math.floor(hash01(n, 2) * ROOFS.length)] as string);
+    const wall = hexRgb(walls[Math.floor(hash01(n, 1) * walls.length)] as string);
+    const roof = hexRgb(roofs[Math.floor(hash01(n, 2) * roofs.length)] as string);
     const shadeK = 0.85 + hash01(n, 3) * 0.25;
     // Walls.
     let along = 0;
@@ -221,6 +210,7 @@ export function buildBuildingChunks(
   heightAt: (x: number, z: number) => number,
   skip: (f: MappedFeature) => boolean = () => false,
   cellSize = 320,
+  palette: BuildingPalette = DEFAULT_THEME.buildings,
 ): {
   chunks: { geometry: BufferGeometry; centre: [number, number, number]; radius: number }[];
   count: number;
@@ -248,7 +238,7 @@ export function buildBuildingChunks(
     [];
   let total = 0;
   for (const list of buckets.values()) {
-    const { geometry, count } = buildBuildings(list, heightAt);
+    const { geometry, count } = buildBuildings(list, heightAt, undefined, palette);
     if (count === 0) {
       geometry.dispose();
       continue;
