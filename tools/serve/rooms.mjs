@@ -1,7 +1,5 @@
 import { spawn } from 'node:child_process';
-import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from './ports.mjs';
@@ -53,18 +51,19 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * Each service keeps its Durable Object state in its own temporary directory, removed on
- * stop. Rooms hold only live races, so nothing is lost; and two services started at once
- * (the test suite's and a local server's, as in CI) never share one SQLite file, which made
- * workerd fail a room tick with `SQLITE_BUSY` (database is locked).
+ * `persistTo` gives the runtime its own state directory. Without it every `wrangler dev` for
+ * this config shares one directory beside it, and two running at once (the test suite's
+ * service and a server started by another test) can collide on its SQLite files
+ * (SQLITE_BUSY, "database is locked").
  *
- * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string> }} options
+ * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
 export function createRoomsService({
   port,
   log = (text) => void process.stdout.write(text),
   quiet = false,
   vars = {},
+  persistTo,
 }) {
   const url = `http://127.0.0.1:${port}`;
   const cancel = new AbortController();
@@ -75,8 +74,6 @@ export function createRoomsService({
   /** @type {Promise<{ code: number | null, signal: string | null }>} */
   const exited = new Promise((resolve) => (resolveExited = resolve));
   let stopPromise = null;
-  /** This instance's own Durable Object state, created in `start()`. */
-  let stateDir = null;
 
   // Last resort if this process exits without stop() finishing: kill the group too.
   const killOnExit = () => child && signalGroup(child.pid, 'SIGKILL');
@@ -84,8 +81,6 @@ export function createRoomsService({
   async function start() {
     if (cancel.signal.aborted) throw new StartCancelled();
     const inspectorPort = await freePort();
-    if (cancel.signal.aborted) throw new StartCancelled();
-    stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
     child = spawn(
@@ -101,12 +96,11 @@ export function createRoomsService({
         String(port),
         '--inspector-port',
         String(inspectorPort),
-        '--persist-to',
-        stateDir,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
         ...Object.entries(vars).flatMap(([key, value]) => ['--var', `${key}:${value}`]),
+        ...(persistTo ? ['--persist-to', persistTo] : []),
       ],
       {
         cwd: REPO_ROOT,
@@ -159,14 +153,6 @@ export function createRoomsService({
 
   async function doStop() {
     cancel.abort();
-    try {
-      await stopGroup();
-    } finally {
-      if (stateDir) fs.rmSync(stateDir, { recursive: true, force: true });
-    }
-  }
-
-  async function stopGroup() {
     if (!child) return;
     const pgid = child.pid;
     if (!childExited) {

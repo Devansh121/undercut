@@ -340,6 +340,8 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.3 and 78.5 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.05 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
 | Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
+| Spa reference lap 109.072 s against the M4 band 97.545–103.579 s (section 7.8) | 5.49 s outside M4; all three sectors outside their ±3 % bands, sector 2 by most (+14 % on the session best) | The car's fast-corner grip: the line asks for the measured flat limit through Pouhon, Stavelot and Les Fagnes. Same cause as the Pouhon sweep row above and Monza's fast corners |
+| Singapore sectors 1 and 3 (section 7.8) | +3.1 % and +4.1 % on the session best; the lap itself is inside its band by 0.016 s | Recorded gaps; the lap is close to its band edge, so a small change to the car can move it outside |
 | Monza reference lap 84.872 s against the M1 band 74.852–82.732 s (section 7.6) | 2.14 s outside M1 (2.24 s before DRS zone 2 moved to its mapped activation), 3.72 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
 | Wheels leave the ground off a kerb's outer edge or a sausage (section 7.2) | 0.1–0.26 s airborne in the kerb-crossing runs | With springs five times the tyre's stiffness and about 1 mm of static spring compression the wheel cannot follow a 50 mm drop until the body rolls; physically plausible for a stiff ground-effect car, not checked against data. The legal corridor keeps the tyres off both; a player who drives over them gets it |
 | Barrier contact is minimal (section 7.7) | Body corners against a line, one restitution and friction for every barrier type, no damage, no wheel-to-barrier or car-to-car contact | Damage and barrier types in M3b; the contact replaces only the impulse rule (ADR 0009) |
@@ -950,11 +952,11 @@ limits through them: 2.644 m, ±1.318 rad pitch and ±3.388 rad roll for 2 m ste
 | Adversarial surface (`packages/sim/validation/adversarial-surface.test.ts`, CI): cells 4–16 m with heights ±1 m (steps to 2 m), normals tilted up to 20°, grip 0.2–1.2, drag ×1–10, random inputs held up to 1 s | 6 seeds × 30 s, plus determinism | All in bounds; bit-identical repeat. A 40-seed sweep: no failures, highest floor 2.25 m against 2.65 |
 | Random driving on Monza (`packages/track/validation/drive-fuzz.test.ts`, CI): random start round the lap and across the track, random steer, throttle and brake held 0.1–3 s | 10 seeds × 180 s (30 min) | All in bounds; deepest body corner 5 µm past a face at the end of a step; hardest barrier impact 62.4 m/s; highest floor 0.281 m; the ground-step rule never acted; floor or rim strikes only with a wheel on a kerb |
 | The same, nightly (`drive-fuzz.soak.test.ts`) | 100 seeds × 600 s (16.7 h) | All in bounds; deepest corner 52 µm past a face; hardest impact 69.3 m/s; highest floor 0.502 m; no ground steps; one floor strike, on a kerb. The first run had failed that seed because a strike on a kerb counted as a failure; strikes on kerbs are now counted, not failed. Raising the skid ceiling to four tyre loads so the floor could lift the car off the kerb was tried and dropped: it threw a rear wheel 1.02 m up (limit 1.01) |
-
-The drive fuzz now runs on Monza, Spa and Singapore, and starts each car with the vertical velocity of the ground along its heading (body heave and wheels): a level start on Kemmel's 6 % grade at up to 80 m/s met the rising ground as a floor strike in the first steps (track-data 5.2).
 | The owner's run (`packages/track/test/offtrack.test.ts`) | 40 s with barriers, and 40 s with the barriers taken away | Bounded both ways; with barriers the car stops at the left barrier before the first chicane and never meets a step |
 | Pit lane (`packages/track/validation/pit-lane.test.ts`) | Entry to exit at 20 m/s | No barrier contact |
 | Ground a car can reach (`packages/track/test/ground-continuity.test.ts`) | Every point inside the barriers plus 0.5 m, and the pit lane, on a 1 m × 0.5 m lattice with 0.25 m probes | No step larger than the steepest kerb flank allows (0.34 m per 0.35 m probe). Before the projection fix: 2.73 m at the first chicane |
+
+The drive fuzz now runs on Monza, Spa and Singapore, and starts each car with the vertical velocity of the ground along its heading (body heave and wheels): a level start on Kemmel's 6 % grade at up to 80 m/s met the rising ground as a floor strike in the first steps (track-data 5.2).
 
 Random driving spends about 70 % of its time touching a barrier in the three-minute runs and 90 %
 in the ten-minute ones (an undriven car ends up against one), so the coverage of free running is
@@ -962,4 +964,66 @@ thinner than the hours suggest.
 
 **Reference lap.** 84.969 s on master after the contact patch (#17) and on this branch, bit for
 bit; the physics suite and the AI artefact fingerprints are unchanged.
+
+### 7.8 Reference laps, Spa and Singapore (2.1, 2.2)
+
+The same reference driver, line builder and legal footprint corridor as at Monza (7.6), built by
+`npm run ai:build` for Spa in medium trim and Singapore in high trim (the physics suite's
+`CIRCUITS`), 10 kg of fuel, 25 °C at the circuit's altitude (Spa 415 m, Singapore 15 m), DRS in
+the zones, full ERS. Each lap is timed from the circuit's timing line, which the track file now
+carries (track format 3: Spa s = 6875.4 m, Singapore s = 4798.4 m, both 128.6 m before the start
+line). Asserted by `packages/ai/validation/reference-lap.test.ts` (one lap each, physics job)
+and the nightly soak (ten laps each); printed by `npm run telemetry -- lap --circuit spa` or
+`singapore`. The lap is judged against the era's pole in the M4 band (±3 %), the trap against
+2.2, and each sector against the session best (±3 %, 2.2; the pole laps' own sectors are not
+published as one lap). Misses are recorded gaps (section 3, rule 2), not loosened targets.
+
+| Quantity | Spa (medium trim) | Singapore (high trim) |
+|---|---|---|
+| Racing line (`ai:build`) | minimum curvature 109.402 s, refined 107.721 s | minimum curvature 92.989 s, refined 91.320 s |
+| Lap | **109.072 s** (plan 107.725 s); pole 1:40.562: +8.510 s (+8.5 %); M4 band 97.545–103.579 s: outside by 5.493 s, recorded gap | **91.817 s** (plan 91.329 s); pole 1:29.158: +2.659 s (+3.0 %); M4 band 86.483–91.833 s: inside, by 0.016 s |
+| Sectors (session best) | S1 31.750 (29.761, +6.7 %), S2 48.486 (42.532, +14.0 %), S3 28.836 (27.857, +3.5 %): all three recorded gaps | S1 27.234 (26.415, +3.1 %, gap), S2 38.326 (37.329, +2.7 %, pass), S3 26.257 (25.220, +4.1 %, gap) |
+| Speed trap | 312.9 km/h at 30 m after T4 (315 ± 6, pass) | 301.7 km/h at 150 m before T1 (304 ± 6, pass) |
+| Timing line | 218.5 km/h (fastest published 234.9) | 259.1 km/h (fastest published 264.8) |
+| Clean | at most 2 wheels wholly past a white line, never four; no tyre sample on grass or gravel; sideslip ≤ 8.0°; line error max 5.00 m, RMS 0.77 m | at most 3 wheels wholly past a white line, never four; no tyre sample on grass or gravel; sideslip ≤ 3.3°; line error max 0.82 m, RMS 0.23 m |
+| MGU-K deployed / harvested | 3.76 / 1.62 MJ | 2.59 / 1.91 MJ |
+| Fuel a lap | 2.07 kg | 1.56 kg |
+| Ten consecutive laps (nightly soak) | 109.783–110.159 s from 39.7 kg, spread 0.376 s, all clean, sideslip ≤ 8.2° | 91.883–91.992 s from 32.0 kg, spread 0.109 s, all clean, sideslip ≤ 4.0° |
+
+**Where Spa's time goes.** Most of it is sector 2, the downforce sector (2.2): +5.95 s on the
+session best, against +1.99 s in sector 1 and +0.98 s in sector 3. The line asks the car for its
+measured flat limit almost everywhere in that sector (Pouhon T10 3.86 g against 3.88, Stavelot
+3.61 against 3.73, Les Fagnes 2.91 against 2.97), so this is the car's fast-corner grip, the same
+gap as at Monza's Lesmo and Parabolica (7.6) and as the Pouhon sweep in section 5, not the driver.
+The largest line error (5.0 m, RMS 0.77 m) is the driver's; the lap is still clean.
+
+**Singapore** is the slow-corner circuit, where the car is closest to the era's cars: the lap is
+inside its band, sector 2 is inside its band, and sectors 1 and 3 miss by 0.8 % and 1.1 % beyond
+the ±3 %. The lap sits 0.016 s inside its band, so a small change to the car can move it outside;
+the suite will then fail and the result must be recorded, as section 3 requires.
+
+| Corner (Spa) | Driven min (km/h) | Line min radius (m) | Implied lateral (g) | Flat limit at that speed (g) |
+|---|---|---|---|---|
+| T1 La Source | 71.3 | 18.7 | 2.14 | 2.07 |
+| T3 Raidillon | 309.1 | 155.7 | 4.83 | 4.97 |
+| T5 Les Combes | 144.0 | 59.3 | 2.75 | 2.71 |
+| T8 Bruxelles | 117.5 | 43.4 | 2.50 | 2.46 |
+| T10 Pouhon | 236.0 | 113.7 | 3.86 | 3.88 |
+| T15 Stavelot | 225.3 | 110.6 | 3.61 | 3.73 |
+| T17 Blanchimont | 321.2 | 168.5 | 4.82 | 5.18 |
+| T18 Bus Stop | 82.9 | 25.9 | 2.09 | 2.17 |
+
+| Corner (Singapore) | Driven min (km/h) | Line min radius (m) | Implied lateral (g) | Flat limit at that speed (g) |
+|---|---|---|---|---|
+| T1 Republic Boulevard | 134.2 | 51.1 | 2.77 | 2.76 |
+| T3 Republic Boulevard | 94.8 | 31.9 | 2.22 | 2.33 |
+| T7 Nicoll Highway | 123.7 | 44.8 | 2.69 | 2.64 |
+| T8 Stamford Road | 89.4 | 28.1 | 2.24 | 2.28 |
+| T13 Esplanade Drive | 62.5 | 15.6 | 1.97 | 2.03 |
+| T14 Esplanade | 89.8 | 27.4 | 2.31 | 2.28 |
+| T18 Marina Promenade | 184.6 | 77.0 | 3.48 | 3.48 |
+
+Singapore's turn 13 hairpin is taken at 62.5 km/h on a 15.6 m line radius, inside the 8.3 m
+centreline radius the map data gives (track-data 5.3); later work may use the wider path a
+reviewer judged drivable there.
 
