@@ -3,37 +3,39 @@ import { expect, test as base } from './base';
 import { openMenu, watchProblems } from './helpers';
 
 /**
- * One browser context per worker for the menu tests (set up under its own fixture timeout, as
- * the drive tests share their session), and a fresh page in it for each test with the page's
- * storage cleared first, so every test starts from the defaults as with a new context. On a
- * busy CI runner a new context made right after a software-WebGL test closed its own can take
- * tens of seconds; these DOM-only tests should not pay that inside their own time.
+ * One page per worker for the menu tests, opened in the worker's own set-up (under its own
+ * fixture timeout, as the drive tests share their session) and reset before each test: the
+ * project's viewport, no emulated media, storage cleared, the launch screen loaded. On a busy
+ * CI runner, opening a page or a context right after a software-WebGL test can take tens of
+ * seconds; these DOM-only tests should not pay that inside their own time.
  */
-const test = base.extend<object, { menuContext: BrowserContext }>({
-  menuContext: [
+const test = base.extend<object, { menuPage: Page }>({
+  menuPage: [
     async ({ browser }, use, workerInfo) => {
       const u = workerInfo.project.use;
-      const context = await browser.newContext({
+      const context: BrowserContext = await browser.newContext({
         viewport: u.viewport ?? null,
         deviceScaleFactor: u.deviceScaleFactor ?? 1,
         isMobile: u.isMobile ?? false,
         hasTouch: u.hasTouch ?? false,
         baseURL: u.baseURL ?? `http://127.0.0.1:${process.env.TEST_PORT ?? 4173}`,
       });
-      await use(context);
+      const page = await context.newPage();
+      await use(page);
       await context.close();
     },
     { scope: 'worker', timeout: 90_000 },
   ],
-  page: async ({ menuContext }, use) => {
-    const page = await menuContext.newPage();
-    await page.goto('/');
-    await page.evaluate(() => {
+  page: async ({ menuPage }, use, testInfo) => {
+    const viewport = testInfo.project.use.viewport;
+    if (viewport) await menuPage.setViewportSize(viewport);
+    await menuPage.emulateMedia({ reducedMotion: null });
+    await menuPage.goto('/');
+    await menuPage.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();
     });
-    await use(page);
-    await page.close();
+    await use(menuPage);
   },
 });
 
@@ -228,9 +230,7 @@ test.describe('menus, keyboard only', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('every control on the main menu and circuit select is reachable with the arrows', async ({
-    page,
-  }) => {
+  test('every control on the main menu is reachable with the arrows', async ({ page }) => {
     const problems = watchProblems(page);
     await page.goto('/');
     await page.keyboard.press('Enter');
@@ -238,6 +238,16 @@ test.describe('menus, keyboard only', () => {
     const hub = await explore(page, 'keyboard');
     expect(hub.reached).toEqual(hub.all);
     expect(hub.all.length).toBeGreaterThan(20);
+    expect(problems).toEqual([]);
+  });
+
+  test('Q and E switch modes, circuit select is reachable with the arrows, Esc goes back', async ({
+    page,
+  }) => {
+    const problems = watchProblems(page);
+    await page.goto('/');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
 
     // Q and E step through the modes; the notice replaces the settings for race modes.
     await page.keyboard.press('KeyE');
@@ -294,7 +304,28 @@ test.describe('menus, gamepad only', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('a pad opens the menu, moves with the D-pad, switches modes on the shoulders and backs out', async ({
+  /** Load the launch screen with one standard pad connected, and open the menu with A. */
+  const padMenu = async (page: Page): Promise<void> => {
+    await installFakePad(page);
+    await page.goto('/');
+    await page.evaluate(() =>
+      (window as unknown as { fakePad: { connect(): void } }).fakePad.connect(),
+    );
+    await frames(page, 4);
+    await padPress(page, PAD.a);
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
+  };
+
+  test('the D-pad reaches every control on the main menu', async ({ page }) => {
+    const problems = watchProblems(page);
+    await padMenu(page);
+    const hub = await explore(page, 'gamepad');
+    expect(hub.reached).toEqual(hub.all);
+    expect(hub.all.length).toBeGreaterThan(20);
+    expect(problems).toEqual([]);
+  });
+
+  test('a pad opens the menu, switches modes on the shoulders, picks with A and backs out with B', async ({
     page,
   }) => {
     const problems = watchProblems(page);
@@ -311,9 +342,6 @@ test.describe('menus, gamepad only', () => {
     await expect(page.locator('[data-action=start] .glyph')).toHaveText('A');
     await expect(page.locator('[data-action=back] .glyph')).toHaveText('B');
     await expect(page.locator('[data-testid=device-chip]')).toContainText('Gamepad');
-
-    const hub = await explore(page, 'gamepad');
-    expect(hub.reached).toEqual(hub.all);
 
     await padPress(page, PAD.rb);
     await expect(page.locator('[data-action=mode-quickRace]')).toHaveAttribute(
