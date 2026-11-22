@@ -490,7 +490,9 @@ export class RaceView {
       // The view may have been released while the world was building (a lost context).
       if (this.disposed) {
         world.dispose();
-        return;
+        // The caller listens for context loss only after load resolves: fail the load so its
+        // retry path builds a fresh view instead of keeping a released one.
+        throw new Error('The view was released while its world was building (lost context)');
       }
       this.world = world;
       this.scene.add(world.group);

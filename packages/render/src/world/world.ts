@@ -192,7 +192,8 @@ export class CircuitWorld {
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: Material[] = [];
   private readonly textures: Texture[] = [];
-  private cover!: CoverMap;
+  /** Unset until the ground step of the build has run. */
+  private cover: CoverMap | null = null;
   private readonly trees: TreeMaterials[] = [];
   /** Per-tree swap between near trees and cards (eye updated every frame). */
   private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
@@ -555,6 +556,8 @@ export class CircuitWorld {
     const { dressing, quality, props } = o;
     const wq = quality.world;
     if (wq.treeDensity <= 0) return;
+    const cover = this.cover;
+    if (!cover) throw new Error('trees are placed after the ground');
     const atlas = treeAtlas(wq.treeTile, quality.anisotropy);
     this.textures.push(atlas);
     const coverage = quality.msaa > 0;
@@ -602,8 +605,8 @@ export class CircuitWorld {
               geometry: k.id === 'tree-row' ? clouds.column : clouds.broad,
               material: cm.material,
               depthMaterial: cm.depth,
-              // Chunk centre distance: the swap distance plus a chunk's reach.
-              maxDistance: wq.treeCloud + 100,
+              // Near-edge distance of the chunk: the swap distance plus the dither band.
+              maxDistance: wq.treeCloud + 15,
             },
           ],
         });
@@ -639,7 +642,7 @@ export class CircuitWorld {
       size: number,
       checkCover = true,
     ): boolean => {
-      if (checkCover && !this.cover.treeAllowed(x, z)) return false;
+      if (checkCover && !cover.treeAllowed(x, z)) return false;
       this.lap.nearest(x, z, hit);
       if (hit.dist < this.lap.barrierAt(hit.index, hit.d) + TREE_CLEARANCE) return false;
       const n = serial++;
@@ -943,7 +946,7 @@ export class CircuitWorld {
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials) m.dispose();
     for (const t of this.textures) t.dispose();
-    this.cover.dispose();
+    this.cover?.dispose();
     this.group.removeFromParent();
   }
 }

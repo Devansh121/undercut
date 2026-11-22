@@ -1025,7 +1025,6 @@ export function placeTracksideFurniture(options: {
   const kitHoarding = propKit?.lodsFor('hoarding', {
     materialOverrides: { 'board-face': kitHoardMat },
     maxDistanceScale: distScale,
-    distanceCaps: [60, 180, 750],
   });
   const hasKitHoarding = Boolean(kitHoarding);
   if (kitHoarding) {
@@ -1074,7 +1073,6 @@ export function placeTracksideFurniture(options: {
 
   const kitFence = propKit?.lodsFor('catch-fence', {
     maxDistanceScale: distScale,
-    distanceCaps: [55, 160, 650],
   });
   const hasKitFence = Boolean(kitFence);
   if (kitFence) {
@@ -1105,7 +1103,6 @@ export function placeTracksideFurniture(options: {
 
   const kitMarshal = propKit?.lodsFor('marshal-post', {
     maxDistanceScale: distScale,
-    distanceCaps: [60, 180, 650],
   });
   if (kitMarshal) {
     kitPropsUsed++;
@@ -1131,7 +1128,6 @@ export function placeTracksideFurniture(options: {
   // painted band that alternates red and white along a run (instance colour).
   const kitAbsorber = propKit?.lodsFor('absorber-block', {
     maxDistanceScale: distScale,
-    distanceCaps: [55, 160, 500],
     slotColors: { rubber: ABSORBER_SHELL },
   });
   if (kitAbsorber) {
@@ -1157,7 +1153,6 @@ export function placeTracksideFurniture(options: {
   const kitScreen = propKit?.lodsFor('screen-tower', {
     materialOverrides: { 'screen-face': screenMat },
     maxDistanceScale: distScale,
-    distanceCaps: [80, 240, 950],
   });
   if (kitScreen) {
     kitPropsUsed++;
@@ -1216,7 +1211,6 @@ export function placeTracksideFurniture(options: {
 
   const kitCamera = propKit?.lodsFor('camera-tower', {
     maxDistanceScale: distScale,
-    distanceCaps: [80, 240, 950],
   });
   if (kitCamera) {
     kitPropsUsed++;
@@ -1277,7 +1271,6 @@ export function placeTracksideFurniture(options: {
       const lods = propKit.lodsFor(catId, {
         materialOverrides: { 'board-face': slotMat },
         maxDistanceScale: distScale,
-        distanceCaps: [60, 180, 500],
       });
       if (lods) {
         kitSigns.add(id);

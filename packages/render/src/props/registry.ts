@@ -24,7 +24,7 @@ import {
 export interface PropLod {
   geometry: BufferGeometry;
   material: Material | Material[];
-  /** Drawn while the chunk centre is nearer than this, m (the last level: up to it, then culled). */
+  /** Drawn while the chunk's near edge is nearer than this, m (the last level: up to it, then culled). */
   maxDistance: number;
   /** Shadow depth material (alpha-tested cards whose uv the vertex shader changes). */
   depthMaterial?: Material;
@@ -174,6 +174,15 @@ export class PropRegistry {
           radius = Math.max(radius, centre.distanceTo(pos.set(p.x, p.y, p.z)));
           if (p.scale !== undefined && p.scale > maxScale) maxScale = p.scale;
         }
+        // How far any level's geometry reaches from the prop's origin (its bounding sphere is
+        // not centred on the origin: towers and boards reach up), scaled.
+        let reach = 0;
+        for (const lod of kind.lods) {
+          lod.geometry.computeBoundingSphere();
+          const gs = lod.geometry.boundingSphere;
+          if (gs) reach = Math.max(reach, gs.center.length() + gs.radius);
+        }
+        reach *= maxScale;
         const meshes = kind.lods.map((lod) => {
           const im = new InstancedMesh(lod.geometry, lod.material, indices.length);
           indices.forEach((i, k) => {
@@ -186,33 +195,33 @@ export class PropRegistry {
           if (lod.depthMaterial) im.customDepthMaterial = lod.depthMaterial;
           im.castShadow = kind.castShadow ?? true;
           im.receiveShadow = kind.receiveShadow ?? true;
-          // Exact chunk bounds including scaled prop geometry radius for frustum culling.
-          lod.geometry.computeBoundingSphere();
-          const r = (lod.geometry.boundingSphere?.radius ?? 1) * maxScale + radius;
-          im.boundingSphere = new Sphere(centre.clone(), r);
+          // Chunk bounds for frustum culling: every instance's whole geometry inside.
+          im.boundingSphere = new Sphere(centre.clone(), reach + radius);
           im.visible = false;
           im.matrixAutoUpdate = false;
           im.name = `prop:${id}`;
           this.group.add(im);
           return im;
         });
-        chunks.push({ centre, radius: radius + maxScale, meshes });
+        chunks.push({ centre, radius: radius + reach, meshes });
       }
       this.chunks.set(id, chunks);
     }
     this.register(this.group);
   }
 
-  /** Per frame: pick each chunk's level and shadow state by its distance from the camera. */
+  /** Per frame: pick each chunk's level and shadow state by its near edge's distance from the camera. */
   update(eye: Vector3): void {
     for (const [id, chunks] of this.chunks) {
       const kind = this.kinds.get(id) as PropKind;
       const casts = kind.castShadow ?? true;
       const shadowMax = kind.shadowMaxDistance ?? Infinity;
       for (const c of chunks) {
-        const dist = c.centre.distanceTo(eye);
-        const lod = chunkLod(dist, kind.lods);
-        const castNow = casts && dist - c.radius < shadowMax;
+        // Level and shadow by the distance to the chunk's near edge, so a prop beside the eye is
+        // never drawn at a reduced level because its chunk's centre is far away.
+        const near = Math.max(0, c.centre.distanceTo(eye) - c.radius);
+        const lod = chunkLod(near, kind.lods);
+        const castNow = casts && near < shadowMax;
         for (let i = 0; i < c.meshes.length; i++) {
           const im = c.meshes[i] as InstancedMesh;
           const active = i === lod;
