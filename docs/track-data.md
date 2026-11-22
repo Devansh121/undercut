@@ -328,10 +328,49 @@ grade through the chicane), and a contract that allows that geometric minimum. T
 response to a sausage at 300 km/h (and the sausage's authored 13 cm, which has no source) is
 what decides the kerb-safety cases.
 
+### 5.7 Filling the folded run-off: the first version
+
+The first version of the fill (commit 0f42f90), measured before the changes of section 5.8.
+Wherever a bend folds before its barrier (the frame's stretch at the barrier, 1 − κd, below
+0.6), the run-off inside it, from the track edge to the barrier, is
+solved on a 0.5 m grid when the track is built: the least-squares plane through the fixed heights
+around the zone (the track edges, the unfolded run-off where the zone ends) plus the smoothest
+(harmonic) departure from it, barriers as free edges, and the ground normal from the world
+gradient. A plain harmonic fill does not work: on a bend with a steady grade the unfolded ground
+already rises with the angle round the bend's centre, which is harmonic, so Laplace's equation
+reproduces the fold. Outside those zones the ground is unchanged. Results, master → fill:
+
+| Measure | Master | Fill |
+|---|---|---|
+| Run-off contract, Monza worst | 40.8 % (turn 2 inside), 20.6 % (turn 1 inside) | 20.4 %, 10.2 %; 31 cells over (100) |
+| Run-off contract, Spa worst | 36.1 % (near s 3210) | 40.4 % near s 3219; 1100 cells over (1156) |
+| Run-off contract, Singapore | passes | passes |
+| Game kerb-review cases (ClA 3.6) | 11 pass | 27 pass: 18 open ones pass, but teleport(5600, 0) at TC 0 and 2 reset |
+| Sim kerb-review cases | 2 pass | 11 pass: 10 open ones pass, but seed 97513 fails (wheel centre 1.005 m against 1.004) |
+| Blocking runs at ClA 3.6: (540, 8) steer −0.1 TC 0 / TC 2 / steer 0; turn 2 run | 0 / 0 / 0 / 1 resets | 0 / 0 / 0 / 0 |
+| The same at ClA 3.9 | 1 / 1 / 1 / 1 | 1 / 1 / 0 / 0 |
+| Reference laps | 84.872 / 109.072 / 91.817 s | 84.864 / 109.066 / 91.820 s (two racing lines change) |
+| Track build | 89 / 56 / 31 ms | 293 / 251 / 52 ms |
+
+**Why it is not enough.** The pockets inside the chicane's turns are bounded by stretches of
+track 20–30 m apart along the lap but 4–8 m apart in the world: inside turn 2 the ground has to
+climb from about 0.2 m to 0.7 m across 4 m, inside turn 1 similarly, so any ground that meets the
+track edges there is 10–15 % steep, and a car crossing it at 300 km/h can still be thrown. The
+three regressed cases and the two remaining 3.9 cases are launched there; they passed on master
+because its folded ground happened to slope away from their paths. The grade itself is the
+Copernicus profile opened over 300 m and averaged over 90 m (section 2.3), about 3 % through the
+chicane; it is a trend at the scale the source resolves, so changing it would be editing below
+that resolution. With that elevation, a correct run-off and the kerb-review cases' zero-reset
+assertions conflict at the chicane: the fill fixes 28 open cases and the turn 2 run for three
+cases that pass now, which is a decision for the owner, not a tolerance this work may move.
+
+The owner chose not to trade: no passing check may regress. Section 5.8 is the model that
+meets that rule.
+
 ### 5.8 The folded run-off, filled
 
 `Track.ground` now fills the run-off where the (s, d) frame folds (`packages/track/src/fold-ground.ts`;
-section 5.7, on PR 43, records the first version). The model:
+section 5.7 records the first version). The model:
 
 - **Where.** Beside a lap sample whose bend folds before its barrier (the frame's stretch at the
   barrier, 1 − κd, below 0.6) and whose own edge is compressed by it (the stretch at the kerb's
