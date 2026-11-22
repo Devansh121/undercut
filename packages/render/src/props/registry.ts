@@ -4,6 +4,7 @@ import {
   Group,
   InstancedMesh,
   Matrix4,
+  MeshDepthMaterial,
   MeshStandardMaterial,
   Quaternion,
   SRGBColorSpace,
@@ -130,6 +131,12 @@ export class PropRegistry {
   private readonly placements = new Map<string, PropPlacement[]>();
   private readonly chunks = new Map<string, Chunk[]>();
   private built = false;
+  /**
+   * The shadow pass's depth material for props without their own: owned here and released with
+   * the registry. Left to three.js, the shadow map's own depth material (which lives as long as
+   * the renderer) would compile and keep an instanced variant for every kind of prop.
+   */
+  readonly shadowDepth = new MeshDepthMaterial();
 
   /**
    * `register` receives the registry's group when it builds: the view hooks every prop material
@@ -197,7 +204,7 @@ export class PropRegistry {
             im.setMatrixAt(k, m.compose(pos.set(p.x, p.y, p.z), q, scl.set(s, s, s)));
             if (p.colour) im.setColorAt(k, tint.setRGB(p.colour[0], p.colour[1], p.colour[2]));
           });
-          if (lod.depthMaterial) im.customDepthMaterial = lod.depthMaterial;
+          im.customDepthMaterial = lod.depthMaterial ?? this.shadowDepth;
           im.castShadow = kind.castShadow ?? true;
           im.receiveShadow = kind.receiveShadow ?? true;
           // Chunk bounds for frustum culling: every instance's whole geometry inside.
@@ -253,6 +260,7 @@ export class PropRegistry {
     for (const chunks of this.chunks.values())
       for (const c of chunks) for (const im of c.meshes) im.dispose();
     this.chunks.clear();
+    this.shadowDepth.dispose();
     this.group.removeFromParent();
   }
 }

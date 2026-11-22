@@ -2,6 +2,7 @@ import {
   Color,
   Group,
   Mesh,
+  MeshDepthMaterial,
   Vector3,
   type BufferGeometry,
   type Material,
@@ -304,6 +305,7 @@ export class CircuitWorld {
       world.dispose();
       throw error;
     }
+    world.ownShadowDepth();
     const finalSlice = performance.now() - sliceStart;
     if (finalSlice > maxSlice) maxSlice = finalSlice;
     world.buildTimes.maxSlice = Math.round(maxSlice);
@@ -354,6 +356,22 @@ export class CircuitWorld {
     step('stands');
     this.placeFurnitureAndDecals(o);
     step('furniture');
+    this.ownShadowDepth();
+  }
+
+  /**
+   * Every mesh of the world without its own shadow depth material gets the world's, released with
+   * the world: left to three.js, the shadow map's depth material (as long-lived as the renderer)
+   * would compile and keep a variant for the world's meshes after the session ends.
+   */
+  private ownShadowDepth(): void {
+    const depth = new MeshDepthMaterial();
+    depth.name = 'world-shadow-depth';
+    this.materials.push(depth);
+    this.group.traverse((o) => {
+      const m = o as Mesh;
+      if (m.isMesh && m.customDepthMaterial === undefined) m.customDepthMaterial = depth;
+    });
   }
 
   private addWorldChunk(
