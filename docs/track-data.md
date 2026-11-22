@@ -328,6 +328,56 @@ grade through the chicane), and a contract that allows that geometric minimum. T
 response to a sausage at 300 km/h (and the sausage's authored 13 cm, which has no source) is
 what decides the kerb-safety cases.
 
+### 5.8 The folded run-off, filled
+
+`Track.ground` now fills the run-off where the (s, d) frame folds (`packages/track/src/fold-ground.ts`;
+section 5.7, on PR 43, records the first version). The model:
+
+- **Where.** Beside a lap sample whose bend folds before its barrier (the frame's stretch at the
+  barrier, 1 − κd, below 0.6) and whose own edge is compressed by it (the stretch at the kerb's
+  outer edge below 0.8): a pocket the bend wraps around, such as Monza's first chicane, Spa's La
+  Source and Bus Stop or Singapore's turns 1–3. A wide run-off inside a gentle bend (Ascari, Spa
+  near s 3210), where the fold lies far out, keeps its ground. The kerb and 0.5 m beyond it keep
+  their ground too (a kerb is laid along the track edge and follows it; the margin follows the
+  kerb's taper at its ends), and the fill grows in over the next metre.
+- **What.** On a 0.5 m grid built with the track: the least-squares plane through the fixed
+  ground around each zone (the track and kerbs, the unfolded run-off) plus the smoothest
+  (harmonic) departure from it, barriers as free edges with ghost values behind them, blended in
+  by a share that grows with how far the bend folds. Laplace's equation alone reproduces the
+  fold (on a bend with a steady grade the edge height rises with the angle round the bend's
+  centre, which is harmonic). Where the fill would be steeper than the original ground, its
+  share is scaled down by the ratio and smoothed. Normals come from the world gradient.
+
+Results against master (one change at a time is in the commit history):
+
+| Measure | Master | Filled |
+|---|---|---|
+| Run-off contract, Monza worst | 40.8 % turn 2 inside, 20.6 % turn 1 inside (100 cells over) | 17.9 %, 11.3 % (41 cells over); still open |
+| Run-off contract, Spa worst | 36.1 % near s 3210 (1156 cells over) | 36.1 %, unchanged there (1102 cells over); still open |
+| Run-off contract, Singapore | passes | passes |
+| Game kerb-review cases passing (40) | 11 | 19, none lost; 540,8,0.1,0 had regressed with the contact patch |
+| Sim kerb-review cases passing (18) | 1 | 1 |
+| Blocking runs at ClA 3.6: (540, 8) steer −0.1 TC 0 / TC 2 / steer 0; turn 2 run | 0 / 0 / 0 / 1 resets | 0 / 0 / 0 / 1 |
+| The same at ClA 3.9 | 1 / 1 / 1 / 1 | 1 / 1 / 0 / 1 |
+| Reference laps | 84.872 / 109.072 / 91.817 s | the same, bit for bit |
+| Track build (best of five, warm) | 28 / 38 / 24 ms | 44 / 47 / 42 ms |
+| First build in a process (cold) | 89 / 56 / 31 ms | 123 / 92 / 58 ms |
+
+The build runs on the main thread when the game loads a track (`apps/web/src/drive.ts`, and the
+online flow); at 9–18 ms warm it is not worth caching in the track build output. If the zones
+grow, the solved grid can be written by the track pipeline and read back instead.
+
+**What was traded.** With no margin beyond the kerb, 27 game and 7 sim cases pass and the turn 2
+run passes at both downforce levels, but the disciplined keyboard driver's recorded drivability
+gap moves from 4 incidents to 6 (barrier strikes past the Lesmo exits after its path changes
+through the chicane), so the margin stays at 0.5 m, where that gap is exactly as on master. The
+first version (5.7) also raised Spa's worst slope: a plane fill across the wide run-off inside
+the bend near s 3210 is steeper near the barrier than the original ground; that run-off is no
+longer filled, and the steepness rule holds the fill to the original's slope elsewhere.
+
+Two of the three cases that block the low-trim downforce change still reset at ClA 3.9; the
+retry was not attempted.
+
 ## 6. Sources
 
 All URLs were opened while doing this work (2026-11-21).

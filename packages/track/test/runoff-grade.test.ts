@@ -13,8 +13,8 @@ import { createGround, Track, VERGE_FALL } from '../src/track';
  * track's grade into ramps; this is the contract that it does not.
  */
 const CIRCUITS: readonly { name: string; data: unknown; open: boolean }[] = [
-  // Open: the inside of the first chicane's second turn (s 645–671, d 9–14: 41 % against 10 %)
-  // and the inside of the first turn (s 622, d −9.7: 24 %), where the frame folds.
+  // Open: the inside of the first chicane's second turn (s 645–671, d 9–14: 18 % against 10 %
+  // since the fill, docs/track-data.md 5.8; 41 % before) and the inside of the first turn (11 %).
   { name: 'Monza', data: monza, open: true },
   // Open: the grass on the inside of the bend at s 3200–3225, 30–36 m out (36 % against 14 %).
   { name: 'Spa', data: spa, open: true },

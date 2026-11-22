@@ -66,7 +66,7 @@ export const VERGE_FALL = 0.02;
  * The folded run-off's fill (`FoldGround`) leaves the kerb and this much beyond it as it is
  * (estimate: the strip a kerb's installation is laid in), and grows in over FOLD_RAMP, m.
  */
-export const FOLD_KERB_MARGIN = 0;
+export const FOLD_KERB_MARGIN = 0.5;
 export const FOLD_RAMP = 1;
 /**
  * A fold is filled only where the track's edge itself is compressed by the bend (its stretch below
