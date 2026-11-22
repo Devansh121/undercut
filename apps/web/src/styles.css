@@ -1948,14 +1948,29 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
   .hud-speedgear .label {
     margin-top: 0;
   }
-  /* ERS as a thin meter; its mode is on the overtake button's colour and in pause. */
+  /* ERS as one line: a thin meter with the deploy mode beside it (no label, no percentage). */
   .hud-ers {
     margin-top: 4px;
     padding-top: 0;
     box-shadow: none;
   }
+  .hud-ers > div:first-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 6px;
+  }
   .hud-ers__row {
+    order: 2;
+    margin-bottom: 0;
+  }
+  .hud-ers__row > .label,
+  .hud-ers__row > b {
     display: none;
+  }
+  .hud-ers .hud-ers__mode {
+    font-size: var(--fs-10);
+    line-height: 1;
   }
   .hud-ers__meter {
     height: 4px;

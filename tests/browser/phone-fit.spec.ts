@@ -94,7 +94,42 @@ for (const size of SIZES) {
     await expect(page.locator('[data-action=press-start]')).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     expect(await sweep(page, [{ label: 'launch' }])).toEqual([]);
+    // The launch screen's text never overlaps (the map credit ran into the tagline at 320 px).
+    expect(
+      await page.evaluate(() => {
+        const parts = ['.launch__title', '.launch__tagline', '.launch__credit', '.launch__bar'];
+        const boxes = parts.map((s) => [s, document.querySelector(s)!.getBoundingClientRect()]);
+        const hits: string[] = [];
+        for (let i = 0; i < boxes.length; i++)
+          for (let j = i + 1; j < boxes.length; j++) {
+            const [n, a] = boxes[i] as [string, DOMRect];
+            const [m, b] = boxes[j] as [string, DOMRect];
+            if (
+              a.left < b.right &&
+              b.left < a.right &&
+              a.top < b.bottom - 0.5 &&
+              b.top < a.bottom - 0.5
+            )
+              hits.push(`${n} overlaps ${m}`);
+          }
+        return hits;
+      }),
+    ).toEqual([]);
     await openMenu(page);
+    // Mode badges ("Not yet available") stay on one line.
+    expect(
+      await page.evaluate(
+        () =>
+          [...document.querySelectorAll<HTMLElement>('.lrow__tag')]
+            .filter((t) => t.getClientRects().length > 0)
+            .map((t) => {
+              const range = document.createRange();
+              range.selectNodeContents(t);
+              return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+            })
+            .filter((n) => n > 1).length,
+      ),
+    ).toBe(0);
     expect(
       await sweep(page, [
         ...['timeTrial', 'quickRace', 'weekend', 'championship', 'online', 'timeTrial'].map(
@@ -141,8 +176,19 @@ test('an iPhone browser is told once how to get full screen', async ({ page }, i
   const box = (await hint.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(375);
+  // Left at once, it has not been seen: it comes back.
+  await page.reload();
+  await expect(hint).toBeVisible();
   await hint.locator('[data-action=home-hint-close]').click();
   await expect(hint).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-action=press-start]')).toBeVisible();
+  await expect(hint).toHaveCount(0);
+  // Left on screen a few seconds also counts as seen.
+  await page.evaluate(() => localStorage.removeItem('hint.homeScreen.v1'));
+  await page.reload();
+  await expect(hint).toBeVisible();
+  await page.waitForTimeout(4600);
   await page.reload();
   await expect(page.locator('[data-action=press-start]')).toBeVisible();
   await expect(hint).toHaveCount(0);
