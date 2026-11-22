@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from './ports.mjs';
@@ -21,6 +23,16 @@ const sleep = (ms, signal) =>
     const timer = setTimeout(resolve, ms);
     signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
   });
+
+/** Memory-backed /dev/shm when it is writable, else the system temp directory. */
+function stateRoot() {
+  try {
+    fs.accessSync('/dev/shm', fs.constants.W_OK);
+    return '/dev/shm';
+  } catch {
+    return os.tmpdir();
+  }
+}
 
 /** True while any process in group `pgid` exists. */
 function groupAlive(pgid) {
@@ -51,10 +63,13 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * `persistTo` gives the runtime its own state directory. Without it every `wrangler dev` for
- * this config shares one directory beside it, and two running at once (the test suite's
- * service and a server started by another test) can collide on its SQLite files
- * (SQLITE_BUSY, "database is locked").
+ * `persistTo` gives the runtime its own state directory. Without it the service makes a private
+ * one of its own, removed on stop, rather than wrangler's default beside the config: every
+ * `wrangler dev` for this config would share that one, and two running at once (the test suite's
+ * service and a server started by another test) collide on its SQLite files (SQLITE_BUSY,
+ * "database is locked"). The private directory is on /dev/shm (memory) where there is one: the
+ * room awaits its alarm writes behind the runtime's output gate, and on a busy machine a disk
+ * write there delays relayed snapshots. Rooms are short-lived; nothing needs to outlive them.
  *
  * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
@@ -74,6 +89,8 @@ export function createRoomsService({
   /** @type {Promise<{ code: number | null, signal: string | null }>} */
   const exited = new Promise((resolve) => (resolveExited = resolve));
   let stopPromise = null;
+  /** This service's own Durable Object storage (see above); null until started. */
+  let persistDir = null;
 
   // Last resort if this process exits without stop() finishing: kill the group too.
   const killOnExit = () => child && signalGroup(child.pid, 'SIGKILL');
@@ -83,6 +100,8 @@ export function createRoomsService({
     const inspectorPort = await freePort();
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
+    // A private state directory, unless the caller gave one (removed on stop only if ours).
+    if (!persistTo) persistDir = fs.mkdtempSync(path.join(stateRoot(), 'undercut-rooms-state-'));
     child = spawn(
       process.execPath,
       [
@@ -96,11 +115,12 @@ export function createRoomsService({
         String(port),
         '--inspector-port',
         String(inspectorPort),
+        '--persist-to',
+        persistTo ?? persistDir,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
         ...Object.entries(vars).flatMap(([key, value]) => ['--var', `${key}:${value}`]),
-        ...(persistTo ? ['--persist-to', persistTo] : []),
       ],
       {
         cwd: REPO_ROOT,
@@ -169,6 +189,7 @@ export function createRoomsService({
       await new Promise((r) => setTimeout(r, 25));
     }
     process.off('exit', killOnExit);
+    if (persistDir) fs.rmSync(persistDir, { recursive: true, force: true });
   }
 
   return {

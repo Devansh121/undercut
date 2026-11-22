@@ -1,4 +1,6 @@
-import { el, icon } from './dom';
+import { el } from './dom';
+import { button } from './kit/components';
+import { S } from './strings';
 
 export interface LoadingScreen {
   root: HTMLElement;
@@ -35,19 +37,15 @@ export function mountLoadingScreen(
   bar.setAttribute('aria-valuemin', '0');
   bar.setAttribute('aria-valuemax', '100');
   const meta = el('div', 'loading__meta');
-  const what = el('span', 'label', 'Loading track and car');
+  const what = el('span', 'label', S.loading.preparing);
   const bytes = el('span', 'loading__bytes num', '');
   meta.append(what, bytes);
   const error = el('div', 'loading__error');
   error.hidden = true;
   const message = el('p', 'loading__message');
   const actions = el('div', 'loading__actions');
-  const retry = el('button', 'button button--primary');
-  retry.type = 'button';
-  retry.append(el('span', 'button__label', 'Try again'), icon('chevron'));
-  const back = el('button', 'button');
-  back.type = 'button';
-  back.append(el('span', 'button__label', 'Back'));
+  const retry = button({ label: S.loading.retry, variant: 'primary', next: true });
+  const back = button({ label: S.loading.back, glyph: 'menuBack' });
   actions.append(retry, back);
   error.append(message, actions);
   root.append(head, bar, meta, error);
@@ -63,12 +61,12 @@ export function mountLoadingScreen(
       fill.style.transform = `scaleX(${shown / 100})`;
       bar.setAttribute('aria-valuenow', String(Math.round(shown)));
       bytes.textContent =
-        total > 0 ? `${(loaded / MB).toFixed(1)} / ${(total / MB).toFixed(1)} MB` : '';
+        total > 0 ? S.loading.mb((loaded / MB).toFixed(1), (total / MB).toFixed(1)) : '';
     },
     fail(text) {
       message.textContent = text;
       error.hidden = false;
-      what.textContent = 'Stopped';
+      what.textContent = S.loading.stopped;
       root.dataset.state = 'error';
       retry.focus({ preventScroll: true });
       return new Promise((resolve) => {
@@ -78,7 +76,7 @@ export function mountLoadingScreen(
     },
     reset() {
       error.hidden = true;
-      what.textContent = 'Loading track and car';
+      what.textContent = S.loading.preparing;
       delete root.dataset.state;
     },
     remove() {

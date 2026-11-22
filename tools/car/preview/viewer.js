@@ -5,6 +5,7 @@
 //
 // Query: team=<id> driver=0|1 lod=high|mobile|far view=<station> steer=<deg> drs=0..1
 //        travel=<m> spin=<deg> glow=0..1 rain=0..1 compound=soft|medium|hard anim=1
+//        bg=<hex> ground=<hex> (background and ground colours, without '#') fog=<near>,<far>
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { HorizontalBlurShader } from 'three/addons/shaders/HorizontalBlurShader.js';
@@ -29,7 +30,12 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#1b1d21');
+scene.background = new THREE.Color(`#${q.get('bg') ?? '1b1d21'}`);
+if (q.has('fog')) {
+  // Ground fading into the background colour: a seamless studio floor.
+  const [near, far] = (q.get('fog') ?? '').split(',').map(Number);
+  scene.fog = new THREE.Fog(scene.background, near, far);
+}
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
 scene.environmentIntensity = 0.6;
@@ -37,7 +43,11 @@ scene.environmentIntensity = 0.6;
 // ground: dark asphalt-grey, receives the key light's shadow
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(80, 80),
-  new THREE.MeshStandardMaterial({ color: '#3a3c40', roughness: 0.95, metalness: 0 }),
+  new THREE.MeshStandardMaterial({
+    color: `#${q.get('ground') ?? '3a3c40'}`,
+    roughness: 0.95,
+    metalness: 0,
+  }),
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
@@ -152,6 +162,8 @@ const STATIONS = {
   bodywork: { eye: [0.3, 1.55, -2.5], at: [-0.75, 0.52, -0.35], fov: 36 },
   wheel: { eye: [2.85, 0.5, -1.95], at: [1.8, 0.36, -0.8], fov: 30 },
   chase: { eye: [-6.0, 2.0, 0], at: [1.2, 0.45, 0], fov: 50 },
+  // the team card in the game's menu (tools/ui/team-cars.mjs): low front three-quarter, wide
+  card: { eye: [6.4, 1.25, -6.6], at: [0.15, 0.36, 0], fov: 23 },
 };
 const strip = view === 'strip';
 const st = STATIONS[view] ?? STATIONS.front34;

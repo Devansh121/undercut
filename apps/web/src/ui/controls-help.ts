@@ -6,6 +6,9 @@ import {
   type DeviceKind,
 } from '@undercut/input';
 import { el } from './dom';
+import { button } from './kit/components';
+import { icon, type IconKey } from './kit/icons';
+import { S } from './strings';
 
 export interface ControlRow {
   id: string;
@@ -14,25 +17,28 @@ export interface ControlRow {
 }
 
 /** The listed actions, in order. Steering is one row built from its two half-axes. */
+const R = S.controls.rows;
 const ROWS: { id: string; label: string; actions: ActionId[] }[] = [
-  { id: 'steer', label: 'Steer', actions: ['steerLeft', 'steerRight'] },
-  { id: 'throttle', label: 'Throttle', actions: ['throttle'] },
-  { id: 'brake', label: 'Brake', actions: ['brake'] },
-  { id: 'gearUp', label: 'Gear up', actions: ['gearUp'] },
-  { id: 'gearDown', label: 'Gear down', actions: ['gearDown'] },
-  { id: 'drs', label: 'DRS', actions: ['drs'] },
-  { id: 'overtake', label: 'Overtake', actions: ['overtake'] },
-  { id: 'pitLimiter', label: 'Pit limiter', actions: ['pitLimiter'] },
-  { id: 'camera', label: 'Camera', actions: ['nextCamera'] },
-  { id: 'lookBack', label: 'Look back', actions: ['lookBack'] },
-  { id: 'resetToTrack', label: 'Reset to track', actions: ['resetToTrack'] },
-  { id: 'pause', label: 'Pause', actions: ['pause'] },
+  { id: 'steer', label: R.steer, actions: ['steerLeft', 'steerRight'] },
+  { id: 'throttle', label: R.throttle, actions: ['throttle'] },
+  { id: 'brake', label: R.brake, actions: ['brake'] },
+  { id: 'gearUp', label: R.gearUp, actions: ['gearUp'] },
+  { id: 'gearDown', label: R.gearDown, actions: ['gearDown'] },
+  { id: 'drs', label: R.drs, actions: ['drs'] },
+  { id: 'overtake', label: R.overtake, actions: ['overtake'] },
+  { id: 'pitLimiter', label: R.pitLimiter, actions: ['pitLimiter'] },
+  { id: 'camera', label: R.camera, actions: ['nextCamera'] },
+  { id: 'lookBack', label: R.lookBack, actions: ['lookBack'] },
+  { id: 'resetToTrack', label: R.resetToTrack, actions: ['resetToTrack'] },
+  { id: 'pause', label: R.pause, actions: ['pause'] },
 ];
 
-export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = {
-  keyboard: 'Keyboard',
-  gamepad: 'Gamepad',
-  touch: 'Touch',
+export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = S.menu.deviceNames;
+
+const DEVICE_ICON: Record<DeviceKind, IconKey> = {
+  keyboard: 'keyboard',
+  gamepad: 'controls',
+  touch: 'touch',
 };
 
 /**
@@ -40,10 +46,10 @@ export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = {
  * reset button; the pause menu has one.
  */
 const ELSEWHERE: Partial<Record<ActionId, string>> = {
-  resetToTrack: 'Pause menu',
+  resetToTrack: S.controls.pauseMenu,
 };
 
-const NOT_BOUND = 'Not bound';
+const NOT_BOUND = S.controls.notBound;
 
 /** The inputs bound to one action on one device, as the game reads them. */
 export function inputLabel(map: BindingMap, device: DeviceKind, action: ActionId): string {
@@ -63,7 +69,7 @@ export function pairLabel(left: string, right: string): string {
   const strip = (x: string): string => x.replace(SIDE, '').replace(/\s+/g, ' ').trim();
   const shared = strip(left);
   if (SIDE.test(left) && SIDE.test(right) && shared && shared === strip(right)) {
-    return shared.toLowerCase() === 'arrow' ? 'arrow keys' : shared;
+    return shared.toLowerCase() === 'arrow' ? S.controls.arrowKeys : shared;
   }
   return `${left}/${right}`;
 }
@@ -81,8 +87,8 @@ function steerLabel(map: BindingMap, device: DeviceKind): string {
     const l = left[i];
     const r = right[i];
     if (l && r) parts.push(pairLabel(l, r));
-    else if (l) parts.push(`${l} (left)`);
-    else if (r) parts.push(`${r} (right)`);
+    else if (l) parts.push(S.controls.leftOnly(l));
+    else if (r) parts.push(S.controls.rightOnly(r));
   }
   return parts.length > 0 ? capitalise(parts.join(' or ')) : NOT_BOUND;
 }
@@ -108,9 +114,9 @@ export function reverseNote(map: BindingMap, device: DeviceKind): string {
     const c = controlsFor(map, device, action)[0];
     return c ? controlLabel(c) : fallback;
   };
-  const down = name('gearDown', 'gear down');
-  const up = name('gearUp', 'gear up');
-  return `Reverse, with automatic gears: stop, then press ${down} twice. Press ${up} twice to return to first.`;
+  const down = name('gearDown', S.controls.gearDownWord);
+  const up = name('gearUp', S.controls.gearUpWord);
+  return S.controls.reverse(down, up);
 }
 
 /** The short first-drive hint: brake, throttle and how to reach the controls list. */
@@ -119,7 +125,7 @@ export function controlsHint(map: BindingMap, device: DeviceKind): string {
     const c = controlsFor(map, device, action)[0];
     return c ? controlLabel(c) : NOT_BOUND;
   };
-  return `Brake: ${first('brake')} · Throttle: ${first('throttle')} · ${first('pause')}, then Controls for all inputs`;
+  return S.controls.hint(first('brake'), first('throttle'), first('pause'));
 }
 
 let hintShown = false;
@@ -136,8 +142,10 @@ export interface ControlsSource {
 }
 
 /**
- * The controls list: a modal over the pause menu or the launch screen, in the pause menu's
- * style. Rows are rebuilt from the live bindings each time it opens.
+ * The controls list: a dialog of the interface kit over the pause menu or the main menu. Rows
+ * are rebuilt from the live bindings each time it opens. While it is open everything beside it
+ * is inert, so Tab, pointer and menu navigation (it is a navigation scope) stay in it; Back is
+ * its one control, and Esc, B or the pause button close it.
  */
 export class ControlsPanel {
   readonly root: HTMLElement;
@@ -153,37 +161,47 @@ export class ControlsPanel {
     private readonly source: ControlsSource,
     private readonly onClose: () => void = () => {},
   ) {
-    const root = el('div', 'pause controls');
+    const root = el('div', 'dialog controls');
     root.dataset.testid = 'controls-panel';
+    root.dataset.navScope = '';
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'controls-title');
     root.hidden = true;
     this.root = root;
 
-    const card = el('div', 'pause__card controls__card');
-    const head = el('header', 'pause__head');
-    const title = el('h2', 'pause__title', 'Controls');
+    const card = el('div', 'dialog__card controls__card');
+    const head = el('header', 'dialog__head');
+    const title = el('h2', 'dialog__title', S.controls.title);
     title.id = 'controls-title';
     this.sub = el('span', 'label controls__device');
     head.append(title, this.sub);
 
+    const body = el('div', 'dialog__body');
     this.list = el('dl', 'controls__list');
     this.note = el('p', 'controls__note');
+    body.append(this.list, this.note);
 
-    this.close = el('button', 'pause__quit');
-    this.close.type = 'button';
-    this.close.dataset.action = 'close-controls';
-    this.close.append(el('span', '', 'Back'));
-    this.close.addEventListener('click', () => this.hide());
+    this.close = button({
+      label: S.menu.back,
+      glyph: 'menuBack',
+      action: 'close-controls',
+      onClick: () => this.hide(),
+    });
+    this.close.dataset.navDefault = '';
     // Back is the dialog's only focusable control: Tab and Shift+Tab stay on it.
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       e.preventDefault();
       this.close.focus({ preventScroll: true });
     });
+    root.addEventListener('pointerdown', (e) => {
+      if (e.target === root) this.hide();
+    });
+    const foot = el('footer', 'dialog__foot');
+    foot.append(this.close);
 
-    card.append(head, this.list, this.note, this.close);
+    card.append(head, body, foot);
     root.append(card);
   }
 
@@ -205,12 +223,14 @@ export class ControlsPanel {
   show(): void {
     const device = this.source.device();
     const map = this.source.bindings();
-    this.sub.textContent = DEVICE_NAMES[device];
+    this.sub.replaceChildren(icon(DEVICE_ICON[device]), el('span', '', DEVICE_NAMES[device]));
     this.note.textContent = reverseNote(map, device);
     const rows = controlRows(map, device).map((r) => {
-      const row = el('div', 'pause__setting controls__row');
+      const row = el('div', 'setting controls__row');
       row.dataset.row = r.id;
-      row.append(el('dt', 'pause__key', r.action), el('dd', 'controls__input', r.input));
+      const input = el('dd', 'controls__input', r.input);
+      if (r.input === NOT_BOUND) input.classList.add('is-empty');
+      row.append(el('dt', 'setting__k', r.action), input);
       return row;
     });
     this.list.replaceChildren(...rows);

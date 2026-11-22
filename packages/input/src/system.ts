@@ -58,6 +58,8 @@ const EVENT_ACTIONS: ReadonlySet<ButtonAction> = new Set<ButtonAction>([
   'menuRight',
   'menuAccept',
   'menuBack',
+  'menuTabPrev',
+  'menuTabNext',
 ]);
 
 /** Pending gear requests kept between ticks; more than this in one tick is not a real driver. */

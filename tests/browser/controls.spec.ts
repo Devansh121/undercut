@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { openMenu } from './helpers';
 
 /** The controls list, opened from the pause menu of the shared drive session. */
 const BRAKE: Record<string, string> = {
@@ -137,11 +138,13 @@ test('gamepad A on Back closes the controls list in the pause menu', async ({
   await expect(menu).toBeHidden();
 });
 
-test('launch screen: the controls list keeps focus, and gamepad A on Back closes it without starting', async ({
+test('main menu: the controls list keeps focus, and gamepad A on Back closes it without starting', async ({
   page,
 }) => {
   test.skip(test.info().project.name !== 'desktop', 'gamepad cases run on desktop');
   await page.goto('/?quality=lite');
+  // The launch screen is a single prompt; the controls list is in the menu's top bar.
+  await openMenu(page);
   const start = page.getByRole('button', { name: /Start/ });
   await expect(start).toBeVisible();
   await page.getByRole('button', { name: 'Controls' }).click();

@@ -328,6 +328,28 @@ test.describe('drive', () => {
     expect(stats.lumaStdDev).toBeGreaterThan(10);
   });
 
+  test('on a phone every pause-menu control is a touch target of 44 px or more', async ({
+    drive: { page },
+  }, info) => {
+    test.skip(info.project.name !== 'phone', 'touch targets are a phone check');
+    await page.evaluate(() => window.__undercut?.pause());
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    const small = await menu.evaluate((root) =>
+      [...root.querySelectorAll<HTMLElement>('button, input, [data-nav]')]
+        .filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0)
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width < 43.5 || r.height < 43.5)
+        .map(
+          ({ el, r }) =>
+            `${el.dataset.action ?? el.dataset.value ?? el.className}: ${Math.round(r.width)} x ${Math.round(r.height)}`,
+        ),
+    );
+    expect(small).toEqual([]);
+    await page.evaluate(() => window.__undercut?.resume());
+    await expect(menu).toBeHidden();
+  });
+
   test('lays out the HUD inside the viewport with nothing overlapping', async ({
     drive: { page },
   }) => {
@@ -346,7 +368,10 @@ test.describe('drive', () => {
         const r = el.getBoundingClientRect();
         return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0;
       };
-      for (const el of document.querySelectorAll('.hud > *, .ut-touch > *')) {
+      // HUD modules, including those inside the right column (a layout wrapper).
+      for (const el of document.querySelectorAll(
+        '.hud > *:not(.hud-right), .hud-right > *, .ut-touch > *',
+      )) {
         if (!visible(el)) continue;
         const r = el.getBoundingClientRect();
         const name = el.className.toString().split(' ')[0] ?? el.tagName;
