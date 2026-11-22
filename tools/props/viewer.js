@@ -318,7 +318,8 @@ window.artwork = async (id) => {
 };
 
 // Isolate the crown against black and compare the same view with the LOD swap disabled/enabled.
-window.treeLuma = async (id) => {
+// Twelve azimuths, 30 degrees apart; with `snapshotAngle`, also draws High and Far side by side.
+window.treeLuma = async (id, snapshotAngle = null) => {
   await window.inspect(id, 'sheet');
   ground.visible = false;
   const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
@@ -333,7 +334,7 @@ window.treeLuma = async (id) => {
   const gl = renderer.getContext();
   const pixels = new Uint8Array(1600 * 1000 * 4);
   const results = [];
-  for (const angle of [0, Math.PI / 4, Math.PI / 2]) {
+  for (const angle of Array.from({ length: 12 }, (_, i) => (i * Math.PI) / 6)) {
     const values = [];
     for (const level of [0, 1]) {
       active[0].visible = level === 0;
@@ -363,6 +364,23 @@ window.treeLuma = async (id) => {
       card: values[1],
       relativeDelta: Math.abs(values[0] - values[1]) / values[0],
     });
+  }
+  if (snapshotAngle !== null) {
+    for (let level = 0; level < 2; level++) {
+      active[0].visible = level === 0;
+      active[1].visible = level === 1;
+      renderer.setViewport(level * 800, 0, 800, 1000);
+      renderer.setScissor(level * 800, 0, 800, 1000);
+      renderer.setScissorTest(true);
+      frame(
+        catalog.props.find((p) => p.id === id),
+        snapshotAngle,
+        0.8,
+        0.05,
+      );
+      renderer.render(scene, camera);
+    }
+    renderer.setScissorTest(false);
   }
   renderer.shadowMap.enabled = shadows;
   for (const o of hidden) o.visible = true;
