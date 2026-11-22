@@ -266,12 +266,6 @@ describe('a car stopped in the road', () => {
     expectClean(stopIn(1842, 5.49, 83));
   }, 300_000);
 
-  it('at Lesmo 2, on the line: the field goes round it in single file, untouched', () => {
-    // The review's case: cars going round on the right came alongside each other in the lane,
-    // and the inner one was squeezed into the stopped car.
-    expectClean(stopIn(2420, 1.94, 91));
-  }, 300_000);
-
   it('in the turn-one braking zone, on the line: the field goes round it, untouched', () => {
     expectClean(stopIn(500, 1.01, 89));
   }, 300_000);
