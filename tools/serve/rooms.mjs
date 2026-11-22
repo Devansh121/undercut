@@ -53,10 +53,10 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * `persistTo` gives the runtime its own state directory. Without it every `wrangler dev` for
- * this config shares one directory beside it, and two running at once (the test suite's
- * service and a server started by another test) can collide on its SQLite files
- * (SQLITE_BUSY, "database is locked").
+ * `persistTo` names the runtime's state directory; without it the runtime gets a temporary
+ * one of its own, removed on stop. Never the shared directory beside the config: two runtimes
+ * at once (the test suite's service and a server started by another test) collided on its
+ * SQLite files (SQLITE_BUSY, "database is locked").
  *
  * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
@@ -68,10 +68,10 @@ export function createRoomsService({
   persistTo,
 }) {
   const url = `http://127.0.0.1:${port}`;
-  // Each instance keeps its Durable Object state (SQLite) in a directory of its own: the shared
-  // default (.wrangler/state) let two runtimes started side by side (the test suite's service and
-  // a test's own server) lock each other's databases (SQLITE_BUSY).
-  const persist = fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
+  // Each instance keeps its Durable Object state (SQLite) in a directory of its own (`persistTo`,
+  // or a temporary one removed on stop), never the shared default beside the config.
+  const ownState = !persistTo;
+  const persist = persistTo ?? fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
   const cancel = new AbortController();
   /** @type {import('node:child_process').ChildProcess | null} */
   let child = null;
@@ -108,7 +108,6 @@ export function createRoomsService({
         '--log-level',
         quiet ? 'error' : 'warn',
         ...Object.entries(vars).flatMap(([key, value]) => ['--var', `${key}:${value}`]),
-        ...(persistTo ? ['--persist-to', persistTo] : []),
       ],
       {
         cwd: REPO_ROOT,
@@ -162,7 +161,7 @@ export function createRoomsService({
   async function doStop() {
     cancel.abort();
     if (!child) {
-      fs.rmSync(persist, { recursive: true, force: true });
+      if (ownState) fs.rmSync(persist, { recursive: true, force: true });
       return;
     }
     const pgid = child.pid;
@@ -180,7 +179,7 @@ export function createRoomsService({
       await new Promise((r) => setTimeout(r, 25));
     }
     process.off('exit', killOnExit);
-    fs.rmSync(persist, { recursive: true, force: true });
+    if (ownState) fs.rmSync(persist, { recursive: true, force: true });
   }
 
   return {
