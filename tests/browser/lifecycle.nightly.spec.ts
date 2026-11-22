@@ -16,9 +16,7 @@ test.use({ viewport: { width: 480, height: 300 } });
 for (const quality of ['mobile'] as const) {
   test(`starting and quitting five sessions on one page leaks nothing and warns about nothing (${quality})`, async ({
     page,
-  }, info) => {
-    // The renderer's lifetime does not depend on the viewport: one project covers it.
-    test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  }) => {
     test.setTimeout(240_000);
     const problems: string[] = [];
     page.on('console', (msg) => {

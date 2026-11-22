@@ -19,7 +19,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  workers: 2,
+  // Public CI runners have 4 vCPUs; 3 workers cuts wall time without starving SwiftShader.
+  workers: process.env.CI ? 3 : 2,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
@@ -30,6 +31,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
+      testIgnore: /\.nightly\.spec\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -39,12 +41,23 @@ export default defineConfig({
     },
     {
       name: 'phone',
+      testIgnore: /\.nightly\.spec\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },
         deviceScaleFactor: 3,
         isMobile: true,
         hasTouch: true,
+        launchOptions,
+      },
+    },
+    {
+      name: 'nightly',
+      testMatch: /\.nightly\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
         launchOptions,
       },
     },
@@ -58,6 +71,17 @@ export default defineConfig({
     gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
     timeout: 120_000,
     stdout: 'pipe',
-    env: { PORT: String(port), HTTPS_PORT: String(httpsPort), ROOMS_PORT: String(roomsPort) },
+    env: {
+      PORT: String(port),
+      HTTPS_PORT: String(httpsPort),
+      ROOMS_PORT: String(roomsPort),
+      ROOM_TIMINGS: JSON.stringify({
+        readyCountdownMs: 500,
+        formationMs: 600,
+        lightIntervalMs: 700,
+        holdMinMs: 100,
+        holdMaxMs: 300,
+      }),
+    },
   },
 });

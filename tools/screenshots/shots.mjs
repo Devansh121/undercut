@@ -9,7 +9,7 @@
 //   npm run shots -- monza --lap                       also a full scripted lap and its HUD
 //   npm run shots -- monza --lifecycle                 also five High sessions on one page: no GL
 //                                                      object or program may leak (GPU twin of
-//                                                      tests/browser/lifecycle.spec.ts)
+//                                                      tests/browser/lifecycle.nightly.spec.ts)
 //   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
 //                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
@@ -499,7 +499,7 @@ async function moving(browser, report) {
 }
 
 /**
- * The lifecycle check on the High preset, on the GPU (tests/browser/lifecycle.spec.ts runs it on
+ * The lifecycle check on the High preset, on the GPU (tests/browser/lifecycle.nightly.spec.ts runs it on
  * Mobile in CI): five sessions started and quit on one page; GL objects counted at the API must
  * not grow between sessions, and only the renderer's own state may remain (no geometry, at most
  * two textures and two programs), with no console warnings or errors.
