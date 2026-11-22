@@ -12,6 +12,12 @@
  * keeps the last frame). A fence after each draw marks its end. Fences complete in submission
  * order, so only the oldest needs checking. A GPU that keeps up never sees a skip: with two in
  * flight, the frame before last has finished by the time the next one starts.
+ *
+ * A fence that never signals (a driver bug) must not freeze the view for the session. After 1 s
+ * of skips with no fence completing, one frame draws anyway (the queue may then hold one more).
+ * After 5 s with none completing, fences are taken not to work here: pacing stops for the
+ * session, its fences are released, and `disabled` says so (renderStats). A slow GPU whose
+ * fences do complete, however late each frame, resets both clocks with every completion.
  */
 export interface Fences<F> {
   /** A fence after the commands issued so far, or null when the context cannot make one. */
@@ -20,10 +26,23 @@ export interface Fences<F> {
   release(fence: F): void;
 }
 
+/** Skipping this long with no fence completing draws one frame anyway, ms. */
+const FORCE_MS = 1000;
+/** This long with no fence completing turns pacing off for the session, ms. */
+const GIVE_UP_MS = 5000;
+
 export class FramePacer<F> {
   /** Draws skipped because the GPU was behind. */
   skipped = 0;
+  /** Frames drawn anyway after a second of waiting on the GPU. */
+  forcedDraws = 0;
+  /** Pacing switched off for the session: fences stopped completing. */
+  disabled = false;
   private readonly queue: F[] = [];
+  /** Time skipping since a fence last completed (or since the last forced draw), ms. */
+  private waiting = 0;
+  /** Time since a fence last completed while the queue was full, ms. */
+  private stalled = 0;
 
   constructor(
     private readonly fences: Fences<F>,
@@ -35,18 +54,41 @@ export class FramePacer<F> {
     return this.queue.length;
   }
 
-  /** May this frame draw? Counts a skip when it may not. */
-  ready(): boolean {
+  /**
+   * May this frame draw? Counts a skip when it may not. `elapsedMs`: real time since the last
+   * call, for the stuck-fence fallbacks above.
+   */
+  ready(elapsedMs = 0): boolean {
+    if (this.disabled) return true;
+    let completed = false;
     while (this.queue.length > 0 && this.fences.signaled(this.queue[0] as F)) {
       this.fences.release(this.queue.shift() as F);
+      completed = true;
+    }
+    if (completed) {
+      this.waiting = 0;
+      this.stalled = 0;
     }
     if (this.queue.length < this.maxInFlight) return true;
+    this.waiting += elapsedMs;
+    this.stalled += elapsedMs;
+    if (this.stalled >= GIVE_UP_MS) {
+      this.disabled = true;
+      this.dispose();
+      return true;
+    }
+    if (this.waiting >= FORCE_MS && this.queue.length <= this.maxInFlight) {
+      this.waiting = 0;
+      this.forcedDraws++;
+      return true;
+    }
     this.skipped++;
     return false;
   }
 
   /** Call after a frame's draw calls. */
   submitted(): void {
+    if (this.disabled) return;
     const fence = this.fences.insert();
     if (fence !== null) this.queue.push(fence);
   }

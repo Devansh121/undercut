@@ -197,6 +197,10 @@ export interface ViewStats {
   drawnFrames: number;
   /** Frames that skipped their draw because the GPU was still two frames behind. */
   skippedDraws: number;
+  /** Frames drawn anyway after a second waiting on the GPU (FramePacer). */
+  forcedDraws: number;
+  /** Frame pacing switched off for the session: GPU fences stopped completing. */
+  pacingDisabled: boolean;
 }
 
 /** Everything a session fetches before it can draw, for one preset. */
@@ -765,7 +769,7 @@ export class RaceView {
     this.sinceDrawMs += frame.frameMs ?? 0;
     // Draw only while the GPU is at most a frame behind (FramePacer); the CPU side below runs
     // every frame either way, so cameras, poses and screen-space queries stay current.
-    const draw = !this.contextLost && this.pacer.ready();
+    const draw = !this.contextLost && this.pacer.ready(frame.frameMs ?? 0);
     if (draw) {
       // GPU time where the browser measures it (CPU-side stalls are not GPU load), else the time
       // since the last drawn frame (the frame time, unless the GPU made this frame wait).
@@ -1013,6 +1017,8 @@ export class RaceView {
       environmentBakes: this.environment.bakes,
       drawnFrames: this.drawnFrames,
       skippedDraws: this.pacer.skipped,
+      forcedDraws: this.pacer.forcedDraws,
+      pacingDisabled: this.pacer.disabled,
     };
   }
 
