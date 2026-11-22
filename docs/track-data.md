@@ -284,6 +284,50 @@ Every per-circuit position in section 4 and physics-validation 4.6 was checked f
 
 The Monza correction changes the DRS zone the reference driver's speed profile uses; the racing-line artefact was rebuilt with `npm run ai:build`, and the reference lap went from 84.969 s to 84.872 s (docs/physics-validation.md 7.6; 85.539 s to 85.452 s before the lap-band changes).
 
+### 5.6 The folded run-off, and what launches cars at the first chicane
+
+**The fold.** Off the track the ground is the track edge's height at the projected s, falling
+away at the drainage slope (`Track.ground`). On the inside of a tight corner the track's (s, d)
+frame folds: with m = 1 − κd the stretch of the frame across the lap, a world step across the
+fold is a step of 1/m along s, so the centreline's grade g becomes a slope of about g/m, and
+where the projection jumps to another stretch of the lap the ground has a step. Measured on a
+world grid inside the barriers (ground slope over a 0.35 m probe, kerbs and the pit lane's own
+ground excluded):
+
+| Circuit | Worst | Where | Contract (`packages/track/test/runoff-grade.test.ts`) |
+|---|---|---|---|
+| Monza | 41 % | inside of turn 2, s 645–671, d 9–14 (m 0.1–0.4, grade 2.8 %); 24 % inside turn 1 (s 622, d −9.7) | open (expected failure) |
+| Spa | 36 % | grass inside the bend at s 3200–3225, 30–36 m out (m 0.2–0.4, grade −7.3 %) | open (expected failure) |
+| Singapore | within the contract | its steep spots are kerb outer drops and the pit lane's blend band at the garage wall (s 4662, d 22–23), other contracts | passes |
+
+The contract: off-track ground that is not a kerb is no steeper than the steepest centreline
+grade and bank within 50 m plus the drainage fall plus 5 %.
+
+**What it does not cause.** The PR 19 kerb-safety cases that block the low-trim downforce
+increase (docs/physics-validation.md 7.9: teleport(540, 8, 300 km/h) with steer −0.1 at TC 0
+and 2, and steer 0 at TC 0) were traced tick by tick. Each crosses the track at 300 km/h and
+strikes the turn 1 inside kerb's 13 cm sausage (the authored `chicane` profile, 1.75–2.05 m
+beyond the edge, s 600–638): three wheels unload, one meets the tyre's bottoming ceiling
+(23.7 kN), and the car is thrown and spins. With low-trim ClA 3.6 (master) the floor peaks at
+0.46 m and the wheel centres stay under their limit; with 3.9 the floor reaches 0.60 m and a
+wheel centre 1.02 m against 1.004, so the safety net acts. The car lands on the turn 1 inside
+run-off, which is smooth along its path. A run along the turn 2 inside run-off from (620, 11)
+at 300 km/h meets the barrier, scrapes along it at about 115 km/h and is thrown by the turn 2
+sausage from behind at s 660; the pocket it crosses rises about 4 % along its path. The note in
+STATUS that these were launches off the run-off ramps was wrong.
+
+**Tried and not kept.** Two world-space treatments of the folded ground: a base blended to the
+centreline height averaged over world distance (gated by m), and the ground itself smoothed in
+the world with a width growing as the frame folds. Both left the contract failing (Monza 20–34 %,
+Spa 29–44 %, from the blend itself where m changes quickly along s), and neither changed the
+three cases or the turn 2 run at ClA 3.9. The turn 2 pocket is enclosed by the track before and
+after the chicane, 26 m apart along s (0.73 m in height) and 6–8 m apart in the world, so any
+ground joining them climbs about 10 % there, which is the contract's own bound at that spot; a
+fix needs a ground that interpolates between the bounding edges (or elevation data with less
+grade through the chicane), and a contract that allows that geometric minimum. The car's
+response to a sausage at 300 km/h (and the sausage's authored 13 cm, which has no source) is
+what decides the kerb-safety cases.
+
 ## 6. Sources
 
 All URLs were opened while doing this work (2026-11-21).
