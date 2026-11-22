@@ -1007,8 +1007,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (player > 0 && player !== statusPlayer) {
         const el = raceStatus.children[player] as HTMLElement | undefined;
         if (el) {
-          const top = el.offsetTop - raceStatus.clientHeight / 2 + el.offsetHeight / 2;
-          raceStatus.scrollTop = Math.max(0, top);
+          // Just into view, under the heading (which stays put).
+          const head = (raceStatus.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+          const bottom = el.offsetTop + el.offsetHeight - raceStatus.clientHeight + 8;
+          const top = el.offsetTop - head - 8;
+          if (raceStatus.scrollTop < bottom) raceStatus.scrollTop = bottom;
+          else if (raceStatus.scrollTop > top) raceStatus.scrollTop = Math.max(0, top);
         }
       }
       statusPlayer = player;
