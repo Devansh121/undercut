@@ -34,6 +34,30 @@ export const words = (n: number): string => WORDS[n] ?? String(n);
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const S = {
+  intro: {
+    title: 'First lap',
+    controls: (steer: string, brake: string, throttle: string, pause: string) =>
+      `Steer: ${steer} · Brake: ${brake} · Throttle: ${throttle} · Pause: ${pause}`,
+    brakeNow: 'Brake now',
+    next: 'Next tip',
+    skip: 'Skip intro',
+    replay: 'Replay intro',
+    brake: (input: string) =>
+      `Brake in a straight line before turning in. The driving line turns red where you need to brake. Brake: ${input}.`,
+    limits:
+      'Four wheels past the white lines invalidates this lap. It cannot set a record. Keep driving for a clean lap.',
+    pause: (input: string) =>
+      `Pause with ${input} for controls and settings. Skip or replay this intro from the pause menu.`,
+    row: 'First-lap intro',
+    rotate: 'Rotate your phone to drive',
+    rotateHelp: 'Use landscape for room to steer and brake. The session is paused.',
+    fullscreen: 'Fullscreen',
+    display: 'Display',
+  },
+  update: {
+    ready: 'A new version is ready.',
+    reload: 'Reload',
+  },
   launch: {
     tagline: (teams: number, drivers: number) =>
       `Open-wheel racing on measured circuits. ${cap(words(teams))} teams, ${words(drivers)} drivers, one car built to the regulations.`,
@@ -247,6 +271,14 @@ export const S = {
   },
 
   pause: {
+    uiAudio: 'Interface volume',
+    ambience: 'Ambience volume',
+    units: 'Speed units',
+    mph: 'mph',
+    autoGraphics: 'Auto',
+    resetDefaults: 'Reset settings',
+    defaults: 'Defaults',
+
     title: 'Paused',
     resume: 'Resume',
     restartLap: 'Restart lap',

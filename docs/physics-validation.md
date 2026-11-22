@@ -1065,7 +1065,7 @@ at full pedal every increase moves a passing check:
 
 | Trim | Tried | What it moves (passing on master) |
 |---|---|---|
-| Low | 3.7, 3.8, 3.9 | Three PR 19 game kerb cases (teleport (540, 8, 300 km/h), steer −0.1 at TC 0 and 2, steer 0 at TC 0) launch off the open run-off ramps at the first chicane and need the safety reset: steer 0 at TC 0 from 3.7, all three at 3.9; above 3.9 the Monza T1 2025 stop time leaves its band (2.422 s at 3.9 against 2.42) |
+| Low | 3.7, 3.8, 3.9 | Three PR 19 game kerb cases (teleport (540, 8, 300 km/h), steer −0.1 at TC 0 and 2, steer 0 at TC 0) are thrown where the first chicane's grade folds into ramps in the run-off (turn 1 inside; docs/track-data.md 5.6) and need the safety reset: steer 0 at TC 0 from 3.7, all three at 3.9; above 3.9 the Monza T1 2025 stop time leaves its band (2.422 s at 3.9 against 2.42) |
 | Medium | 4.7, 4.8 | Spa T5 2025 peak 5.11–5.12 g against 5.1; the Spa trap 304.7–305.0 km/h against 309 (the floor rides lower on Kemmel) |
 | High | 6.0 (6.24 stalls the floor at its reference condition) | No passing check, but three recorded gaps widen (Singapore T7 distance, T14 peak, sector 3) for 0.16 s, and [57] gives no reason to move a trim already inside its range |
 
@@ -1082,7 +1082,7 @@ powers (recorded gaps), 20 of 36.
 **What it would take.** The low and medium downforce the cited figure points to needs either a
 braking model under which the published Monza and Spa stops and the high-trim lock hold together
 (a pad friction that changes through the stop, with a source for its curve, is the candidate),
-or a correction of the run-off ramps at the first chicane (s 620–670, track-data, its own PR) so
+or the elevation through the first chicane's folded run-off (docs/track-data.md 5.6) so
 the kerb cases stop depending on the exact path. Neither is done here.
 
 **Sources looked for and not used.** No team, FIA or peer-reviewed figure was found for ClA, CdA,

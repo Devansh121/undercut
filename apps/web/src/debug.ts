@@ -93,7 +93,7 @@ export interface DebugApi {
   /** Can this browser run the audio worklet, and why sound fell back to silent if it did. */
   audioCapability(): { supported: boolean; fallback: string | null };
   /** What the steering-wheel display last drew (cockpit camera), or null. */
-  dashboard(): { gear: string; speed: string; revs: number } | null;
+  dashboard(): { gear: string; speed: string; revs: number; unit: string } | null;
   /** The player's car's projected bounding box, CSS px. */
   carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** Show or hide the HUD layer (frame-time measurement). */
@@ -102,6 +102,8 @@ export interface DebugApi {
   view(): unknown;
   /** Set start gantry lights bitmask (bits 0..4 red, bit 5 green). */
   setStartLights(mask: number): void;
+  /** Near-tree swap distance, m (0: cards only); returns the distance in use (0 without a world). */
+  treeSwap(distance?: number): number;
   /** Counts of placed world dressing objects and props. */
   worldCounts(): Record<string, number> | null;
   quit(): void;
@@ -246,7 +248,9 @@ export function installDebugApi(
       if (!isQuality(name)) throw new Error(`unknown preset ${name}`);
       await need().setQuality(name);
     },
+
     setStartLights: (mask) => need().view.world?.setStartLights(mask),
+    treeSwap: (distance) => need().view.world?.treeSwapDistance(distance) ?? 0,
     worldCounts: () => {
       const w = need().view.world;
       return w ? { ...w.counts, propsTotal: need().view.props.instanceCount } : null;

@@ -201,6 +201,13 @@ export function mountTouchOverlay(host: HTMLElement, system: InputSystem): Touch
     const [x, y] = local(event);
     if (system.touch.pointerDown(event.pointerId, x, y)) {
       event.preventDefault();
+      if ((event.target as Element).closest('.ut-touch__btn')) {
+        try {
+          doc.defaultView?.navigator.vibrate?.(8);
+        } catch {
+          /* Haptics are optional. */
+        }
+      }
       const target = event.target;
       if (target instanceof Element) {
         try {

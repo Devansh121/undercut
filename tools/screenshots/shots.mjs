@@ -12,6 +12,9 @@
 //   npm run shots -- monza --lifecycle                 also five High sessions on one page: no GL
 //                                                      object or program may leak (GPU twin of
 //                                                      tests/browser/lifecycle.nightly.spec.ts)
+//   npm run shots -- monza --tree-swap-check          also near trees against the cards they replace:
+//                                                      mean luma with and without them, day and
+//                                                      night, within 10 %
 //   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
 //                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
@@ -378,6 +381,64 @@ async function runStation(page, station) {
   await page.waitForTimeout(900);
 }
 
+async function mobileUi(browser, report) {
+  const vp = PERF_VIEWPORTS[1];
+  const { context, page, errors } = await openGame(browser, vp);
+  try {
+    for (const size of [
+      { width: 844, height: 390 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(size);
+      const label = `${size.width}x${size.height}`;
+      if (size.width > size.height) await page.evaluate(() => globalThis.__undercut.resume());
+      const landscape = size.width > size.height;
+      const screens = ['onboarding', ...(landscape ? ['onboarding-step2'] : []), 'hud'];
+      for (const screen of [...screens, 'pause', 'settings']) {
+        if (screen === 'onboarding') {
+          await page.evaluate(() => globalThis.__undercut.pause());
+          // Pause offers Skip while the coach runs and Replay once it is done.
+          const skip = page.locator('[data-action=skip-intro]');
+          if (await skip.isVisible()) await skip.click();
+          await page.locator('[data-action=replay-intro]').click();
+        }
+        if (screen === 'onboarding-step2') {
+          // The first tip moves on by driving alone.
+          await page.evaluate(() => globalThis.__undercut.drive({ throttle: 1 }));
+          await page.waitForTimeout(4000);
+          await page.evaluate(() => globalThis.__undercut.drive(null));
+        }
+        if (screen === 'hud') {
+          await page.evaluate(() => globalThis.__undercut.pause());
+          await page.locator('[data-action=skip-intro]').click();
+          await page.evaluate(() => globalThis.__undercut.resume());
+        }
+        if (screen === 'pause' || screen === 'settings')
+          await page.evaluate(() => globalThis.__undercut.pause());
+        if (screen === 'pause')
+          // Portrait keeps the menu open from the step before: show it from the top.
+          await page.evaluate(() => {
+            for (const n of globalThis.document.querySelectorAll(
+              '[data-testid=pause-menu], .pause *',
+            ))
+              n.scrollTop = 0;
+          });
+        if (screen === 'settings')
+          await page.locator('[data-slider=master]').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(300);
+        const file = path.join(outDir, `${screen}-${label}.png`);
+        await page.screenshot({ path: file, scale: 'css' });
+        report.shots.push({ screen, viewport: label, file });
+      }
+    }
+    report.errors.push(...errors);
+  } finally {
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await page.goto('about:blank');
+    await context.close();
+  }
+}
+
 async function shots(browser, report) {
   const only = option('only')?.split(',');
   const sizes = option('viewport')?.split(',');
@@ -453,6 +514,8 @@ function summarise(times) {
     onePercentLowFps: +(1000 / worstMean).toFixed(1),
     p99FrameMs: +p99.toFixed(2),
     meanFrameMs: +mean.toFixed(2),
+    medianFrameMs: +sorted[Math.floor(sorted.length * 0.5)].toFixed(2),
+    p95FrameMs: +sorted[Math.floor(sorted.length * 0.95)].toFixed(2),
   };
 }
 
@@ -482,7 +545,7 @@ const PERF_VIEWPORTS = [
 ];
 
 async function perf(report) {
-  for (const vsync of [true, false]) await perfRuns(report, vsync);
+  for (const vsync of flag('phone-audit') ? [true] : [true, false]) await perfRuns(report, vsync);
 }
 
 async function perfRuns(report, vsync) {
@@ -490,10 +553,26 @@ async function perfRuns(report, vsync) {
     args: [...GPU_ARGS, ...(vsync ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit'])],
   });
   try {
-    for (const vp of PERF_VIEWPORTS) {
+    for (const vp of flag('phone-audit')
+      ? [2, 3].flatMap((deviceScaleFactor) =>
+          [
+            { width: 844, height: 390 },
+            { width: 390, height: 844 },
+          ].map((viewport) => ({
+            label: `${viewport.width}x${viewport.height}-dpr${deviceScaleFactor}`,
+            viewport,
+            deviceScaleFactor,
+            isMobile: true,
+            hasTouch: true,
+            quality: 'mobile',
+          })),
+        )
+      : PERF_VIEWPORTS) {
       const quality = option('perf-quality') ?? vp.quality;
       const { context, page } = await openGame(browser, { ...vp, quality });
-      for (const run of ['drive', 'grid']) {
+      for (const run of flag('phone-audit')
+        ? ['grid', 'chicane', 'lesmo', 'parabolica']
+        : ['drive', 'grid']) {
         await page.evaluate((run) => {
           const u = globalThis.__undercut;
           u.autopilot(false);
@@ -503,6 +582,10 @@ async function perfRuns(report, vsync) {
             u.camera('chase-near');
             u.teleport(4300, 0, 250);
             u.autopilot(true);
+          } else if (run !== 'grid') {
+            u.camera('chase-near');
+            u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
+            u.drive({ throttle: 0, brake: 1, steer: 0 });
           } else {
             // From the last slot looking up the grid: nineteen cars ahead, all in view.
             u.restartLap();
@@ -531,6 +614,12 @@ async function perfRuns(report, vsync) {
           ...summarise(times),
           gpu,
           render: stats,
+          memory: await page.evaluate(() => ({
+            heapBytes: performance.memory?.usedJSHeapSize ?? null,
+            resources: performance
+              .getEntriesByType('resource')
+              .reduce((sum, r) => sum + r.transferSize, 0),
+          })),
           file: path.relative(root, file),
         };
         report.perf.push(summary);
@@ -538,6 +627,8 @@ async function perfRuns(report, vsync) {
           `  perf ${run} ${vp.label} ${quality} vsync=${vsync}: ${JSON.stringify(summary)}`,
         );
       }
+      await page.evaluate(() => globalThis.__undercut.quit());
+      await page.goto('about:blank');
       await context.close();
     }
   } finally {
@@ -696,6 +787,116 @@ async function lifecycle(browser, report) {
  * compares the central sky band (where High's lens vignette is zero) between the HDR pipeline and
  * the direct fallback (half-float colour targets hidden) on a frozen grid start.
  */
+/**
+ * Near trees against the cards they replace (High, by day and under floodlights at night): the
+ * same frozen poses drawn with the near trees on (the preset's swap distance) and off (0, cards
+ * only), mean luma over the pixels that change. The two must be within TREE_SWAP_TOLERANCE, or
+ * a band of lighter or darker trees travels with the camera.
+ */
+const TREE_SWAP_TOLERANCE = 0.1;
+async function treeSwapCheck(browser, report) {
+  const problems = [];
+  const cases = [];
+  for (const [label, tod] of [
+    ['day', ''],
+    ['night', '&tod=night-floodlit'],
+  ]) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    page.on('pageerror', (e) => problems.push(e.message));
+    await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high${tod}`);
+    await page.waitForFunction(() => Boolean(globalThis.__undercut));
+    await page.evaluate(() => globalThis.__undercut.start());
+    await page.waitForFunction(
+      () => globalThis.document.documentElement.dataset.ready !== undefined,
+      null,
+      { timeout: 120_000 },
+    );
+    const poses = {
+      // Chase camera through the Lesmo woods, and a high view over the park.
+      lesmo: () => {
+        const u = globalThis.__undercut;
+        u.camera('chase-near');
+        u.teleport(1640, 0, 250);
+        u.setTimeScale(0);
+      },
+      park: () => {
+        const u = globalThis.__undercut;
+        u.camera('tv');
+        const e = u.trackPoint(2150, 70, 32);
+        const a = u.trackPoint(2650, -40, 2);
+        u.tvCamera(e.x, e.y, e.z, 42, a);
+      },
+    };
+    const swap = await page.evaluate(() => globalThis.__undercut.treeSwap());
+    for (const [name, set] of Object.entries(poses)) {
+      await page.evaluate(set);
+      const shots = [];
+      for (const d of [swap, 0]) {
+        await page.evaluate((v) => {
+          globalThis.__undercut.treeSwap(v);
+          globalThis.__undercut.resetFrameTimes();
+        }, d);
+        await page.waitForFunction(() => (globalThis.__undercut.frameTimes().length ?? 0) >= 20);
+        const png = await page
+          .locator('#view')
+          .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+        fs.writeFileSync(path.join(outDir, `tree-swap-${label}-${name}-${d}.png`), png);
+        shots.push(png.toString('base64'));
+      }
+      await page.evaluate((v) => globalThis.__undercut.treeSwap(v), swap);
+      const m = await page.evaluate(async ([a, b]) => {
+        const read = async (b64) => {
+          const img = new globalThis.Image();
+          img.src = `data:image/png;base64,${b64}`;
+          await img.decode();
+          const canvas = new globalThis.OffscreenCanvas(img.width, img.height);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          return ctx.getImageData(0, 0, img.width, img.height).data;
+        };
+        const pa = await read(a);
+        const pb = await read(b);
+        let sa = 0;
+        let sb = 0;
+        let n = 0;
+        for (let i = 0; i < pa.length; i += 4) {
+          const la = 0.2126 * pa[i] + 0.7152 * pa[i + 1] + 0.0722 * pa[i + 2];
+          const lb = 0.2126 * pb[i] + 0.7152 * pb[i + 1] + 0.0722 * pb[i + 2];
+          if (Math.abs(la - lb) < 6) continue;
+          sa += la;
+          sb += lb;
+          n++;
+        }
+        return { near: n ? sa / n : 0, cards: n ? sb / n : 0, changed: n / (pa.length / 4) };
+      }, shots);
+      const ratio = m.cards > 0 ? m.near / m.cards : 1;
+      cases.push({
+        tod: label,
+        pose: name,
+        swap,
+        nearLuma: +m.near.toFixed(1),
+        cardLuma: +m.cards.toFixed(1),
+        ratio: +ratio.toFixed(3),
+        changedPct: +(m.changed * 100).toFixed(1),
+      });
+    }
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await context.close();
+  }
+  const ok =
+    problems.length === 0 &&
+    cases.length === 4 &&
+    cases.every((c) => c.swap > 0 && Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE);
+  report.treeSwapCheck = { ok, tolerance: TREE_SWAP_TOLERANCE, cases, problems };
+  for (const c of cases)
+    console.log(
+      `  tree-swap ${c.tod} ${c.pose}: near ${c.nearLuma} vs cards ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
+    );
+  console.log(`  tree-swap-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
+  if (!ok) report.errors.push(`Tree swap check failed: ${JSON.stringify(report.treeSwapCheck)}`);
+}
+
 async function skyCheck(browser, report) {
   const hideFloatTargets = () => {
     const hidden = new Set(['EXT_color_buffer_float', 'EXT_color_buffer_half_float']);
@@ -822,11 +1023,13 @@ try {
   await waitForServer(server);
   const browser = await chromium.launch({ args: GPU_ARGS });
   try {
+    if (flag('mobile-ui')) await mobileUi(browser, report);
     if (!flag('no-shots')) await shots(browser, report);
     if (flag('lap')) await lap(browser, report);
     if (flag('moving')) await moving(browser, report);
     if (flag('lifecycle')) await lifecycle(browser, report);
     if (flag('sky-check')) await skyCheck(browser, report);
+    if (flag('tree-swap-check')) await treeSwapCheck(browser, report);
   } finally {
     await browser.close();
   }

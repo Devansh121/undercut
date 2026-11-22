@@ -34,6 +34,7 @@
       "coverResolution": 1.5,
       "treeNear": 260,
       "treeFar": 4500,
+      "treeCloud": 110,
       "structures": true
     }
   },
@@ -71,6 +72,7 @@
       "coverResolution": 2,
       "treeNear": 220,
       "treeFar": 4000,
+      "treeCloud": 95,
       "structures": true
     }
   },
@@ -108,12 +110,13 @@
       "coverResolution": 2,
       "treeNear": 160,
       "treeFar": 3000,
+      "treeCloud": 0,
       "structures": true
     }
   },
   "mobile": {
     "label": "Mobile",
-    "pixelRatioCap": 1.5,
+    "pixelRatioCap": 1.25,
     "msaa": 2,
     "smaa": false,
     "post": true,
@@ -145,6 +148,7 @@
       "coverResolution": 4,
       "treeNear": 120,
       "treeFar": 2000,
+      "treeCloud": 0,
       "structures": true
     }
   },
@@ -182,6 +186,7 @@
       "coverResolution": 8,
       "treeNear": 60,
       "treeFar": 800,
+      "treeCloud": 0,
       "structures": false
     }
   }

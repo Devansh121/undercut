@@ -1,0 +1,52 @@
+{
+  "sha": "268d05b",
+  "circuit": "monza",
+  "shots": [],
+  "perf": [],
+  "lap": null,
+  "moving": null,
+  "errors": [],
+  "treeSwapCheck": {
+    "ok": true,
+    "tolerance": 0.1,
+    "cases": [
+      {
+        "tod": "day",
+        "pose": "lesmo",
+        "swap": 95,
+        "nearLuma": 47.6,
+        "cardLuma": 51.7,
+        "ratio": 0.92,
+        "changedPct": 19
+      },
+      {
+        "tod": "day",
+        "pose": "park",
+        "swap": 95,
+        "nearLuma": 64.9,
+        "cardLuma": 68.1,
+        "ratio": 0.953,
+        "changedPct": 10.5
+      },
+      {
+        "tod": "night",
+        "pose": "lesmo",
+        "swap": 95,
+        "nearLuma": 17.9,
+        "cardLuma": 19.5,
+        "ratio": 0.918,
+        "changedPct": 16.3
+      },
+      {
+        "tod": "night",
+        "pose": "park",
+        "swap": 95,
+        "nearLuma": 16.7,
+        "cardLuma": 15.7,
+        "ratio": 1.061,
+        "changedPct": 4.3
+      }
+    ],
+    "problems": []
+  }
+}
