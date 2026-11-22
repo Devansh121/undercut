@@ -115,12 +115,14 @@ describe('FramePacer', () => {
       }
       return drawn;
     };
-    // Two frames in flight, then one draw anyway after a second of waiting.
-    expect(drawsBy(1100, 0)).toBe(3);
+    // Two frames in flight, then one draw anyway after 10 s of waiting.
+    expect(drawsBy(9900, 0)).toBe(2);
+    expect(drawsBy(10_100, 9900)).toBe(1);
     expect(pacer.forcedDraws).toBe(1);
     expect(pacer.disabled).toBe(false);
-    // Nothing signalled for 5 s: fences are not working here; pacing stops.
-    drawsBy(5100, 1100);
+    // Nothing signalled for a minute: fences are not working here; pacing stops.
+    expect(drawsBy(59_900, 10_100)).toBe(0);
+    drawsBy(60_100, 59_900);
     expect(pacer.disabled).toBe(true);
     expect(gpu.released.length).toBe(3);
     expect(pacer.inFlight).toBe(0);
@@ -134,12 +136,12 @@ describe('FramePacer', () => {
   it('a slow GPU that keeps signalling is never forced or switched off', () => {
     const gpu = new FakeGpu();
     const pacer = new FramePacer(gpu);
-    // One GPU frame completes every 600 ms.
+    // One GPU frame completes every 6 s (a CPU-starved machine with software WebGL).
     let sinceDone = 0;
-    for (let t = 0; t < 30000; t += 16.7) {
+    for (let t = 0; t < 300_000; t += 16.7) {
       if (pacer.ready(16.7)) pacer.submitted();
       sinceDone += 16.7;
-      if (sinceDone >= 600 && gpu.done < gpu.next - 1) {
+      if (sinceDone >= 6000 && gpu.done < gpu.next - 1) {
         gpu.done++;
         sinceDone = 0;
       }

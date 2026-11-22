@@ -13,11 +13,14 @@
  * order, so only the oldest needs checking. A GPU that keeps up never sees a skip: with two in
  * flight, the frame before last has finished by the time the next one starts.
  *
- * A fence that never signals (a driver bug) must not freeze the view for the session. After 1 s
- * of skips with no fence completing, one frame draws anyway (the queue may then hold one more).
- * After 5 s with none completing, fences are taken not to work here: pacing stops for the
- * session, its fences are released, and `disabled` says so (renderStats). A slow GPU whose
- * fences do complete, however late each frame, resets both clocks with every completion.
+ * A fence that never signals (a driver bug) must not freeze the view for the session. After 10 s
+ * with no fence completing, one frame draws anyway (the queue may then hold one more); after 60 s,
+ * fences are taken not to work here: pacing stops for the session, its fences are released, and
+ * `disabled` says so (renderStats). The times are long on purpose: on a CPU-starved machine with
+ * software WebGL a working fence was measured taking more than 5 s to complete, and stopping
+ * pacing there brings back the unbounded queue this class exists to prevent (an online race on
+ * one core: the host page stopped pacing and never showed the start lights). A slow GPU whose
+ * fences do complete resets both clocks with every completion.
  */
 export interface Fences<F> {
   /** A fence after the commands issued so far, or null when the context cannot make one. */
@@ -27,14 +30,14 @@ export interface Fences<F> {
 }
 
 /** Skipping this long with no fence completing draws one frame anyway, ms. */
-const FORCE_MS = 1000;
+const FORCE_MS = 10_000;
 /** This long with no fence completing turns pacing off for the session, ms. */
-const GIVE_UP_MS = 5000;
+const GIVE_UP_MS = 60_000;
 
 export class FramePacer<F> {
   /** Draws skipped because the GPU was behind. */
   skipped = 0;
-  /** Frames drawn anyway after a second of waiting on the GPU. */
+  /** Frames drawn anyway after 10 s of waiting on the GPU. */
   forcedDraws = 0;
   /** Pacing switched off for the session: fences stopped completing. */
   disabled = false;
