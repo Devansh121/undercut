@@ -317,9 +317,163 @@ window.artwork = async (id) => {
   renderer.render(scene, camera);
 };
 
-// Inspection assemblies, not game placement: overcast (street kit, stands, hill pit garages) or the
-// night marina.
-window.kitScene = async (overcast) => {
+// The swap as it happens in the game: Mobile against Far in the full scene (sky, fog, ground,
+// shadows) from a 1.5 m eye at `distance`, aimed at mid-crown, with the chase camera's 60 degree
+// field of view. Tree pixels differ from a tree-less frame; solid pixels are those the sky does
+// not show through (by day under 40% of the sky behind them, at night 6 levels above it).
+window.treeSwap = async (id, angle, distance, fov = 60) => {
+  for (const o of active) scene.remove(o);
+  active = [];
+  scene.remove(car);
+  const prop = catalog.props.find((p) => p.id === id);
+  for (const lod of prop.lods.slice(1)) {
+    const o = (await loader.loadAsync(`/${lod.file}`)).scene;
+    o.traverse((n) => {
+      if (n.isMesh) n.castShadow = n.receiveShadow = true;
+    });
+    scene.add(o);
+    env.register(o);
+    active.push(o);
+  }
+  const W = 1600;
+  const H = 1000;
+  camera.fov = fov;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  const aim = new T.Vector3(0, prop.bounds.max[1] / 2, 0);
+  camera.position.set(Math.cos(angle) * distance, 1.5, Math.sin(angle) * distance);
+  camera.lookAt(aim);
+  env.update(camera, aim, true);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
+  const gl = renderer.getContext();
+  const grab = (level) => {
+    active.forEach((o, i) => (o.visible = i === level));
+    renderer.render(scene, camera);
+    const p = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, p);
+    return p;
+  };
+  const sky = grab(-1);
+  const frames = [grab(0), grab(1)];
+  const luma = (p, i) => 0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2];
+  const tree = frames.map((p) => {
+    const m = new Uint8Array(W * H);
+    for (let i = 0, k = 0; i < W * H; i++, k += 4)
+      m[i] =
+        Math.abs(p[k] - sky[k]) +
+          Math.abs(p[k + 1] - sky[k + 1]) +
+          Math.abs(p[k + 2] - sky[k + 2]) >
+        6
+          ? 1
+          : 0;
+    return m;
+  });
+  const night = lightMode === 'night';
+  const solid = frames.map((p, l) => {
+    const m = new Uint8Array(W * H);
+    for (let i = 0, k = 0; i < W * H; i++, k += 4) {
+      const y = luma(p, k);
+      const b = luma(sky, k);
+      m[i] = tree[l][i] && (night ? y > b + 6 : y < 0.4 * b) ? 1 : 0;
+    }
+    return m;
+  });
+  const count = (m) => m.reduce((n, v) => n + v, 0);
+  const mean = (l, keep) => {
+    let s = 0;
+    let n = 0;
+    for (let i = 0; i < W * H; i++)
+      if (keep(i)) {
+        s += luma(frames[l], i * 4);
+        n++;
+      }
+    return { mean: s / Math.max(n, 1), n };
+  };
+  const both = (i) => solid[0][i] && solid[1][i];
+  const union = (i) => tree[0][i] || tree[1][i];
+  const interior = [mean(0, both), mean(1, both)];
+  const region = [mean(0, union), mean(1, union)];
+  active.forEach((o) => (o.visible = true));
+  camera.fov = 35;
+  camera.updateProjectionMatrix();
+  return {
+    angle,
+    distance,
+    coverage: tree.map(count),
+    solid: solid.map(count),
+    interior: { mobile: interior[0].mean, far: interior[1].mean, pixels: interior[0].n },
+    region: { mobile: region[0].mean, far: region[1].mean, pixels: region[0].n },
+  };
+};
+
+// Redraw the last `treeSwap` view with one level (0 Mobile, 1 Far) for a capture.
+window.treeSwapShow = (level, fov = 35) => {
+  active.forEach((o, i) => (o.visible = i === level));
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  camera.fov = 35;
+  camera.updateProjectionMatrix();
+};
+
+// Isolate the crown against black and compare the same view with the LOD swap disabled/enabled.
+// Twelve azimuths, 30 degrees apart.
+window.treeLuma = async (id) => {
+  await window.inspect(id, 'sheet');
+  ground.visible = false;
+  const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
+  for (const o of hidden) o.visible = false;
+  const background = scene.background;
+  scene.background = new T.Color(0);
+  const fog = scene.fog;
+  scene.fog = null;
+  renderer.setViewport(0, 0, 1600, 1000);
+  const shadows = renderer.shadowMap.enabled;
+  renderer.shadowMap.enabled = false;
+  const gl = renderer.getContext();
+  const pixels = new Uint8Array(1600 * 1000 * 4);
+  const results = [];
+  for (const angle of Array.from({ length: 12 }, (_, i) => (i * Math.PI) / 6)) {
+    const values = [];
+    for (const level of [0, 1]) {
+      active[0].visible = level === 0;
+      active[1].visible = level === 1;
+      frame(
+        catalog.props.find((p) => p.id === id),
+        angle,
+        1.6,
+        0.05,
+      );
+      renderer.render(scene, camera);
+      gl.readPixels(0, 0, 1600, 1000, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let sum = 0,
+        count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const luma = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2];
+        if (luma > 2) {
+          sum += luma;
+          count++;
+        }
+      }
+      values.push(sum / count);
+    }
+    results.push({
+      angle,
+      near: values[0],
+      card: values[1],
+      relativeDelta: Math.abs(values[0] - values[1]) / values[0],
+    });
+  }
+  renderer.shadowMap.enabled = shadows;
+  for (const o of hidden) o.visible = true;
+  scene.background = background;
+  scene.fog = fog;
+  ground.visible = true;
+  return results;
+};
+
+window.kitScene = async (forest) => {
   for (const o of active) scene.remove(o);
   active = [];
   const group = new T.Group();
@@ -348,8 +502,11 @@ window.kitScene = async (overcast) => {
     }
   }
   for (let z = 0; z < 65; z += 8) await place('temporary-grandstand', -16, z);
-  if (overcast) {
+  if (forest) {
     for (let z = -10; z < 74; z += 6) await place('hill-pit-garage', 18, z, Math.PI);
+    for (let z = -30; z < 100; z += 7)
+      for (let x = -45; x < -25; x += 6)
+        await place((x + z) % 3 ? 'forest-spruce' : 'forest-fir', x, z, z);
   } else {
     for (let z = 0; z < 85; z += 25)
       await place(z % 2 ? 'marina-hotel' : 'marina-office', 28, z, Math.PI);
@@ -389,4 +546,115 @@ window.kitScene = async (overcast) => {
   camera.updateProjectionMatrix();
   env.update(camera, new T.Vector3(0, 0, 15), true);
   renderer.render(scene, camera);
+};
+
+// LOD transition evidence for a tree: High, Mobile and Far from the same camera on black, with
+// mean luma and silhouette coverage per level and the silhouette overlap (IoU) of each level
+// against the Far card. Leaves a four-panel frame: High | Mobile | Far | Mobile vs Far (red:
+// Mobile only, blue: Far only, white: both).
+window.treeTransition = async (id) => {
+  for (const o of active) scene.remove(o);
+  active = [];
+  const prop = catalog.props.find((p) => p.id === id);
+  const levels = [];
+  for (const lod of prop.lods) {
+    const o = (await loader.loadAsync(`/${lod.file}`)).scene;
+    scene.add(o);
+    env.register(o);
+    levels.push(o);
+    active.push(o);
+  }
+  ground.visible = false;
+  const hidden = scene.children.filter((o) => o.visible && !active.includes(o) && !o.isLight);
+  for (const o of hidden) o.visible = false;
+  const background = scene.background;
+  const fog = scene.fog;
+  scene.background = new T.Color(0);
+  scene.fog = null;
+  const shadows = renderer.shadowMap.enabled;
+  renderer.shadowMap.enabled = false;
+  const gl = renderer.getContext();
+  const W = 400;
+  const H = 640;
+  const pixels = new Uint8Array(W * H * 4);
+  const render = (level) => {
+    levels.forEach((o, i) => (o.visible = i === level));
+    renderer.setViewport(0, 0, W, H);
+    renderer.setScissor(0, 0, W, H);
+    renderer.setScissorTest(true);
+    renderer.render(scene, camera);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const mask = new Uint8Array(W * H);
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < W * H; i++) {
+      const l = 0.2126 * pixels[i * 4] + 0.7152 * pixels[i * 4 + 1] + 0.0722 * pixels[i * 4 + 2];
+      if (l > 2) {
+        mask[i] = 1;
+        sum += l;
+        count++;
+      }
+    }
+    return { mask, luma: sum / Math.max(count, 1), coverage: count };
+  };
+  const iou = (a, b) => {
+    let inter = 0;
+    let union = 0;
+    for (let i = 0; i < a.length; i++) {
+      inter += a[i] & b[i];
+      union += a[i] | b[i];
+    }
+    return inter / Math.max(union, 1);
+  };
+  const views = [];
+  let last = null;
+  for (const angle of [0, Math.PI / 6, Math.PI / 3]) {
+    frame(prop, angle, W / H, 0.05);
+    const r = [0, 1, 2].map(render);
+    views.push({
+      angle,
+      luma: r.map((x) => x.luma),
+      coverage: r.map((x) => x.coverage),
+      iouHighFar: iou(r[0].mask, r[2].mask),
+      iouMobileFar: iou(r[1].mask, r[2].mask),
+      coverageMobileOverFar: r[1].coverage / r[2].coverage,
+    });
+    last = r;
+  }
+  // The evidence frame for the last view: three renders side by side, then the difference.
+  renderer.setScissorTest(true);
+  for (let level = 0; level < 3; level++) {
+    levels.forEach((o, i) => (o.visible = i === level));
+    renderer.setViewport(level * W, 0, W, H);
+    renderer.setScissor(level * W, 0, W, H);
+    renderer.render(scene, camera);
+  }
+  renderer.setScissorTest(false);
+  const diff = document.createElement('canvas');
+  diff.width = W;
+  diff.height = H;
+  const ctx = diff.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const src = (H - 1 - y) * W + x;
+      const m = last[1].mask[src];
+      const f = last[2].mask[src];
+      const o = (y * W + x) * 4;
+      img.data[o] = m ? 255 : 0;
+      img.data[o + 1] = m && f ? 255 : 0;
+      img.data[o + 2] = f ? 255 : 0;
+      img.data[o + 3] = 255;
+    }
+  ctx.putImageData(img, 0, 0);
+  diff.id = 'tree-diff';
+  diff.style.cssText = `position:fixed;left:${3 * W}px;top:${window.innerHeight - H}px;width:${W}px;height:${H}px;z-index:9`;
+  document.getElementById('tree-diff')?.remove();
+  document.body.appendChild(diff);
+  renderer.shadowMap.enabled = shadows;
+  for (const o of hidden) o.visible = true;
+  scene.background = background;
+  scene.fog = fog;
+  ground.visible = true;
+  return views;
 };
