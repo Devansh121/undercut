@@ -370,7 +370,15 @@ export class RaceView {
     this.renderer.toneMapping = q.post ? NoToneMapping : NeutralToneMapping;
     this.renderer.shadowMap.enabled = q.shadow.cascades > 0;
     this.renderer.shadowMap.needsUpdate = true;
-    this.dynamic = new DynamicResolution(q.dynamicResolution);
+    // Above the cap only up to the screen's own pixel ratio: the buffer never exceeds the screen.
+    const dpr = window.devicePixelRatio || 1;
+    this.dynamic = new DynamicResolution({
+      ...q.dynamicResolution,
+      max: Math.max(
+        1,
+        Math.min(q.dynamicResolution.max ?? 1, dpr / Math.min(dpr, q.pixelRatioCap)),
+      ),
+    });
     this.gpu = new GpuTimer(this.renderer.getContext() as WebGL2RenderingContext);
 
     const t0 = performance.now();

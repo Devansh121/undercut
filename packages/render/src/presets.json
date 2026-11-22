@@ -137,7 +137,7 @@
     "grainVignette": false,
     "grain": 0,
     "speedBlur": false,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.6 },
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.6, "max": 1.6 },
     "world": {
       "enabled": true,
       "treeDensity": 0.35,
