@@ -46,6 +46,8 @@ export const S = {
       `Brake in a straight line before turning in. The driving line turns red where you need to brake. Brake: ${input}.`,
     limits:
       'Four wheels past the white lines invalidates this lap. It cannot set a record. Keep driving for a clean lap.',
+    limitsRace:
+      'Four wheels past the white lines is a track-limits strike. Strikes bring warnings, then the black and white flag, then a time penalty. Keep at least one wheel inside.',
     pause: (input: string) =>
       `Pause with ${input} for controls and settings. Skip or replay this intro from the pause menu.`,
     row: 'First-lap intro',

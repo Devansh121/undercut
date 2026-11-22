@@ -529,10 +529,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (o.onRestartRace) o.onRestartRace();
     else quit();
   };
-  const intro = new Onboarding({
-    bindings: () => input.profile.bindings,
-    device: () => input.activeDevice,
-  });
+  const intro = new Onboarding(
+    {
+      bindings: () => input.profile.bindings,
+      device: () => input.activeDevice,
+    },
+    session.quickRace,
+  );
   let autoQuality = o.autoQuality ?? false;
   // Rows at the end of the pause settings, so Resume, Restart and Reset stay in view.
   const commands: PauseCommand[] = [
@@ -1069,7 +1072,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         braking: car.brakeApplied > 0.1,
         invalid: !session.timer.valid,
         paused: session.phase === 'paused',
-        laps: lapsDone,
+        // (In a race the lap events are the race's: its timer counts the laps.)
+        laps: session.quickRace ? session.race.control.timer(0).lapsCompleted : lapsDone,
       });
     }
     const playing = session.phase === 'running';
@@ -1109,8 +1113,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       });
       view.setRaceCars(fleetPoses, fleetDrs);
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
-      // After the player's flag the standings take the screen; the driving cluster is done.
-      hud.root.toggleAttribute('data-finished', session.playerFinished);
+      // After the player's flag, or any final result (a retirement too), the standings take the
+      // screen; the driving cluster is done.
+      hud.root.toggleAttribute('data-finished', session.playerFinished || session.result !== null);
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
