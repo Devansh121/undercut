@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "tolerance": 0.1,
+  "cases": [
+    {
+      "tod": "overcast",
+      "pose": "blanchimont",
+      "swap": 95,
+      "nearLuma": 105.9,
+      "cardLuma": 101.6,
+      "ratio": 1.043,
+      "changedPct": 13.1
+    },
+    {
+      "tod": "overcast",
+      "pose": "plantation",
+      "swap": 95,
+      "nearLuma": 98,
+      "cardLuma": 101.3,
+      "ratio": 0.967,
+      "changedPct": 7.1
+    },
+    {
+      "tod": "sun",
+      "pose": "blanchimont",
+      "swap": 95,
+      "nearLuma": 64.7,
+      "cardLuma": 61.4,
+      "ratio": 1.054,
+      "changedPct": 12.3
+    },
+    {
+      "tod": "sun",
+      "pose": "plantation",
+      "swap": 95,
+      "nearLuma": 53.9,
+      "cardLuma": 56.1,
+      "ratio": 0.962,
+      "changedPct": 6.8
+    }
+  ],
+  "problems": []
+}

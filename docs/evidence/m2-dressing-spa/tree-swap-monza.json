@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "tolerance": 0.1,
+  "cases": [
+    {
+      "tod": "day",
+      "pose": "lesmo",
+      "swap": 95,
+      "nearLuma": 51.6,
+      "cardLuma": 55.1,
+      "ratio": 0.937,
+      "changedPct": 22.8
+    },
+    {
+      "tod": "day",
+      "pose": "park",
+      "swap": 95,
+      "nearLuma": 65.3,
+      "cardLuma": 68.4,
+      "ratio": 0.955,
+      "changedPct": 10.9
+    },
+    {
+      "tod": "night",
+      "pose": "lesmo",
+      "swap": 95,
+      "nearLuma": 20.4,
+      "cardLuma": 22,
+      "ratio": 0.929,
+      "changedPct": 17.8
+    },
+    {
+      "tod": "night",
+      "pose": "park",
+      "swap": 95,
+      "nearLuma": 17.3,
+      "cardLuma": 16.3,
+      "ratio": 1.062,
+      "changedPct": 4.4
+    }
+  ],
+  "problems": []
+}
