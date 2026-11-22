@@ -50,7 +50,7 @@ export const ASSIST_PRESETS: Readonly<Record<DeviceKind, Readonly<AssistPreset>>
     abs: 'on',
     tractionControl: 'high',
     gears: 'automatic',
-    racingLine: 'full',
+    racingLine: 'braking',
   }),
 });
 

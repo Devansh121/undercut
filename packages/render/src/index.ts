@@ -47,6 +47,15 @@ export {
   type QualityName,
   type RenderCapabilities,
 } from './quality';
+export {
+  DRIVING_LINE_CUE,
+  DrivingLineRibbon,
+  type DrivingLineCue,
+  type DrivingLineMode,
+  type DrivingLineRibbonOptions,
+  type DrivingLineSource,
+  type DrivingLineState,
+} from './driving-line';
 export { estimateRacingLine } from './racing-line';
 export {
   RaceView,

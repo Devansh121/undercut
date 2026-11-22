@@ -13,12 +13,17 @@ import {
   type ControlInput,
 } from '@undercut/sim';
 import type { DeviceKind } from './actions';
-import { assistPresetFor, type AssistLevel } from './assists';
+import { assistPresetFor, type AssistLevel, type AssistPreset } from './assists';
 
-/** The assists a session applies: the sim's settings plus the steering and braking help levels. */
+/**
+ * The assists a session applies: the sim's settings plus the steering and braking help levels
+ * and the driving line's display mode.
+ */
 export interface AssistConfig extends AssistSettings {
   /** Speed-sensitive steering for sticks and touch, 0 (off) to 3. Keyboards shape their own. */
   steering: number;
+  /** On-track driving-line assist display mode. */
+  racingLine?: AssistPreset['racingLine'];
   /**
    * Braking help, 0 (off) to 3: brakes for the corner ahead when the car is faster than the
    * driving line's speed there (see `brakeHelp`). Needs the circuit's guide; off without it.
@@ -68,6 +73,7 @@ export function assistsFor(device: DeviceKind, overrides: AssistOverrides): Assi
     abs: preset.abs === 'on' ? ABS_ON : 0,
     autoGears: preset.gears === 'automatic',
     steering: LEVEL[preset.steering],
+    racingLine: preset.racingLine,
     braking: LEVEL[preset.braking],
     ...overrides,
   };

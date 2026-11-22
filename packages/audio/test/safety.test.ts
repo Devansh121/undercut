@@ -346,6 +346,10 @@ describe('cost', () => {
   }, 30_000);
 
   it('renders one car much faster than real time', () => {
+    // A cost bound on a shared machine. Other work on the runner can only make a run slower,
+    // never faster, so the fastest of several runs is the closest measure of what the code
+    // costs: the bound applies to the minimum time. A warm-up run of the same loop comes
+    // first, so every timed run uses optimised code.
     const core = new AudioCore({ sampleRate: FS });
     const out = [new Float32Array(128), new Float32Array(128)];
     const state = engineState(11_000, 1, {
@@ -354,25 +358,23 @@ describe('cost', () => {
       speed: 80,
       slipRear: 0.05,
     });
-    for (let i = 0; i < 2000; i++) {
-      core.setCarState(state);
-      core.process(out, 128);
-    }
-    // 20 s of audio, timed as four 5 s slices. Another test worker or the OS can only add time
-    // to a slice, never remove it, so the fastest slice is the core's own cost: the bound holds
-    // on a busy CI runner without being loosened.
-    const blocks = 1875; // 5 s per slice
-    let best = Infinity;
-    for (let slice = 0; slice < 4; slice++) {
+    const blocks = 3750; // 10 s of audio per run
+    const run = () => {
       const t0 = performance.now();
       for (let i = 0; i < blocks; i++) {
         if (i % 3 === 0) core.setCarState(state);
         core.process(out, 128);
       }
-      best = Math.min(best, (performance.now() - t0) / 1000);
-    }
-    const ratio = (blocks * 128) / FS / best;
-    process.stderr.write(`audio core: ${ratio.toFixed(1)}x real time (one car, 48 kHz stereo)\n`);
-    expect(ratio).toBeGreaterThan(10);
+      const seconds = (performance.now() - t0) / 1000;
+      return (blocks * 128) / FS / seconds;
+    };
+    run();
+    const ratios = [run(), run(), run(), run(), run()];
+    const best = Math.max(...ratios);
+    const runs = ratios.map((r) => r.toFixed(1)).join(', ');
+    process.stderr.write(
+      `audio core: ${best.toFixed(1)}x real time, best of ${ratios.length} runs (${runs}); one car, 48 kHz stereo\n`,
+    );
+    expect(best, `real-time factor, best of runs ${runs}`).toBeGreaterThan(10);
   }, 30_000);
 });
