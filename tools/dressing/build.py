@@ -14,6 +14,7 @@ import base64
 import json
 import math
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +46,10 @@ CLASSES = [
     ("park", "area", lambda t: t.get("leisure") == "park" or t.get("boundary") == "protected_area"),
 ]
 
+# Names that spell a real racing series (as tools/ci/check-names.mjs finds them) are dropped: the
+# repo never writes one, and a stand or building is placed the same without its name.
+_F = "F"
+SERIES_NAME = re.compile(r"\b" + _F + r"1\b|\b" + _F + r"ormula[\s-]?(1|One)\b", re.I)
 KEEP_TAGS = ("name", "building", "levels", "building:levels", "height", "roof:shape", "surface", "layer", "leaf_type", "leaf_cycle", "covered", "highway", "barrier")
 
 
@@ -177,7 +182,40 @@ def _blur2d(h, cols, rows, n):
     return out
 
 
-def terrain_grid(cfg, frame, datum, offline):
+def _in_ring(p, x, z):
+    inside = False
+    n = len(p) // 2
+    j = n - 1
+    for i in range(n):
+        xi, zi, xj, zj = p[2 * i], p[2 * i + 1], p[2 * j], p[2 * j + 1]
+        if (zi > z) != (zj > z) and x < (xj - xi) * (z - zi) / (zj - zi) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def canopy_mask(woods, x0, z0, cell, n):
+    """Share of each grid cell under mapped woodland (1 inside a wood, 0 outside)."""
+    m = [0.0] * (n * n)
+    for f in woods:
+        p = f["p"]
+        if len(p) < 6:
+            continue
+        bx0, bx1 = min(p[0::2]), max(p[0::2])
+        bz0, bz1 = min(p[1::2]), max(p[1::2])
+        c0 = max(0, int((bx0 - x0) // cell))
+        c1 = min(n - 1, int((bx1 - x0) // cell) + 1)
+        r0 = max(0, int((bz0 - z0) // cell))
+        r1 = min(n - 1, int((bz1 - z0) // cell) + 1)
+        for r in range(r0, r1 + 1):
+            z = z0 + r * cell
+            for c in range(c0, c1 + 1):
+                if m[r * n + c] < 1 and _in_ring(p, x0 + c * cell, z):
+                    m[r * n + c] = 1.0
+    return m
+
+
+def terrain_grid(cfg, frame, datum, offline, woods=()):
     """Bare-ground heights on a square grid around the origin, relative to the track datum.
 
     The Copernicus model is a surface model (canopy and roofs included), so the grid gets the same
@@ -196,6 +234,14 @@ def terrain_grid(cfg, frame, datum, offline):
             x = -half + c * cell
             lat, lon = frame.to_latlon(x, z)
             h.append(dem.sample(lat, lon) - datum)
+    canopy = t.get("canopy")
+    if canopy:
+        # The surface model is the forest roof where the map has woods; an opening only removes
+        # woods narrower than its window, so first take off the canopy height inside mapped
+        # woods (softened at their edges), then filter what is left.
+        m = canopy_mask(woods, -half, -half, cell, n)
+        m = _blur2d(m, n, n, int(round(canopy["edge"] / cell)) | 1)
+        h = [v - canopy["height"] * k for v, k in zip(h, m)]
     w = int(round(t["openWindow"] / cell)) | 1
     h = _filter2d(_filter2d(h, n, n, w, min), n, n, w, max)
     h = _blur2d(h, n, n, int(round(t["average"] / cell)) | 1)
@@ -203,7 +249,10 @@ def terrain_grid(cfg, frame, datum, offline):
     return {
         "x0": -half, "z0": -half, "cell": cell, "cols": n, "rows": n,
         "unit": "dm above the track datum, int16 little endian, rows run +z (south)",
-        "filter": {"openWindow": t["openWindow"], "average": t["average"]},
+        "filter": dict(
+            {"openWindow": t["openWindow"], "average": t["average"]},
+            **({"canopy": t["canopy"]} if t.get("canopy") else {}),
+        ),
         "source": rec,
         "heights": base64.b64encode(raw).decode(),
         "range": [round(min(h), 1), round(max(h), 1)],
@@ -264,6 +313,9 @@ def build(cfg, offline):
             pts = simplify(ring, cfg["simplify"])
             item = {"id": "%s/%d" % (el["type"][0], el["id"]), "p": flat(pts)}
             kept = {k: tags[k] for k in KEEP_TAGS if k in tags}
+            if SERIES_NAME.search(kept.get("name", "")):
+                del kept["name"]
+                stats["unnamed"] = stats.get("unnamed", 0) + 1
             if kept:
                 item["t"] = kept
             out[name].append(item)
@@ -271,7 +323,7 @@ def build(cfg, offline):
     for name in out:
         if name != "tree":
             out[name].sort(key=lambda it: it["id"])
-    terrain = terrain_grid(cfg, frame, o["datum"], offline)
+    terrain = terrain_grid(cfg, frame, o["datum"], offline, out["wood"])
     counts = {k: (len(v) // 2 if k == "tree" else len(v)) for k, v in out.items()}
     doc = {
         "format": "undercut-dressing",

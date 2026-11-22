@@ -30,6 +30,7 @@ import { MenuInput } from './ui/menu-input';
 import { CircuitSelectScreen } from './ui/screens/circuits';
 import { HubScreen, type SessionChoice } from './ui/screens/hub';
 import { LaunchScreen } from './ui/screens/launch';
+import { timeOfDayOf } from './ui/screens/session-settings';
 import { Shell } from './ui/shell';
 
 type DriveModule = typeof DriveModuleNs;
@@ -141,12 +142,14 @@ function showMenus(screen: 'launch' | 'hub'): void {
 /** The choice on the main menu now (the debug API starts with it). */
 function currentChoice(): SessionChoice {
   const p = prefs.get();
+  const summary = CIRCUITS.find((c) => c.id === p.circuit);
   return {
     mode: 'timeTrial',
     circuit: p.circuit,
     team: p.team,
     driver: p.driver,
-    timeOfDay: p.timeOfDay[p.circuit] ?? '',
+    // The circuit's own sky as the hub would pick it (Spa is overcast), not the default one.
+    timeOfDay: summary ? timeOfDayOf(p, summary) : (p.timeOfDay[p.circuit] ?? ''),
     assists: p.assists[input.activeDevice] ?? {},
   };
 }
@@ -264,7 +267,9 @@ if (debugEnabled()) {
   installDebugApi(
     () => drive,
     () => start(),
-    () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
+    () =>
+      driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0, programRefs: 0 },
+    () => driveModule?.rendererPrograms() ?? [],
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),
   );

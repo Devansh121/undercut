@@ -396,7 +396,12 @@ function paintTree(
  * into the transparent texels. Row 0 of the data is the canvas's top row, so in uv a tile at
  * canvas row r spans v = r / ROWS (its top) to (r + 1) / ROWS (the ground).
  */
-export function treeAtlas(tile: number, anisotropy: number): DataTexture {
+export function treeAtlas(
+  tile: number,
+  anisotropy: number,
+  /** Per-species changes by name (a circuit's own form of a species; theme.ts). */
+  species: Readonly<Record<string, Partial<Species>>> = {},
+): DataTexture {
   const canvas = document.createElement('canvas');
   canvas.width = tile * ATLAS_COLS;
   canvas.height = tile * ATLAS_ROWS;
@@ -409,7 +414,7 @@ export function treeAtlas(tile: number, anisotropy: number): DataTexture {
     ctx.beginPath();
     ctx.rect(ox, oy, tile, tile);
     ctx.clip();
-    paintTree(ctx, sp, 7919 * (i + 1), ox, oy, tile);
+    paintTree(ctx, { ...sp, ...species[sp.name] }, 7919 * (i + 1), ox, oy, tile);
     ctx.restore();
   });
   CLUSTERS.forEach((leaf, i) => {

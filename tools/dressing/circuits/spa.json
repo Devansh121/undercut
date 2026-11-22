@@ -1,0 +1,17 @@
+{
+  "id": "spa",
+  "track": "packages/track/data/spa.json",
+  "radius": 600,
+  "simplify": 0.5,
+  "notes": "Mapped features within `radius` metres of the centreline, resolved into the track's world frame by tools/dressing/build.py. The Ardennes forest roof is taken off the surface model inside mapped woods before the terrain filters.",
+  "terrain": {
+    "cell": 50,
+    "halfSize": 6000,
+    "openWindow": 150,
+    "average": 100,
+    "canopy": {
+      "height": 22,
+      "edge": 100
+    }
+  }
+}

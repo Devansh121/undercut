@@ -52,7 +52,12 @@ import {
 import { estimateRacingLine } from './racing-line';
 import { GRASS_COLOUR, TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 import { isDressingFile, type DressingFile } from './world/dressing';
-import { PropKitAssets, isPropCatalog } from './props/catalog';
+import {
+  PropKitAssets,
+  isPropCatalog,
+  nearTreePropIds,
+  worldCatalogPropIds,
+} from './props/catalog';
 import type { BrandSpec } from './world/brands';
 import type { GarageTeam } from './world/pit-building';
 import { CircuitWorld } from './world/world';
@@ -337,7 +342,14 @@ export class RaceView {
     // The prop kit is only placed with the structures.
     const kitP =
       dressingUrl && worldQ.structures && isPropCatalog(options.propCatalog)
-        ? PropKitAssets.load(loader, options.propCatalog, q, options.dracoPath)
+        ? PropKitAssets.load(
+            loader,
+            options.propCatalog,
+            q,
+            options.dracoPath,
+            worldCatalogPropIds(options.track.id, { world: worldQ }),
+            nearTreePropIds(options.track.id),
+          )
         : Promise.resolve(null);
     // Settle all of them before deciding: a car that finishes after another file failed is
     // released here, never left behind.
