@@ -47,7 +47,7 @@ On top of that:
 
 **Master bus** (`core.ts`, `limiter.ts`): voices → engine, effects and UI buses → bus gains → master gain and pause fade → DC blocker (12 Hz) → look-ahead true-peak limiter → soft clipper. Gains are smoothed over 30 ms; pause fades over about 10 ms, then outputs exact zeros and stops computing. The limiter detects true peak (each sample and the points the same 4× interpolator as the true-peak meter puts around it), looks 1.5 ms ahead and holds −1.5 dBTP on that measure exactly (the gain at each delayed sample is a moving average of sliding minima of the gain each sample needs, so it is never above what the peak needs); its latency is 79 samples at 48 kHz; the clipper after it is the identity below −1.3 dBFS and never reaches −0.5 dBFS.
 
-**More cars later.** The core mixes cars (`CarSource`: controls, an engine voice, a road voice and pan gains) into buses. Adding other cars means more sources with distance gain, pan and Doppler; nothing in the bus or master path changes. Only the player's car exists in this slice.
+**Other cars, ambience and cues** are the scene layer (`scene.ts`), mixed into the same buses after the player's car; see the Slice 2 section at the end.
 
 **Allocation and determinism.** `AudioCore.process` renders in chunks of at most 32 frames aligned to its own sample clock, and does control-rate work (filter retuning, waking or sleeping optional layers) only on chunk boundaries of that clock, so the output is bit-identical however the host splits its blocks. Hot loops work on typed arrays and call nothing that returns a fractional number, every mutable field is initialised with a number, and filters are retuned by writing fields and calling `design()`. In V8 the other patterns (a non-inlined call returning a double, a field declared without an initialiser, a list of voices of different classes at one call site) each allocate per sample; together they produced a garbage collection every 20 ms before this was fixed.
 
@@ -223,3 +223,128 @@ about 2.3% of one CPU core for this one-car render, excluding analysis and file 
 this is not a mobile AudioWorklet CPU measurement. Both
 views pass the gates and block-size hash comparison. Silent layers are `null` in the JSON
 (the JSON representation of −infinity dBFS).
+
+## M6 other cars, ambience and cues (Slice 2)
+
+The game sends an `AudioScene` every drawn frame (`apps/web/src/game/audio-scene.ts` builds it
+from the race; `AudioEngine.setScene`), packed into a `Float64Array` of 119 numbers for the
+worklet (`packScene`). It carries up to nineteen other cars in the player car's frame (+x forward,
++z right: position, relative velocity, crank speed, throttle), the circuit's bed, the crowd level
+reaching each ear and the start-light state. Every field is clamped to its range in one pass;
+a car with a non-finite position is absent.
+
+**Voice pool** (`scene.ts`, `opponent-voice.ts`). Each car keeps the slot of its race index, so a
+voice's phase never resets. The six nearest cars within 300 m get a voice; their level fades out
+over the last 80 m and any voice that loses its place fades over 50 ms (no cut). Cars without a
+voice but within 600 m are summed by power into one far-field voice, placed in their
+power-weighted mean direction at the distance one car of that level would be, at their
+power-weighted mean pitch and throttle.
+
+Each voice is a cheaper engine than the player's: one table holds a whole six-pulse V6 cycle
+(built from the player's single-cylinder pulse tables in the frequency domain, keeping only the
+multiples of the sixth harmonic, so it is exactly as band-limited), part-load and full-load
+trains mixed by throttle, with combustion noise gated by the pulses. Then, per voice:
+
+| Stage | Model | Parameters |
+|---|---|---|
+| Distance | inverse distance (−6 dB per doubling) | reference 6 m, level 0.11 there at full throttle |
+| Air absorption | one-pole low-pass | corner 20 kHz / (1 + (d − 6 m) / 15 m), floor 1.8 kHz; about −7 dB at 4 kHz and −12 dB at 8 kHz at 150 m (ISO 9613-1 air at 20 °C, 50 %: roughly −5 and −15 dB) |
+| Interaural time difference | fractional delay on the far ear | up to 0.66 ms (Woodworth, 8.75 cm head radius) × sideways share |
+| Level pan | equal power, width 0.7 | a car fully to one side is about 10 dB louder in the near ear |
+| Head shadow | one-pole low-pass on the far ear, and on both ears for a car behind | far-ear corner down to 2.4 kHz, behind down to 3 kHz; corners in series with air absorption |
+| Doppler | ratio 343 / (343 + radial velocity) of the relative velocity | bounded to 0.8–1.25 (closing or opening faster than about 69–86 m/s saturates), smoothed over 50 ms |
+
+All voice parameters glide with a 50 ms time constant. A voice that wakes takes its target pitch,
+place and tone at once and only fades in, so a car entering the pool does not sweep up from
+silence. Occlusion is ignored. The listener is the player's car in every camera.
+
+**Ambience** (`ambience.ts`), on the ambience bus:
+
+| Layer | Synthesis | Where |
+|---|---|---|
+| Crowd | decorrelated noise per ear, band-pass 700 Hz Q 0.5, one-pole low-pass 2.2 kHz, swells at 0.13 and 0.31 Hz; lights out lifts it up to +8 dB (0.8 s rise, 6 s fall) | every circuit, by the stands |
+| Trees | decorrelated noise, band-pass 550 Hz Q 0.8, gusts from two slow sines (0.07, 0.19 Hz) | forest 1, park 0.45 |
+| Birds | calls of 3–6 falling notes, 2.6–4.4 kHz, 70 ms with 45 ms gaps, every 1.5–6 s, random side | forest 1, park 0.6 |
+| Night city | traffic rumble (noise low-passed at 140 Hz), floodlight hum at 100, 200 and 300 Hz (twice the 50 Hz mains), insects (band-pass 5.2 kHz Q 3, pulsed at 38 Hz in 9 s waves) | city at night |
+
+The crowd level comes from the render world's fitted grandstands (`StandFrame`): each stand is
+sized by front length × rows (60 m × 20 rows at 20 m reads 1), heard from the nearest point of its
+front edge, falling 6 dB per doubling beyond 20 m, panned by its bearing with width 0.8; stands add
+by power. The beds by circuit: Monza parkland, Spa forest, Singapore city at night. The Lite
+world has no stands, so it has no crowd. Levels move with a 0.5 s time constant.
+
+**Cues** (`cues.ts`), on the UI bus (so they duck the car and the ambience as Slice 1 set out): up
+to two notes each, sine plus an octave partial, 4 ms attack, exponential decay, 12 ms release to
+exact zero; two players alternate so a cue never cuts the last one off.
+
+| Cue | Notes |
+|---|---|
+| `focus` | 1.2 kHz tick, 30 ms |
+| `accept` | 880 Hz then 1320 Hz 45 ms later (a rising fifth) |
+| `back` | 990 Hz then 660 Hz (a falling fifth) |
+| `light` | 1 kHz, 180 ms, once per lamp |
+| `go` | 2 kHz, 400 ms, at lights out (only after a lamp was seen) |
+
+The page (`apps/web/src/audio.ts`) plays `focus` when a menu control takes focus by keyboard or
+gamepad (not from a pointer press), and `accept` or `back` (`data-action="back"` or `…-back`)
+when one is pressed, after the first gesture. Outside a driving session the context runs for
+0.8 s after a cue with the car and circuit buses held at 0, then suspends again.
+
+**Checks** (`packages/audio/test/scene.test.ts`, `apps/web/test/audio-scene.test.ts`):
+
+| Check | Threshold |
+|---|---|
+| Pool | 30 cars: 6 voiced and the far field on; 301 m: no voice, far field on; 601 m: nothing |
+| Pitch | firing peak within 0.5 Hz of rpm / 20 |
+| Tone follows throttle | spectral centroid ×1.3 or more, full against closed, same rpm |
+| Distance | 10 m against 40 m at the firing frequency: 11–13 dB (inverse distance: 12.04) |
+| Air absorption | 4–8 kHz against the firing band falls by more than 6 dB from 10 m to 150 m |
+| Side | a car to the right: right louder by more than 8 dB, left lagging by the ITD (31.7 samples at 48 kHz) to the ITD plus 4 samples (the shadow filter's delay) |
+| Behind | 3–8 kHz against the firing band at least 3 dB lower behind than in front |
+| Doppler | closing at 30 m/s within 0.5 Hz of 343/313; at ±150 m/s exactly at the bounds |
+| Pass-by | 50 m/s past at 4 m: 527 Hz and 393 Hz within 2 Hz at the ends, never rising by more than 0.5 Hz |
+| Culling | a car dropped from the scene loses under 2 dB in the first 10 ms and is 60 dB down within 0.4 s |
+| Determinism | bit-identical with host blocks of 127, 128 and 4096, nineteen cars moving, forest, crowd, lamps |
+| Ambience | exact silence with no bed and no crowd; forest trees band 6.9 ± 1.5 dB over park; bird calls more than 10 dB over the forest bed (98th against 50th percentile, 2.8–4.6 kHz; 14.4 dB measured); city hum peak within 0.5 Hz of 100 Hz and 30–150 Hz more than 15 dB over the forest; crowd on its side by more than 30 dB and 12.04 ± 0.5 dB for a quarter level; lights out lifts the crowd more than 4 dB |
+| Cues | one 1 kHz tone per lamp and 2 kHz at lights out, nothing between; each menu cue above −50 dBFS, silent after, silent with the UI bus at 0; an overlapping cue makes no step over 0.02 |
+| Allocation | the Slice 1 allocation test now also sends a packed scene every 6 blocks (19 cars moving, city bed, crowd, a lamp every 400 blocks) and a cue every 250 blocks: still under 16 kB of young generation and no scavenge |
+| App | crowd from stands: side, level 1 at 20 m, −6 dB per doubling, rows, power sum; opponent placement and relative velocity in the player's frame; menu cue mapping |
+
+**Renders.** `npm run audio:render -- scene` writes five scenes to `artifacts/audio/` (WAV and
+spectrogram) and Ogg excerpts, spectrograms and `scene-summary.json` to
+`docs/evidence/m6-audio/`. The player's engine is off in these, so only the scene is heard.
+
+| Scene | What to hear | LUFS | dBTP | Speed in Node |
+|---|---|---|---|---|
+| `grid-start` | from the back of the grid, stands on the left: five lamp tones over the idling field, lights out with a cheer, the field pulls away, the nearest six fall in pitch and the far field takes over | −24.2 | −10.4 | 30× |
+| `opponent-pass` | one car at 50 m/s past on the right: 527 Hz down to 393 Hz, darker behind | −37.6 | −17.9 | 52× |
+| `forest-leaving-stands` | Spa: crowd fading over 8 s, then trees and birds | −32.4 | −20.3 | 56× |
+| `city-night` | Singapore: rumble, hum lines, insects in waves, a stand on the right | −33.2 | −20.7 | 52× |
+| `menu-cues` | focus, focus, accept, back, focus, accept | −36.8 | −24.3 | 61× |
+
+**CPU in the AudioWorklet.** `npm run audio:browser-check` runs the bundled worklet in
+Playwright's Chromium (muted, 844×390 mobile viewport) through 43.7 s of audio with the worst
+Mobile workload: the player's car with every layer, nineteen opponents in range (six voiced plus
+the far field, confirmed by the processor's report), the city bed and a crowd on both sides. The
+processor sums `Date.now()` around each 128-frame block (a coarse clock, unbiased over 16 384
+blocks); the check fails at 10 % of one core. Measured on this laptop's desktop core: 2.3–2.4 %
+(1021–1067 ms of processing). DevTools CPU throttling does not reach the worklet thread (at 4×
+the cost was unchanged), so there is no phone-class figure; at a phone core 4–6 times slower this
+would be about 10–15 %, which is the first thing to measure on a real device.
+
+**What the checks cannot tell.** Whether six pulse-train voices and one far-field voice sound
+like a field of cars or like a synth pad; whether the 50 ms glides read as smooth or as lag on a
+fast pass; whether the crowd sounds like people or like surf; whether the birds and insects are
+pleasant over a long session; whether the cues fit the interface's look. Phone speakers lose most
+of the far field and the hum.
+
+**Listening queue, Slice 2:**
+
+1. `docs/evidence/m6-audio/opponent-pass-excerpt.ogg` on headphones: does the pass sit on the
+   right and sweep down naturally, and does the car sound behind once past?
+2. `artifacts/audio/grid-start.wav`: do the lamp tones and the lights-out tone sit well over the
+   field, and does the cheer read as a cheer?
+3. `artifacts/audio/forest-leaving-stands.wav` and `city-night.wav`: are the beds believable and
+   quiet enough under an engine?
+4. `artifacts/audio/menu-cues.wav`: are the cues too loud, too bright or too long?
+5. In the game, a Quick Race start from mid-grid with the cockpit camera.
