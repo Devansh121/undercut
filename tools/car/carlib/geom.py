@@ -250,6 +250,34 @@ def planar_uv(points, normal_hint=None):
     return uv, da, db
 
 
+# Materials whose normal and anisotropy maps run on the metric UVs. A face of one of these must
+# not have degenerate metric UVs: the renderer derives its tangent frame from them, and a zero
+# frame turns the anisotropic environment lighting into NaN (which bloom spreads over the image).
+METRIC_UV_MATERIALS = {"carbon", "carbon_matte"}
+
+
+def _repair_metric_uv(mesh):
+    """Give faces with no metric UV area (fan caps, half-ring caps, faces added without UVs) a
+    metric projection along their dominant axis, so the weave keeps its scale there too."""
+    for k, f in enumerate(mesh.f):
+        if mesh.mat[k] not in METRIC_UV_MATERIALS or len(f) < 3:
+            continue
+        uv = mesh.uv1[k]
+        area = 0.0
+        for c in range(1, len(f) - 1):
+            (u0, v0), (u1, v1), (u2, v2) = uv[0], uv[c], uv[c + 1]
+            area += abs((u1 - u0) * (v2 - v0) - (u2 - u0) * (v1 - v0))
+        pts = [mesh.v[i] for i in f]
+        nrm = Vector()
+        for c in range(1, len(f) - 1):
+            nrm += (pts[c] - pts[0]).cross(pts[c + 1] - pts[0])
+        if area > 0.3 * nrm.length:  # squashed below 30 % of the true area: re-project
+            continue
+        ax = max(range(3), key=lambda i: abs(nrm[i]))
+        iu, iv = ((1, 2), (0, 2), (0, 1))[ax]
+        mesh.uv1[k] = [(p[iu], p[iv]) for p in pts]
+
+
 class Mesh:
     def __init__(self):
         self.v = []
@@ -416,6 +444,7 @@ class Mesh:
         me.polygons.foreach_set("use_smooth", [bool(s) for s in self.smooth])
         uv1 = me.uv_layers.new(name="UVMap")
         uvm = me.uv_layers.new(name="UVMetric")
+        _repair_metric_uv(self)
         flat0, flat1 = [], []
         for k, f in enumerate(self.f):
             u0 = self.uv0[k]
