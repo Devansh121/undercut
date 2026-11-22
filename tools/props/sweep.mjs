@@ -45,6 +45,13 @@ try {
         type: 'jpeg',
         quality: 90,
       });
+      await page.evaluate(([id, angle]) => window.treeDistances(id, angle), [id, worst.angle]);
+      await page.screenshot({
+        path: `docs/evidence/m2-models/${id}-${light}-distances.jpg`,
+        type: 'jpeg',
+        quality: 85,
+        clip: { x: 0, y: 0, width: 1599, height: 1000 },
+      });
       console.log(
         `${light} ${id}: ${(100 * worst.relativeDelta).toFixed(2)}% at ${Math.round((worst.angle * 180) / Math.PI)} degrees`,
       );

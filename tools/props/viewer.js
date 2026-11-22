@@ -317,6 +317,39 @@ window.artwork = async (id) => {
   renderer.render(scene, camera);
 };
 
+// High | Mobile | Far in the full scene (sky, fog, shadows) from a 1.5 m eye at 50 m (top) and
+// 260 m (bottom), all aimed at mid-crown: how the LOD swap reads from trackside.
+window.treeDistances = async (id, angle) => {
+  for (const o of active) scene.remove(o);
+  active = [];
+  scene.remove(car);
+  const prop = catalog.props.find((p) => p.id === id);
+  for (const lod of prop.lods) {
+    const o = (await loader.loadAsync(`/${lod.file}`)).scene;
+    o.traverse((n) => {
+      if (n.isMesh) n.castShadow = n.receiveShadow = true;
+    });
+    scene.add(o);
+    env.register(o);
+    active.push(o);
+  }
+  const aim = new T.Vector3(0, prop.bounds.max[1] / 2, 0);
+  camera.aspect = 533 / 500;
+  camera.updateProjectionMatrix();
+  renderer.setScissorTest(true);
+  for (const [row, distance] of [50, 260].entries())
+    for (let col = 0; col < 3; col++) {
+      camera.position.set(Math.cos(angle) * distance, 1.5, Math.sin(angle) * distance);
+      camera.lookAt(aim);
+      env.update(camera, aim, true);
+      active.forEach((o, i) => (o.visible = i === col));
+      renderer.setViewport(col * 533, (1 - row) * 500, 533, 500);
+      renderer.setScissor(col * 533, (1 - row) * 500, 533, 500);
+      renderer.render(scene, camera);
+    }
+  renderer.setScissorTest(false);
+};
+
 // Isolate the crown against black and compare the same view with the LOD swap disabled/enabled.
 // Twelve azimuths, 30 degrees apart; with `snapshotAngle`, also draws High and Far side by side.
 window.treeLuma = async (id, snapshotAngle = null) => {
