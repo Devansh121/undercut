@@ -30,7 +30,14 @@ import { unregisteredLitMaterials } from './lighting/registration';
 import type { LocalLight } from './lighting/light-pool';
 import { nextLift } from './framing';
 import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
-import { addLampLight, bakeLampMap, type LampMap } from './lighting/lamp-map';
+import {
+  LAMP_POOL_SLOTS,
+  addLampLight,
+  bakeLampMap,
+  type LampMap,
+  type PooledLamp,
+} from './lighting/lamp-map';
+import { TERRAIN_DROP } from './world/terrain';
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { FramePacer, webglFences } from './pipeline/frame-pacer';
@@ -241,6 +248,14 @@ export class RaceView {
   world: CircuitWorld | null = null;
   /** The circuit's lamp banks baked for the static scenery at night (lighting/lamp-map.ts). */
   private lampMap: LampMap | null = null;
+  /** The pool's slots each frame, for the lamp map to take out of its baked light. */
+  private readonly pooledLamps: PooledLamp[] = Array.from({ length: LAMP_POOL_SLOTS }, () => ({
+    x: 0,
+    y: 0,
+    z: 0,
+    intensity: 0,
+    distance: 1,
+  }));
   private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
@@ -539,11 +554,13 @@ export class RaceView {
         z1 = Math.max(z1, lap.z[i] as number);
       }
       const m = LAMP_MAP_MARGIN;
+      // At road level: the world's ground stands TERRAIN_DROP below the track's surface.
+      const world = this.world;
       this.lampMap = bakeLampMap(
         lamps,
         [x0 - m, z0 - m, x1 + m, z1 + m],
         LAMP_MAP_CELL,
-        this.world.heightAt,
+        (x, z) => world.heightAt(x, z) + TERRAIN_DROP,
       );
       addLampLight([this.trackView.group, this.world.group, this.props.group], this.lampMap);
     }
@@ -917,7 +934,19 @@ export class RaceView {
     }
     this.focus.set(frame.pose.x, frame.pose.y, frame.pose.z);
     this.environment.update(this.camera, this.focus, true);
-    this.lampMap?.update(this.camera.position, this.environment.pool?.reach ?? 0);
+    if (this.lampMap && this.environment.pool) {
+      const slots = this.environment.pool.active;
+      for (let k = 0; k < this.pooledLamps.length; k++) {
+        const slot = slots[k];
+        const p = this.pooledLamps[k] as PooledLamp;
+        p.x = slot?.position.x ?? 0;
+        p.y = slot?.position.y ?? 0;
+        p.z = slot?.position.z ?? 0;
+        p.intensity = slot?.intensity ?? 0;
+        p.distance = slot?.distance ?? 1;
+      }
+      this.lampMap.update(this.pooledLamps);
+    }
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
     this.world?.update(frame.time, this.camera.position);

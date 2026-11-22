@@ -73,6 +73,14 @@ export class LightPool {
     return edge;
   }
 
+  /**
+   * The slots as they stand after `update`: position, intensity (with its fade) and reach, in
+   * slot order; a free slot has intensity 0. The baked lamp map takes these out of its own light.
+   */
+  get active(): readonly PointLight[] {
+    return this.slots;
+  }
+
   /** Distance from the eye of the farthest light in a slot after `update`, m (0: none). */
   reach = 0;
 

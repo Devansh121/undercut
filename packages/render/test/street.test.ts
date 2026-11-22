@@ -1,10 +1,17 @@
-import { BoxGeometry, MeshStandardMaterial, type Material } from 'three';
+import { BoxGeometry, MeshStandardMaterial, Scene, Vector3, type Material } from 'three';
 import { describe, expect, it } from 'vitest';
 import { Track } from '@undercut/track';
 import singaporeTrackJson from '@undercut/track/data/singapore.json';
 import catalogJson from '../data/props.catalog.json';
 import singaporeDressingJson from '../data/singapore.dressing.json';
-import { bakeLampMap, lampFalloff } from '../src/lighting/lamp-map';
+import {
+  bakeLampMap,
+  lampFalloff,
+  lampLightAt,
+  lampOnGround,
+  type PooledLamp,
+} from '../src/lighting/lamp-map';
+import { LightPool } from '../src/lighting/light-pool';
 import {
   worldCatalogPropIds,
   type PropCatalogEntry,
@@ -153,11 +160,57 @@ describe('baked lamp light', () => {
   it('bakes a lamp onto the ground below it and nowhere beyond its reach', () => {
     const lamp = { x: 0, y: 10, z: 0, colour: '#ffffff', intensity: 900, distance: 70 };
     const map = bakeLampMap([lamp], [-100, -100, 100, 100], 2, () => 0);
-    expect(map.sample(0, 0)).toBeCloseTo(900 * lampFalloff(10, 70), 3);
+    // Half-float storage: three significant figures.
+    expect(map.sample(0, 0).e / (900 * lampFalloff(10, 70))).toBeCloseTo(1, 2);
     // At 20 m out: the angle of incidence and the distance both count.
     const d = Math.hypot(20, 10);
-    expect(map.sample(20, 0)).toBeCloseTo(900 * lampFalloff(d, 70) * (10 / d), 3);
-    expect(map.sample(80, 0)).toBe(0);
+    expect(map.sample(20, 0).e / (900 * lampFalloff(d, 70) * (10 / d))).toBeCloseTo(1, 2);
+    expect(map.sample(80, 0).e).toBe(0);
+    map.dispose();
+  });
+
+  it('lights the road once as banks hand over between the pooled lights and the bake', () => {
+    // Singapore's own banks on level ground, the pool as a session runs it.
+    const { res } = streetAt(true);
+    const lights = res.lights;
+    const map = bakeLampMap(lights, [-1400, -1400, 1400, 1400], 2, () => 0);
+    const pool = new LightPool(new Scene(), 8);
+    pool.setLights(lights);
+    const eye = new Vector3();
+    const p = { x: 0, y: 0, z: 0 };
+    const pooled = (): PooledLamp[] =>
+      pool.active.map((l) => ({
+        x: l.position.x,
+        y: l.position.y,
+        z: l.position.z,
+        intensity: l.intensity,
+        distance: l.distance,
+      }));
+    let worst = 0;
+    let naiveWorst = 0;
+    for (const probeS of [500, 1000, 2000, 3000, 4500]) {
+      track.lap.pointAt(probeS, 0, p);
+      const px = p.x;
+      const pz = p.z;
+      let reference = 0;
+      for (const l of lights) reference += lampOnGround(l, px, 0, pz);
+      expect(reference).toBeGreaterThan(0);
+      // The camera drives past the probe: from 300 m before to 300 m after it.
+      for (let ds = -300; ds <= 300; ds += 5) {
+        track.lap.pointAt((probeS + ds + track.length) % track.length, 0, p);
+        eye.set(p.x, 1.2, p.z);
+        pool.update(eye);
+        const slots = pooled();
+        const total = lampLightAt(map, slots, px, pz);
+        worst = Math.max(worst, Math.abs(total / reference - 1));
+        // Adding the whole bake to the pooled lights, as before: lit twice near the camera.
+        let pool0 = 0;
+        for (const l of slots) pool0 += lampOnGround(l, px, 0, pz);
+        naiveWorst = Math.max(naiveWorst, (pool0 + map.sample(px, pz).e) / reference);
+      }
+    }
+    expect(worst).toBeLessThan(0.03);
+    expect(naiveWorst).toBeGreaterThan(1.3);
     map.dispose();
   });
 });
