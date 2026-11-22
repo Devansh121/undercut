@@ -5,6 +5,7 @@ import raceEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
 import {
   InputController,
   RaceSession,
+  circuitInfo,
   type LapResult,
   type LapTimer,
   type RaceEvent,
@@ -218,6 +219,8 @@ export class DriveSession {
       : undefined;
     this.race = new RaceSession({
       track: this.track,
+      // Timed from the control line the track file carries (format 3), for every circuit.
+      circuit: circuitInfo(this.track, { timingLine: this.track.timingLine }),
       session: this.quickRace
         ? { kind: 'race', laps: options.quickRace?.laps ?? 5 }
         : { kind: 'timeTrial' },

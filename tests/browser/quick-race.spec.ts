@@ -1,9 +1,16 @@
 import { expect, test } from './base';
+import { startQuickRace } from './helpers';
 
 test('Quick Race: grid, lights, moving field and player result', async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto('/?debug=1&quality=lite&world=lite');
   await page.waitForFunction(() => !!window.__undercut);
+  // Through the menus: the main menu's Quick Race starts twenty cars on the Monza grid.
+  await startQuickRace(page);
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+  expect(await page.evaluate(() => window.__undercut!.state().cars)).toBe(20);
+  // The rest on a one-lap race (the menus' race length is five laps).
+  await page.evaluate(() => window.__undercut!.quit());
   await page.evaluate(() => window.__undercut!.startQuickRace(1));
   expect(await page.evaluate(() => window.__undercut!.state().cars)).toBe(20);
   expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toBe('grid');

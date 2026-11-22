@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from './base';
+import { startTimeTrial } from './helpers';
 
 /**
  * Verifies that circuit dressing loads cleanly in a real browser race session and populates the
@@ -41,7 +42,7 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
 
   // The full Mobile world: the one browser test that builds every structure.
   await page.goto('/?quality=mobile&debug=1');
-  await page.getByRole('button', { name: 'Time Trial', exact: true }).click();
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await Promise.all(pending);
   const wanted = Object.keys(expected).filter((f) =>
@@ -73,6 +74,6 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   // Quitting releases the world without errors (GL balance with the full world is checked on
   // the GPU by npm run shots -- monza --lifecycle).
   await page.evaluate(() => window.__undercut?.quit());
-  await expect(page.getByRole('button', { name: 'Time Trial', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
   expect(errors).toEqual([]);
 });

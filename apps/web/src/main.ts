@@ -1,10 +1,12 @@
 import '../../../design/mock/tokens.css';
+import './styles/kit.css';
+import './styles/menu.css';
 import './styles.css';
 import './online/race-hud.css';
 import { OnlineFlow } from './online/flow';
 import { codeFromUrl } from './online/invite';
 import type { DriveExtension } from './drive';
-import { InputSystem } from '@undercut/input';
+import { InputSystem, type DeviceKind, type MenuButton } from '@undercut/input';
 import {
   WebStorageAdapter,
   attachFocusGuard,
@@ -13,16 +15,22 @@ import {
   navigatorRumble,
 } from '@undercut/input/dom';
 import type { QualityName } from '@undercut/render';
+import { CIRCUITS } from 'virtual:undercut/circuits';
 import { PageAudio } from './audio';
 import { debugEnabled, installDebugApi } from './debug';
 import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
+import { RecordStore, durableStorage, memoryStorage } from './game/records';
+import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
+import { PrefsStore } from './ui/data/prefs';
+import { MenuInput } from './ui/menu-input';
+import { CircuitSelectScreen } from './ui/screens/circuits';
+import { HubScreen, type SessionChoice } from './ui/screens/hub';
+import { LaunchScreen } from './ui/screens/launch';
+import { Shell } from './ui/shell';
 
 type DriveModule = typeof DriveModuleNs;
 import type { QuickRaceOptions } from './game/session';
-import { RecordStore, durableStorage, memoryStorage } from './game/records';
-import { mountLaunchScreen, type LaunchScreen } from './launch';
-import { firstGuess, isQuality, loadQuality } from './game/quality-setting';
 
 const app = document.getElementById('app');
 const canvas = document.getElementById('view');
@@ -33,11 +41,14 @@ if (!(app instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
 const params = new URLSearchParams(window.location.search);
 const touch = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // One record store for the page, so records kept in memory (storage blocked, or ?storage=memory)
-// survive quitting to the launch screen and starting again.
+// survive quitting to the menu and starting again.
 const webStorage = new WebStorageAdapter();
 const records = new RecordStore(
   params.get('storage') === 'memory' ? memoryStorage() : durableStorage(webStorage),
 );
+// What the menus remember (mode, circuit, team, settings), through the same storage port.
+const prefs = new PrefsStore(webStorage);
+await prefs.load();
 // Engine sound for the page: created on the first gesture, saved volumes beside the settings.
 const audio = new PageAudio(webStorage);
 const input = new InputSystem({
@@ -64,111 +75,134 @@ function chooseQuality(): { quality: QualityName; auto: boolean } {
 let online: OnlineFlow | null = null;
 let drive: DriveHandle | null = null;
 let driveModule: DriveModule | null = null;
-let launch: LaunchScreen | null = null;
 let starting: Promise<DriveHandle> | null = null;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function showLaunch(): void {
-  online = null;
+// ---- Menus
+const shell = new Shell(app, () => undefined, {
+  bindings: () => input.profile.bindings,
+  device: () => input.activeDevice,
+});
+shell.setDevice(input.activeDevice);
+const menuInput = new MenuInput(input, {
+  action: (a, native, device) => {
+    if (online) onlineAction(a, device);
+    else shell.handle(a, native);
+  },
+  device: (d) => {
+    shell.setDevice(d);
+    hub.setDevice(d);
+  },
+});
+const hub: HubScreen = new HubScreen({
+  circuits: CIRCUITS,
+  prefs,
+  records,
+  device: () => input.activeDevice,
+  onStart: (choice) => {
+    // The Start press is the gesture that may start audio.
+    audio.gesture();
+    start(choice).catch(() => undefined);
+  },
+  onOnline: () => {
+    audio.gesture();
+    showOnline(null);
+  },
+  onCircuits: () => shell.push(circuits),
+  onBack: () => shell.pop(),
+});
+const circuits = new CircuitSelectScreen(CIRCUITS, prefs, records, () => shell.pop());
+const launch = new LaunchScreen(__BUILD_HASH__, () => {
+  audio.gesture();
+  shell.push(hub);
+});
+
+function showMenus(screen: 'launch' | 'hub'): void {
   drive = null;
-  launch = mountLaunchScreen(app as HTMLElement, {
-    buildHash: __BUILD_HASH__,
-    onOnline: () => showOnline(null),
-    record: null,
-    controls: { bindings: () => input.profile.bindings, device: () => input.activeDevice },
-    onStart: (quickRace) => {
-      // The Start click is the gesture that may start audio.
-      audio.gesture();
-      start(quickRace ? { quickRace: {} } : {}).catch(() => undefined);
-    },
-  });
-  void records.load('monza').then((r) => launch?.setRecord(r?.lap ?? null));
+  online = null;
+  shell.mount();
+  if (screen === 'launch' || !shell.current) shell.reset(launch);
+  if (screen === 'hub') {
+    if (shell.current !== hub) shell.push(hub);
+    else hub.enter();
+  }
+  hub.setLoading(false);
+  menuInput.start();
 }
 
-function pollMenus(): void {
-  // Gamepad and keyboard accept on the launch screen, through the input layer's menu context.
-  let last: number | null = null;
-  const poll = (now: number): void => {
-    if (drive || starting) {
-      requestAnimationFrame(poll);
-      last = now;
-      return;
-    }
-    const dt = last === null ? 0 : (now - last) / 1000;
-    last = now;
-    const f = input.sample(dt, 0);
-    for (const e of f.events) {
-      // A focused button already clicks on Enter; gamepads need the accept passed on.
-      const native =
-        f.device === 'keyboard' &&
-        ['BUTTON', 'INPUT', 'A'].includes(document.activeElement?.tagName ?? '');
-      if (e.type === 'action' && e.action === 'menuAccept' && !native) {
-        // The focused control (an online screen field, the controls list's Back) takes it;
-        // with nothing focused the launch screen starts, as on master.
-        if (
-          document.activeElement instanceof HTMLElement &&
-          document.activeElement !== document.body
-        )
-          document.activeElement.click();
-        else launch?.accept();
-      }
-      if (
-        e.type === 'action' &&
-        (e.action === 'menuLeft' || e.action === 'menuRight') &&
-        f.device === 'gamepad'
-      ) {
-        const field = document.activeElement;
-        if (field instanceof HTMLInputElement && field.type === 'number' && !field.disabled) {
-          if (e.action === 'menuRight') field.stepUp();
-          else field.stepDown();
-          field.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }
-      if (e.type === 'action' && (e.action === 'menuDown' || e.action === 'menuUp')) {
-        const buttons = [
-          ...app!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a'),
-        ].filter((b) => !b.closest('[inert]'));
-        const at = buttons.indexOf(document.activeElement as HTMLElement);
-        buttons[
-          (at + (e.action === 'menuDown' ? 1 : buttons.length - 1)) % buttons.length
-        ]?.focus();
-      }
-      if (e.type === 'action' && e.action === 'menuBack' && f.device !== 'keyboard') launch?.back();
-    }
-    requestAnimationFrame(poll);
+/** The choice on the main menu now (the debug API starts with it). */
+function currentChoice(): SessionChoice {
+  const p = prefs.get();
+  return {
+    mode: 'timeTrial',
+    circuit: p.circuit,
+    team: p.team,
+    driver: p.driver,
+    timeOfDay: p.timeOfDay[p.circuit] ?? '',
+    assists: p.assists[input.activeDevice] ?? {},
   };
-  requestAnimationFrame(poll);
 }
 
+/**
+ * The online screens (apps/web/src/online) on the shared menu input: the focused control takes
+ * accept, up and down step through the screen's buttons and fields, a pad's left and right step a
+ * number field. A keyboard's Enter on a button, field or link is already native.
+ */
+function onlineAction(a: MenuButton, device: DeviceKind): void {
+  const active = document.activeElement;
+  const nativeKey =
+    device === 'keyboard' && ['BUTTON', 'INPUT', 'A'].includes(active?.tagName ?? '');
+  if (a === 'menuAccept' && !nativeKey) {
+    if (active instanceof HTMLElement && active !== document.body) active.click();
+  } else if ((a === 'menuLeft' || a === 'menuRight') && device === 'gamepad') {
+    if (active instanceof HTMLInputElement && active.type === 'number' && !active.disabled) {
+      if (a === 'menuRight') active.stepUp();
+      else active.stepDown();
+      active.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  } else if (a === 'menuDown' || a === 'menuUp') {
+    const controls = [
+      ...(app as HTMLElement).querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), a',
+      ),
+    ].filter((b) => !b.closest('[inert]'));
+    const at = controls.indexOf(active as HTMLElement);
+    controls[(at + (a === 'menuDown' ? 1 : controls.length - 1)) % controls.length]?.focus();
+  }
+}
+
+/** Online rooms (lobby, race, results) from the main menu or an invite link. */
 function showOnline(code: string | null): void {
-  launch = null;
+  menuInput.start();
   online = new OnlineFlow(
     app as HTMLElement,
     code,
-    (extension, quit) => start({ extension, quit }),
-    showLaunch,
+    (extension, quit) => start(currentChoice(), extension, quit),
+    () => showMenus('hub'),
   );
 }
 
 /** A Quick Race to start again as soon as the current one has quit (Restart race). */
-let restartWith: QuickRaceOptions | null = null;
+let restartWith: { choice: SessionChoice; quickRace: QuickRaceOptions } | null = null;
 
-/** What to start: a Quick Race, an online extension, or (neither) a time trial. */
-export interface StartOptions {
-  quickRace?: QuickRaceOptions;
-  extension?: DriveExtension;
-  quit?: () => void;
-}
-
-async function start(o: StartOptions = {}): Promise<DriveHandle> {
-  const { quickRace, extension, quit } = o;
+/**
+ * Start a session from the menus' choice: a Quick Race (`choice.mode`, or race options from the
+ * debug API), an online extension, or a time trial.
+ */
+async function start(
+  choice: SessionChoice = currentChoice(),
+  extension?: DriveExtension,
+  quit?: () => void,
+  raceOptions?: QuickRaceOptions,
+): Promise<DriveHandle> {
+  const quickRace = raceOptions ?? (choice.mode === 'quickRace' ? {} : undefined);
   if (drive) return drive;
   if (starting) return starting;
-  launch?.setLoading(true);
-
+  if (!extension) hub.setLoading(true);
+  menuInput.stop();
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -191,30 +225,45 @@ async function start(o: StartOptions = {}): Promise<DriveHandle> {
         ...(quickRace
           ? {
               onRestartRace: () => {
-                restartWith = quickRace;
+                restartWith = { choice, quickRace };
                 drive?.quit();
               },
             }
           : {}),
+        circuit: choice.circuit,
+        team: choice.team,
+        driver: choice.driver,
+        timeOfDay: choice.timeOfDay,
+        assists: choice.assists,
+        onAssist: (device, key, value) =>
+          prefs.update((p) => {
+            p.assists[device] = { ...(p.assists[device] ?? {}), [key]: value };
+          }),
         ...(extension ? { extension } : {}),
         onQuit: () => {
           drive = null;
           if (restartWith) {
             const again = restartWith;
             restartWith = null;
-            start({ quickRace: again }).catch(() => undefined);
-          } else if (quit) quit();
-          else showLaunch();
+            start(again.choice, undefined, undefined, again.quickRace).catch(() => undefined);
+          } else if (quit) {
+            // Back to the online screens, on the menu input.
+            menuInput.start();
+            quit();
+          } else showMenus('hub');
         },
       });
       drive = handle;
       return handle;
     } catch (error) {
-      launch?.setLoading(false);
       if (error instanceof Error && error.name === 'LoadCancelled') {
-        showLaunch();
+        // Online: the flow leaves the room and shows its screens again.
+        if (extension) menuInput.start();
+        else showMenus('hub');
         throw error;
       }
+      hub.setLoading(false);
+      menuInput.start();
       document.documentElement.dataset.webgl = 'unavailable';
       console.error('Could not start the session', error);
       throw error;
@@ -225,14 +274,21 @@ async function start(o: StartOptions = {}): Promise<DriveHandle> {
   return starting;
 }
 
-showLaunch();
-pollMenus();
+showMenus('launch');
 const invite = codeFromUrl(location.href);
 if (invite) showOnline(invite);
 if (debugEnabled()) {
   installDebugApi(
     () => drive,
-    start,
+    (o) =>
+      o?.quickRace
+        ? start(
+            { ...currentChoice(), mode: 'quickRace', circuit: 'monza' },
+            undefined,
+            undefined,
+            o.quickRace,
+          )
+        : start(),
     () => driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0 },
     () => audio.status,
     () => ({ supported: PageAudio.supported, fallback: audio.fallbackReason }),

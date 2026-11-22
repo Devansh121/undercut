@@ -24,6 +24,16 @@ const sleep = (ms, signal) =>
     signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true });
   });
 
+/** Memory-backed /dev/shm when it is writable, else the system temp directory. */
+function stateRoot() {
+  try {
+    fs.accessSync('/dev/shm', fs.constants.W_OK);
+    return '/dev/shm';
+  } catch {
+    return os.tmpdir();
+  }
+}
+
 /** True while any process in group `pgid` exists. */
 function groupAlive(pgid) {
   try {
@@ -53,10 +63,13 @@ function signalGroup(pgid, signal) {
  * `vars` are passed to the Worker as environment variables (tests use them to shorten
  * room timings); the normal run passes none.
  *
- * `persistTo` names the runtime's state directory; without it the runtime gets a temporary
- * one of its own, removed on stop. Never the shared directory beside the config: two runtimes
- * at once (the test suite's service and a server started by another test) collided on its
- * SQLite files (SQLITE_BUSY, "database is locked").
+ * `persistTo` gives the runtime its own state directory. Without it the service makes a private
+ * one of its own, removed on stop, rather than wrangler's default beside the config: every
+ * `wrangler dev` for this config would share that one, and two running at once (the test suite's
+ * service and a server started by another test) collide on its SQLite files (SQLITE_BUSY,
+ * "database is locked"). The private directory is on /dev/shm (memory) where there is one: the
+ * room awaits its alarm writes behind the runtime's output gate, and on a busy machine a disk
+ * write there delays relayed snapshots. Rooms are short-lived; nothing needs to outlive them.
  *
  * @param {{ port: number, log?: (text: string) => void, quiet?: boolean, vars?: Record<string, string>, persistTo?: string }} options
  */
@@ -68,10 +81,6 @@ export function createRoomsService({
   persistTo,
 }) {
   const url = `http://127.0.0.1:${port}`;
-  // Each instance keeps its Durable Object state (SQLite) in a directory of its own (`persistTo`,
-  // or a temporary one removed on stop), never the shared default beside the config.
-  const ownState = !persistTo;
-  const persist = persistTo ?? fs.mkdtempSync(path.join(os.tmpdir(), 'undercut-rooms-state-'));
   const cancel = new AbortController();
   /** @type {import('node:child_process').ChildProcess | null} */
   let child = null;
@@ -80,6 +89,8 @@ export function createRoomsService({
   /** @type {Promise<{ code: number | null, signal: string | null }>} */
   const exited = new Promise((resolve) => (resolveExited = resolve));
   let stopPromise = null;
+  /** This service's own Durable Object storage (see above); null until started. */
+  let persistDir = null;
 
   // Last resort if this process exits without stop() finishing: kill the group too.
   const killOnExit = () => child && signalGroup(child.pid, 'SIGKILL');
@@ -89,6 +100,8 @@ export function createRoomsService({
     const inspectorPort = await freePort();
     if (cancel.signal.aborted) throw new StartCancelled();
     const wrangler = require.resolve('wrangler/bin/wrangler.js', { paths: [REPO_ROOT] });
+    // A private state directory, unless the caller gave one (removed on stop only if ours).
+    if (!persistTo) persistDir = fs.mkdtempSync(path.join(stateRoot(), 'undercut-rooms-state-'));
     child = spawn(
       process.execPath,
       [
@@ -103,7 +116,7 @@ export function createRoomsService({
         '--inspector-port',
         String(inspectorPort),
         '--persist-to',
-        persist,
+        persistTo ?? persistDir,
         '--show-interactive-dev-session=false',
         '--log-level',
         quiet ? 'error' : 'warn',
@@ -160,10 +173,7 @@ export function createRoomsService({
 
   async function doStop() {
     cancel.abort();
-    if (!child) {
-      if (ownState) fs.rmSync(persist, { recursive: true, force: true });
-      return;
-    }
+    if (!child) return;
     const pgid = child.pid;
     if (!childExited) {
       signalGroup(pgid, 'SIGTERM');
@@ -179,7 +189,7 @@ export function createRoomsService({
       await new Promise((r) => setTimeout(r, 25));
     }
     process.off('exit', killOnExit);
-    if (ownState) fs.rmSync(persist, { recursive: true, force: true });
+    if (persistDir) fs.rmSync(persistDir, { recursive: true, force: true });
   }
 
   return {

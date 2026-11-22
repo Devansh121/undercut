@@ -1,0 +1,48 @@
+{
+  "shots": [
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/launch-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-notice-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/circuits-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-spa-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-singapore-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-race-singapore-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-online-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/ui-gallery-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-1280x720.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/launch-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-settings-dialog-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/circuits-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-race-spa-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hub-online-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hud-drive-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hud-invalid-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/pause-1440x900.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hud-drive-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/pause-844x390.png",
+    "../../../../.cache/undercut/scratch/m2-ui-hud-menus/shots5/hud-singapore-1440x900.png"
+  ],
+  "hudBench": {
+    "viewport": "1440x900",
+    "quality": "high",
+    "vsync": false,
+    "hudOn": {
+      "frames": 3102,
+      "meanMs": 1.963,
+      "medianMs": 0.9,
+      "p95Ms": 2.2,
+      "p99Ms": 41.7
+    },
+    "hudOff": {
+      "frames": 3122,
+      "meanMs": 1.943,
+      "medianMs": 0.8,
+      "p95Ms": 1.6,
+      "p99Ms": 32.2
+    },
+    "deltaMeanMs": 0.02,
+    "deltaMedianMs": 0.1
+  },
+  "errors": []
+}

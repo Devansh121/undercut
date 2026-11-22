@@ -29,209 +29,6 @@ body {
   --safe-b: max(var(--safe), env(safe-area-inset-bottom, 0px));
 }
 
-button {
-  font: inherit;
-  color: inherit;
-  margin: 0;
-}
-
-:focus-visible {
-  outline: 2px solid var(--c-brand);
-  outline-offset: 2px;
-}
-
-.icon {
-  width: 1em;
-  height: 1em;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: square;
-  stroke-linejoin: miter;
-  flex: none;
-}
-
-.num {
-  font-family: var(--font-num);
-  font-feature-settings: var(--num-features);
-  font-variant-numeric: tabular-nums lining-nums;
-}
-
-/* ================= Launch ================= */
-
-.launch {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  background: var(--c-ink-0);
-}
-
-.launch__stage {
-  position: relative;
-  display: grid;
-  align-content: end;
-  padding: 0 var(--safe-r) 10vh var(--safe-l);
-  overflow: hidden;
-  /* The vermilion stripe field is a background layer, so nothing overflows the stage. */
-  background:
-    linear-gradient(180deg, rgba(11, 12, 14, 0) 30%, var(--c-ink-0) 92%),
-    repeating-linear-gradient(108deg, rgba(255, 90, 31, 0.16) 0 6px, transparent 6px 26px) right
-      12vh / 62vw 52vh no-repeat,
-    linear-gradient(100deg, #23272d 0%, #15181c 55%, #0f1114 100%);
-}
-
-.launch__title {
-  position: relative;
-  margin: 0;
-  font-size: clamp(56px, 11vw, 168px);
-  line-height: 0.86;
-  font-weight: 850;
-  font-stretch: var(--wdth-wide);
-  letter-spacing: 0.06em;
-}
-
-.launch__tagline {
-  position: relative;
-  margin: var(--sp-4) 0 0;
-  max-width: 520px;
-  color: var(--c-text-2);
-  font-size: var(--fs-16);
-}
-
-.launch__bar {
-  display: flex;
-  /* Narrow screens: the buttons wrap onto a second row rather than run off the edge. */
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-6);
-  padding: var(--sp-5) var(--safe-r) max(var(--sp-5), env(safe-area-inset-bottom, 0px))
-    var(--safe-l);
-  box-shadow: inset 0 1px 0 var(--c-line);
-}
-
-.launch__mode {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-}
-
-.launch__mode-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-1);
-  background: var(--c-brand);
-  color: var(--c-text-inverse);
-  font-size: 22px;
-  flex: none;
-}
-
-.launch__mode-text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.launch__mode-name {
-  font-size: var(--fs-20);
-  line-height: var(--lh-snug);
-  font-weight: 700;
-  font-stretch: var(--wdth-semi);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-
-.launch__mode-desc {
-  font-size: var(--fs-12);
-  color: var(--c-text-3);
-  white-space: nowrap;
-}
-
-.launch__build {
-  margin-left: auto;
-  font-size: var(--fs-12);
-  color: var(--c-text-3);
-  white-space: nowrap;
-}
-
-/* Map-data credit (ODbL asks for it where the game is seen): quiet, bottom right of the stage. */
-.launch__credit {
-  position: absolute;
-  right: var(--safe-r);
-  bottom: var(--sp-3);
-  margin: 0;
-  font-size: var(--fs-12);
-  color: var(--c-text-3);
-  text-align: right;
-}
-
-.launch__credit a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.launch__build code {
-  font-family: var(--font-num);
-  font-feature-settings: var(--num-features);
-}
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
-  height: 44px;
-  padding: 0 var(--sp-3) 0 var(--sp-5);
-  border: 0;
-  border-radius: var(--r-1);
-  font-size: var(--fs-14);
-  font-weight: 700;
-  font-stretch: var(--wdth-semi);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: var(--c-ink-2);
-  color: var(--c-text-1);
-  box-shadow: inset 0 0 0 1px var(--c-line-strong);
-  cursor: pointer;
-  transition: background-color var(--t-quick) var(--ease-out);
-}
-
-.button--primary {
-  background: var(--c-brand);
-  color: var(--c-text-inverse);
-  box-shadow: none;
-}
-
-.button--primary:hover {
-  background: #ff6d38;
-}
-
-.button:disabled {
-  cursor: progress;
-  opacity: 0.7;
-}
-
-.button .icon {
-  width: 18px;
-  height: 18px;
-}
-
-.key {
-  display: inline-grid;
-  place-items: center;
-  min-width: 24px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: var(--r-1);
-  font-size: var(--fs-11);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: rgba(11, 12, 14, 0.14);
-}
-
 /* ================= Loading ================= */
 
 .loading {
@@ -330,10 +127,15 @@ button {
   color: var(--c-text-1);
 }
 
+.hud[hidden] {
+  display: none;
+}
+
 .panel {
   background: var(--hud-panel);
   border-radius: var(--r-1);
   box-shadow: var(--e-1), var(--edge-top);
+  contain: layout style;
 }
 
 .panel-head {
@@ -350,22 +152,232 @@ button {
   color: var(--c-text-1);
 }
 
-/* Session (top left) */
-.hud-session {
+/* Timing tower (top left): lap counter, flag state, one row per car on the clock */
+.hud-tower {
   position: absolute;
   left: var(--safe-l);
   top: var(--safe-t);
   width: 232px;
+  overflow: hidden;
+  transform-origin: top left;
+  transform: scale(var(--hud-scale, 1));
 }
 
-.hud-session .panel-head {
-  border-bottom: 2px solid var(--c-brand);
+.hud-tower__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 var(--sp-3);
+  background: var(--hud-panel-solid);
+  box-shadow: inset 0 -2px 0 var(--hud-team, var(--c-brand));
 }
 
-.hud-session__body {
-  display: grid;
+.hud-tower__lap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-16);
+  font-weight: 800;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.hud-tower__lap b {
+  font-size: var(--fs-20);
+  font-weight: 700;
+}
+
+.hud-tower__status {
+  display: flex;
+  align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-3);
+  height: 24px;
+  padding: 0 var(--sp-3);
+  background: rgba(47, 191, 98, 0.14);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-1);
+}
+
+.hud-tower__flag {
+  width: 4px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--c-flag-green);
+}
+
+.hud-tower__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hud-tower__row {
+  display: grid;
+  grid-template-columns: 20px 3px minmax(0, 1fr) auto auto;
+  /* Rows slide to a new place (FLIP from tower.ts); reduced motion makes it instant. */
+  transition: transform var(--t-base) var(--ease-out);
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.hud-tower__pos {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-align: right;
+  color: var(--c-text-2);
+}
+
+.hud-tower__bar {
+  height: 14px;
+  border-radius: 1px;
+  background: var(--row-team, var(--hud-team, var(--c-brand)));
+}
+
+.hud-tower__total {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--c-text-3);
+}
+
+.hud-tower__time[data-tone='overall'] {
+  color: var(--c-time-overall);
+}
+
+.hud-tower__time[data-tone='personal'] {
+  color: var(--c-time-personal);
+}
+
+.hud-tower__tyre {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-1);
+  box-shadow: inset 0 0 0 1.5px var(--compound, var(--c-text-3));
+  font-family: var(--font-num);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--compound, var(--c-text-2));
+}
+
+.hud-tower__row.is-fastest .hud-tower__code::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 1px;
+  background: var(--c-time-overall);
+  vertical-align: 2px;
+}
+
+.hud-tower__status[data-flag='yellow'] {
+  background: rgba(246, 201, 14, 0.18);
+}
+
+.hud-tower__status[data-flag='yellow'] .hud-tower__flag {
+  background: var(--c-flag-yellow);
+}
+
+.hud-tower__status[data-flag='red'] {
+  background: rgba(229, 56, 59, 0.2);
+}
+
+.hud-tower__status[data-flag='red'] .hud-tower__flag {
+  background: var(--c-flag-red);
+}
+
+.hud-tower__status[data-flag='blue'] .hud-tower__flag {
+  background: var(--c-flag-blue);
+}
+
+.hud-tower__status[data-flag='chequered'] {
+  background: var(--c-ink-3);
+}
+
+.hud-tower__status[data-flag='chequered'] .hud-tower__flag {
+  background: repeating-conic-gradient(var(--c-text-1) 0 25%, var(--c-ink-0) 0 50%) 0 0 / 6px 6px;
+}
+
+.hud-tower__status[data-flag='neutral'] {
+  background: var(--c-ink-2);
+}
+
+.hud-tower__status[data-flag='neutral'] .hud-tower__flag {
+  background: var(--c-text-3);
+}
+
+.hud-tower__code {
+  font-size: var(--fs-14);
+  font-weight: 750;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hud-tower__time {
+  font-size: var(--fs-14);
+  font-weight: 600;
+}
+
+.hud-tower__time.is-empty {
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+}
+
+.hud-tower__row.is-player {
+  background: var(--c-text-1);
+  color: var(--c-text-inverse);
+}
+
+.hud-tower__row.is-player .hud-tower__pos,
+.hud-tower__row.is-player .hud-tower__time.is-empty {
+  color: var(--c-text-inverse);
+}
+
+.hud-tower__row.is-record .hud-tower__bar {
+  background: repeating-linear-gradient(
+    180deg,
+    var(--row-team, var(--c-time-overall)) 0 3px,
+    transparent 3px 5px
+  );
+}
+
+.hud-tower__row.is-record .hud-tower__code {
+  color: var(--c-text-2);
+}
+
+.hud-tower__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3);
+}
+
+.hud-session__ghost {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.hud-session__ghost.is-empty {
+  color: var(--c-text-3);
 }
 
 .hud-row {
@@ -383,12 +395,13 @@ button {
   color: var(--c-time-overall);
 }
 
-/* Race control: flag and message slot (top centre) */
+/* Race control: flag, prompt and message slot (top centre) */
 .hud-control {
   position: absolute;
   left: 50%;
   top: var(--safe-t);
-  transform: translateX(-50%);
+  transform-origin: top center;
+  transform: translateX(-50%) scale(var(--hud-scale, 1));
   display: grid;
   justify-items: center;
   gap: var(--sp-2);
@@ -444,6 +457,62 @@ button {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.hud-prompt {
+  display: none;
+  align-items: stretch;
+  height: 36px;
+  background: var(--hud-panel-solid);
+  border-radius: var(--r-1);
+  box-shadow: var(--e-1), var(--edge-top);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hud-prompt.is-on {
+  display: flex;
+}
+
+.hud-prompt__sw {
+  width: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--c-time-slower);
+  color: var(--c-text-inverse);
+}
+
+.hud-prompt__sw .icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.hud-prompt__txt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4);
+}
+
+.hud-prompt__txt strong {
+  font-size: var(--fs-14);
+  font-weight: 700;
+  font-stretch: var(--wdth-semi);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hud-prompt__txt span {
+  color: var(--c-text-2);
+  font-size: var(--fs-12);
+  font-weight: 550;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.hud-prompt__glyph {
+  color: var(--c-text-1);
 }
 
 .hud-msg {
@@ -505,6 +574,8 @@ button {
   right: var(--safe-r);
   top: var(--safe-t);
   width: 300px;
+  transform-origin: top right;
+  transform: scale(var(--hud-scale, 1));
 }
 
 .hud-timing__lap {
@@ -642,13 +713,35 @@ button {
   color: var(--c-time-personal);
 }
 
-/* Minimap (bottom left) */
+/* Minimap (right, under the lap timing) */
 .hud-map {
   position: absolute;
-  left: var(--safe-l);
-  bottom: var(--safe-b);
-  width: 232px;
+  right: var(--safe-r);
+  top: var(--safe-t);
+  width: 300px;
   padding: var(--sp-3);
+  transform-origin: top right;
+  transform: scale(var(--hud-scale, 1));
+}
+
+/* Right column on desktop: lap timing, then the map, 8 px apart. Zero-specificity selectors so
+   the phone layout below (timing top centre, map top right) still places each on its own. */
+.hud-right {
+  position: absolute;
+  right: var(--safe-r);
+  top: var(--safe-t);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  transform-origin: top right;
+  transform: scale(var(--hud-scale, 1));
+}
+
+:where(.hud-right) > .hud-timing,
+:where(.hud-right) > .hud-map {
+  position: static;
+  transform: none;
 }
 
 .hud-map__head {
@@ -661,6 +754,7 @@ button {
   display: block;
   width: 100%;
   height: auto;
+  max-height: 176px;
 }
 
 /* Driver cluster (bottom right) */
@@ -671,6 +765,88 @@ button {
   display: flex;
   gap: var(--sp-2);
   align-items: flex-end;
+  transform-origin: bottom right;
+  transform: scale(var(--hud-scale, 1));
+}
+
+/* Tyre panel (desktop only, beside the drive cluster) */
+.hud-tyres {
+  width: 124px;
+  padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.hud-tyres__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.hud-compound {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-12);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--compound, var(--c-text-1));
+}
+
+.hud-compound__ticks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hud-compound__ticks i {
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--c-ink-4);
+}
+
+.hud-compound__ticks i.is-on {
+  background: var(--compound, var(--c-text-1));
+}
+
+.hud-tyres__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.hud-tyre {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 5px 4px;
+  border-radius: var(--r-1);
+  background: var(--c-ink-2);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+}
+
+.hud-tyre__pos {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  color: var(--c-text-3);
+}
+
+.hud-tyre b {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.hud-tyres__note {
+  font-size: var(--fs-10);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--c-text-3);
+  text-align: center;
 }
 
 .hud-drive {
@@ -788,18 +964,28 @@ button {
 
 .hud-ers__meter i {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
+  inset: 0;
   background: var(--c-ers);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
 }
 
 .hud-ers__meter u {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(0%);
+  will-change: transform;
+}
+
+.hud-ers__meter u::after {
+  content: '';
+  position: absolute;
   top: 0;
   bottom: 0;
-  left: 100%;
+  right: 0;
   width: 2px;
-  margin-left: -2px;
   background: var(--c-text-1);
 }
 
@@ -939,11 +1125,11 @@ button {
 }
 
 .pause__card {
-  width: min(760px, 100%);
+  width: min(780px, 100%);
   max-height: 100%;
   overflow: auto;
   display: grid;
-  gap: var(--sp-5);
+  gap: var(--sp-4);
   padding: var(--sp-6);
   background: var(--c-ink-1);
   border-radius: var(--r-2);
@@ -969,65 +1155,25 @@ button {
 
 .pause__body {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   gap: var(--sp-6);
 }
 
 .pause__actions {
   display: grid;
-  gap: 2px;
+  gap: var(--sp-2);
   align-content: start;
 }
 
-.pause__action,
-.pause__quit {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-height: 48px;
+.pause__action {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 46px;
   padding: 0 var(--sp-4);
-  border: 0;
-  border-radius: var(--r-1);
-  background: var(--c-ink-2);
-  color: var(--c-text-1);
-  font-size: var(--fs-16);
-  font-weight: 700;
-  font-stretch: var(--wdth-semi);
-  letter-spacing: 0.01em;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--t-quick) var(--ease-out);
 }
 
-.pause__action .icon,
-.pause__quit .icon {
-  width: 20px;
-  height: 20px;
-  color: var(--c-text-2);
-}
-
-.pause__action:hover,
-.pause__action:focus-visible,
-.pause__quit:hover,
-.pause__quit:focus-visible {
-  background: var(--c-ink-3);
-}
-
-.pause__action.is-primary {
-  background: var(--c-brand);
-  color: var(--c-text-inverse);
-}
-
-.pause__action.is-primary .icon {
-  color: var(--c-text-inverse);
-}
-
-.pause__quit {
-  justify-self: start;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--c-line-strong);
-  font-size: var(--fs-14);
-  min-height: 44px;
+.pause__action .btn__glyph {
+  margin-left: auto;
 }
 
 .pause__settings {
@@ -1043,6 +1189,13 @@ button {
   min-height: 48px;
   padding: 4px 0;
   box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.pause__hint {
+  display: block;
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: var(--c-text-3);
 }
 
 .pause__key {
@@ -1068,55 +1221,107 @@ button {
   }
 }
 
-.seg {
+.pause__controls {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+
+:root[data-device='touch'] .pause__controls {
+  display: none;
+}
+
+.pause__controls-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.pause__control {
   display: inline-flex;
-  padding: 2px;
-  border-radius: var(--r-1);
-  background: var(--c-ink-0);
-  box-shadow: inset 0 0 0 1px var(--c-line);
+  align-items: center;
+  gap: 6px;
 }
 
-.seg__opt {
-  min-width: 44px;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 1px;
-  background: transparent;
+.pause__control-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pause__control-label {
   font-size: var(--fs-12);
-  font-weight: 650;
-  color: var(--c-text-3);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  white-space: nowrap;
+  font-weight: 550;
+  color: var(--c-text-2);
 }
 
-.seg__opt.is-on {
-  background: var(--c-text-1);
-  color: var(--c-text-inverse);
+.pause__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: var(--sp-3);
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+
+.pause__quit {
+  padding: 0 var(--sp-4);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
 }
 
 /* ================= Phone landscape ================= */
 
 @media (max-height: 500px) and (orientation: landscape) {
-  .launch__stage {
-    padding-bottom: 6vh;
-  }
-  .launch__tagline {
-    font-size: var(--fs-14);
-    margin-top: var(--sp-2);
-  }
-  .launch__bar {
-    gap: var(--sp-4);
-    padding-top: var(--sp-3);
-    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom, 0px));
-  }
-  .launch__mode-name {
-    font-size: var(--fs-16);
+  .hud-tyres {
+    display: none;
   }
 
-  .hud-session {
+  /* The tower stays top left on a phone, compact: lap, flag, the rows; no footer. */
+  .hud-tower {
+    width: 156px;
+  }
+  .hud-tower__head {
+    height: 26px;
+    padding: 0 var(--sp-2);
+  }
+  .hud-tower__head .label,
+  .hud-tower__foot {
     display: none;
+  }
+  .hud-tower__lap {
+    font-size: var(--fs-12);
+  }
+  .hud-tower__lap b {
+    font-size: var(--fs-14);
+  }
+  .hud-tower__status {
+    height: 18px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-10);
+  }
+  .hud-tower__row {
+    grid-template-columns: 14px 3px minmax(0, 1fr) auto auto;
+    gap: 6px;
+    height: 22px;
+    padding: 0 var(--sp-2) 0 4px;
+  }
+  .hud-tower__pos,
+  .hud-tower__code,
+  .hud-tower__time {
+    font-size: var(--fs-12);
+  }
+  .hud-tower__time.is-empty {
+    font-size: var(--fs-10);
+  }
+
+  .hud-right {
+    display: contents;
+  }
+  :where(.hud-right) > .hud-timing,
+  :where(.hud-right) > .hud-map {
+    position: absolute;
+    top: var(--safe-t);
+    transform: scale(var(--hud-scale, 1));
   }
 
   .hud-control {
@@ -1126,20 +1331,25 @@ button {
        and the map. */
     max-width: calc(100vw - 408px);
   }
-  .hud-flag {
+  .hud-flag,
+  .hud-prompt {
     height: 26px;
   }
-  .hud-flag__sw {
+  .hud-flag__sw,
+  .hud-prompt__sw {
     width: 26px;
   }
-  .hud-flag__sw .icon {
+  .hud-flag__sw .icon,
+  .hud-prompt__sw .icon {
     width: 15px;
     height: 15px;
   }
-  .hud-flag__txt strong {
+  .hud-flag__txt strong,
+  .hud-prompt__txt strong {
     font-size: var(--fs-11);
   }
-  .hud-flag__txt span {
+  .hud-flag__txt span,
+  .hud-prompt__txt span {
     display: none;
   }
   .hud-msg {
@@ -1161,7 +1371,8 @@ button {
   .hud-timing {
     left: 50%;
     right: auto;
-    transform: translateX(-50%);
+    transform-origin: top center;
+    transform: translateX(-50%) scale(var(--hud-scale, 1));
     width: 236px;
   }
   .hud-timing .panel-head {
@@ -1204,6 +1415,7 @@ button {
     right: var(--safe-r);
     top: var(--safe-t);
     bottom: auto;
+    transform-origin: top right;
     width: 128px;
     padding: 6px;
   }
@@ -1214,7 +1426,8 @@ button {
   .hud-cluster {
     right: auto;
     left: 50%;
-    transform: translateX(-50%);
+    transform-origin: bottom center;
+    transform: translateX(-50%) scale(var(--hud-scale, 1));
     gap: 6px;
   }
   .hud-drive {
@@ -1287,33 +1500,56 @@ button {
     display: none;
   }
 
+  .pause {
+    padding: var(--sp-2) var(--safe-r) var(--sp-2) var(--safe-l);
+  }
   .pause__card {
-    padding: var(--sp-3) var(--sp-4);
-    gap: var(--sp-3);
+    height: 100%;
+    overflow: hidden;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 10px var(--sp-4);
+    gap: var(--sp-2);
   }
   .pause__title {
-    font-size: var(--fs-24);
+    font-size: var(--fs-20);
   }
-  .pause__sub {
+  .pause__sub,
+  .pause__controls {
     display: none;
   }
   .pause__body {
-    grid-template-columns: 180px minmax(0, 1fr);
+    min-height: 0;
+    grid-template-columns: 176px minmax(0, 1fr);
     gap: var(--sp-4);
   }
+  .pause__settings {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: var(--sp-1);
+  }
+  /* Touch targets 44 px or more on a phone. */
   .pause__action {
     min-height: 44px;
-    font-size: var(--fs-14);
+    height: 44px;
+    font-size: var(--fs-12);
+    padding: 0 var(--sp-3);
   }
   .pause__setting {
-    min-height: 40px;
+    min-height: 44px;
   }
   .pause__key {
     font-size: var(--fs-12);
   }
+  .pause__foot {
+    padding-top: var(--sp-2);
+  }
+  .pause__quit {
+    height: 44px;
+    font-size: var(--fs-12);
+  }
   .seg__opt {
-    min-width: 36px;
-    min-height: 30px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0 6px;
     font-size: var(--fs-11);
   }
@@ -1406,59 +1642,10 @@ button {
   .range {
     grid-template-columns: 96px 36px;
   }
+  .range__input {
+    height: 44px;
+  }
   .range__value {
-    font-size: var(--fs-12);
-  }
-}
-
-/* ================= Controls list ================= */
-
-.controls {
-  position: fixed;
-  z-index: 30;
-}
-
-.controls__card {
-  width: min(560px, 100%);
-}
-
-.controls__device {
-  color: var(--c-text-2);
-}
-
-.controls__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  column-gap: var(--sp-6);
-  margin: 0;
-}
-
-.controls__row {
-  min-height: 36px;
-}
-
-.controls__input {
-  margin: 0;
-  font-size: var(--fs-14);
-  font-weight: 700;
-  text-align: right;
-  color: var(--c-text-1);
-}
-
-.controls__note {
-  margin: 0;
-  font-size: var(--fs-12);
-  color: var(--c-text-2);
-}
-
-@media (max-height: 500px) {
-  .controls__card {
-    width: min(760px, 100%);
-  }
-  .controls__row {
-    min-height: 28px;
-  }
-  .controls__input {
     font-size: var(--fs-12);
   }
 }
@@ -1525,7 +1712,8 @@ button {
   min-height: 24px;
 }
 
-/* Quick Race: the time-trial record row has no meaning in a race. */
-.hud[data-mode='race'] .hud-row--record {
+/* Quick Race: the time-trial tower (best lap, record, ghost) has no meaning in a race; the race
+   panel shows position, gap and laps until the broadcast tower takes race data. */
+.hud[data-mode='race'] .hud-tower {
   display: none;
 }
