@@ -86,6 +86,11 @@ export interface QuickRaceOptions {
   skillSpread?: number;
   /** How far AI pace is shuffled against the grid order, 0 to 1 (default 0.5). */
   gridNoise?: number;
+  /**
+   * Seconds the AI field waits after lights out before leaving the grid (a test fixture: the
+   * player is sure to take the flag first). Default 0.
+   */
+  fieldStartDelay?: number;
 }
 
 export interface DriveSessionOptions {
@@ -200,6 +205,9 @@ export class DriveSession {
           seed: options.seed,
           ...(options.quickRace?.skillSpread !== undefined
             ? { spread: options.quickRace.skillSpread }
+            : {}),
+          ...(options.quickRace?.fieldStartDelay !== undefined
+            ? { startDelay: options.quickRace.fieldStartDelay, jumpStartChance: 0 }
             : {}),
         })
       : [];
