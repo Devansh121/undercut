@@ -103,11 +103,12 @@ export class ViewMix {
   begin(aligned: boolean): void {
     if (aligned) {
       const k = this.k;
+      const chunk = CHUNK;
       for (let g = 0; g < VIEW_GROUPS; g++) {
         const v0 = this.value[g] as number;
         const v1 = v0 + ((this.target[g] as number) - v0) * k;
         this.start[g] = v0;
-        this.step[g] = (v1 - v0) / CHUNK;
+        this.step[g] = (v1 - v0) / chunk;
         this.value[g] = v1;
       }
       // Geometric glide: an octave takes the same time anywhere in the range.

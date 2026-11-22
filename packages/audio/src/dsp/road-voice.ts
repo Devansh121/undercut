@@ -490,7 +490,9 @@ export class RoadVoice implements Voice {
       const slide = slideF > slideR ? slideF : slideR;
       this.judderPhase += (SLIP_VOICES.judderRate + 9 * slide) * dt;
       if (this.judderPhase >= 1) this.judderPhase -= 1;
-      const judder = 1 - 0.6 * slide * (0.5 + 0.5 * Math.sin(TWO_PI * this.judderPhase));
+      // Without a slide the judder is exactly 1; skip the sine.
+      const judder =
+        slide > 0 ? 1 - 0.6 * slide * (0.5 + 0.5 * Math.sin(TWO_PI * this.judderPhase)) : 1;
       this.gScrubF[i] = this.scrubF * judder;
       this.gScrubR[i] = this.scrubR * judder;
       if (this.squealLive) {

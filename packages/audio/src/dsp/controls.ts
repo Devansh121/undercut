@@ -57,6 +57,9 @@ export class CarControls {
   private readonly max = new Float64Array(CAR_STATE_LENGTH);
   private readonly discrete = new Uint8Array(CAR_STATE_LENGTH);
   private readonly magnitude = new Uint8Array(CAR_STATE_LENGTH);
+  /** The value each buffer holds over its first `heldFrames[i]` frames, if it holds one. */
+  private readonly held = new Float64Array(CAR_STATE_LENGTH);
+  private readonly heldFrames = new Int32Array(CAR_STATE_LENGTH);
   private remaining = 0;
   private interval = 0;
   private sinceUpdate = 0;
@@ -124,15 +127,37 @@ export class CarControls {
   /** Fill `buffers` for the next `frames` (<= CHUNK) samples. */
   advance(frames: number): void {
     const remaining = this.remaining;
-    for (let i = 0; i < CAR_STATE_LENGTH; i++) {
+    const held = this.held;
+    const heldFrames = this.heldFrames;
+    const fields = CAR_STATE_LENGTH;
+    for (let i = 0; i < fields; i++) {
       const buf = this.buffers[i] as Float64Array;
       let v = this.value[i] as number;
-      if (remaining === 0) {
-        buf.fill(v, 0, frames);
-        continue;
-      }
       const step = this.step[i] as number;
       const target = this.target[i] as number;
+      // A field that is not moving over this chunk holds one value: `v` once its ramp is done,
+      // or, still inside a ramp that does not change it, v + 0 (what the ramp loop below
+      // writes; + 0 turns −0 into +0 as the loop does). Most fields hold still most of the
+      // time, and their buffers already contain the value from the last chunk.
+      let still = remaining === 0;
+      if (!still && step === 0 && v === target && remaining > frames) {
+        v = v + 0;
+        this.value[i] = v;
+        still = true;
+      }
+      if (still) {
+        const h = held[i] as number;
+        // Same bits: equal, and for zero the same sign.
+        const same = v === h && (v !== 0 || 1 / v === 1 / h);
+        if (!same || (heldFrames[i] as number) < frames) {
+          // A loop, not `fill`: passing a fractional number to a builtin boxes it.
+          for (let f = 0; f < frames; f++) buf[f] = v;
+          held[i] = v;
+          heldFrames[i] = frames;
+        }
+        continue;
+      }
+      heldFrames[i] = 0;
       let left = remaining;
       for (let f = 0; f < frames; f++) {
         if (left > 0) {

@@ -31,6 +31,7 @@ export interface AssistChoice {
   steering?: number;
   stability?: number;
   braking?: number;
+  racingLine?: 'off' | 'braking' | 'full';
 }
 
 export interface RaceSetup {
@@ -104,6 +105,8 @@ function readAssists(v: unknown): AssistChoice {
   if (typeof v.steering === 'number') out.steering = int(v.steering, 0, 3, 0);
   if (typeof v.stability === 'number') out.stability = int(v.stability, 0, 1, 0);
   if (typeof v.braking === 'number') out.braking = int(v.braking, 0, 3, 0);
+  if (v.racingLine === 'off' || v.racingLine === 'braking' || v.racingLine === 'full')
+    out.racingLine = v.racingLine;
   return out;
 }
 

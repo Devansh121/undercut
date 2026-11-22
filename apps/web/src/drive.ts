@@ -32,6 +32,7 @@ import {
   type CameraName,
   type CarLivery,
   type CompoundLook,
+  type DrivingLineMode,
   type QualityName,
   type ToneMap,
 } from '@undercut/render';
@@ -44,9 +45,8 @@ import {
 } from '@undercut/ai';
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
-// The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
-// The AI's racing line and measured vehicle envelope, for the rubbered line and the driving
-// line's advised speeds (braking help).
+// The AI's racing line and measured vehicle envelope are loaded per circuit below, for the
+// rubbered line, the driving-line assist, and the driving line's advised speeds (braking help).
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
@@ -135,7 +135,11 @@ export interface DriveOptions {
   /** The player's assist choices on top of the device preset. */
   assists?: Partial<AssistConfig>;
   /** An assist changed in the pause menu (to remember it for that device). */
-  onAssist?: (device: DeviceKind, key: keyof AssistConfig, value: number | boolean) => void;
+  onAssist?: <K extends keyof AssistConfig>(
+    device: DeviceKind,
+    key: K,
+    value: NonNullable<AssistConfig[K]>,
+  ) => void;
   /** A mode on top of the drive screen (online racing). */
   extension?: DriveExtension;
 }
@@ -322,6 +326,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     seed: o.seed,
     record,
     today: o.today,
+    device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
   for (const [key, value] of Object.entries(o.assists ?? {}) as [keyof AssistConfig, never][]) {
@@ -370,6 +375,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          drivingLine,
+          drivingLineMode: session.assists.racingLine ?? 'off',
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
@@ -545,6 +552,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         hint: S.setup.steeringKeyboard,
         get: () => session.assists.steering,
         set: (v) => setAssist('steering', Number(v)),
+      },
+      {
+        id: 'line',
+        label: 'Driving line',
+        description: 'Shows the racing line and where to lift or brake.',
+        choices: [
+          { value: 'off', label: 'Off' },
+          { value: 'braking', label: 'Braking' },
+          { value: 'full', label: 'Full' },
+        ],
+        get: () => session.assists.racingLine ?? 'off',
+        set: (v) => setAssist('racingLine', v as DrivingLineMode),
       },
     ],
     () =>
@@ -797,6 +816,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             0,
             Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
           );
+    view.setDrivingLine(session.assists.racingLine ?? 'off');
     view.render({
       pose,
       ghost: ghostOn ? ghostPose : null,
@@ -1131,6 +1151,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       hud.setVisible(true);
       setSource('human');
       loop.timeScale = 1;
+      session.resetAssists();
+      view.setDrivingLine(session.assists.racingLine ?? 'off');
       view.setSkyProbe(null);
       view.setCamera('chase-near');
       if (!ext) restartLap();

@@ -80,6 +80,8 @@ export interface DriveSessionOptions {
   today?: string;
   /** Track-limit counter; defaults to `TrackLimits` on this track. */
   limits?: WheelsOffCounter;
+  /** Initial active input device (defaults to keyboard). */
+  device?: DeviceKind;
   /** Advised speeds round the circuit (the driving line), for the braking help. */
   guide?: SpeedGuide;
 }
@@ -103,8 +105,9 @@ export class DriveSession {
   private ghostValue: Ghost | null = null;
   private assistMemory: AssistState = createAssistState();
   private overrides: AssistOverrides = {};
-  private assistValue: AssistConfig = assistsFor('keyboard', {});
-  private deviceValue: DeviceKind = 'keyboard';
+  private assistValue: AssistConfig;
+  private deviceValue: DeviceKind;
+  private readonly initialDevice: DeviceKind;
   private readonly pending: ControlInput;
   private readonly sampleHint = createSurfaceHint();
   private readonly wheelHints = [
@@ -137,6 +140,9 @@ export class DriveSession {
     this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
     this.params = options.params ?? createCarParams('low');
     this.today = options.today ?? '';
+    this.initialDevice = options.device ?? 'keyboard';
+    this.deviceValue = this.initialDevice;
+    this.assistValue = assistsFor(this.deviceValue, this.overrides);
     this.pending = {
       steer: 0,
       throttle: 0,
@@ -254,6 +260,13 @@ export class DriveSession {
   /** Change one assist from the pause menu; it sticks across device changes. */
   setAssist<K extends keyof AssistConfig>(key: K, value: AssistConfig[K]): void {
     this.overrides = { ...this.overrides, [key]: value };
+    this.assistValue = assistsFor(this.deviceValue, this.overrides);
+  }
+
+  /** Drop pause-menu overrides and restore the initial device's defaults. */
+  resetAssists(): void {
+    this.overrides = {};
+    this.deviceValue = this.initialDevice;
     this.assistValue = assistsFor(this.deviceValue, this.overrides);
   }
 

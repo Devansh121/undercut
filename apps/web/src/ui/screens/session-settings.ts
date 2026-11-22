@@ -48,6 +48,7 @@ export function effectiveAssists(
     steering: a.steering,
     stability: a.stability ?? 0,
     braking: a.braking,
+    racingLine: a.racingLine ?? 'off',
   };
 }
 
