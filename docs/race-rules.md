@@ -126,12 +126,22 @@ restart, which puts them back in the session.
 A retired car (dnf or dsq) is parked out of the race where it stopped: it becomes a ghost that no
 other car touches and the AI drivers no longer see, so it can never block the road. It is not
 moved: a car lifted elsewhere could land on another car or a barrier. Before it retires, a car
-standing still in the road is an obstacle the AI drivers go round (`packages/ai`, race driver).
+standing still in the road is an obstacle the AI drivers go round (`packages/ai`, race driver),
+except where the racing line sweeps across the road beside it (a chicane): there they stop 10 m
+behind it.
+
+A car standing still on the road with traffic held up behind it is a ghost too, for as long as
+it blocks: once a car within 60 m behind it (on the road, anywhere across it) has been held
+under 5 m/s for 6 s, the stopped car becomes a ghost and the cars behind drive on through it.
+Only the car at the head counts (no other car standing still within 40 m ahead of it). It is
+solid again once it moves off at over 5 m/s clear of every car. Only cars racing and under way
+count (not in the pit lane, not held by the pit crew, and not cars that have yet to move off the
+grid). The state is carried in `RaceSession.snapshot` (`blockers`).
 
 ## Snapshots and cost
 
 `RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 2) adds
-the world, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
+the world, the blocking-ghost state, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
 follower's path) and every search hint, so a session restored from it continues bit for bit
 (checked at the lights, mid-race, on the pit approach and mid-service).
 

@@ -83,7 +83,34 @@ export interface RaceSessionSnapshot {
    * pit-lane position, the track-limit wheels): caches, kept so a restore is bit-identical.
    */
   hints: { surface: number[]; lap: number; pit: number; limits: number[] | null }[];
+  /** The stopped-queue ghost state per car (absent in older snapshots: none). */
+  blockers?: { underway: boolean[]; still: number[]; block: number[]; ghost: boolean[] };
 }
+
+/**
+ * A car standing still in the road with traffic held up behind it: after `BLOCK_GHOST_AFTER` of
+ * a car behind it held under `HELD_SPEED`, it becomes a ghost, so the cars behind drive on
+ * through it. The racing drivers go round a stopped car where there is road beside it, in single
+ * file; this is for where there is none (a chicane, a car sideways across the road, two cars
+ * stopped side by side) and for the back of a long queue, so the race never waits on a stopped
+ * car for more than a few seconds, let alone the full minute before the rules retire it.
+ */
+const BLOCK_GHOST_AFTER = 6;
+/** Held up: a car within `HELD_REACH` m behind, on the road anywhere across it, under this speed, m/s. */
+const HELD_SPEED = 5;
+const HELD_REACH = 60;
+/** Under way: has gone faster than this since the start, m/s (a car held on the grid is not). */
+const UNDERWAY_SPEED = 10;
+/** Still: under this speed, m/s (the watchdog's stationary speed). */
+const STILL_SPEED = 1;
+/** At the head: no other car standing still within this far ahead of it on the road, m. */
+const HEAD_REACH = 40;
+/** On the road: within this far past the track edge, m. */
+const ROAD_MARGIN = 1;
+/** A ghost comes back once moving at this speed, m/s, with no car within this box, m. */
+const UNGHOST_SPEED = 5;
+const CLEAR_LENGTH = 6.5;
+const CLEAR_WIDTH = 2.6;
 
 /**
  * A session over the sim world: N cars, each driven by a `CarController` (human input or AI),
@@ -94,6 +121,14 @@ export interface RaceSessionSnapshot {
  *
  * Pure and deterministic: no clock, seeded randomness only.
  */
+/** Signed distance along the lap from a to b, m, in (-L/2, L/2]. */
+function signedGap(L: number, a: number, b: number): number {
+  let x = (b - a) % L;
+  if (x > L / 2) x -= L;
+  else if (x <= -L / 2) x += L;
+  return x;
+}
+
 export class RaceSession {
   readonly track: Track;
   readonly circuit: CircuitInfo;
@@ -107,6 +142,12 @@ export class RaceSession {
   private readonly facts: CarFacts[];
   private readonly telemetry: CarTelemetry[];
   private readonly contexts: ControlContext[];
+  /** Ghost this tick, per car (retired, or a stopped-queue blocker); time standing still; time blocking a stopped queue. */
+  private readonly ghosts: boolean[];
+  private readonly blockGhost: boolean[];
+  private readonly stillTime: number[];
+  private readonly underway: boolean[];
+  private readonly blockTime: number[];
   private readonly limits: WheelsOffCounter[];
   private readonly hints: { index: number }[];
   private readonly pitHints: { index: number }[];
@@ -158,6 +199,11 @@ export class RaceSession {
     this.limits = o.cars.map((_, i) => (o.limits ? o.limits(i) : new TrackLimits(this.track)));
     this.hints = o.cars.map(() => ({ index: -1 }));
     this.pitHints = o.cars.map(() => ({ index: -1 }));
+    this.ghosts = o.cars.map(() => false);
+    this.blockGhost = o.cars.map(() => false);
+    this.stillTime = o.cars.map(() => 0);
+    this.underway = o.cars.map(() => false);
+    this.blockTime = o.cars.map(() => 0);
     this.contexts = o.cars.map((_, i) => ({
       car: i,
       time: 0,
@@ -168,6 +214,7 @@ export class RaceSession {
       track: this.track,
       circuit: this.circuit,
       field: this.facts,
+      ghosts: this.ghosts,
     }));
     for (let i = 0; i < o.cars.length; i++) this.locate(i);
   }
@@ -222,6 +269,7 @@ export class RaceSession {
   tick(): RaceEvent[] {
     const world = this.world;
     const control = this.control;
+    this.updateGhosts();
     for (let i = 0; i < this.cars.length; i++) {
       const wc = world.cars[i]!;
       readCarTelemetry(wc.state, this.telemetry[i]!);
@@ -231,9 +279,7 @@ export class RaceSession {
       const input = wc.input;
       controller.control(this.contexts[i]!, input);
       const st = control.cars[i]!.status;
-      // Retired, the car is parked out of the race where it stopped: a ghost no car touches
-      // (and the drivers no longer see), so it never blocks the road (race-rules.md).
-      wc.ghost = st === 'dnf' || st === 'dsq';
+      wc.ghost = this.ghosts[i]!;
       if (control.held(i) || st === 'dnf' || st === 'dsq') {
         input.throttle = 0;
         input.brake = 1;
@@ -249,6 +295,95 @@ export class RaceSession {
       if (e.type === 'lapStart' || e.type === 'lap') this.onLine(e.car);
     }
     return events;
+  }
+
+  /** Whether a car is a ghost this tick: no car touches it and no driver sees it. */
+  ghost(car: number): boolean {
+    return this.ghosts[car]!;
+  }
+
+  /**
+   * Who is a ghost this tick (race-rules.md). A retired car is parked out of the race where it
+   * stopped. A car standing still at the head of a stopped queue (see `BLOCK_GHOST_AFTER`) is
+   * one until it moves off clear of every car. Read from the last tick's facts, before any
+   * driver runs, so every driver sees the same field.
+   */
+  private updateGhosts(): void {
+    const f = this.facts;
+    const dt = this.world.step;
+    const n = this.cars.length;
+    for (let i = 0; i < n; i++) {
+      if (f[i]!.speed > UNDERWAY_SPEED && this.control.racing(i)) this.underway[i] = true;
+      this.stillTime[i] =
+        this.queueable(i) && f[i]!.speed < STILL_SPEED ? this.stillTime[i]! + dt : 0;
+    }
+    for (let i = 0; i < n; i++) {
+      const st = this.control.cars[i]!.status;
+      if (st === 'dnf' || st === 'dsq') {
+        this.ghosts[i] = true;
+        this.blockGhost[i] = false;
+        this.blockTime[i] = 0;
+        continue;
+      }
+      if (this.blockGhost[i]) {
+        if (!this.control.racing(i) || (f[i]!.speed > UNGHOST_SPEED && this.clearOfAll(i))) {
+          this.blockGhost[i] = false;
+        }
+      } else if (this.headOfStillQueue(i)) {
+        this.blockTime[i]! += dt;
+        if (this.blockTime[i]! >= BLOCK_GHOST_AFTER) {
+          this.blockGhost[i] = true;
+          this.blockTime[i] = 0;
+        }
+      } else this.blockTime[i] = 0;
+      this.ghosts[i] = this.blockGhost[i]!;
+    }
+  }
+
+  /** On the road in the race: racing, under way, not in the pit lane, not held. */
+  private queueable(i: number): boolean {
+    const f = this.facts[i]!;
+    return this.control.racing(i) && this.underway[i]! && !f.inPitLane && !this.control.held(i);
+  }
+
+  /**
+   * Standing still on the road, no other car standing still just ahead of it (that one is the
+   * head), and a car held up behind it. Into a chicane the queue lines up on the line, which may
+   * be across the road from the stopped car: anywhere across counts.
+   */
+  private headOfStillQueue(i: number): boolean {
+    if (this.stillTime[i]! <= 0) return false;
+    const L = this.track.length;
+    const me = this.facts[i]!;
+    if (!this.onRoad(me)) return false;
+    let held = false;
+    for (let j = 0; j < this.cars.length; j++) {
+      if (j === i || this.ghosts[j] || !this.queueable(j)) continue;
+      const o = this.facts[j]!;
+      if (!this.onRoad(o)) continue;
+      const ds = signedGap(L, me.s, o.s);
+      if (ds > 0 && ds < HEAD_REACH && this.stillTime[j]! > 0) return false;
+      if (ds < 0 && ds > -HELD_REACH && o.speed < HELD_SPEED) held = true;
+    }
+    return held;
+  }
+
+  private onRoad(f: CarFacts): boolean {
+    const s = this.track.wrap(f.s);
+    return Math.abs(f.d) < this.track.halfWidthAt(s, f.d >= 0 ? 0 : 1) + ROAD_MARGIN;
+  }
+
+  private clearOfAll(i: number): boolean {
+    const L = this.track.length;
+    const me = this.facts[i]!;
+    for (let j = 0; j < this.cars.length; j++) {
+      if (j === i || this.ghosts[j]) continue;
+      const o = this.facts[j]!;
+      if (Math.abs(signedGap(L, me.s, o.s)) < CLEAR_LENGTH && Math.abs(o.d - me.d) < CLEAR_WIDTH) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Step until the session ends or `seconds` of sim time pass; returns every event. */
@@ -359,6 +494,12 @@ export class RaceSession {
         pit: this.pitHints[i]!.index,
         limits: this.limits[i]!.hintState?.() ?? null,
       })),
+      blockers: {
+        underway: [...this.underway],
+        still: [...this.stillTime],
+        block: [...this.blockTime],
+        ghost: [...this.blockGhost],
+      },
     };
   }
 
@@ -393,6 +534,13 @@ export class RaceSession {
       else this.limits[i]!.reset();
       this.cars[i]!.controller.restore(snap.controllers[i]!);
       this.locate(i);
+      this.underway[i] = snap.blockers?.underway[i] ?? false;
+      this.stillTime[i] = snap.blockers?.still[i] ?? 0;
+      this.blockTime[i] = snap.blockers?.block[i] ?? 0;
+      this.blockGhost[i] = snap.blockers?.ghost[i] ?? false;
+      const st = this.control.cars[i]!.status;
+      this.ghosts[i] = st === 'dnf' || st === 'dsq' || this.blockGhost[i]!;
+      c.ghost = this.ghosts[i]!;
     });
   }
 }

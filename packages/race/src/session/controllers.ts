@@ -46,6 +46,12 @@ export interface ControlContext {
    * driver sees them from the cockpit and the mirrors. Racing drivers read it; humans ignore it.
    */
   readonly field: readonly CarFacts[];
+  /**
+   * Cars out of the race's way this tick (index = car number): retired, or standing still at
+   * the head of a stopped queue for too long (see `RaceSession`). No car touches them and no
+   * driver sees them.
+   */
+  readonly ghosts: readonly boolean[];
 }
 
 export interface CarController {
@@ -286,9 +292,9 @@ export class AiController implements CarController {
     for (let j = 0; j < field.length; j++) {
       const f = field[j]!;
       if (j === ctx.car) continue;
-      // A retired car is parked out of the race, a ghost on the road: no traffic.
-      const status = ctx.control.cars[j]!.status;
-      if (status === 'dnf' || status === 'dsq') continue;
+      // A ghost (a retired car parked out of the race, or a stopped car the queue behind it
+      // drives through) is no traffic.
+      if (ctx.ghosts[j]) continue;
       // A car in the pit lane is seen only where the lane meets the track (entry and exit):
       // behind the pit wall it is no traffic.
       if (f.inPitLane) {
