@@ -150,4 +150,21 @@ describe('FramePacer', () => {
     expect(pacer.disabled).toBe(false);
     expect(pacer.inFlight).toBeLessThanOrEqual(2);
   });
+
+  it('at one animation frame a second, the pacer still forces a draw at 10 s and gives up at 60 s', () => {
+    // Fences that never complete; render timing gets the real 1000 ms per frame.
+    const stuck: Fences<number> = { insert: () => 1, signaled: () => false, release: () => {} };
+    const pacer = new FramePacer(stuck);
+    let forcedAt = 0;
+    let disabledAt = 0;
+    for (let t = 1; t <= 120; t++) {
+      if (pacer.ready(1000)) pacer.submitted();
+      if (!forcedAt && pacer.forcedDraws > 0) forcedAt = t;
+      if (!disabledAt && pacer.disabled) disabledAt = t;
+    }
+    expect(forcedAt).toBeGreaterThanOrEqual(10);
+    expect(forcedAt).toBeLessThanOrEqual(13);
+    expect(disabledAt).toBeGreaterThanOrEqual(60);
+    expect(disabledAt).toBeLessThanOrEqual(63);
+  });
 });

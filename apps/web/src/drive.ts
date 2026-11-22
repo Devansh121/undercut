@@ -99,6 +99,7 @@ import {
 import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
+import { physicsDt } from './frame-timing';
 import { speedUnit, setSpeedUnit } from './ui/player-settings';
 import { Onboarding } from './ui/onboarding';
 import { phoneSession } from './ui/phone-session';
@@ -910,7 +911,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const frame = (): void => {
     const now = performance.now();
     if (quitting) return;
-    const dt = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
+    const elapsedMs = last === null ? 0 : now - last;
+    const dt = physicsDt(elapsedMs);
     if (last !== null) {
       frameLog.push(now - last);
       if (frameLog.length > FRAME_LOG) frameLog.shift();
@@ -997,7 +999,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       longG: t.longG,
       latG: t.latG,
       brake: t.brake,
-      frameMs: dt * 1000,
+      // Real time, not the capped physics step: frame pacing and dynamic resolution count it.
+      frameMs: elapsedMs,
       dt: realDt,
       time: clock,
       lookBack,
