@@ -1745,6 +1745,27 @@ html[data-screen='drive']:not([data-paused]) #view {
 [data-paused] .onboarding {
   display: none;
 }
+.update-bar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: var(--safe-b, 16px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 16px;
+  background: var(--c-ink-1);
+  border-left: 3px solid var(--c-accent);
+  box-shadow: var(--e-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  color: var(--c-text-1);
+}
+html[data-screen='drive']:not([data-paused]) .update-bar {
+  display: none;
+}
 .rotate-prompt {
   position: fixed;
   inset: 0;

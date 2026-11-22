@@ -52,6 +52,10 @@ export const S = {
     rotateHelp: 'Use landscape for room to steer and brake. The session is paused.',
     fullscreen: 'Fullscreen',
   },
+  update: {
+    ready: 'A new version is ready.',
+    reload: 'Reload',
+  },
   launch: {
     tagline: (teams: number, drivers: number) =>
       `Open-wheel racing on measured circuits. ${cap(words(teams))} teams, ${words(drivers)} drivers, one car built to the regulations.`,

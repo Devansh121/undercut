@@ -1,11 +1,15 @@
 // Build app-owned install icons and an atomic, versioned Mobile time-trial cache.
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 const GAME_NAME = /export const GAME_NAME = ['"]([^'"]+)/.exec(
   fs.readFileSync('packages/core/src/name.ts', 'utf8'),
 )[1];
 const dir = 'apps/web/dist';
+const INK = [13, 15, 18];
+const ACCENT = [224, 83, 49];
+
 function crc(buffer) {
   let c = 0xffffffff;
   for (const byte of buffer) {
@@ -22,35 +26,56 @@ function chunk(type, data) {
   tail.writeUInt32BE(crc(body));
   return Buffer.concat([head, body, tail]);
 }
-for (const size of [192, 512]) {
+
+/**
+ * Two slanted bars, each a whole parallelogram (no clipped slivers), supersampled 4x4 so the
+ * edges are smooth. `scale` is the mark's size relative to the square: the maskable icon keeps
+ * it well inside the 80 % safe circle.
+ */
+function icon(size, scale) {
+  const SS = 4;
+  const half = 0.22 * scale;
+  const slant = 0.36;
+  const bar = 0.13 * scale;
+  const gap = 0.07 * scale;
+  const left = 0.5 - bar - gap / 2;
+  const inMark = (u, v) => {
+    const y = v - 0.5;
+    if (Math.abs(y) > half) return false;
+    const x = u + y * slant;
+    return (x >= left && x <= left + bar) || (x >= left + bar + gap && x <= left + 2 * bar + gap);
+  };
   const pixels = Buffer.alloc((size * 4 + 1) * size);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
+      let hits = 0;
+      for (let sy = 0; sy < SS; sy++)
+        for (let sx = 0; sx < SS; sx++)
+          if (inMark((x + (sx + 0.5) / SS) / size, (y + (sy + 0.5) / SS) / size)) hits++;
+      const a = hits / (SS * SS);
       const i = y * (size * 4 + 1) + 1 + x * 4;
-      // Two offset racing stripes, comfortably inside the maskable safe circle.
-      const stripe =
-        x > size * 0.3 &&
-        x < size * 0.7 &&
-        y > size * 0.25 &&
-        y < size * 0.75 &&
-        Math.floor((x + y) / (size * 0.12)) % 2 === 0;
-      pixels.set(stripe ? [224, 83, 49, 255] : [13, 15, 18, 255], i);
+      for (let c = 0; c < 3; c++) pixels[i + c] = Math.round(INK[c] + (ACCENT[c] - INK[c]) * a);
+      pixels[i + 3] = 255;
     }
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size);
   ihdr.writeUInt32BE(size, 4);
   ihdr[8] = 8;
   ihdr[9] = 6;
-  fs.writeFileSync(
-    `${dir}/icon-${size}.png`,
-    Buffer.concat([
-      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-      chunk('IHDR', ihdr),
-      chunk('IDAT', zlib.deflateSync(pixels)),
-      chunk('IEND', Buffer.alloc(0)),
-    ]),
-  );
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(pixels)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
+
+const ICONS = [
+  { src: 'icon-192.png', size: 192, scale: 1.3, purpose: 'any' },
+  { src: 'icon-512.png', size: 512, scale: 1.3, purpose: 'any' },
+  { src: 'icon-maskable-512.png', size: 512, scale: 0.95, purpose: 'maskable' },
+];
+for (const i of ICONS) fs.writeFileSync(`${dir}/${i.src}`, icon(i.size, i.scale));
 fs.writeFileSync(
   `${dir}/manifest.webmanifest`,
   JSON.stringify({
@@ -63,51 +88,102 @@ fs.writeFileSync(
     orientation: 'landscape',
     background_color: '#0d0f12',
     theme_color: '#0d0f12',
-    icons: [192, 512].map((size) => ({
-      src: `icon-${size}.png`,
-      sizes: `${size}x${size}`,
+    icons: ICONS.map((i) => ({
+      src: i.src,
+      sizes: `${i.size}x${i.size}`,
       type: 'image/png',
-      purpose: 'any maskable',
+      purpose: i.purpose,
     })),
   }),
 );
 if (process.argv.includes('--icons')) process.exit(0);
+
+/*
+ * Precache the shell (stored under './', never 'index.html': a static host may answer
+ * /index.html with a redirect to /, and a redirected response cannot answer a navigation) and
+ * the Mobile first-race files under assets/. Endpoints in the inventory such as network-info
+ * are dynamic and are never cached.
+ */
 const inventory = JSON.parse(fs.readFileSync(`${dir}/first-race.json`));
 const files = [
   ...new Set([
-    'index.html',
+    './',
     'manifest.webmanifest',
-    'icon-192.png',
-    'icon-512.png',
-    ...Object.keys(inventory.presets.mobile.files),
+    ...ICONS.map((i) => i.src),
+    ...Object.keys(inventory.presets.mobile.files).filter((f) => f.startsWith('assets/')),
   ]),
 ];
+const diskPath = (file) => `${dir}/${file === './' ? 'index.html' : file}`;
+
+/*
+ * Every servable file feeds the version, not only the precached ones: the worker also keeps
+ * other assets/ files as they are fetched (a higher preset), so any change to the build must
+ * start a new cache.
+ */
 const version = crypto.createHash('sha256');
 version.update(fs.readFileSync(new URL(import.meta.url)));
-for (const file of files) version.update(fs.readFileSync(`${dir}/${file}`));
+for (const file of files) version.update(fs.readFileSync(diskPath(file)));
+const walk = (root) =>
+  fs
+    .readdirSync(root, { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(path.join(root, e.name)) : [path.join(root, e.name)]));
+for (const file of walk(`${dir}/assets`).sort())
+  if (!/\.(br|gz|map)$/.test(file)) {
+    version.update(file);
+    version.update(fs.readFileSync(file));
+  }
 const name = `race-shell-${version.digest('hex').slice(0, 16)}`;
+
+// Plain ES2017 so it runs in every browser with service workers; built with no bundler.
 fs.writeFileSync(
   `${dir}/sw.js`,
   `
 const NAME=${JSON.stringify(name)};
 const FILES=${JSON.stringify(files)};
-self.addEventListener('install', event => event.waitUntil((async () => {
-  try { const cache=await caches.open(NAME); await cache.addAll(FILES); }
-  catch(error) { await caches.delete(NAME); throw error; }
+// Dynamic or server-owned paths: always the network, never a cache.
+const NEVER=['rooms','network-info','sw.js'];
+const scope=new URL(self.registration.scope);
+const SHELL=new URL('./',scope).href;
+async function download(file){
+  const response=await fetch(new URL(file,scope),{cache:'no-cache'});
+  if(!response.ok) throw new Error(file+' '+response.status);
+  // A copy without the redirected flag, so it may answer a navigation.
+  return response.redirected
+    ? new Response(await response.blob(),{status:response.status,statusText:response.statusText,headers:response.headers})
+    : response;
+}
+self.addEventListener('install',event=>event.waitUntil((async()=>{
+  const cache=await caches.open(NAME);
+  try { await Promise.all(FILES.map(async file=>cache.put(new URL(file,scope).href,await download(file)))); }
+  catch(error){ await caches.delete(NAME); throw error; }
 })()));
-self.addEventListener('activate', event => event.waitUntil((async () => {
-  for(const name of await caches.keys()) if(name.startsWith('race-shell-') && name!==NAME) await caches.delete(name);
+self.addEventListener('activate',event=>event.waitUntil((async()=>{
+  for(const key of await caches.keys()) if(key.startsWith('race-shell-')&&key!==NAME) await caches.delete(key);
   await self.clients.claim();
 })()));
-self.addEventListener('fetch', event => {
-  const request=event.request, url=new URL(request.url), base=new URL(self.registration.scope);
-  if(request.method!=='GET' || url.origin!==base.origin || !url.pathname.startsWith(base.pathname) || url.pathname.startsWith(base.pathname+'rooms')) return;
-  if(request.mode==='navigate') {
-    if(url.pathname!==base.pathname && url.pathname!==base.pathname+'index.html') return;
-    event.respondWith(caches.open(NAME).then(c=>c.match('index.html'))); return;
+// The page asks for this when the player accepts the reload prompt.
+self.addEventListener('message',event=>{ if(event.data==='skip-waiting') self.skipWaiting(); });
+async function answer(key,request,keep){
+  const cache=await caches.open(NAME);
+  const hit=await cache.match(key,{ignoreSearch:true});
+  if(hit) return hit;
+  const response=await fetch(request);
+  if(keep&&response.status===200&&response.type==='basic'&&!response.redirected)
+    await cache.put(key,response.clone()).catch(()=>{});
+  return response;
+}
+self.addEventListener('fetch',event=>{
+  const request=event.request, url=new URL(request.url);
+  if(request.method!=='GET'||url.origin!==scope.origin||!url.pathname.startsWith(scope.pathname)) return;
+  const path=url.pathname.slice(scope.pathname.length);
+  if(NEVER.some(p=>path===p||path.startsWith(p+'/'))) return;
+  if(request.mode==='navigate'){
+    if(path!==''&&path!=='index.html') return;
+    event.respondWith(answer(SHELL,request,false)); return;
   }
-  if(!FILES.some(file=>new URL(file,base).pathname===url.pathname)) return;
-  event.respondWith(caches.open(NAME).then(async cache => (await cache.match(request, {ignoreSearch:true})) || fetch(request)));
+  const asset=path.startsWith('assets/');
+  if(!asset&&!FILES.includes(path)) return;
+  event.respondWith(answer(new URL(path,scope).href,request,asset));
 });
 `,
 );
