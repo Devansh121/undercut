@@ -1,5 +1,6 @@
 import { NEUTRAL_INPUT, REFERENCE_CAR, createAssistState, createCarState } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
+import { ASSIST_PRESETS } from '../src/assists';
 import { applyDriverAids, assistsFor, brakeHelp, type SpeedGuide } from '../src/driver-aids';
 
 const DT = 1 / 240;
@@ -93,5 +94,12 @@ describe('braking help', () => {
     expect(assistsFor('keyboard', {}).braking).toBeGreaterThan(0);
     expect(assistsFor('touch', {}).braking).toBeGreaterThan(assistsFor('keyboard', {}).braking);
     expect(assistsFor('gamepad', {}).braking).toBe(0);
+  });
+});
+
+describe('driving line presets', () => {
+  it('shows the braking zones by default on keyboard and touch, as the brief asks', () => {
+    expect(ASSIST_PRESETS.keyboard.racingLine).toBe('braking');
+    expect(ASSIST_PRESETS.touch.racingLine).toBe('braking');
   });
 });

@@ -29,6 +29,14 @@ declare global {
     /** The keyboard autopilot as a clumsy player, mistakes seeded. */
     clumsyPilot(seed: number): void;
     camera(name?: string): string;
+    drivingLine(mode?: 'off' | 'braking' | 'full'): {
+      mode: 'off' | 'braking' | 'full';
+      visible: boolean;
+      throttleCount: number;
+      liftCount: number;
+      brakeCount: number;
+      firstBrakeDistance: number | null;
+    };
     pause(): void;
     resume(): void;
     restartLap(): void;

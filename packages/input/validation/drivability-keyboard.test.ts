@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { expectLap, lapTargetName } from '../../ai/validation/expect-lap';
 import { MONZA, referenceLap } from '../../ai/validation/lib/index';
-import { LAP_GAPS } from '../../ai/validation/lib/targets';
+import { LAP_GAPS, REFERENCE_LAP_EXACT } from '../../ai/validation/lib/targets';
 import { ASSISTS_OFF, DRIVABILITY_GAPS, tally } from './lib/compare';
 import { DISCIPLINED } from './lib/human';
 
@@ -13,12 +13,17 @@ import { DISCIPLINED } from './lib/human';
  * off): 1 / 100 / 134 incidents in ten laps, 43 / 70 / 83 s off or spun per lap.
  */
 describe('drivability: keyboard', () => {
-  // The unassisted car: the reference driver's lap against the value the physics suite records
-  // (master's, not a copy), as `reference-lap.test.ts` checks it.
+  // The unassisted car: the reference driver's lap against the physics suite's record, both
+  // the target check (`expectLap`, as `reference-lap.test.ts` runs it) and to the last bit.
   it(lapTargetName('monza-lap-m1'), () => {
     const { result } = referenceLap(MONZA);
+    const lap = result.laps[0]!;
     expect(result.spun).toBe(false);
-    expectLap('monza-lap-m1', result.laps[0]!.time);
+    expectLap('monza-lap-m1', lap.time);
+    const exact = REFERENCE_LAP_EXACT['monza-lap-m1']!;
+    expect(lap.time).toBe(exact.time);
+    expect(lap.trap).toBe(exact.trap);
+    expect(result.ticks).toBe(exact.ticks);
   });
 
   const preset = tally('keyboard', {}, 5, 2);

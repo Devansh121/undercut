@@ -136,31 +136,48 @@ describe('Spa: elevation', () => {
   });
 });
 
-describe('Spa: Kemmel', () => {
-  it('climbs smoothly: no crest or dip a car at 300 km/h would feel as more than 0.3 g', () => {
-    // Regression: a surface-model bump at s 1400 to 1450 m gave -0.87 g (review of PR #18).
-    const v = 300 / 3.6;
-    const w = Math.round(10 / step);
-    let worst = 0;
-    let where = 0;
-    for (let s = corner(4) + 150; s <= corner(5) - 150; s += step) {
-      const i = track.lap.sampleIndex(s);
-      const kv =
-        (track.lap.grade[(i + w) % n]! - track.lap.grade[(i + n - w) % n]!) / (2 * w * step);
-      const acc = Math.abs((v * v * kv) / 9.80665);
-      if (acc > worst) {
-        worst = acc;
-        where = s;
-      }
+/** Largest vertical acceleration a car at 300 km/h feels from the vertical curvature over [a, b]. */
+function worstVerticalG(a: number, b: number): { worst: number; where: number } {
+  const v = 300 / 3.6;
+  const w = Math.round(10 / step);
+  let worst = 0;
+  let where = a;
+  for (let s = a; s <= b; s += step) {
+    const i = track.lap.sampleIndex(s);
+    const kv = (track.lap.grade[(i + w) % n]! - track.lap.grade[(i + n - w) % n]!) / (2 * w * step);
+    const acc = Math.abs((v * v * kv) / 9.80665);
+    if (acc > worst) {
+      worst = acc;
+      where = s;
     }
+  }
+  return { worst, where };
+}
+
+describe('Spa: corrected elevation spans', () => {
+  const fixes = (data.source.dem as { corrections: { from: number; to: number }[] }).corrections;
+
+  it('climbs Kemmel smoothly: no crest or dip a car at 300 km/h would feel as more than 0.3 g', () => {
+    // Regression: a surface-model bump at s 1400 to 1450 m gave -0.87 g (review of PR #18).
+    const { worst, where } = worstVerticalG(corner(4) + 150, corner(5) - 150);
     expect(worst, `s ${where.toFixed(0)}`).toBeLessThan(0.3);
-    // The data's correction is recorded where it was applied.
-    const fixes = (data.source.dem as { corrections: { from: number; to: number }[] }).corrections;
-    const kemmel = fixes.filter((f) => f.from > corner(4) && f.to < corner(5));
-    expect(kemmel).toHaveLength(1);
-    // Every correction is on a straight, clear of Eau Rouge and Raidillon.
+  });
+
+  it('climbs from Blanchimont to the Bus Stop smoothly, through turn 17, under 0.3 g', () => {
+    // Regression: a surface-model step at s 6050 to 6200 m gave +1.33 and -1.20 g (second review
+    // of PR #18). The straights rule skips turn 17 and 150 m either side, so check the whole span.
+    const blanchimont = fixes.filter((f) => f.from > corner(16) && f.to < corner(18));
+    expect(blanchimont).toHaveLength(1);
+    const { worst, where } = worstVerticalG(blanchimont[0]!.from, blanchimont[0]!.to);
+    expect(worst, `s ${where.toFixed(0)}`).toBeLessThan(0.3);
+  });
+
+  it('records three corrections, all clear of Eau Rouge and Raidillon', () => {
+    // Kemmel, the descent to Pouhon and the climb after Blanchimont; the last includes turn 17,
+    // a flat-out kink.
     expect(fixes).toHaveLength(3);
-    for (const f of fixes) expect(f.from > corner(4) || f.to < corner(2) - 200).toBe(true);
+    expect(fixes.filter((f) => f.from > corner(4) && f.to < corner(5))).toHaveLength(1);
+    for (const f of fixes) expect(f.from > corner(4) + 150 || f.to < corner(2) - 200).toBe(true);
   });
 });
 

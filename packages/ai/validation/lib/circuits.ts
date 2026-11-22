@@ -1,6 +1,8 @@
 import { createCarParams, type AeroTrim, type CarParams } from '@undercut/sim';
 import { Track } from '@undercut/track';
 import monza from '@undercut/track/data/monza.json';
+import singapore from '@undercut/track/data/singapore.json';
+import spa from '@undercut/track/data/spa.json';
 import { CIRCUITS } from '../../../sim/validation/lib/harness';
 
 /**
@@ -20,6 +22,8 @@ export interface CircuitSetup {
   controlLine: number;
   /** Track file, relative to the repository root. */
   trackFile: string;
+  /** Published braking stops to measure on the lap: corner number to [from, to] km/h. */
+  stops?: Readonly<Record<number, readonly [number, number]>>;
   track: () => Track;
 }
 
@@ -39,7 +43,35 @@ export const MONZA: CircuitSetup = {
   // track-pipeline task (docs/physics-validation.md section 7.6).
   controlLine: 5472.5,
   trackFile: 'packages/track/data/monza.json',
+  // Brembo: T1 2025, 337 to 89 km/h (doc 2.4).
+  stops: { 1: [337, 89] },
   track: () => Track.fromJSON(monza),
+};
+
+/**
+ * Spa in medium trim (the physics suite's choice for it). The timing line comes from the track
+ * file (track format 3): s = 6875.4 m, 128.6 m before the start line, measured on the 2025 FIA
+ * circuit map (docs/track-data.md section 5.4).
+ */
+export const SPA: CircuitSetup = {
+  id: 'spa',
+  trim: CIRCUITS.spa.trim,
+  airDensity: CIRCUITS.spa.airDensity,
+  fuel: QUALIFYING_FUEL,
+  controlLine: spa.timingLine.s,
+  trackFile: 'packages/track/data/spa.json',
+  track: () => Track.fromJSON(spa),
+};
+
+/** Singapore in high trim; timing line s = 4798.4 m from the track file, as for Spa. */
+export const SINGAPORE: CircuitSetup = {
+  id: 'singapore',
+  trim: CIRCUITS.singapore.trim,
+  airDensity: CIRCUITS.singapore.airDensity,
+  fuel: QUALIFYING_FUEL,
+  controlLine: singapore.timingLine.s,
+  trackFile: 'packages/track/data/singapore.json',
+  track: () => Track.fromJSON(singapore),
 };
 
 export function carFor(setup: CircuitSetup): CarParams {
