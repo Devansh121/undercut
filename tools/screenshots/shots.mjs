@@ -392,10 +392,21 @@ async function mobileUi(browser, report) {
       await page.setViewportSize(size);
       const label = `${size.width}x${size.height}`;
       if (size.width > size.height) await page.evaluate(() => globalThis.__undercut.resume());
-      for (const screen of ['onboarding', 'hud', 'pause', 'settings']) {
+      const landscape = size.width > size.height;
+      const screens = ['onboarding', ...(landscape ? ['onboarding-step2'] : []), 'hud'];
+      for (const screen of [...screens, 'pause', 'settings']) {
         if (screen === 'onboarding') {
           await page.evaluate(() => globalThis.__undercut.pause());
+          // Pause offers Skip while the coach runs and Replay once it is done.
+          const skip = page.locator('[data-action=skip-intro]');
+          if (await skip.isVisible()) await skip.click();
           await page.locator('[data-action=replay-intro]').click();
+        }
+        if (screen === 'onboarding-step2') {
+          // The first tip moves on by driving alone.
+          await page.evaluate(() => globalThis.__undercut.drive({ throttle: 1 }));
+          await page.waitForTimeout(4000);
+          await page.evaluate(() => globalThis.__undercut.drive(null));
         }
         if (screen === 'hud') {
           await page.evaluate(() => globalThis.__undercut.pause());

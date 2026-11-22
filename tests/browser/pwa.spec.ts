@@ -119,6 +119,11 @@ test('installable shell survives a redirecting host, updates on reload, and driv
     await expect(page.locator('html')).toHaveAttribute('data-quality', 'mobile');
     await expect(page.getByTestId('loading')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('settings.quality.auto'))).toBe('medium');
+    // No debug API in this session: quit as a player does, so the WebGL context is released
+    // before teardown (see base.ts).
+    await page.keyboard.press('Escape');
+    await page.getByTestId('pause-menu').locator('[data-action=quit]').click();
+    await expect(page.locator('html')).not.toHaveAttribute('data-screen', 'drive');
     await context.setOffline(false);
   } finally {
     await context.setOffline(false);
