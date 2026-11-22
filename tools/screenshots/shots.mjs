@@ -39,8 +39,8 @@ const option = (name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 
-if (circuit !== 'monza') {
-  console.error(`Only monza has stations in M1 (asked for ${circuit}).`);
+if (!['monza', 'spa', 'singapore'].includes(circuit)) {
+  console.error(`No stations for ${circuit} (monza, spa, singapore).`);
   process.exit(2);
 }
 
@@ -94,7 +94,7 @@ const drive =
     });
   };
 
-const STATIONS = [
+const MONZA_STATIONS = [
   {
     // The full field from in front of the pole slot, twenty cars in ten liveries, five red lights on.
     name: 'grid-front',
@@ -280,6 +280,62 @@ const STATIONS = [
   },
 ];
 
+/** A chase-camera station driving from `from` to `to` (lap metres) at `kmh`. */
+const chase = (name, from, kmh, to, camera = 'chase-near') => ({
+  name,
+  camera,
+  run: drive(from, kmh, to),
+});
+/** A trackside or high camera: eye at (s, d, h), aimed at (s2, d2, h2), with the sim frozen. */
+const tv = (name, eye, aim, fov) => ({
+  name,
+  camera: 'tv',
+  run: async (page) => {
+    await page.evaluate(
+      ({ eye, aim, fov }) => {
+        const u = globalThis.__undercut;
+        u.teleport(aim[0], 0, 0);
+        u.setTimeScale(0);
+        const e = u.trackPoint(eye[0], eye[1], eye[2]);
+        const a = u.trackPoint(aim[0], aim[1], aim[2]);
+        u.tvCamera(e.x, e.y, e.z, fov, a);
+      },
+      { eye, aim, fov },
+    );
+  },
+});
+/** Stations of the circuits after Monza, by corner (see each track file's corner list). */
+const CIRCUIT_STATIONS = {
+  spa: [
+    tv('grid-tv', [20, 6, 3], [6900, 0, 0.8], 30),
+    chase('la-source', 120, 230, 250),
+    chase('eau-rouge', 760, 260, 960, 'chase-far'),
+    tv('raidillon-tv', [1250, -18, 6], [1010, 0, 1], 34),
+    chase('kemmel', 1500, 290, 1900),
+    tv('les-combes-tv', [2200, 25, 8], [2330, 0, 1], 38),
+    chase('pouhon', 3550, 250, 3740, 'chase-far'),
+    tv('paddock-heli', [6750, 120, 70], [6950, -40, 0], 42),
+  ],
+  singapore: [
+    tv('grid-tv', [12, 5, 3], [4840, 0, 0.8], 30),
+    chase('turn-1', 120, 260, 280),
+    chase('raffles', 650, 230, 820),
+    tv('esplanade-tv', [2850, 20, 6], [2700, 0, 1], 34),
+    chase('marina', 3300, 230, 3460, 'chase-far'),
+    tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
+    chase('promenade', 4400, 200, 4560),
+  ],
+};
+const STATIONS = circuit === 'monza' ? MONZA_STATIONS : CIRCUIT_STATIONS[circuit];
+
+/** Sessions start on the chosen circuit: the menu's saved choice, set before the page loads. */
+async function onCircuit(context) {
+  if (circuit === 'monza') return;
+  await context.addInitScript((id) => {
+    globalThis.localStorage.setItem('menu.prefs', JSON.stringify({ version: 1, circuit: id }));
+  }, circuit);
+}
+
 const VIEWPORTS = [
   {
     label: '1440x900',
@@ -355,6 +411,7 @@ async function openGame(browser, vp, extraQuery = '', launchShot = null) {
     isMobile: vp.isMobile,
     hasTouch: vp.hasTouch,
   });
+  await onCircuit(context);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -544,6 +601,16 @@ const PERF_VIEWPORTS = [
   },
 ];
 
+/**
+ * Where the perf drive starts, per circuit: Monza's Lesmo woods, Spa's spruce plantation before
+ * Blanchimont (the most near trees), Singapore's waterfront.
+ */
+const PERF_DRIVE_S = { monza: 4300, spa: 5200, singapore: 3300 };
+/** The circuit's last grid slot (its track file), where the grid run stands. */
+const LAST_SLOT = JSON.parse(
+  fs.readFileSync(path.join(root, `packages/track/data/${circuit}.json`), 'utf8'),
+).grid.at(-1);
+
 async function perf(report) {
   for (const vsync of flag('phone-audit') ? [true] : [true, false]) await perfRuns(report, vsync);
 }
@@ -573,32 +640,50 @@ async function perfRuns(report, vsync) {
       for (const run of flag('phone-audit')
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
-        await page.evaluate((run) => {
-          const u = globalThis.__undercut;
-          u.autopilot(false);
-          u.drive(null);
-          u.gridCars(0);
-          if (run === 'drive') {
-            u.camera('chase-near');
-            u.teleport(4300, 0, 250);
-            u.autopilot(true);
-          } else if (run !== 'grid') {
-            u.camera('chase-near');
-            u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
-            u.drive({ throttle: 0, brake: 1, steer: 0 });
-          } else {
-            // From the last slot looking up the grid: nineteen cars ahead, all in view.
-            u.restartLap();
-            u.gridCars(19);
-            u.camera('chase-far');
-            u.drive({ throttle: 0, brake: 1, steer: 0 });
-          }
-        }, run);
+        await page.evaluate(
+          ([run, driveS, slot]) => {
+            const u = globalThis.__undercut;
+            u.autopilot(false);
+            u.drive(null);
+            u.gridCars(0);
+            if (run === 'drive') {
+              u.camera('chase-near');
+              u.teleport(driveS, 0, 250);
+              u.autopilot(true);
+            } else if (run !== 'grid') {
+              u.camera('chase-near');
+              u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
+              u.drive({ throttle: 0, brake: 1, steer: 0 });
+            } else {
+              // From the last slot looking up the grid: nineteen cars ahead, all in view. The
+              // player stands on the last slot first (the fleet leaves the player's slot free).
+              u.teleport(slot.s, slot.d, 0);
+              u.setTimeScale(0);
+              u.gridCars(19);
+              u.camera('chase-far');
+              u.drive({ throttle: 0, brake: 1, steer: 0 });
+            }
+          },
+          [run, PERF_DRIVE_S[circuit], LAST_SLOT],
+        );
+        if (run === 'grid') {
+          const at = await page.evaluate(() => globalThis.__undercut.state());
+          if (Math.abs(at.s - LAST_SLOT.s) > 1 || Math.abs(at.d - LAST_SLOT.d) > 0.5)
+            throw new Error(`grid run: player at s ${at.s}, d ${at.d}, not the last slot`);
+        }
         await page.waitForTimeout(3000);
-        await page.evaluate(() => globalThis.__undercut.resetFrameTimes());
+        // Frame times are the page's animation frames; the pacer skips the draw on a frame when
+        // the GPU is two frames behind, so the frames actually drawn are counted as well.
+        const before = await page.evaluate(() => {
+          globalThis.__undercut.resetFrameTimes();
+          const st = globalThis.__undercut.renderStats();
+          return { drawn: st.drawnFrames, skipped: st.skippedDraws, t: performance.now() };
+        });
         await page.waitForTimeout(Number(option('perf-seconds') ?? 20) * 1000);
         const times = await page.evaluate(() => globalThis.__undercut.frameTimes());
         const stats = await page.evaluate(() => globalThis.__undercut.renderStats());
+        const seconds = ((await page.evaluate(() => performance.now())) - before.t) / 1000;
+        const drawnFps = (stats.drawnFrames - before.drawn) / seconds;
         const gpu = await page.evaluate(() => {
           const gl = globalThis.document.createElement('canvas').getContext('webgl2');
           const ext = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -612,6 +697,9 @@ async function perfRuns(report, vsync) {
           quality,
           vsync,
           ...summarise(times),
+          drawnFps: +drawnFps.toFixed(1),
+          drawnFrameMs: +(1000 / drawnFps).toFixed(2),
+          skippedDraws: stats.skippedDraws - before.skipped,
           gpu,
           render: stats,
           memory: await page.evaluate(() => ({
@@ -649,6 +737,7 @@ async function moving(browser, report) {
     deviceScaleFactor: 1,
     recordVideo: { dir: videoDir, size: vp.viewport },
   });
+  await onCircuit(context);
   const page = await context.newPage();
   await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=${vp.quality}`);
   await page.waitForFunction(() => Boolean(globalThis.__undercut));
@@ -717,6 +806,7 @@ async function moving(browser, report) {
  */
 async function lifecycle(browser, report) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await onCircuit(context);
   const page = await context.newPage();
   const problems = [];
   page.on('console', (m) => ['error', 'warning'].includes(m.type()) && problems.push(m.text()));
@@ -764,6 +854,9 @@ async function lifecycle(browser, report) {
       await page.evaluate(() => ({
         gl: { ...globalThis.__glBalance },
         info: globalThis.__undercut.rendererInfo(),
+        // Which programs outlive the session and how many materials still hold each: a count
+        // that stays level can hide references that grow session after session.
+        programs: globalThis.__undercut.rendererPrograms(),
       })),
     );
   }
@@ -794,14 +887,64 @@ async function lifecycle(browser, report) {
  * a band of lighter or darker trees travels with the camera.
  */
 const TREE_SWAP_TOLERANCE = 0.1;
+/**
+ * Per circuit: the lighting each is checked under, its own (the menu's first choice) and one
+ * more. Spa is only offered overcast; the afternoon sun is the harder second case there (night
+ * is not offered at Spa).
+ */
+const SWAP_LIGHTING = {
+  monza: [
+    ['day', ''],
+    ['night', '&tod=night-floodlit'],
+  ],
+  spa: [
+    ['overcast', '&tod=overcast-day'],
+    ['sun', '&tod=monza-afternoon'],
+  ],
+};
+/** Per circuit: a chase pose through woods and a high view over them. */
+const SWAP_POSES = {
+  monza: {
+    // Chase camera through the Lesmo woods, and a high view over the park.
+    lesmo: () => {
+      const u = globalThis.__undercut;
+      u.camera('chase-near');
+      u.teleport(1640, 0, 250);
+      u.setTimeScale(0);
+    },
+    park: () => {
+      const u = globalThis.__undercut;
+      u.camera('tv');
+      const e = u.trackPoint(2150, 70, 32);
+      const a = u.trackPoint(2650, -40, 2);
+      u.tvCamera(e.x, e.y, e.z, 42, a);
+    },
+  },
+  spa: {
+    // Chase camera past the spruce plantation before Blanchimont (needleleaved on the map), and
+    // a view from above the far verge across to it, low enough that the near trees fill part of
+    // the frame (from 30 m up they cover 0.2% of it).
+    blanchimont: () => {
+      const u = globalThis.__undercut;
+      u.camera('chase-near');
+      u.teleport(5600, 0, 250);
+      u.setTimeScale(0);
+    },
+    plantation: () => {
+      const u = globalThis.__undercut;
+      u.camera('tv');
+      const e = u.trackPoint(5450, -25, 14);
+      const a = u.trackPoint(5620, 60, 6);
+      u.tvCamera(e.x, e.y, e.z, 42, a);
+    },
+  },
+};
 async function treeSwapCheck(browser, report) {
   const problems = [];
   const cases = [];
-  for (const [label, tod] of [
-    ['day', ''],
-    ['night', '&tod=night-floodlit'],
-  ]) {
+  for (const [label, tod] of SWAP_LIGHTING[circuit]) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await onCircuit(context);
     const page = await context.newPage();
     page.on('pageerror', (e) => problems.push(e.message));
     await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high${tod}`);
@@ -812,22 +955,7 @@ async function treeSwapCheck(browser, report) {
       null,
       { timeout: 120_000 },
     );
-    const poses = {
-      // Chase camera through the Lesmo woods, and a high view over the park.
-      lesmo: () => {
-        const u = globalThis.__undercut;
-        u.camera('chase-near');
-        u.teleport(1640, 0, 250);
-        u.setTimeScale(0);
-      },
-      park: () => {
-        const u = globalThis.__undercut;
-        u.camera('tv');
-        const e = u.trackPoint(2150, 70, 32);
-        const a = u.trackPoint(2650, -40, 2);
-        u.tvCamera(e.x, e.y, e.z, 42, a);
-      },
-    };
+    const poses = SWAP_POSES[circuit];
     const swap = await page.evaluate(() => globalThis.__undercut.treeSwap());
     for (const [name, set] of Object.entries(poses)) {
       await page.evaluate(set);
@@ -913,6 +1041,7 @@ async function skyCheck(browser, report) {
   const problems = [];
   const measure = async (hideFloat) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await onCircuit(context);
     const page = await context.newPage();
     page.on('console', (m) => {
       if (['error', 'warning'].includes(m.type())) problems.push(m.text());

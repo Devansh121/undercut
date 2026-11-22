@@ -77,3 +77,60 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('loads Spa: its dressing and prop models as the budget counts them, conifers and kit garages', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs once on the desktop project');
+  test.setTimeout(90_000);
+
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
+  });
+  const inventory = JSON.parse(
+    fs.readFileSync(path.resolve('apps/web/dist/first-race.json'), 'utf8'),
+  ) as { circuits: Record<string, { presets: Record<string, { files: Record<string, number> }> }> };
+  const expected = inventory.circuits.spa?.presets.mobile?.files ?? {};
+  const fetched = new Map<string, number>();
+  const pending: Promise<void>[] = [];
+  page.on('requestfinished', (request) => {
+    const url = new URL(request.url());
+    if (!/^\/assets\/(props\/|[a-z]+\.dressing-)/.test(url.pathname)) return;
+    pending.push(
+      (async () => {
+        fetched.set(url.pathname.slice(1), (await request.sizes()).responseBodySize);
+      })(),
+    );
+  });
+  await page.addInitScript(() => {
+    globalThis.localStorage.setItem('menu.prefs', JSON.stringify({ version: 1, circuit: 'spa' }));
+  });
+
+  await page.goto('/?quality=mobile&debug=1');
+  await startTimeTrial(page);
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+  await Promise.all(pending);
+  const wanted = Object.keys(expected).filter((f) =>
+    /^assets\/(props\/|spa\.dressing-.*\.json$)/.test(f),
+  );
+  expect(wanted.some((f) => f.includes('hill-pit-garage'))).toBe(true);
+  // Mobile draws no near trees: the forest models are not fetched there.
+  expect(wanted.some((f) => f.includes('forest-'))).toBe(false);
+  expect([...fetched.keys()].sort()).toEqual(wanted.sort());
+  for (const [rel, bytes] of fetched)
+    expect(bytes, `${rel}: bytes on the wire`).toBe(expected[rel]);
+
+  const counts = await page.evaluate(() => window.__undercut?.worldCounts() ?? null);
+  expect(counts).not.toBeNull();
+  expect(counts!.pitGarages).toBeGreaterThanOrEqual(20);
+  expect(counts!.garageBays).toBe(counts!.pitGarages);
+  expect(counts!.treesConifer).toBeGreaterThan(100);
+  expect(counts!.stands).toBeGreaterThan(3);
+  expect(counts!.crowd).toBeGreaterThan(50);
+
+  await page.evaluate(() => window.__undercut?.quit());
+  await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});

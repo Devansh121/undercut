@@ -127,13 +127,50 @@ const RETIRED_FADE_S = 3;
 let pageRenderer: ReturnType<typeof createRenderer> | null = null;
 
 /** Live GPU resources of the page's renderer, for the lifecycle test (0s before any session). */
-export function rendererInfo(): { geometries: number; textures: number; programs: number } {
+export function rendererInfo(): {
+  geometries: number;
+  textures: number;
+  programs: number;
+  programRefs: number;
+} {
   const info = pageRenderer?.info;
   return {
     geometries: info?.memory.geometries ?? 0,
     textures: info?.memory.textures ?? 0,
     programs: info?.programs?.length ?? 0,
+    // Materials holding the programs: a program is freed when its last material is disposed.
+    programRefs: (info?.programs ?? []).reduce((n, p) => n + p.usedTimes, 0),
   };
+}
+
+/** The page renderer's live programs: shader name, cache key (shortened) and materials using it. */
+export function rendererPrograms(): {
+  name: string;
+  key: string;
+  used: number;
+  uniforms: string;
+}[] {
+  const gl = pageRenderer?.getContext();
+  return (pageRenderer?.info.programs ?? []).map((p) => {
+    const program = p.program as WebGLProgram;
+    // The program's own uniforms (three's built-ins left out) say whose shader it is.
+    const names: string[] = [];
+    const n = gl ? (gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number) : 0;
+    for (let i = 0; i < n; i++) {
+      const u = gl?.getActiveUniform(program, i);
+      if (u && (p.usedTimes > 1 || /^u[A-Z]/.test(u.name)))
+        names.push(u.name.replace(/\[0\]$/, ''));
+    }
+    return {
+      name: p.name,
+      key:
+        p.cacheKey.length > 200
+          ? `${p.cacheKey.slice(0, 40)}…${p.cacheKey.slice(-160)}`
+          : p.cacheKey,
+      used: p.usedTimes,
+      uniforms: names.join(' '),
+    };
+  });
 }
 
 /** What the drive screen needs from the page's audio: lifecycle and the volume sliders. */

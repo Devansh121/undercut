@@ -9,6 +9,7 @@ import {
   type Vector3,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
+import { createPropKitMaterial } from '../props/catalog';
 import { hash01 } from './dressing';
 import { ATLAS_COLS, ATLAS_ROWS, BARK_TILE, CLUSTER_TILE } from './tree-atlas';
 
@@ -432,4 +433,19 @@ export function treeCloudMaterials(
   depth.onBeforeCompile = hook;
   depth.customProgramCacheKey = () => `tree-cloud-depth-${options.wind ? 1 : 0}`;
   return { material, depth };
+}
+
+/**
+ * The prop kit's material for kit tree models drawn as near trees (the conifers): faded in per
+ * tree over the swap band as the cards fade out, as the near trees of the atlas are.
+ */
+export function nearKitTreeMaterial(swap: TreeSwap): MeshStandardMaterial {
+  const m = createPropKitMaterial({ key: 'tree-kit-near' });
+  const inner = m.onBeforeCompile.bind(m);
+  m.onBeforeCompile = (shader, renderer) => {
+    inner(shader, renderer);
+    addSwap(shader, swap, true);
+  };
+  m.customProgramCacheKey = () => 'tree-kit-near-v1';
+  return m;
 }

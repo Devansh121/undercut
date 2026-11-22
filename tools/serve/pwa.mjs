@@ -107,10 +107,14 @@ if (process.argv.includes('--icons')) process.exit(0);
 /*
  * Precache the shell (stored under './', never 'index.html': a static host may answer
  * /index.html with a redirect to /, and a redirected response cannot answer a navigation) and
- * the Mobile first-race files under assets/. Endpoints in the inventory such as network-info
- * are dynamic and are never cached.
+ * the Mobile first-race files under assets/ (Monza's), with every circuit's own code chunks
+ * (track, racing lines, dressing). Endpoints in the inventory such as network-info are dynamic
+ * and are never cached.
  */
 const inventory = JSON.parse(fs.readFileSync(`${dir}/first-race.json`));
+const circuitCode = Object.values(inventory.circuits ?? {})
+  .flatMap((c) => Object.keys(c.presets.mobile?.files ?? {}))
+  .filter((f) => f.startsWith('assets/') && !/^assets\/(tex|env|car|draco|props)\//.test(f));
 const files = [
   ...new Set([
     './',
@@ -118,6 +122,7 @@ const files = [
     ...ICONS.map((i) => i.src),
     APPLE_ICON,
     ...Object.keys(inventory.presets.mobile.files).filter((f) => f.startsWith('assets/')),
+    ...circuitCode,
   ]),
 ];
 const diskPath = (file) => `${dir}/${file === './' ? 'index.html' : file}`;

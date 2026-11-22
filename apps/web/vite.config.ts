@@ -154,6 +154,9 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
+    // The chunk graph (dist/.vite/manifest.json): the budget check follows it from the page to
+    // the chunks a race at each circuit loads.
+    manifest: true,
     // The real gate is tools/budget; this only silences Vite's generic warning.
     chunkSizeWarningLimit: 1500,
     rolldownOptions: {

@@ -67,6 +67,28 @@ export interface PropCatalog {
  */
 export const WORLD_CATALOG_PROP_IDS: readonly string[] = Object.freeze([...worldProps.ids]);
 
+interface CircuitProps {
+  ids?: readonly string[];
+  nearTrees?: readonly string[];
+}
+const CIRCUIT_PROPS: Readonly<Record<string, CircuitProps>> = worldProps.circuits;
+
+/**
+ * The catalogue ids one circuit's world places on a preset: the common ones, the circuit's own,
+ * and its near-tree models where the preset draws near trees as geometry.
+ */
+export function worldCatalogPropIds(
+  circuit: string,
+  quality: { world: { treeCloud: number } },
+): string[] {
+  const own = CIRCUIT_PROPS[circuit] ?? {};
+  return [
+    ...WORLD_CATALOG_PROP_IDS,
+    ...(own.ids ?? []),
+    ...(quality.world.treeCloud > 0 ? (own.nearTrees ?? []) : []),
+  ];
+}
+
 /** Material names that receive per-instance colour tinting by default (team colours / crowd clothes). */
 const DEFAULT_TINTABLE_SLOTS = new Set(['clothing', 'paint-band', 'seat', 'team-tint']);
 
@@ -102,12 +124,26 @@ export function catalogAssetPath(file: string): string {
   return file.replace(/^assets\//, '');
 }
 
-/** Pick the LODs to fetch for a given quality preset (drops `_high.glb` on mobile/lite). */
+/**
+ * A circuit's near-tree models (world-props.json `circuits.<id>.nearTrees`): drawn only inside the
+ * near-tree swap distance, where the cards take over, so their far level is never fetched.
+ */
+export function nearTreePropIds(circuit: string): ReadonlySet<string> {
+  return new Set(CIRCUIT_PROPS[circuit]?.nearTrees ?? []);
+}
+
+/**
+ * Pick the LODs to fetch for a given quality preset (drops `_high.glb` on mobile/lite, and
+ * `_far.glb` when `withoutFar`).
+ */
 export function selectCatalogLods(
   entry: PropCatalogEntry,
   quality: Pick<Quality, 'name'>,
+  withoutFar = false,
 ): PropCatalogLod[] {
-  const sorted = [...entry.lods].sort((a, b) => a.maxDistance - b.maxDistance);
+  const sorted = [...entry.lods]
+    .sort((a, b) => a.maxDistance - b.maxDistance)
+    .filter((l) => !withoutFar || !/_far\.glb$/i.test(l.file));
   if (quality.name === 'mobile' || quality.name === 'lite') {
     const light = sorted.filter((l) => !/_high\.glb$/i.test(l.file));
     if (light.length > 0) return light;
@@ -449,6 +485,8 @@ export interface PropLodOptions {
   slotColors?: Readonly<Record<string, readonly [number, number, number]>>;
   /** Optional replacement unified material for non-overridden slots (e.g. swaying crowd). */
   baseMaterial?: Material;
+  /** Multiplier on every slot's colour (calibrating a model against what it stands in for). */
+  colourScale?: number;
 }
 
 /**
@@ -499,6 +537,8 @@ export class PropKitAssets {
     quality: Quality,
     dracoPath: string,
     wantedIds: readonly string[] = WORLD_CATALOG_PROP_IDS,
+    /** Ids loaded without their far level (`nearTreePropIds`). */
+    withoutFar: ReadonlySet<string> = new Set(),
   ): Promise<PropKitAssets> {
     const kit = new PropKitAssets();
     const wanted = new Set(wantedIds);
@@ -513,7 +553,7 @@ export class PropKitAssets {
 
     // Declare every file first so the loading progress bar reflects the full prop kit bytes.
     const plan: { entry: PropCatalogEntry; lods: PropCatalogLod[] }[] = targets.map((entry) => {
-      const lods = selectCatalogLods(entry, quality);
+      const lods = selectCatalogLods(entry, quality, withoutFar.has(entry.id));
       for (const lod of lods) loader.expect(catalogAssetPath(lod.file), lod.bytes);
       return { entry, lods };
     });
@@ -564,6 +604,7 @@ export class PropKitAssets {
     const caps = options.distanceCaps;
     const tintSet = options.tintSlots ? new Set(options.tintSlots) : DEFAULT_TINTABLE_SLOTS;
     const slotColors = options.slotColors;
+    const k = options.colourScale ?? 1;
     const baseMat = options.baseMaterial ?? this.getSharedMaterial();
 
     return list.map((lod, lodIdx) => {
@@ -597,9 +638,9 @@ export class PropKitAssets {
         const c = slotColors?.[s.name] ?? s.color;
         for (let i = 0; i < count; i++) {
           const k3 = (vOff + i) * 3;
-          col[k3] = c[0];
-          col[k3 + 1] = c[1];
-          col[k3 + 2] = c[2];
+          col[k3] = c[0] * k;
+          col[k3 + 1] = c[1] * k;
+          col[k3 + 2] = c[2] * k;
           pbr[k3] = s.roughness;
           pbr[k3 + 1] = s.metalness;
           pbr[k3 + 2] = tintMask;
