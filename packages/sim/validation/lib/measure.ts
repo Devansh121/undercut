@@ -44,6 +44,7 @@ export function measureBrakingEvent(e: BrakingEvent): {
       [`${e.id}-distance`]: run.distance,
       [`${e.id}-time`]: run.time,
       [`${e.id}-peak`]: run.peakG,
+      ...(e.power === undefined ? {} : { [`${e.id}-power`]: run.peakBrakePower / 1e3 }),
     },
   };
 }
