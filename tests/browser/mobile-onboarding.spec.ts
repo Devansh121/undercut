@@ -4,9 +4,9 @@ test('first-lap coach can be skipped and replayed, with safe phone rotation', as
   drive,
 }, info) => {
   const { page } = drive;
-  const tick = await page.evaluate(() => window.__undercut!.state().tick);
+  const tick = await page.evaluate(() => Number(window.__undercut!.state().tick));
   await expect
-    .poll(() => page.evaluate(() => window.__undercut!.state().tick))
+    .poll(() => page.evaluate(() => Number(window.__undercut!.state().tick)))
     .toBeGreaterThan(tick);
 
   await page.evaluate(() => window.__undercut!.pause());
