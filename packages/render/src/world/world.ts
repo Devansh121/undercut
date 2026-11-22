@@ -237,7 +237,8 @@ export class CircuitWorld {
   /** Per-tree swap between near trees and cards (eye updated every frame). */
   private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
   private readonly crowdTime = { value: 0 };
-  private readonly lap: LapIndex;
+  /** Nearest lap sample to a world point (shared with the view's lamp map). */
+  readonly lap: LapIndex;
   private readonly worldChunks: WorldChunk[] = [];
   private pitComplex: PitComplexData | null = null;
   private startGantry: StartGantry | null = null;

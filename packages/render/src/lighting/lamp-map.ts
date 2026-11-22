@@ -83,19 +83,25 @@ export function lampOnGround(
 }
 
 /**
- * The lamp light level ground gets at (x, z), as the scenery's shader adds it: the pooled lights
- * (three's point lights, here on the baked ground point) plus the baked light less their share.
+ * The lamp light a level surface at (x, y, z) gets, as the scenery's shader adds it: the pooled
+ * lights as three.js lights the point itself, plus the baked light less what those pooled lights
+ * put on the map's ground point (the height the cell was baked at).
  */
 export function lampLightAt(
   map: LampMap,
   pooled: readonly PooledLamp[],
   x: number,
+  y: number,
   z: number,
 ): number {
   const { e, ground } = map.sample(x, z);
   let pool = 0;
-  for (const l of pooled) pool += lampOnGround(l, x, ground, z);
-  return pool + Math.max(0, e - pool);
+  let share = 0;
+  for (const l of pooled) {
+    pool += lampOnGround(l, x, y, z);
+    share += lampOnGround(l, x, ground, z);
+  }
+  return pool + Math.max(0, e - share);
 }
 
 /**
@@ -112,9 +118,17 @@ export function bakeLampMap(
   const w = Math.max(2, Math.ceil((x1 - x0) / cell) + 1);
   const h = Math.max(2, Math.ceil((z1 - z0) / cell) + 1);
   const e = new Float32Array(w * h);
+  // The ground height of the cells a lamp reaches, found the first time one does; the others get
+  // no light, so their height is never used.
   const ground = new Float32Array(w * h);
-  for (let j = 0; j < h; j++)
-    for (let i = 0; i < w; i++) ground[j * w + i] = groundAt(x0 + i * cell, z0 + j * cell);
+  const known = new Uint8Array(w * h);
+  const groundOf = (k: number, x: number, z: number): number => {
+    if (!known[k]) {
+      ground[k] = groundAt(x, z);
+      known[k] = 1;
+    }
+    return ground[k] as number;
+  };
   // Mean colour of the lamps (they are all warm white); the texture holds the scalar.
   const colour = new Color(0, 0, 0);
   for (const l of lights) {
@@ -126,8 +140,9 @@ export function bakeLampMap(
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
         const k = j * w + i;
-        e[k] =
-          (e[k] as number) + lampOnGround(l, x0 + i * cell, ground[k] as number, z0 + j * cell);
+        const x = x0 + i * cell;
+        const z = z0 + j * cell;
+        e[k] = (e[k] as number) + lampOnGround(l, x, groundOf(k, x, z), z);
       }
     }
     colour.add(new Color(l.colour));

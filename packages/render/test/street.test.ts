@@ -19,10 +19,11 @@ import {
 } from '../src/props/catalog';
 import type { PropKind, PropPlacement, PropRegistry } from '../src/props/registry';
 import { buildingHeight } from '../src/world/buildings';
-import { decodeTerrain, inRing, type DressingFile } from '../src/world/dressing';
+import { decodeTerrain, gridHeight, inRing, type DressingFile } from '../src/world/dressing';
 import { LapIndex } from '../src/world/lap-index';
+import { receivingHeight } from '../src/world/corridor';
 import { pickBackdrops, placeStreetCircuit } from '../src/world/street';
-import { waterBodies } from '../src/world/terrain';
+import { WATER_DEPTH, waterBodies } from '../src/world/terrain';
 import { worldTheme } from '../src/world/theme';
 
 const track = Track.fromJSON(singaporeTrackJson);
@@ -58,7 +59,7 @@ function recorder(): { props: PropRegistry; placed: Map<string, PropPlacement[]>
   return { props, placed };
 }
 
-function streetAt(night: boolean) {
+function streetAt(night: boolean, heightAt: (x: number, z: number) => number = () => 0) {
   const { props, placed } = recorder();
   const spectators: { x: number; z: number }[] = [];
   const res = placeStreetCircuit({
@@ -68,7 +69,7 @@ function streetAt(night: boolean) {
     kit: fakeKit(),
     street,
     obstacles: [...dressing.mapped.building, ...dressing.mapped.water],
-    heightAt: () => 0,
+    heightAt,
     night,
     mobile: false,
     castShadows: true,
@@ -160,57 +161,77 @@ describe('baked lamp light', () => {
   it('bakes a lamp onto the ground below it and nowhere beyond its reach', () => {
     const lamp = { x: 0, y: 10, z: 0, colour: '#ffffff', intensity: 900, distance: 70 };
     const map = bakeLampMap([lamp], [-100, -100, 100, 100], 2, () => 0);
-    // Half-float storage: three significant figures.
-    expect(map.sample(0, 0).e / (900 * lampFalloff(10, 70))).toBeCloseTo(1, 2);
+    expect(map.sample(0, 0).e).toBeCloseTo(900 * lampFalloff(10, 70), 3);
     // At 20 m out: the angle of incidence and the distance both count.
     const d = Math.hypot(20, 10);
-    expect(map.sample(20, 0).e / (900 * lampFalloff(d, 70) * (10 / d))).toBeCloseTo(1, 2);
+    expect(map.sample(20, 0).e).toBeCloseTo(900 * lampFalloff(d, 70) * (10 / d), 3);
     expect(map.sample(80, 0).e).toBe(0);
     map.dispose();
   });
 
-  it('lights the road once as banks hand over between the pooled lights and the bake', () => {
-    // Singapore's own banks on level ground, the pool as a session runs it.
-    const { res } = streetAt(true);
+  it('lights the road once as banks hand over between the pooled lights and the bake, at its real height', () => {
+    // Singapore's terrain (held under its water, as the world holds it) and its road, which
+    // stands metres above the water on the Esplanade bridge (s 3000).
+    const grid = decodeTerrain(dressing.terrain);
+    const water = waterBodies(dressing.mapped.water, grid);
+    const terrainAt = (x: number, z: number): number => {
+      let h = gridHeight(grid, x, z);
+      for (const b of water) if (inRing(b.p, x, z)) h = Math.min(h, b.level - WATER_DEPTH);
+      return h;
+    };
+    const surfaceAt = receivingHeight(track, lap, terrainAt);
+    // The banks stand on that ground; the map is baked on it.
+    const { res } = streetAt(true, surfaceAt);
     const lights = res.lights;
-    const map = bakeLampMap(lights, [-1400, -1400, 1400, 1400], 2, () => 0);
-    const pool = new LightPool(new Scene(), 8);
-    pool.setLights(lights);
+    const map = bakeLampMap(lights, [-1400, -1400, 1400, 1400], 2, surfaceAt);
     const eye = new Vector3();
     const p = { x: 0, y: 0, z: 0 };
-    const pooled = (): PooledLamp[] =>
-      pool.active.map((l) => ({
-        x: l.position.x,
-        y: l.position.y,
-        z: l.position.z,
-        intensity: l.intensity,
-        distance: l.distance,
-      }));
-    let worst = 0;
-    let naiveWorst = 0;
-    for (const probeS of [500, 1000, 2000, 3000, 4500]) {
-      track.lap.pointAt(probeS, 0, p);
-      const px = p.x;
-      const pz = p.z;
+    const probes = [500, 1000, 2000, 3000, 4500].map((s) => {
+      track.lap.pointAt(s, 0, p);
+      const y = track.groundHeightAt(p.x, p.z);
       let reference = 0;
-      for (const l of lights) reference += lampOnGround(l, px, 0, pz);
-      expect(reference).toBeGreaterThan(0);
-      // The camera drives past the probe: from 300 m before to 300 m after it.
-      for (let ds = -300; ds <= 300; ds += 5) {
-        track.lap.pointAt((probeS + ds + track.length) % track.length, 0, p);
-        eye.set(p.x, 1.2, p.z);
-        pool.update(eye);
-        const slots = pooled();
-        const total = lampLightAt(map, slots, px, pz);
-        worst = Math.max(worst, Math.abs(total / reference - 1));
-        // Adding the whole bake to the pooled lights, as before: lit twice near the camera.
-        let pool0 = 0;
-        for (const l of slots) pool0 += lampOnGround(l, px, 0, pz);
-        naiveWorst = Math.max(naiveWorst, (pool0 + map.sample(px, pz).e) / reference);
+      for (const l of lights) reference += lampOnGround(l, p.x, y, p.z);
+      return { s, x: p.x, y, z: p.z, reference };
+    });
+    // On the bridge the road is far above the terrain under it, and the map holds the road.
+    const bridge = probes.find((q) => q.s === 3000)!;
+    expect(bridge.y - terrainAt(bridge.x, bridge.z)).toBeGreaterThan(3);
+    expect(map.sample(bridge.x, bridge.z).ground).toBeCloseTo(bridge.y, 1);
+    // Eight slots with post-processing, four without (Mobile).
+    for (const slots of [8, 4]) {
+      const pool = new LightPool(new Scene(), slots);
+      pool.setLights(lights);
+      let lo = Infinity;
+      let hi = 0;
+      let naiveHi = 0;
+      for (const q of probes) {
+        expect(q.reference).toBeGreaterThan(0);
+        // The camera drives past the probe: from 300 m before to 300 m after it.
+        for (let ds = -300; ds <= 300; ds += 5) {
+          track.lap.pointAt((q.s + ds + track.length) % track.length, 0, p);
+          eye.set(p.x, track.groundHeightAt(p.x, p.z) + 1.2, p.z);
+          pool.update(eye);
+          const pooled: PooledLamp[] = pool.active.map((l) => ({
+            x: l.position.x,
+            y: l.position.y,
+            z: l.position.z,
+            intensity: l.intensity,
+            distance: l.distance,
+          }));
+          const ratio = lampLightAt(map, pooled, q.x, q.y, q.z) / q.reference;
+          lo = Math.min(lo, ratio);
+          hi = Math.max(hi, ratio);
+          // Adding the whole bake to the pooled lights: lit twice near the camera.
+          let pool0 = 0;
+          for (const l of pooled) pool0 += lampOnGround(l, q.x, q.y, q.z);
+          naiveHi = Math.max(naiveHi, (pool0 + map.sample(q.x, q.z).e) / q.reference);
+        }
       }
+      expect(lo, `${slots} slots`).toBeGreaterThan(0.97);
+      expect(hi, `${slots} slots`).toBeLessThan(1.03);
+      expect(naiveHi).toBeGreaterThan(1.3);
+      pool.dispose();
     }
-    expect(worst).toBeLessThan(0.03);
-    expect(naiveWorst).toBeGreaterThan(1.3);
     map.dispose();
   });
 });

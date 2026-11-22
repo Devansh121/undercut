@@ -37,7 +37,7 @@ import {
   type LampMap,
   type PooledLamp,
 } from './lighting/lamp-map';
-import { TERRAIN_DROP } from './world/terrain';
+import { receivingHeight } from './world/corridor';
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { FramePacer, webglFences } from './pipeline/frame-pacer';
@@ -557,13 +557,12 @@ export class RaceView {
         z1 = Math.max(z1, lap.z[i] as number);
       }
       const m = LAMP_MAP_MARGIN;
-      // At road level: the world's ground stands TERRAIN_DROP below the track's surface.
-      const world = this.world;
+      // On the surface that receives the light: the road where the track is, the terrain beyond.
       this.lampMap = bakeLampMap(
         lamps,
         [x0 - m, z0 - m, x1 + m, z1 + m],
         LAMP_MAP_CELL,
-        (x, z) => world.heightAt(x, z) + TERRAIN_DROP,
+        receivingHeight(this.track, this.world.lap, this.world.heightAt),
       );
       addLampLight([this.trackView.group, this.world.group, this.props.group], this.lampMap);
     }

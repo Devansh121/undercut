@@ -45,3 +45,26 @@ export function footprintOnTrack(
   lap.forEachSampleIn(x0, z0, x1, z1, (_i, x, z) => (inside = inRing(p, x, z)));
   return inside;
 }
+
+/** How far beyond the barriers the lamp map takes the track's ground for its height, m. */
+export const RECEIVER_MARGIN = 3;
+
+/**
+ * Height of the surface that receives light at (x, z): the track's own ground (road, kerbs,
+ * run-off, as the track draws it) inside the barriers and `margin` beyond, the world's terrain
+ * elsewhere. They differ by metres where the road stands on a bridge or a quay over lower ground.
+ */
+export function receivingHeight(
+  track: { groundHeightAt(x: number, z: number): number },
+  lap: LapIndex,
+  terrainAt: (x: number, z: number) => number,
+  margin = RECEIVER_MARGIN,
+): (x: number, z: number) => number {
+  const hit = { index: 0, s: 0, d: 0, dist: 0 };
+  return (x, z) => {
+    lap.nearest(x, z, hit);
+    return hit.dist <= lap.barrierAt(hit.index, hit.d) + margin
+      ? track.groundHeightAt(x, z)
+      : terrainAt(x, z);
+  };
+}
