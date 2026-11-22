@@ -4,20 +4,20 @@ Twelve original scripted props, each with High / Mobile / Far LODs. All sizes be
 
 | Prop | Triangles (High / Mobile / Far) | Bytes (High / Mobile / Far) |
 | --- | --- | --- |
-| street-block | 88 / 88 / 40 | 6112 / 6016 / 3592 |
-| street-fence | 948 / 448 / 192 | 15828 / 9304 / 6332 |
-| street-fence-end | 84 / 52 / 52 | 4872 / 4468 / 4468 |
-| floodlight-mast | 568 / 172 / 172 | 15640 / 8696 / 8696 |
-| lighting-truss | 884 / 412 / 412 | 16712 / 9496 / 9496 |
-| temporary-grandstand | 2904 / 1912 / 1552 | 38840 / 28252 / 22116 |
-| marina-office | 652 / 524 / 440 | 13852 / 10836 / 10276 |
-| marina-hotel | 752 / 624 / 516 | 14524 / 11304 / 10636 |
-| marina-pavilion | 336 / 208 / 208 | 12244 / 9364 / 9364 |
-| hill-pit-garage | 1448 / 696 / 444 | 36680 / 18920 / 15916 |
-| forest-spruce | 7062 / 3254 / 40 | 255372 / 117188 / 39028 |
-| forest-fir | 5540 / 2564 / 40 | 206620 / 97684 / 37324 |
+| street-block | 88 / 88 / 40 | 6168 / 6076 / 3624 |
+| street-fence | 948 / 448 / 192 | 15864 / 9344 / 6364 |
+| street-fence-end | 84 / 52 / 52 | 4916 / 4516 / 4512 |
+| floodlight-mast | 568 / 172 / 172 | 15740 / 8804 / 8792 |
+| lighting-truss | 884 / 412 / 412 | 16780 / 9572 / 9564 |
+| temporary-grandstand | 2904 / 1912 / 1552 | 38940 / 28360 / 22188 |
+| marina-office | 652 / 524 / 440 | 13956 / 10948 / 10372 |
+| marina-hotel | 752 / 624 / 516 | 14620 / 11412 / 10724 |
+| marina-pavilion | 336 / 208 / 208 | 12352 / 9480 / 9464 |
+| hill-pit-garage | 1448 / 696 / 444 | 36808 / 19064 / 16040 |
+| forest-spruce | 7062 / 3254 / 40 | 255412 / 117228 / 39072 |
+| forest-fir | 5540 / 2564 / 40 | 206648 / 97712 / 37356 |
 
-New kit: 1,146,068 bytes across all LODs. Complete catalogue: 3,568,588 bytes, below the existing 4,000,000 byte cap.
+New kit: 1,148,792 bytes across all LODs. Complete catalogue: 3,571,312 bytes, below the existing 4,000,000 byte cap.
 
 The production build reports 8.87 MiB for the existing High first race and 3.69 MiB on Mobile. `kit-budget.json` reserves every new LOD plus both circuits’ skies at both tiers on top of that baseline: High 10.08 MiB, Mobile 4.90 MiB. This is a conservative model-asset allowance, not measured integrated Spa/Singapore traffic. Terrain, placement, light layout and circuit request telemetry remain with dressing.
 
@@ -31,7 +31,7 @@ The production build reports 8.87 MiB for the existing High first race and 3.69 
 - `forest-transition.json` and `forest-<id>-transition.jpg`: High, Mobile and Far from the same camera at 0°, 30° and 60° (High | Mobile | Far | Mobile against Far: red Mobile only, blue Far only, white both), with mean luma, silhouette coverage and silhouette IoU. The capture fails if Mobile/Far coverage leaves 0.85–1.2 or either IoU drops below 0.6 (measured: coverage 1.04–1.12, IoU 0.62–0.77, lowest at 30° between card planes).
 - `kit-budget.json`: per-LOD counts/sizes and conservative transfer reservation. Run `node tools/props/kit-budget.mjs` after `npm run build`.
 
-Build with `npm run props:build -- --kits-only`. Capture under the shared GPU lock using the commands in `tools/props/README.md`. All captures are inspected before handoff. The preview closes its server and browser in `finally`.
+Build with `npm run props:build -- --kits-only`. A full `npm run props:build` from an empty props folder (a clean export of this branch) succeeds and reproduces all 36 kit files and every slice 1 file byte for byte, except 23 crew and crowd files, which differ only in vertex order (same vertices, materials and AO, decoded; the documented export nondeterminism of the people). This branch leaves those people files as master has them. Kit meshes are named `<id>-<level>-<material>`, so a kits-only and a full build name them alike. Capture under the shared GPU lock using the commands in `tools/props/README.md`. All captures are inspected before handoff. The preview closes its server and browser in `finally`.
 
 ## Integration notes
 

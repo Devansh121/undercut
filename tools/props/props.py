@@ -851,6 +851,11 @@ for ident, module in specs:
             bpy.ops.object.join()
             ob = bpy.context.object
             ob.name = key
+            if ident in dict(SPECS):
+                # Blender suffixes reused datablock names (Cube.001, Cube.2523) by how many meshes
+                # came before, so a kits-only and a full build named the same mesh differently.
+                # One name per prop, level and material keeps the kit's files identical either way.
+                ob.data.name = f"{ident}-{('high', 'mobile', 'far')[lod]}-{key}"
             bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
             # Lateral reflection reverses winding; recalculate normals preserving per-face smoothness.
             bm = bmesh.new()

@@ -1380,21 +1380,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 88,
-          "bytes": 6112
+          "bytes": 6168
         },
         {
           "file": "assets/props/street-block_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 88,
-          "bytes": 6016
+          "bytes": 6076
         },
         {
           "file": "assets/props/street-block_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 40,
-          "bytes": 3592
+          "bytes": 3624
         }
       ],
       "bounds": {
@@ -1416,21 +1416,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 948,
-          "bytes": 15828
+          "bytes": 15864
         },
         {
           "file": "assets/props/street-fence_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 448,
-          "bytes": 9304
+          "bytes": 9344
         },
         {
           "file": "assets/props/street-fence_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 192,
-          "bytes": 6332
+          "bytes": 6364
         }
       ],
       "bounds": {
@@ -1452,21 +1452,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 84,
-          "bytes": 4872
+          "bytes": 4916
         },
         {
           "file": "assets/props/street-fence-end_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 52,
-          "bytes": 4468
+          "bytes": 4516
         },
         {
           "file": "assets/props/street-fence-end_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 52,
-          "bytes": 4468
+          "bytes": 4512
         }
       ],
       "bounds": {
@@ -1488,21 +1488,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 568,
-          "bytes": 15640
+          "bytes": 15740
         },
         {
           "file": "assets/props/floodlight-mast_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 172,
-          "bytes": 8696
+          "bytes": 8804
         },
         {
           "file": "assets/props/floodlight-mast_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 172,
-          "bytes": 8696
+          "bytes": 8792
         }
       ],
       "bounds": {
@@ -1543,21 +1543,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 884,
-          "bytes": 16712
+          "bytes": 16780
         },
         {
           "file": "assets/props/lighting-truss_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 412,
-          "bytes": 9496
+          "bytes": 9572
         },
         {
           "file": "assets/props/lighting-truss_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 412,
-          "bytes": 9496
+          "bytes": 9564
         }
       ],
       "bounds": {
@@ -1594,21 +1594,21 @@
           "maxDistance": 80,
           "triangleBudget": 4000,
           "triangles": 2904,
-          "bytes": 38840
+          "bytes": 38940
         },
         {
           "file": "assets/props/temporary-grandstand_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 2200,
           "triangles": 1912,
-          "bytes": 28252
+          "bytes": 28360
         },
         {
           "file": "assets/props/temporary-grandstand_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 1800,
           "triangles": 1552,
-          "bytes": 22116
+          "bytes": 22188
         }
       ],
       "bounds": {
@@ -1687,21 +1687,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 652,
-          "bytes": 13852
+          "bytes": 13956
         },
         {
           "file": "assets/props/marina-office_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 524,
-          "bytes": 10836
+          "bytes": 10948
         },
         {
           "file": "assets/props/marina-office_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 440,
-          "bytes": 10276
+          "bytes": 10372
         }
       ],
       "bounds": {
@@ -1725,21 +1725,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 752,
-          "bytes": 14524
+          "bytes": 14620
         },
         {
           "file": "assets/props/marina-hotel_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 624,
-          "bytes": 11304
+          "bytes": 11412
         },
         {
           "file": "assets/props/marina-hotel_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 516,
-          "bytes": 10636
+          "bytes": 10724
         }
       ],
       "bounds": {
@@ -1763,21 +1763,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 336,
-          "bytes": 12244
+          "bytes": 12352
         },
         {
           "file": "assets/props/marina-pavilion_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 208,
-          "bytes": 9364
+          "bytes": 9480
         },
         {
           "file": "assets/props/marina-pavilion_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 208,
-          "bytes": 9364
+          "bytes": 9464
         }
       ],
       "bounds": {
@@ -1801,21 +1801,21 @@
           "maxDistance": 80,
           "triangleBudget": 30000,
           "triangles": 1448,
-          "bytes": 36680
+          "bytes": 36808
         },
         {
           "file": "assets/props/hill-pit-garage_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 12000,
           "triangles": 696,
-          "bytes": 18920
+          "bytes": 19064
         },
         {
           "file": "assets/props/hill-pit-garage_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 2500,
           "triangles": 444,
-          "bytes": 15916
+          "bytes": 16040
         }
       ],
       "bounds": {
@@ -1853,21 +1853,21 @@
           "maxDistance": 80,
           "triangleBudget": 8000,
           "triangles": 7062,
-          "bytes": 255372
+          "bytes": 255412
         },
         {
           "file": "assets/props/forest-spruce_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 4000,
           "triangles": 3254,
-          "bytes": 117188
+          "bytes": 117228
         },
         {
           "file": "assets/props/forest-spruce_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
           "triangles": 40,
-          "bytes": 39028
+          "bytes": 39072
         }
       ],
       "bounds": {
@@ -1891,21 +1891,21 @@
           "maxDistance": 80,
           "triangleBudget": 8000,
           "triangles": 5540,
-          "bytes": 206620
+          "bytes": 206648
         },
         {
           "file": "assets/props/forest-fir_mobile.glb",
           "maxDistance": 250,
           "triangleBudget": 4000,
           "triangles": 2564,
-          "bytes": 97684
+          "bytes": 97712
         },
         {
           "file": "assets/props/forest-fir_far.glb",
           "maxDistance": 1200,
           "triangleBudget": 100,
           "triangles": 40,
-          "bytes": 37324
+          "bytes": 37356
         }
       ],
       "bounds": {
@@ -1918,5 +1918,5 @@
       "materials": ["forest-bark", "forest-fir-needles"]
     }
   ],
-  "totalBytes": 3568588
+  "totalBytes": 3571312
 }
