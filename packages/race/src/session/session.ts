@@ -107,8 +107,16 @@ const STILL_SPEED = 1;
 const HEAD_REACH = 40;
 /** On the road: within this far past the track edge, m. */
 const ROAD_MARGIN = 1;
-/** A ghost comes back once moving at this speed, m/s, with no car within this box, m. */
+/**
+ * A ghost comes back once moving at this speed, m/s, with no car within this box, m, and no
+ * solid car behind it in an overlapping lane (within `CLEAR_WIDTH` plus `LANE_MARGIN` across)
+ * that would close the gap within `CLOSING_TIME` at its closing speed.
+ */
 const UNGHOST_SPEED = 5;
+const LANE_MARGIN = 1;
+const CLOSING_TIME = 2;
+/** The drivers see a blocking ghost once it moves faster than this, m/s (traffic again). */
+const SEEN_SPEED = 2;
 const CLEAR_LENGTH = 6.5;
 const CLEAR_WIDTH = 2.6;
 
@@ -144,6 +152,8 @@ export class RaceSession {
   private readonly contexts: ControlContext[];
   /** Ghost this tick, per car (retired, or a stopped-queue blocker); time standing still; time blocking a stopped queue. */
   private readonly ghosts: boolean[];
+  /** Unseen by the drivers this tick: retired, or a blocking ghost still standing. */
+  private readonly unseen: boolean[];
   private readonly blockGhost: boolean[];
   private readonly stillTime: number[];
   private readonly underway: boolean[];
@@ -200,6 +210,7 @@ export class RaceSession {
     this.hints = o.cars.map(() => ({ index: -1 }));
     this.pitHints = o.cars.map(() => ({ index: -1 }));
     this.ghosts = o.cars.map(() => false);
+    this.unseen = o.cars.map(() => false);
     this.blockGhost = o.cars.map(() => false);
     this.stillTime = o.cars.map(() => 0);
     this.underway = o.cars.map(() => false);
@@ -214,7 +225,7 @@ export class RaceSession {
       track: this.track,
       circuit: this.circuit,
       field: this.facts,
-      ghosts: this.ghosts,
+      unseen: this.unseen,
     }));
     for (let i = 0; i < o.cars.length; i++) this.locate(i);
   }
@@ -297,16 +308,23 @@ export class RaceSession {
     return events;
   }
 
-  /** Whether a car is a ghost this tick: no car touches it and no driver sees it. */
+  /** Whether a car is a ghost this tick: no car touches it (retired, or blocking). */
   ghost(car: number): boolean {
     return this.ghosts[car]!;
   }
 
+  /** Whether a car is a ghost for blocking the road (not retired): it turns solid again. */
+  blockingGhost(car: number): boolean {
+    return this.blockGhost[car]!;
+  }
+
   /**
    * Who is a ghost this tick (race-rules.md). A retired car is parked out of the race where it
-   * stopped. A car standing still at the head of a stopped queue (see `BLOCK_GHOST_AFTER`) is
-   * one until it moves off clear of every car. Read from the last tick's facts, before any
-   * driver runs, so every driver sees the same field.
+   * stopped. A car standing still with traffic held up behind it (see `BLOCK_GHOST_AFTER`) is
+   * one until it moves off clear of every car with none closing on it from behind; the drivers
+   * see it again as soon as it moves, so the cars behind plan round it before it turns solid.
+   * Read from the last tick's facts, before any driver runs, so every driver sees the same
+   * field.
    */
   private updateGhosts(): void {
     const f = this.facts;
@@ -321,12 +339,13 @@ export class RaceSession {
       const st = this.control.cars[i]!.status;
       if (st === 'dnf' || st === 'dsq') {
         this.ghosts[i] = true;
+        this.unseen[i] = true;
         this.blockGhost[i] = false;
         this.blockTime[i] = 0;
         continue;
       }
       if (this.blockGhost[i]) {
-        if (!this.control.racing(i) || (f[i]!.speed > UNGHOST_SPEED && this.clearOfAll(i))) {
+        if (!this.control.racing(i) || (f[i]!.speed > UNGHOST_SPEED && this.safeToSolidify(i))) {
           this.blockGhost[i] = false;
         }
       } else if (this.headOfStillQueue(i)) {
@@ -337,6 +356,7 @@ export class RaceSession {
         }
       } else this.blockTime[i] = 0;
       this.ghosts[i] = this.blockGhost[i]!;
+      this.unseen[i] = this.blockGhost[i]! && f[i]!.speed < SEEN_SPEED;
     }
   }
 
@@ -373,14 +393,22 @@ export class RaceSession {
     return Math.abs(f.d) < this.track.halfWidthAt(s, f.d >= 0 ? 0 : 1) + ROAD_MARGIN;
   }
 
-  private clearOfAll(i: number): boolean {
+  /**
+   * No solid car overlapping it, and none behind it in an overlapping lane that would close the
+   * gap within `CLOSING_TIME` (a car arriving at racing speed would run into it).
+   */
+  private safeToSolidify(i: number): boolean {
     const L = this.track.length;
     const me = this.facts[i]!;
     for (let j = 0; j < this.cars.length; j++) {
       if (j === i || this.ghosts[j]) continue;
       const o = this.facts[j]!;
-      if (Math.abs(signedGap(L, me.s, o.s)) < CLEAR_LENGTH && Math.abs(o.d - me.d) < CLEAR_WIDTH) {
-        return false;
+      const ds = signedGap(L, me.s, o.s);
+      const across = Math.abs(o.d - me.d);
+      if (Math.abs(ds) < CLEAR_LENGTH && across < CLEAR_WIDTH) return false;
+      if (ds < 0 && across < CLEAR_WIDTH + LANE_MARGIN) {
+        const closing = o.speed - me.speed;
+        if (closing > 0 && -ds - CLEAR_LENGTH < closing * CLOSING_TIME) return false;
       }
     }
     return true;
@@ -540,6 +568,8 @@ export class RaceSession {
       this.blockGhost[i] = snap.blockers?.ghost[i] ?? false;
       const st = this.control.cars[i]!.status;
       this.ghosts[i] = st === 'dnf' || st === 'dsq' || this.blockGhost[i]!;
+      this.unseen[i] =
+        st === 'dnf' || st === 'dsq' || (this.blockGhost[i]! && this.facts[i]!.speed < SEEN_SPEED);
       c.ghost = this.ghosts[i]!;
     });
   }
