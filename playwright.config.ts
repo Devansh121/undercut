@@ -26,8 +26,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  // Public CI runners have 4 vCPUs; 3 workers cuts wall time without starving SwiftShader.
-  workers: process.env.CI ? 3 : 2,
+  // Two workers on CI as on a laptop. Measured on one CI runner (4 vCPUs), the desktop and
+  // phone suite took 4.2 min at both 2 and 3 workers, but at 3 the desktop cold start took 60 s
+  // of its 90 s limit instead of 43 s: SwiftShader already uses several threads per browser.
+  workers: 2,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
