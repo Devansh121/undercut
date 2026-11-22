@@ -421,7 +421,6 @@ export class Track {
     this.speedTrap = data.timing.speedTrap;
     this.drsZones = data.timing.drs.map((z) => ({ ...z }));
     this.pitSide = data.pit.side === 'left' ? LEFT : RIGHT;
-    this.fold = options.fillFolds === false ? null : this.buildFoldGround();
 
     const p = createVec3();
     const t = createVec3();
@@ -455,6 +454,9 @@ export class Track {
       for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
     }
     this.pitHeight = smoothOpen(under, PIT_GROUND_SIGMA / pp.step);
+    // The pit lane is its own surface, built from the original ground under it (above); the fill
+    // of the folded run-off comes after it, and the pit lane's blend band joins the two.
+    this.fold = options.fillFolds === false ? null : this.buildFoldGround();
     this.pit = new PitLane(data.pit, (x, z) => this.groundHeightAt(x, z));
 
     this.trackLimits = [new Float64Array(2 * n), new Float64Array(2 * n)];
