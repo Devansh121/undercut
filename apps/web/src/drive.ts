@@ -1,3 +1,4 @@
+import { RaceAudioScene } from './game/audio-scene';
 /**
  * The drive screen: a time-trial session at Monza in the browser. Loaded on demand from the
  * launch screen so the first paint does not wait for three.js and the track. Wires the pure
@@ -983,6 +984,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
+  const audioScene = new RaceAudioScene();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
   /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
@@ -1395,6 +1397,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       audioState,
       !playing || document.visibilityState === 'hidden',
       camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
+      audioScene.update(session),
     );
 
     ext?.ready?.();

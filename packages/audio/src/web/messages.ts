@@ -1,3 +1,4 @@
+import type { AudioScene, AudioCue } from '../dsp/scene';
 import type { AudioView } from '../dsp/view';
 import type { GainId } from '../dsp/voice';
 
@@ -6,6 +7,8 @@ export const PROCESSOR_NAME = 'undercut-car-audio';
 
 /** Main thread → audio thread. */
 export type ToProcessor =
+  | { type: 'scene'; scene: AudioScene }
+  | { type: 'cue'; cue: AudioCue }
   | { type: 'state'; packed: Float64Array }
   | { type: 'gain'; id: GainId; value: number }
   | { type: 'pause'; paused: boolean }

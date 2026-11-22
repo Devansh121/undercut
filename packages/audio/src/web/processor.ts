@@ -34,6 +34,12 @@ export class CarAudioProcessor extends scope.AudioWorkletProcessor {
 
   private receive(message: ToProcessor): void {
     switch (message.type) {
+      case 'scene':
+        this.core.setScene(message.scene);
+        break;
+      case 'cue':
+        this.core.cue(message.cue);
+        break;
       case 'state':
         this.core.setCarState(message.packed);
         break;

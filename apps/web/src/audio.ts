@@ -1,4 +1,5 @@
-import type { AudioView, AudioCarState } from '@undercut/audio';
+import { defaultCarState } from '@undercut/audio';
+import type { AudioScene, AudioView, AudioCarState } from '@undercut/audio';
 import { createAudioEngine, type AudioEngine } from '@undercut/audio/web';
 import type { StoragePort } from '@undercut/input';
 import type { CarAudioSink } from './game/audio-seam';
@@ -21,6 +22,30 @@ export class PageAudio {
     void this.settings.load().then(() => this.applyVolumes());
     // The first key, click or touch anywhere counts as the gesture that unlocks audio.
     const onGesture = (): void => this.gesture();
+    const cueTarget = (event: Event): Element | null =>
+      event.target instanceof Element
+        ? event.target.closest('button, [role="button"], input, select')
+        : null;
+    win.addEventListener('focusin', (event) => {
+      if (cueTarget(event)) this.engine?.cue('focus');
+    });
+    win.addEventListener('click', (event) => {
+      const target = cueTarget(event);
+      if (!target || target.matches(':disabled, [aria-disabled="true"]')) return;
+      this.play();
+      if (!this.active) {
+        this.engine?.setCarState(defaultCarState());
+        this.engine?.setScene({ cars: [], circuit: 'park', progress: 0.5, lights: -1 });
+        for (const bus of ['engine', 'effects', 'ambience'] as const)
+          this.engine?.setVolume(bus, 0);
+      }
+      this.engine?.cue('accept');
+      // Menus need the UI bus while the vehicle remains off.
+      if (!this.active)
+        setTimeout(() => {
+          if (!this.active) void this.engine?.suspend();
+        }, 300);
+    });
     for (const type of ['pointerdown', 'keydown', 'touchstart'] as const) {
       win.addEventListener(type, onGesture, { capture: true, passive: true });
     }
@@ -65,7 +90,10 @@ export class PageAudio {
     state: Readonly<AudioCarState>,
     _paused: boolean,
     view?: AudioView,
+    scene?: AudioScene,
   ) => {
+    if (_paused) return;
+    if (scene) this.engine?.setScene(scene);
     if (view) this.engine?.setView(view);
     this.engine?.setCarState(state as AudioCarState);
   };

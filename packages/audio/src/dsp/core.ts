@@ -1,3 +1,4 @@
+import { SceneSound, type AudioScene, type AudioCue } from './scene';
 import { createRng } from '@undercut/core';
 import { Biquad, onePoleCoefficient } from './biquad';
 import { CarControls, CHUNK } from './controls';
@@ -62,6 +63,7 @@ const DEFAULT_GAIN = 1;
  */
 export class AudioCore {
   readonly sampleRate: number;
+  readonly scene: SceneSound;
   readonly meters = new LayerMeters();
   readonly limiter: SoftLimiter;
   readonly ducker: Ducker;
@@ -92,6 +94,7 @@ export class AudioCore {
       );
     }
     this.sampleRate = sampleRate;
+    this.scene = new SceneSound(sampleRate, options.seed ?? 1);
     const rng = createRng(options.seed ?? 1);
     const seeds = () => rng.nextUint32();
     const controls = new CarControls(sampleRate);
@@ -112,6 +115,13 @@ export class AudioCore {
     this.ducker = new Ducker(sampleRate);
     this.kGain = onePoleCoefficient(0.03, sampleRate);
     this.kPause = onePoleCoefficient(0.008, sampleRate);
+  }
+
+  setScene(scene: AudioScene): void {
+    this.scene.set(scene);
+  }
+  cue(cue: AudioCue): void {
+    this.scene.cue(cue);
   }
 
   /** Latest state of the player's car (struct or packed form). Cheap; call per sim step. */
@@ -219,6 +229,15 @@ export class AudioCore {
       this.mixInto(1, source, n);
       source.view.end(n);
     }
+    this.scene.render(
+      this.busLeft[0]!,
+      this.busRight[0]!,
+      this.busLeft[3]!,
+      this.busRight[3]!,
+      this.busLeft[2]!,
+      this.busRight[2]!,
+      n,
+    );
     this.meters.frames += n;
     const duck = this.ducker;
     duck.impact = this.player.road.impacts.envelope;

@@ -25,3 +25,12 @@ export {
   type AudioCarState,
 } from './state';
 export type { BusId, GainId, Voice } from './voice';
+
+export {
+  SceneSound,
+  AUDIBLE_CARS,
+  OTHER_CAR_CAPACITY,
+  type AudioScene,
+  type AudioCue,
+  type OtherCarSound,
+} from './scene';

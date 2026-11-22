@@ -1,3 +1,4 @@
+import type { AudioScene, AudioCue } from '../dsp/scene';
 /**
  * Main-thread facade over the audio worklet. The game talks to an `AudioEngine`; when the
  * browser has no Web Audio or no AudioWorklet, or loading fails, it gets a silent engine with
@@ -28,6 +29,8 @@ export interface AudioEngine {
   /** Fade out and suspend the audio context (tab hidden, game paused). */
   suspend(): Promise<void>;
   /** Latest state of the player's car. Cheap; call every sim step (60–240 Hz). */
+  setScene(scene: AudioScene): void;
+  cue(cue: AudioCue): void;
   setCarState(state: AudioCarState): void;
   /** Bus volume, 0–1 (up to 2 is accepted): master, engine, effects, ui or ambience. */
   setVolume(id: GainId, value: number): void;
@@ -92,6 +95,8 @@ export class SilentAudioEngine implements AudioEngine {
   suspend(): Promise<void> {
     return Promise.resolve();
   }
+  setScene(): void {}
+  cue(): void {}
   setCarState(): void {}
   setVolume(): void {}
   setView(): void {}
@@ -122,6 +127,8 @@ class WorkletAudioEngine implements AudioEngine {
   private chain: Promise<void> = Promise.resolve();
   private readonly packed = new Float64Array(CAR_STATE_LENGTH);
   private hasState = false;
+  private scene: AudioScene | undefined;
+  private pendingCue: AudioCue | undefined;
   private readonly gains = new Map<GainId, number>();
   private view: AudioView | undefined;
   private readonly onVisibility = () => void this.reconcile();
@@ -161,6 +168,15 @@ class WorkletAudioEngine implements AudioEngine {
   suspend(): Promise<void> {
     this.wanted = false;
     return this.reconcile();
+  }
+
+  setScene(scene: AudioScene): void {
+    this.scene = scene;
+    this.post({ type: 'scene', scene });
+  }
+  cue(cue: AudioCue): void {
+    if (!this.node) this.pendingCue = cue;
+    else this.post({ type: 'cue', cue });
   }
 
   setCarState(state: AudioCarState): void {
@@ -259,6 +275,11 @@ class WorkletAudioEngine implements AudioEngine {
         processorOptions,
       });
       this.node = node;
+      if (this.scene) this.post({ type: 'scene', scene: this.scene });
+      if (this.pendingCue) {
+        this.post({ type: 'cue', cue: this.pendingCue });
+        this.pendingCue = undefined;
+      }
       for (const [id, value] of this.gains) this.post({ type: 'gain', id, value });
       if (this.view) this.post({ type: 'view', view: this.view });
       if (this.hasState) this.post({ type: 'state', packed: this.packed });
