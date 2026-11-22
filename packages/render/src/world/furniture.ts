@@ -967,6 +967,11 @@ export function placeTracksideFurniture(options: {
   materials: Material[];
   /** Textures the furniture creates (released with the world). */
   textures: Texture[];
+  /**
+   * A street circuit: its walls carry the boards and the debris fence (street.ts), so no
+   * hoardings or catch fencing along the barriers or on the pit wall here.
+   */
+  street?: boolean;
 }): Record<string, number> {
   const {
     track,
@@ -1470,7 +1475,7 @@ export function placeTracksideFurniture(options: {
     ? (propKit?.entries.get('hoarding')?.moduleLength ?? 4) + 0.1
     : 6.2;
   const hoardStep = mobile ? 14 : hoardPitch;
-  for (const run of hoardingRuns) {
+  for (const run of options.street ? [] : hoardingRuns) {
     const span = run.s1 >= run.s0 ? run.s1 - run.s0 : L - run.s0 + run.s1;
     for (let ds = 0; ds < span; ds += run.step ?? hoardStep) {
       const s = wrapS(run.s0 + ds);
@@ -1536,7 +1541,7 @@ export function placeTracksideFurniture(options: {
     fences++;
   };
   // Pit-wall catch fence.
-  if (pitComplex) {
+  if (pitComplex && !options.street) {
     for (const pt of pitComplex.pitWallLine) {
       const yaw = Math.atan2(-pt.nz, pt.nx);
       placeFence(pt.x, pt.y, pt.z, yaw, pt.s);
@@ -1577,7 +1582,7 @@ export function placeTracksideFurniture(options: {
     new Uint8Array(slotCount),
     new Uint8Array(slotCount),
   ];
-  for (const z of fenceZones) {
+  for (const z of options.street ? [] : fenceZones) {
     const span = z.s1 >= z.s0 ? z.s1 - z.s0 : L - z.s0 + z.s1;
     for (let ds = 0; ds <= span; ds += fenceSlotStep * 0.5) {
       const slot = Math.floor(wrapS(z.s0 + ds) / fenceSlotStep) % slotCount;

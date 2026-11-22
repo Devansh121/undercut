@@ -40,7 +40,7 @@ const presets = JSON.parse(
  * Each circuit's first sky: the sky of its first time of day in the menus
  * (apps/web/src/ui/data/circuit-summary.ts TIMES, render TIMES_OF_DAY).
  */
-const CIRCUIT_SKY = { monza: 'monza_afternoon', spa: 'overcast', singapore: 'overcast' };
+const CIRCUIT_SKY = { monza: 'monza_afternoon', spa: 'overcast', singapore: 'night' };
 const CIRCUITS = Object.keys(CIRCUIT_SKY);
 const CAR_FILES = {
   high: 'car/car_high.glb',

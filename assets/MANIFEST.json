@@ -501,7 +501,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Authored list of catalogue props the circuit world loads",
-    "sha256": "2af19a96f8965517d7b5a9198058955035c14dbc275aac8ef3eed20da1908178"
+    "sha256": "b33a34a839c7072623b198a668f5cfa4ce89cdb4d43069aedf3bc79a8d36c83d"
   },
   {
     "file": "apps/web/public/assets/car/car_far.glb",
@@ -1814,5 +1814,13 @@
     "licence": "ODbL-1.0",
     "changes": "Derived database built by tools/dressing/build.py spa: OSM woods, tree rows, single trees, buildings, grandstands, bridges, roads, paths, water and car parks within 600 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 6 km with the forest roof (22 m) taken off inside mapped woods, a 150 m opening and a 100 m average. Notices in packages/render/data/LICENSE-DATA.md",
     "sha256": "c16e4668334d8aaf93c24c0c7d83873ab0c95ab4ac0c28cac856d42f04736761"
+  },
+  {
+    "file": "packages/render/data/singapore.dressing.json",
+    "source_url": "https://www.openstreetmap.org (Overpass query via https://overpass-api.de/api/interpreter, fetched 2026-11-22T16:25:50Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N01_00_E103_00_DEM/Copernicus_DSM_COG_10_N01_00_E103_00_DEM.tif",
+    "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+    "licence": "ODbL-1.0",
+    "changes": "Derived database built by tools/dressing/build.py singapore: OSM buildings (with their mapped heights and levels), parks, single trees, tree rows, bridges, roads, paths, water and car parks within 500 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 5 km with a 300 m opening (the city's roofs off) and a 150 m average. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "521e0dcdc90bb0ed6d1123e83f03c343a8433d73d97939105be40cd0f10bd61d"
   }
 ]

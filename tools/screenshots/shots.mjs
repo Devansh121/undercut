@@ -320,6 +320,9 @@ const CIRCUIT_STATIONS = {
     tv('grid-tv', [12, 5, 3], [4840, 0, 0.8], 30),
     chase('turn-1', 120, 260, 280),
     chase('raffles', 650, 230, 820),
+    // Up to the two buildings mapped across the road (s 1234 and 1366), which are left out.
+    chase('raffles-1234', 1080, 200, 1200),
+    chase('raffles-1366', 1210, 200, 1330),
     tv('esplanade-tv', [2850, 20, 6], [2700, 0, 1], 34),
     chase('marina', 3300, 230, 3460, 'chase-far'),
     tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
@@ -636,7 +639,11 @@ async function perfRuns(report, vsync) {
         )
       : PERF_VIEWPORTS) {
       const quality = option('perf-quality') ?? vp.quality;
-      const { context, page } = await openGame(browser, { ...vp, quality });
+      const { context, page } = await openGame(
+        browser,
+        { ...vp, quality },
+        option('query') ? `&${option('query')}` : '',
+      );
       for (const run of flag('phone-audit')
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
@@ -901,6 +908,11 @@ const SWAP_LIGHTING = {
     ['overcast', '&tod=overcast-day'],
     ['sun', '&tod=monza-afternoon'],
   ],
+  // Raced at night under its own floodlights (the menu's first choice), and a day session.
+  singapore: [
+    ['night', ''],
+    ['overcast', '&tod=overcast-day'],
+  ],
 };
 /** Per circuit: a chase pose through woods and a high view over them. */
 const SWAP_POSES = {
@@ -935,6 +947,24 @@ const SWAP_POSES = {
       u.camera('tv');
       const e = u.trackPoint(5450, -25, 14);
       const a = u.trackPoint(5620, 60, 6);
+      u.tvCamera(e.x, e.y, e.z, 42, a);
+    },
+  },
+  singapore: {
+    // Chase camera along Esplanade Drive, where the mapped park trees stand thickest (standing:
+    // at speed the chase camera shakes and its floodlights' highlights move between captures),
+    // and a view from above the verge across them.
+    esplanade: () => {
+      const u = globalThis.__undercut;
+      u.camera('chase-near');
+      u.teleport(3150, 0, 0);
+      u.setTimeScale(0);
+    },
+    park: () => {
+      const u = globalThis.__undercut;
+      u.camera('tv');
+      const e = u.trackPoint(3180, -20, 14);
+      const a = u.trackPoint(3320, 40, 5);
       u.tvCamera(e.x, e.y, e.z, 42, a);
     },
   },

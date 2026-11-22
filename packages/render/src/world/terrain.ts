@@ -1,6 +1,13 @@
-import { BufferAttribute, BufferGeometry, Sphere, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, ShapeUtils, Sphere, Vector2, Vector3 } from 'three';
 import type { MeshData, Track } from '@undercut/track';
-import { gridHeight, type TerrainGrid } from './dressing';
+import {
+  bounds,
+  gridHeight,
+  inRing,
+  ringArea,
+  type MappedFeature,
+  type TerrainGrid,
+} from './dressing';
 import type { LapIndex } from './lap-index';
 
 /** Terrain sits this far below the track's ground so it never shows through it (as the track's). */
@@ -97,12 +104,23 @@ function cellOf(lines: readonly number[], v: number): number {
  * TERRAIN_DROP below that triangle's lowest vertex, the rule the track package uses, so the ground
  * never shows through the circuit and meets the verge apron without a crack.
  */
+/** A body of water the ground stays below: its outline (flat x, z), box and surface height. */
+export interface WaterBody {
+  p: readonly number[];
+  box: readonly [number, number, number, number];
+  level: number;
+}
+
+/** The ground under water stands this far below the water's surface, m. */
+export const WATER_DEPTH = 1.5;
+
 export function buildTerrain(
   track: Track,
   grid: TerrainGrid,
   lapIndex: LapIndex,
   drivable: readonly MeshData[],
   o: TerrainOptions,
+  water: readonly WaterBody[] = [],
 ): {
   geometry: BufferGeometry;
   chunks: BufferGeometry[];
@@ -151,7 +169,11 @@ export function buildTerrain(
     const dist = lapIndex.nearest(x, z, hit).dist;
     const w = smoothstep(o.blendNear, o.blendFar, dist);
     const far = gridHeight(grid, x, z);
-    const h = w >= 1 ? far : w <= 0 ? near(x, z) : near(x, z) * (1 - w) + far * w;
+    let h = w >= 1 ? far : w <= 0 ? near(x, z) : near(x, z) * (1 - w) + far * w;
+    for (const b of water) {
+      if (x < b.box[0] || x > b.box[2] || z < b.box[1] || z > b.box[3]) continue;
+      if (inRing(b.p, x, z)) h = Math.min(h, b.level - WATER_DEPTH);
+    }
     return h - TERRAIN_DROP;
   };
 
@@ -295,4 +317,66 @@ export function buildTerrain(
     );
   };
   return { geometry, chunks, heightAt };
+}
+
+/**
+ * The mapped water big enough to see (lakes, the bay, a river; not a rooftop pool, which the map
+ * gives a height), each at the height the filtered surface model has inside it: its 5th
+ * percentile, the open water rather than the banks the average smears into a narrow river.
+ */
+export function waterBodies(
+  features: readonly MappedFeature[],
+  grid: TerrainGrid,
+  minArea = 1500,
+): WaterBody[] {
+  const out: WaterBody[] = [];
+  for (const f of features) {
+    if (f.t?.height !== undefined) continue;
+    if (Math.abs(ringArea(f.p)) < minArea) continue;
+    const box = bounds(f.p);
+    const heights: number[] = [];
+    const step = Math.max(10, Math.min(box[2] - box[0], box[3] - box[1]) / 12);
+    for (let z = box[1]; z <= box[3]; z += step)
+      for (let x = box[0]; x <= box[2]; x += step)
+        if (inRing(f.p, x, z)) heights.push(gridHeight(grid, x, z));
+    if (heights.length < 3) continue;
+    heights.sort((a, b) => a - b);
+    out.push({ p: f.p, box, level: heights[Math.floor(heights.length * 0.05)] as number });
+  }
+  return out;
+}
+
+/** A water body's surface: its outline triangulated, flat at its level, facing up. */
+export function waterGeometry(b: WaterBody): BufferGeometry | null {
+  const p = b.p;
+  let m = p.length / 2;
+  if (m >= 2 && p[0] === p[p.length - 2] && p[1] === p[p.length - 1]) m--;
+  if (m < 3) return null;
+  const contour: Vector2[] = [];
+  for (let i = 0; i < m; i++) contour.push(new Vector2(p[2 * i] as number, p[2 * i + 1] as number));
+  const tris = ShapeUtils.triangulateShape(contour, []);
+  if (tris.length === 0) return null;
+  const pos = new Float32Array(m * 3);
+  const nor = new Float32Array(m * 3);
+  for (let i = 0; i < m; i++) {
+    pos.set([p[2 * i] as number, b.level, p[2 * i + 1] as number], i * 3);
+    nor.set([0, 1, 0], i * 3);
+  }
+  const idx: number[] = [];
+  for (const t of tris) {
+    const [a, c1, c2] = t as [number, number, number];
+    const e1x = (p[2 * c1] as number) - (p[2 * a] as number);
+    const e1z = (p[2 * c1 + 1] as number) - (p[2 * a + 1] as number);
+    const e2x = (p[2 * c2] as number) - (p[2 * a] as number);
+    const e2z = (p[2 * c2 + 1] as number) - (p[2 * a + 1] as number);
+    // Face up (+y): the cross product's y is e1.z * e2.x - e1.x * e2.z.
+    if (e1z * e2x - e1x * e2z < 0) idx.push(a, c2, c1);
+    else idx.push(a, c1, c2);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(pos, 3));
+  g.setAttribute('normal', new BufferAttribute(nor, 3));
+  g.setIndex(m > 65535 ? new BufferAttribute(new Uint32Array(idx), 1) : idx);
+  g.computeBoundingSphere();
+  return g;
 }

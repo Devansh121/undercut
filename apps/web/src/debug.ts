@@ -50,6 +50,8 @@ export interface DebugApi {
   resetToTrack(): void;
   capture(): Record<string, unknown>;
   frameTimes(): number[];
+  /** Download what a session here would on a preset (its whole world), then release it. */
+  prefetch(quality: string): Promise<void>;
   resetFrameTimes(): void;
   renderStats(): Record<string, unknown>;
   /** Static cars on the grid slots (0 clears them). */
@@ -216,6 +218,10 @@ export function installDebugApi(
       events: getDrive()?.events().slice(-30) ?? [],
     }),
     frameTimes: () => need().frameTimes(),
+    prefetch: (q) => {
+      if (!isQuality(q)) return Promise.reject(new Error(`no preset ${q}`));
+      return need().prefetch(q);
+    },
     resetFrameTimes: () => need().resetFrameTimes(),
     setHudVisible: (on) => need().setHudVisible(on),
     view: () => need().view,

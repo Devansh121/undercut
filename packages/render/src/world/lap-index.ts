@@ -114,6 +114,36 @@ export class LapIndex {
     return out;
   }
 
+  /**
+   * Visit the lap samples inside the box (x0, z0)-(x1, z1), by the grid's cells: `fn` gets the
+   * sample's index and position and may return true to stop.
+   */
+  forEachSampleIn(
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    fn: (index: number, x: number, z: number) => boolean | void,
+  ): void {
+    const lap = this.track.lap;
+    const i0 = Math.max(0, Math.floor((x0 - this.x0) / this.cell));
+    const i1 = Math.min(this.cols - 1, Math.floor((x1 - this.x0) / this.cell));
+    const j0 = Math.max(0, Math.floor((z0 - this.z0) / this.cell));
+    const j1 = Math.min(this.rows - 1, Math.floor((z1 - this.z0) / this.cell));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const k = j * this.cols + i;
+        for (let e = this.start[k] as number; e < (this.start[k + 1] as number); e++) {
+          const idx = this.items[e] as number;
+          const x = lap.x[idx] as number;
+          const z = lap.z[idx] as number;
+          if (x < x0 || x > x1 || z < z0 || z > z1) continue;
+          if (fn(idx, x, z)) return;
+        }
+      }
+    }
+  }
+
   /** Clearance from the centreline to the barrier on the side of offset d at sample i, m. */
   barrierAt(index: number, d: number): number {
     const side = d >= 0 ? 0 : 1;

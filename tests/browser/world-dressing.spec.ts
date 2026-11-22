@@ -134,3 +134,73 @@ test('loads Spa: its dressing and prop models as the budget counts them, conifer
   await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('loads Singapore: street walls, floodlights, temporary stands and backdrops, its files as the budget counts them', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs once on the desktop project');
+  test.setTimeout(90_000);
+
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
+  });
+  const inventory = JSON.parse(
+    fs.readFileSync(path.resolve('apps/web/dist/first-race.json'), 'utf8'),
+  ) as { circuits: Record<string, { presets: Record<string, { files: Record<string, number> }> }> };
+  const expected = inventory.circuits.singapore?.presets.mobile?.files ?? {};
+  const fetched = new Map<string, number>();
+  const pending: Promise<void>[] = [];
+  page.on('requestfinished', (request) => {
+    const url = new URL(request.url());
+    if (!/^\/assets\/(props\/|[a-z]+\.dressing-|env\/)/.test(url.pathname)) return;
+    pending.push(
+      (async () => {
+        fetched.set(url.pathname.slice(1), (await request.sizes()).responseBodySize);
+      })(),
+    );
+  });
+  await page.addInitScript(() => {
+    globalThis.localStorage.setItem(
+      'menu.prefs',
+      JSON.stringify({ version: 1, circuit: 'singapore' }),
+    );
+  });
+
+  // The menu's first sky at Singapore is the floodlit night.
+  await page.goto('/?quality=mobile&debug=1');
+  await startTimeTrial(page);
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+  await Promise.all(pending);
+  const wanted = Object.keys(expected).filter((f) =>
+    /^assets\/(props\/|singapore\.dressing-.*\.json$|env\/)/.test(f),
+  );
+  expect(wanted.some((f) => f.includes('street-fence'))).toBe(true);
+  expect(wanted.some((f) => /^assets\/env\/night\//.test(f))).toBe(true);
+  expect([...fetched.keys()].sort()).toEqual(wanted.sort());
+  for (const [rel, bytes] of fetched)
+    expect(bytes, `${rel}: bytes on the wire`).toBe(expected[rel]);
+
+  const counts = await page.evaluate(() => window.__undercut?.worldCounts() ?? null);
+  expect(counts).not.toBeNull();
+  // Blocks and fence on every concrete run, a terminal at each open end.
+  expect(counts!.streetBlocks).toBeGreaterThan(1000);
+  expect(counts!.debrisFences).toBe(counts!.streetBlocks);
+  expect(counts!.fenceEnds).toBeGreaterThan(0);
+  expect(counts!.fenceEnds! % 2).toBe(0);
+  // A mast every 40 m a side by the track's rule, less the pit side by the pit lane.
+  expect(counts!.floodlightMasts).toBeGreaterThan(180);
+  expect(counts!.localLights).toBeGreaterThan(counts!.floodlightMasts!);
+  expect(counts!.tempStands).toBeGreaterThanOrEqual(5);
+  expect(counts!.crowd).toBeGreaterThan(200);
+  expect(counts!.lightingTrusses).toBeGreaterThan(50);
+  expect(counts!.backdrops).toBeGreaterThan(5);
+  expect(counts!.water).toBeGreaterThanOrEqual(1);
+  // A street circuit has its own walls and fencing: no catch fences or barrier hoardings.
+  expect(counts!.catchFences).toBe(0);
+
+  await page.evaluate(() => window.__undercut?.quit());
+  await expect(page.getByRole('button', { name: /Start/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});

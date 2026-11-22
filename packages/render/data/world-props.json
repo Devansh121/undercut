@@ -14,6 +14,19 @@
     "spa": {
       "ids": ["hill-pit-garage"],
       "nearTrees": ["forest-spruce", "forest-fir"]
+    },
+    "singapore": {
+      "ids": [
+        "street-block",
+        "street-fence",
+        "street-fence-end",
+        "floodlight-mast",
+        "lighting-truss",
+        "temporary-grandstand",
+        "marina-office",
+        "marina-hotel",
+        "marina-pavilion"
+      ]
     }
   }
 }

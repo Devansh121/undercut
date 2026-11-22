@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from './base';
-import { startTimeTrial } from './helpers';
+import { startTimeTrial, waitForDraws, watchProblems } from './helpers';
 
 /**
  * The budget check's first-race inventory (apps/web/dist/first-race.json, written by
@@ -86,3 +86,91 @@ for (const circuit of ['monza', 'spa', 'singapore']) {
     );
   });
 }
+
+/**
+ * High's own files at a dressed circuit: the High-only levels of the prop models, the High
+ * textures, car and sky, and the dressing, which the Lite-world first races above never fetch.
+ * CI renders in software and draws only Lite and Mobile, so the session runs on Mobile without
+ * its world and the page then downloads (and decodes) what a High session at the circuit would,
+ * with the HTTP cache off: every request of that is in the High inventory at the bytes counted,
+ * and every asset of it is requested.
+ */
+test('the High first race at Singapore, with its world, requests what the budget counts', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
+  test.setTimeout(120_000);
+  const expected = inventory.circuits.singapore?.presets.high;
+  if (!expected) throw new Error('no singapore high preset in first-race.json');
+  await page.addInitScript(() => {
+    globalThis.localStorage.setItem(
+      'menu.prefs',
+      JSON.stringify({ version: 1, circuit: 'singapore' }),
+    );
+  });
+  // The Mobile session's requests, then the High prefetch's; the page keeps what it downloaded
+  // (car levels both presets use come from the first).
+  const before = new Set<string>();
+  const fetched = new Map<string, number>();
+  let phase: 'mobile' | 'high' = 'mobile';
+  const pending: Promise<void>[] = [];
+  page.on('requestfinished', (request) => {
+    const url = new URL(request.url());
+    if (url.origin !== new URL(page.url()).origin || !url.pathname.startsWith('/assets/')) return;
+    const rel = url.pathname.slice(1);
+    if (phase === 'mobile') {
+      before.add(rel);
+      return;
+    }
+    pending.push(
+      (async () => {
+        fetched.set(rel, (await request.sizes()).responseBodySize);
+      })(),
+    );
+  });
+  const problems = watchProblems(page);
+  await page.goto('/?quality=mobile&debug=1&world=lite');
+  await startTimeTrial(page);
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+  phase = 'high';
+  await page.evaluate(() => window.__undercut!.prefetch('high'));
+  await Promise.all(pending);
+
+  for (const [rel, bytes] of fetched) {
+    expect(expected.files[rel], `${rel} is fetched but not in the High inventory`).toBeDefined();
+    expect(bytes, `${rel}: bytes on the wire`).toBe(expected.files[rel]);
+  }
+  // Livery masks load as the cars are built (the first races above request them), not here.
+  const assets = Object.keys(expected.files).filter((f) =>
+    /^assets\/(props|tex|env)\/|^assets\/car\/[^/]+\.glb$|^assets\/singapore\.dressing-.*\.json$/.test(
+      f,
+    ),
+  );
+  // The High levels of the kit's models are among them.
+  expect(assets.some((f) => /^assets\/props\/street-fence_high\.glb$/.test(f))).toBe(true);
+  for (const rel of assets)
+    expect(
+      fetched.has(rel) || before.has(rel),
+      `${rel} is in the High inventory but was not fetched`,
+    ).toBe(true);
+  // What only High has (its levels of the kit, the dressing) came with the prefetch.
+  for (const rel of assets.filter((f) => /_high\.glb$|dressing-/.test(f)))
+    expect(fetched.has(rel), `${rel} came with the High prefetch`).toBe(true);
+  console.log(
+    `High at singapore: ${fetched.size} requests; ${assets.length} assets in the inventory`,
+  );
+
+  // A prefetch releases only what it made: a new session still draws its sky and textures from
+  // the page's cached downloads, the very images a prefetch on its preset decoded too. (The HTTP
+  // cache is back on: only the page's own cache is under test here.)
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: false });
+  await page.evaluate(() => window.__undercut!.prefetch('mobile'));
+  await page.evaluate(() => window.__undercut!.quit());
+  await expect(page.locator('html')).not.toHaveAttribute('data-ready', '');
+  await page.evaluate(() => window.__undercut!.start());
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
+  await waitForDraws(page, 3);
+  expect(problems).toEqual([]);
+});

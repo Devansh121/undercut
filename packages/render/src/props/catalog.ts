@@ -32,6 +32,14 @@ export interface PropCatalogAttachment {
   position: readonly [number, number, number];
   size?: readonly [number, number];
   uv?: readonly [number, number, number, number];
+  /** Material slot the marker belongs to (lamp emitters, window masks). */
+  material?: string;
+  /** Aim of a lamp, local frame. */
+  direction?: readonly [number, number, number];
+  /** A row of markers (stand seats): along `axis` from `position`, `count` at `spacing` m. */
+  axis?: readonly [number, number, number];
+  spacing?: number;
+  count?: number;
 }
 
 /** One modular prop entry in `packages/render/data/props.catalog.json`. */
