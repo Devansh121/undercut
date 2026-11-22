@@ -134,7 +134,9 @@ export const ATLAS_ROWS = 3;
 export const CLUSTER_TILE = 8;
 export const BARK_TILE = 11;
 
-/** Leaf colours of the three cluster tiles (linear-ish, as the species leaves). */
+/** Brightness of the three cluster tiles relative to the cards' mean (see matchClustersToCards). */
+const CLUSTER_BRIGHTNESS = [1, 0.9, 1.08];
+/** Leaf colours of the three cluster tiles (linear-ish, as the species leaves); calibrated after painting. */
 const CLUSTERS: readonly [number, number, number][] = [
   [0.19, 0.27, 0.1],
   [0.14, 0.22, 0.08],
@@ -184,9 +186,71 @@ function paintCluster(
   }
 }
 
+const toLinear = (c: number): number => Math.pow(c / 255, 2.2);
+const toByte = (v: number): number =>
+  Math.round(Math.min(1, Math.pow(Math.max(0, v), 1 / 2.2)) * 255);
+
+/** Mean linear colour of a tile's opaque texels (alpha at least half). */
+export function tileMean(
+  data: Uint8Array,
+  width: number,
+  tile: number,
+  t: number,
+): [number, number, number] {
+  const ox = (t % ATLAS_COLS) * tile;
+  const oy = Math.floor(t / ATLAS_COLS) * tile;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  for (let y = oy; y < oy + tile; y++) {
+    for (let x = ox; x < ox + tile; x++) {
+      const i = (y * width + x) * 4;
+      if ((data[i + 3] as number) < 128) continue;
+      r += toLinear(data[i] as number);
+      g += toLinear(data[i + 1] as number);
+      b += toLinear(data[i + 2] as number);
+      n++;
+    }
+  }
+  return n ? [r / n, g / n, b / n] : [0, 0, 0];
+}
+
+/**
+ * The near trees replace the cards within the swap distance, so their leaves must average to the
+ * same colour as the card crowns or a band of lighter trees travels with the camera. Scale each
+ * cluster tile (in linear light) so its mean over opaque texels equals the mean of the species
+ * card tiles, keeping the clusters' small differences between each other.
+ */
+function matchClustersToCards(data: Uint8Array, width: number, tile: number): void {
+  const target = [0, 0, 0];
+  SPECIES.forEach((_, t) => {
+    const m = tileMean(data, width, tile, t);
+    for (let c = 0; c < 3; c++)
+      target[c] = (target[c] as number) + (m[c] as number) / SPECIES.length;
+  });
+  CLUSTERS.forEach((_, i) => {
+    const t = CLUSTER_TILE + i;
+    const m = tileMean(data, width, tile, t);
+    const variation = CLUSTER_BRIGHTNESS[i] ?? 1;
+    const k = m.map((v, c) => (v > 1e-6 ? ((target[c] as number) * variation) / v : 1));
+    const ox = (t % ATLAS_COLS) * tile;
+    const oy = Math.floor(t / ATLAS_COLS) * tile;
+    for (let y = oy; y < oy + tile; y++) {
+      for (let x = ox; x < ox + tile; x++) {
+        const p = (y * width + x) * 4;
+        if ((data[p + 3] as number) === 0) continue;
+        for (let c = 0; c < 3; c++)
+          data[p + c] = toByte(toLinear(data[p + c] as number) * (k[c] as number));
+      }
+    }
+  });
+}
+
 /** Bark: vertical fissures in grey-brown, tiling top to bottom. */
 function paintBark(ctx: CanvasRenderingContext2D, ox: number, oy: number, size: number): void {
-  ctx.fillStyle = '#4a4238';
+  // The species cards' bark tones ('#3b342c' to '#5a564e'), toward their darker end.
+  ctx.fillStyle = '#3d362e';
   ctx.fillRect(ox, oy, size, size);
   for (let i = 0; i < 90; i++) {
     const x = hash01(i, 31) * size;
@@ -362,6 +426,7 @@ export function treeAtlas(tile: number, anisotropy: number): DataTexture {
   paintBark(ctx, (BARK_TILE % ATLAS_COLS) * tile, Math.floor(BARK_TILE / ATLAS_COLS) * tile, tile);
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = new Uint8Array(img.data.buffer.slice(0));
+  matchClustersToCards(data, canvas.width, tile);
   bleed(data, canvas.width, canvas.height);
   const t = new DataTexture(data, canvas.width, canvas.height, RGBAFormat, UnsignedByteType);
   t.colorSpace = SRGBColorSpace;

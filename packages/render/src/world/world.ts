@@ -414,6 +414,15 @@ export class CircuitWorld {
     this.startGantry?.setLights(mask);
   }
 
+  /**
+   * Distance within which trees are real geometry, m; 0 shows the cards everywhere. Read back
+   * when called without an argument (the tree-swap check compares the two).
+   */
+  treeSwapDistance(distance?: number): number {
+    if (distance !== undefined) this.treeSwap.distance.value = Math.max(0, distance);
+    return this.treeSwap.distance.value;
+  }
+
   /** Pit building, team garage boards, pit-wall canopies and pit crew. */
   private placePitComplex(o: CircuitWorldOptions): void {
     const { track, quality, props } = o;

@@ -227,6 +227,11 @@ export interface CloudShape {
   card: number;
 }
 
+/** Occlusion of the innermost leaf clusters (1 at the crown's surface). */
+const CROWN_AO = 0.35;
+/** Shade on the trunk and limbs under the crown. */
+const TRUNK_AO = 0.6;
+
 export const BROADLEAF_CLOUD: CloudShape = {
   crownY: 0.6,
   rx: 0.36,
@@ -259,6 +264,10 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
   const pos: number[] = [];
   const nor: number[] = [];
   const uv: number[] = [];
+  // Baked crown occlusion (vertex colour): clusters deep inside and under the crown are darker,
+  // as the cards' painted crowns are. Without it the near crowns light evenly where there is no
+  // sun shadow (night under floodlights) and read brighter than the cards around them.
+  const col: number[] = [];
   const idx: number[] = [];
   const R = (a: number, b = 0): number => hash01(seed, a, b);
   // Trunk and limbs: prisms from a to b, radius r0 to r1.
@@ -298,6 +307,8 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
       ] as const) {
         pos.push(p[0] + n[0]! * r, p[1] + n[1]! * r, p[2] + n[2]! * r);
         nor.push(n[0]!, n[1]!, n[2]!);
+        // Trunk and limbs stand in the crown's shade.
+        col.push(TRUNK_AO, TRUNK_AO, TRUNK_AO);
         uv.push(...atlasUv(BARK_TILE, k / sides, tv * 0.98 + 0.01));
       }
     }
@@ -335,10 +346,15 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
     const vx = [-Math.sin(yaw) * Math.sin(tilt), Math.cos(tilt), Math.cos(yaw) * Math.sin(tilt)];
     const h = shape.card * (0.75 + R(i, 15) * 0.5) * 0.5;
     // Normal: out of the crown, leaning up (sky light on the top).
-    let n = [dx, dy * 0.8 + 0.35, dz];
+    let n = [dx, dy * 0.8 + 0.25, dz];
     const nl = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
     n = n.map((v) => v / nl);
     const t = CLUSTER_TILE + Math.floor(R(i, 16) * 3);
+    const depth = (shell - 0.55) / 0.45;
+    // Brightest round the crown's waist: the underside in its own shade, the very top a little
+    // darker too (seen from above, cards cover little of the crown and the ground shows through).
+    const band = dy >= 0 ? 1 - 0.12 * dy : 1 + 0.2 * dy;
+    const ao = (CROWN_AO + (1 - CROWN_AO) * depth) * band;
     const base = pos.length / 3;
     for (const [su, sv] of [
       [-1, -1],
@@ -352,6 +368,7 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
         c[2]! + (ux[2]! * su + vx[2]! * sv) * h,
       );
       nor.push(n[0]!, n[1]!, n[2]!);
+      col.push(ao, ao, ao);
       uv.push(...atlasUv(t, (su + 1) / 2, (sv + 1) / 2));
     }
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -360,6 +377,7 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+  g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3));
   g.setIndex(idx);
   g.computeBoundingSphere();
   return g;
@@ -389,6 +407,7 @@ export function treeCloudMaterials(
   };
   const material = new MeshStandardMaterial({
     map: atlas,
+    vertexColors: true,
     alphaTest: 0.5,
     alphaToCoverage: options.coverage,
     side: DoubleSide,
