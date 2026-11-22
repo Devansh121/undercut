@@ -5,6 +5,7 @@ import { CHUNK, type CarControls } from './controls';
 import { L, type LayerMeters } from './meters';
 import { Noise } from './noise';
 import { pulseTables, TABLE_SIZE } from './pulse-tables';
+import { SINE_MASK, SINE_STEPS, SINE_TABLE } from './sine';
 import type { PowerUnitSoundSpec } from './spec';
 import { GearWhine } from './gear-whine';
 import { F } from './state';
@@ -381,6 +382,9 @@ export class EngineVoice implements Voice {
     const imbFull = this.spec.bankImbalance.fullLoad;
     const imbRange = this.spec.bankImbalance.overrun - imbFull;
     const cycleScale = this.dt / (2 * TWO_PI);
+    // Imported constants into locals: the module runner that loads this code in Node (tests,
+    // offline renders) reads an imported binding as a property of the module on every use.
+    const tableSize = TABLE_SIZE;
 
     for (let i = 0; i < n; i++) {
       const w = engineSpeed[i] as number;
@@ -453,7 +457,7 @@ export class EngineVoice implements Voice {
           );
         }
         prevU[cyl] = u;
-        const x = u * TABLE_SIZE;
+        const x = u * tableSize;
         const j = x | 0;
         const fr = x - j;
         const s0 = softT[j] as number;
@@ -492,6 +496,9 @@ export class EngineVoice implements Voice {
     const span = this.spec.turboWhine.full - idle;
     const fadeTop = this.fadeTop;
     const fadeScale = this.fadeScale;
+    const sine = SINE_TABLE;
+    const steps = SINE_STEPS;
+    const mask = SINE_MASK;
     for (let i = 0; i < n; i++) {
       let target = boost[i] as number;
       target = (target < 0 ? 0 : target > 1 ? 1 : target) * (this.envBuf[i] as number);
@@ -500,15 +507,25 @@ export class EngineVoice implements Voice {
       const fw = idle + span * this.spool;
       this.turboPhase += fw * this.dt;
       if (this.turboPhase >= 1) this.turboPhase -= 1;
-      const p = TWO_PI * this.turboPhase;
+      // sin(2π·phase) and sin(4π·phase) from the table (see SINE_TABLE).
+      const x1 = this.turboPhase * steps;
+      let k = x1 | 0;
+      let fr = x1 - k;
+      k &= mask;
+      const sin1 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const x2 = 2 * x1;
+      k = x2 | 0;
+      fr = x2 - k;
+      k &= mask;
+      const sin2 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
       const level = this.spool * (0.35 + 0.65 * (load[i] as number));
       // Each partial fades out linearly between 0.40 and 0.45 of the sample rate (see fadeTop).
       let g1 = (fadeTop - fw) * fadeScale;
       g1 = g1 < 0 ? 0 : g1 > 1 ? 1 : g1;
       let g2 = (fadeTop - 2 * fw) * fadeScale;
       g2 = g2 < 0 ? 0 : g2 > 1 ? 1 : g2;
-      const first = g1 > 0 ? g1 * Math.sin(p) : 0;
-      const second = g2 > 0 ? 0.3 * g2 * Math.sin(2 * p) : 0;
+      const first = g1 > 0 ? g1 * sin1 : 0;
+      const second = g2 > 0 ? 0.3 * g2 * sin2 : 0;
       tone[i] = (first + second) * this.spool * level * LEVEL.turboWhine;
       hissIn[i] = level * LEVEL.turboHiss;
     }
@@ -532,6 +549,9 @@ export class EngineVoice implements Voice {
     const invMax = 1 / this.spec.mgukMaxPower;
     const fadeTop = this.fadeTop;
     const fadeScale = this.fadeScale;
+    const sine = SINE_TABLE;
+    const steps = SINE_STEPS;
+    const mask = SINE_MASK;
     let e = 0;
     for (let i = 0; i < n; i++) {
       const p = power[i] as number;
@@ -545,16 +565,31 @@ export class EngineVoice implements Voice {
       const fe = (speed[i] as number) * toHz;
       this.ersPhase += fe * this.dt;
       if (this.ersPhase >= 1) this.ersPhase -= 1;
-      const ph = TWO_PI * this.ersPhase;
       let g1 = (fadeTop - fe) * fadeScale;
       g1 = g1 < 0 ? 0 : g1 > 1 ? 1 : g1;
       let g2 = (fadeTop - 2 * fe) * fadeScale;
       g2 = g2 < 0 ? 0 : g2 > 1 ? 1 : g2;
       let g3 = (fadeTop - 3 * fe) * fadeScale;
       g3 = g3 < 0 ? 0 : g3 > 1 ? 1 : g3;
-      const s1 = g1 > 0 ? g1 * Math.sin(ph) : 0;
-      const h2 = g2 > 0 ? g2 * Math.sin(2 * ph) : 0;
-      const h3 = g3 > 0 ? g3 * Math.sin(3 * ph) : 0;
+      // The first three harmonics from the table (see SINE_TABLE).
+      const x1 = this.ersPhase * steps;
+      let k = x1 | 0;
+      let fr = x1 - k;
+      k &= mask;
+      const sin1 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const x2 = 2 * x1;
+      k = x2 | 0;
+      fr = x2 - k;
+      k &= mask;
+      const sin2 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const x3 = 3 * x1;
+      k = x3 | 0;
+      fr = x3 - k;
+      k &= mask;
+      const sin3 = (sine[k] as number) + fr * ((sine[k + 1] as number) - (sine[k] as number));
+      const s1 = g1 > 0 ? g1 * sin1 : 0;
+      const h2 = g2 > 0 ? g2 * sin2 : 0;
+      const h3 = g3 > 0 ? g3 * sin3 : 0;
       const d = this.deploy > 1.5 ? 1.5 : this.deploy;
       const h = this.harvest > 1.5 ? 1.5 : this.harvest;
       const v =

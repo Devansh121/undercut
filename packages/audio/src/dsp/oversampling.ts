@@ -29,3 +29,21 @@ export const POLYPHASE: Float64Array = (() => {
   }
   return out;
 })();
+
+/**
+ * Largest gain any interpolated point can have over the input samples it is made from: the
+ * biggest sum of absolute coefficients over the phases, and at least 1 (the sample itself is
+ * also a detected point). So no true-peak estimate exceeds the largest input magnitude in its
+ * window times this. Raised by 1e-9 to cover rounding in the multiply-adds (16 terms add at
+ * most about 4e-15 of relative error), so the bound also holds for the computed sums.
+ */
+export const INTERPOLATOR_MAX_GAIN: number = (() => {
+  let worst = 1;
+  for (let p = 0; p < OVERSAMPLE; p++) {
+    let sum = 0;
+    for (let t = 0; t < TAPS_PER_PHASE; t++)
+      sum += Math.abs(POLYPHASE[p * TAPS_PER_PHASE + t] as number);
+    if (sum > worst) worst = sum;
+  }
+  return worst * (1 + 1e-9);
+})();
