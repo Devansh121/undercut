@@ -40,6 +40,18 @@ test('two players race, rematch, leave and migrate the host', async ({
     await expect.poll(async () => (await state(host)).state?.members.length).toBe(2);
     await host.getByLabel('Laps', { exact: true }).fill('1');
     expect((await state(host)).state!.room!.settings.circuit).toEqual(DEFAULT_CIRCUIT);
+    // Shorten only the lap timing floor for this 1-lap test segment (lengthM stays Monza's so
+    // snapshot-distance validation at the real timing line runs unchanged).
+    const shortCircuit = { ...DEFAULT_CIRCUIT, minLapMs: 2000, minSectorMs: [] };
+    expect(
+      await host.evaluate(
+        (circuit) => window.__undercut!.onlineSettings({ circuit }),
+        shortCircuit,
+      ),
+    ).toBe(true);
+    await expect
+      .poll(async () => (await state(host)).state?.room?.settings.circuit.minLapMs)
+      .toBe(2000);
     await host.screenshot({ path: info.outputPath('lobby-desktop.png') });
     await guest.screenshot({ path: info.outputPath('lobby-phone.png') });
     await guest.getByRole('button', { name: 'Ready', exact: true }).click();

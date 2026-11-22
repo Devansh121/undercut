@@ -12,6 +12,7 @@ import {
   navigatorGamepads,
   navigatorRumble,
 } from '@undercut/input/dom';
+import type { SettingsPatch } from '@undercut/protocol';
 import type { QualityName } from '@undercut/render';
 import { PageAudio } from './audio';
 import { debugEnabled, installDebugApi } from './debug';
@@ -220,5 +221,6 @@ if (debugEnabled()) {
       state: online?.session.state ?? null,
       race: online?.race?.snapshot() ?? null,
     }),
+    onlineSettings: (patch: SettingsPatch) => online?.session.changeSettings(patch) ?? false,
   });
 }
