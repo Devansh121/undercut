@@ -12,8 +12,13 @@ export function watchProblems(page: Page): string[] {
 }
 
 /** Load the launch screen with the debug API and press Start with a real click. */
+/**
+ * Launch to a driving session without the circuit's surroundings (`world=lite`): the full world
+ * is tested once, in world-dressing.spec.ts, and its start-up cost on the GPU
+ * (`npm run shots -- monza --perf`).
+ */
 export async function coldStart(page: Page, quality: 'lite' | 'mobile'): Promise<void> {
-  await page.goto(`/?debug=1&quality=${quality}`);
+  await page.goto(`/?debug=1&quality=${quality}&world=lite`);
   await page.getByRole('button', { name: /Start/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await expect(page.locator('[data-testid=hud]')).toBeVisible();

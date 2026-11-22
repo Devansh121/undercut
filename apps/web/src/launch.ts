@@ -58,6 +58,15 @@ export function mountLaunchScreen(root: HTMLElement, options: LaunchScreenOption
   start.addEventListener('click', () => options.onStart());
 
   const build = el('footer', 'launch__build');
+  // The circuit and its surroundings are built from OpenStreetMap (ODbL), which asks for a
+  // credit where the game is seen; heights from Copernicus WorldDEM-30 (credits in CREDITS.md).
+  const credit = el('p', 'launch__credit', 'Map data ');
+  const osm = el('a', '', '© OpenStreetMap contributors');
+  osm.href = 'https://www.openstreetmap.org/copyright';
+  osm.target = '_blank';
+  osm.rel = 'noopener';
+  credit.append(osm, '. Heights: Copernicus WorldDEM-30.');
+  stage.append(credit);
   build.append('Build ', el('code', '', options.buildHash));
 
   const online = el('button', 'button', 'Online rooms');
