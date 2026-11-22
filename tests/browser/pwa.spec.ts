@@ -119,8 +119,11 @@ test('installable shell survives a redirecting host, updates on reload, and driv
     await expect(page.locator('html')).toHaveAttribute('data-quality', 'mobile');
     await expect(page.getByTestId('loading')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('settings.quality.auto'))).toBe('medium');
-    // No debug API in this session: quit as a player does, so the WebGL context is released
-    // before teardown (see base.ts).
+    // No debug API in this session: quit as a player does. Quitting stops drawing but keeps the
+    // page's one WebGL context (createRenderer); unloading to about:blank in `finally` releases
+    // it, and first runs whatever the GPU still has queued. On software WebGL that is the
+    // session's start-up work plus at most two frames (FramePacer): about 4 s idle, 9 to 11 s
+    // on two busy cores.
     await page.keyboard.press('Escape');
     await page.getByTestId('pause-menu').locator('[data-action=quit]').click();
     await expect(page.locator('html')).not.toHaveAttribute('data-screen', 'drive');

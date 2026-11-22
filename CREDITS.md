@@ -90,3 +90,5 @@ The team car images on the main menu (`apps/web/public/assets/ui/cars/`) are ren
 ## Circuit prop kit
 
 The GLBs in `apps/web/public/assets/props/` are original scripted models by Project contributors, MIT, authored in `tools/props/props.py`: geometry, procedural surface grain and baked vertex ambient occlusion. No third-party models or textures are included. Per-file hashes and provenance are recorded in `assets/MANIFEST.json`.
+
+The street furniture, temporary scaffold stands, generic marina facades, hill pit extension are also original scripted work by Project contributors, MIT (`tools/props/kits.py`). Their surface grain is procedural, with no third-party source imagery. The manifest records every GLB, including its embedded textures.

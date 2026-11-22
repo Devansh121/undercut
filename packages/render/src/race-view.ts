@@ -32,6 +32,7 @@ import { nextLift } from './framing';
 import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
+import { FramePacer, webglFences } from './pipeline/frame-pacer';
 import { GpuTimer } from './pipeline/gpu-timer';
 import { RenderPipeline, type GradeFrame, type ToneMap } from './pipeline/post';
 import { PropRegistry } from './props/registry';
@@ -192,6 +193,10 @@ export interface ViewStats {
   /** 'hdr': half-float target and post-processing; 'direct': straight to the canvas. */
   renderPath: 'hdr' | 'direct';
   environmentBakes: number;
+  /** Frames this view has drawn (an animation frame skips its draw while the GPU is behind). */
+  drawnFrames: number;
+  /** Frames that skipped their draw because the GPU was still two frames behind. */
+  skippedDraws: number;
 }
 
 /** Everything a session fetches before it can draw, for one preset. */
@@ -232,6 +237,11 @@ export class RaceView {
   private readonly assets: SessionAssets;
   private readonly dynamic: DynamicResolution;
   private readonly gpu: GpuTimer;
+  /** At most two frames queued on the GPU (see FramePacer). */
+  private readonly pacer: FramePacer<WebGLSync>;
+  /** Frame time since the last drawn frame, ms: dynamic resolution's sample when draws skip. */
+  private sinceDrawMs = 0;
+  private drawnFrames = 0;
   private contextLost = false;
   private readonly fleetLiveries: readonly CarLivery[];
   private readonly track: Track;
@@ -380,6 +390,7 @@ export class RaceView {
       ),
     });
     this.gpu = new GpuTimer(this.renderer.getContext() as WebGL2RenderingContext);
+    this.pacer = new FramePacer(webglFences(this.renderer.getContext() as WebGL2RenderingContext));
 
     const t0 = performance.now();
     this.environment = new Environment(this.scene, this.camera, tod, assets.sky, q);
@@ -524,6 +535,7 @@ export class RaceView {
   private readonly onContextLost = (): void => {
     this.contextLost = true;
     this.gpu.abandon();
+    this.pacer.abandon();
     this.dispose();
   };
 
@@ -750,9 +762,21 @@ export class RaceView {
 
   render(frame: ViewFrame): void {
     const dt = frame.dt;
-    // GPU time where the browser measures it (CPU-side stalls are not GPU load), else frame time.
-    const sample = this.gpu.available ? this.gpu.latest : (frame.frameMs ?? null);
-    if (!this.contextLost && sample !== null && this.dynamic.update(sample)) this.resize(true);
+    this.sinceDrawMs += frame.frameMs ?? 0;
+    // Draw only while the GPU is at most a frame behind (FramePacer); the CPU side below runs
+    // every frame either way, so cameras, poses and screen-space queries stay current.
+    const draw = !this.contextLost && this.pacer.ready();
+    if (draw) {
+      // GPU time where the browser measures it (CPU-side stalls are not GPU load), else the time
+      // since the last drawn frame (the frame time, unless the GPU made this frame wait).
+      const sample = this.gpu.available
+        ? this.gpu.latest
+        : frame.frameMs === undefined
+          ? null
+          : this.sinceDrawMs;
+      this.sinceDrawMs = 0;
+      if (sample !== null && this.dynamic.update(sample)) this.resize(true);
+    }
     this.camera.clearViewOffset();
     this.camera.aspect = this.width / Math.max(1, this.height);
     this.updateHeat(frame);
@@ -824,9 +848,9 @@ export class RaceView {
     const exposure = this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1);
     this.drivingLine.update(frame.pose.x, frame.pose.z, frame.speed, exposure);
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
-    // Without a context only the CPU side runs (cameras, poses), so screen-space queries such as
-    // carScreenRect stay right; nothing touches GL.
-    if (this.contextLost) return;
+    // Without a context, or with the GPU behind, only the CPU side runs (cameras, poses), so
+    // screen-space queries such as carScreenRect stay right; nothing touches GL.
+    if (!draw) return;
     if (this.checkRegistration && --this.framesToCheck <= 0) {
       this.framesToCheck = 120;
       for (const m of unregisteredLitMaterials(this.scene, (x) =>
@@ -872,10 +896,14 @@ export class RaceView {
         });
       }
       this.gpu.end();
+      this.pacer.submitted();
+      this.drawnFrames++;
       return;
     }
     this.pipeline.render(this.scene, this.camera, g);
     this.gpu.end();
+    this.pacer.submitted();
+    this.drawnFrames++;
   }
 
   private skyProbePath: 'hdr' | 'direct' | null = null;
@@ -983,6 +1011,8 @@ export class RaceView {
       cars: 1 + this.fleet.size,
       renderPath: this.quality.post ? 'hdr' : 'direct',
       environmentBakes: this.environment.bakes,
+      drawnFrames: this.drawnFrames,
+      skippedDraws: this.pacer.skipped,
     };
   }
 
@@ -995,6 +1025,7 @@ export class RaceView {
     this.observer.disconnect();
     this.setSkyProbe(null);
     this.gpu.dispose();
+    this.pacer.dispose();
     this.pipeline.dispose();
     this.trackView.dispose();
     this.drivingLine.dispose();

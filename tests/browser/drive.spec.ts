@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { waitForDraws } from './helpers';
 import { SurfaceKind } from '@undercut/sim';
 import { Track, createGround } from '@undercut/track';
 import raw from '@undercut/track/data/monza.json' with { type: 'json' };
@@ -627,13 +628,13 @@ test.describe('drive', () => {
       window.__undercut?.teleport(460, 0, 300);
       window.__undercut?.drivingLine('braking');
     });
-    await waitFrames(2);
+    await waitForDraws(page);
     const warmOn = await countWarmPixels();
 
     await page.evaluate(() => {
       window.__undercut?.drivingLine('off');
     });
-    await waitFrames(2);
+    await waitForDraws(page);
     const warmOff = await countWarmPixels();
 
     expect(warmOn).toBeGreaterThan(warmOff + 80);
