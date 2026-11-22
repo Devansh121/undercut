@@ -231,3 +231,11 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - The gauntlet joins are derived from the steering-column transform and the sleeve endpoints; rear caps sit inside the sleeve and the thumbs curl around the grips. High wheel legends and rotary indicators use a texture on existing polygons; glove seam and restrained wear detail use a small suede texture.
 - The crouched mechanic uses one connected garment surface across the torso, pelvis and thigh roots, replacing the overlapping hip shell.
 - Track separately: the Mobile HUD obscures the wheel display, the mirrors remain dark in some lighting, and the halo weave reads as coarse zigzags at Mobile resolution. These need HUD/render review; this asset correction keeps their existing pipelines.
+
+### Decided for you — circuit model kits
+
+- Deliver ten catalogue props without changing world placement or enabling dressing in drive.ts. The dressing slice owns integration; current Spa/Singapore races therefore request no new prop files yet.
+- Street barrier and fence modules tile along +Z at 4 m; the terminal post closes a run. Temporary scaffold stands tile at 8 m and expose eight crowd rows. Hill pit garages use the existing 6 m team-board contract.
+- Generic marina office, hotel and pavilion silhouettes carry deterministic lit/dark window masks as separate PBR material regions. No landmark, logo or third-party asset is included. Lamp attachments expose emitter material and downward aim; the dressing renderer must provide actual local light illumination (emission alone lights only the panel).
+- The spruce and fir forest left this PR for its own branch (`m2/forest-kit`), so the review of its Far cards at the 250 m swap does not hold up the other props.
+- Transfer reservation adds all new levels and both circuits' sky tiers to the existing first race, without subtracting replaced assets. It is deliberately conservative; actual integrated circuit request telemetry belongs to the placement pass.
