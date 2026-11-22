@@ -773,10 +773,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     opacity: 1,
   }));
   const raceStatus = document.createElement('div');
-  raceStatus.className = 'panel';
+  raceStatus.className = 'panel race-status';
   raceStatus.dataset.testid = 'race-status';
-  raceStatus.style.cssText =
-    'padding:8px 16px;white-space:pre-line;text-align:center;max-height:60vh;overflow:auto;pointer-events:auto';
   // After the player's flag: the field is still finishing; skip runs the race to its end at
   // the fastest time scale.
   const skipResults = document.createElement('button');
@@ -975,6 +973,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       });
       view.setRaceCars(fleetPoses, fleetDrs);
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
+      // After the player's flag the standings take the screen; the driving cluster is done.
+      hud.root.toggleAttribute('data-finished', session.playerFinished);
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
