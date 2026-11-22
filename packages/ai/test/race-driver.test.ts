@@ -145,6 +145,21 @@ describe('race driver: gap keeping', () => {
     expect(gap).toBeLessThan(0.6);
   });
 
+  it('brakes for a car stopping further up the queue before the car ahead does', () => {
+    const dr = driver();
+    const ld = (x: number) => lineD(dr, x);
+    const me = { id: 0, s: STRAIGHT, d: ld(STRAIGHT), speed: 50 };
+    // The car ahead still at speed, 20 m up; the one beyond it nearly stopped 45 m up.
+    const ahead = { id: 1, s: STRAIGHT + CAR_LENGTH + 20, d: ld(STRAIGHT + 25.6), speed: 50 };
+    const beyond = { id: 2, s: STRAIGHT + 2 * CAR_LENGTH + 45, d: ld(STRAIGHT + 56), speed: 5 };
+    tick(dr, me, [ahead]);
+    const alone = dr.last.accelLimit;
+    tick(dr, me, [ahead, beyond]);
+    expect(dr.last.leader).toBe(1);
+    expect(alone).toBeGreaterThan(0);
+    expect(dr.last.accelLimit).toBeLessThan(-10);
+  });
+
   it('ignores a car out of sight ahead', () => {
     const dr = driver();
     const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 80 };

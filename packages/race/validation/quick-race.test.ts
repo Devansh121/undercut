@@ -8,7 +8,9 @@ import { runRace } from './lib/runner';
  * runs more seeds and the full distance (race.soak.test.ts).
  */
 describe('Quick Race: twenty cars, five laps, pit stops', () => {
-  for (const seed of [1, 17]) {
+  // 17: the pit-stop deadlock of the first review; 29 and 211: lap-1 contacts into the first
+  // chicane of the second.
+  for (const seed of [17, 29, 211]) {
     it(`seed ${seed}: clean start, every car classified, no stuck cars, cars pass`, () => {
       expectCleanRace(runRace({ cars: 20, laps: 5, seed }), 5);
     }, 300_000);

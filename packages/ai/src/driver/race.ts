@@ -418,6 +418,8 @@ export class RaceDriver implements Driver {
   // ---- Traffic ----
 
   private readonly room = { lo: 0, hi: 0 };
+  /** Scratch: cars in this car's lane ahead this tick (distance, speed). */
+  private readonly queue = Array.from({ length: 24 }, () => ({ ds: 0, speed: 0 }));
   /** Scratch: cars alongside this tick. */
   private readonly side = Array.from({ length: 24 }, () => ({
     car: null as unknown as TrafficCar,
@@ -452,6 +454,7 @@ export class RaceDriver implements Driver {
     let passDs = 0;
     const side = this.side;
     let ns = 0;
+    let nq = 0;
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       // Relative position as it was SEE_DELAY ago (both cars move; the gap changes by the
@@ -472,6 +475,12 @@ export class RaceDriver implements Driver {
       const inPath = lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns;
       // Ahead and in the way (or overlapping it already): follow it.
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
+        // The queue in this car's lane, further cars included (see `queueLimit`).
+        if (nq < this.queue.length) {
+          const q = this.queue[nq++]!;
+          q.ds = ds;
+          q.speed = c.speed;
+        }
         if (ds < leaderDs) {
           leaderDs = ds;
           leader = c;
@@ -661,6 +670,7 @@ export class RaceDriver implements Driver {
       }
       limit = SPEED_GAIN * (vOk - v);
     }
+    if (nq > 1) limit = Math.min(limit, this.queueLimit(nq, v));
     limit = Math.min(limit, this.offLineLimit(s0, v));
     // Never ask for more than the brakes give: past the tyres' limit the wheels lock, and the
     // lock-up feel backs the pedal off further than the demand would have.
@@ -674,6 +684,40 @@ export class RaceDriver implements Driver {
     last.accelLimit = limit;
     last.passing = this.passId;
     last.yielding = yielding;
+  }
+
+  /**
+   * A queue in this car's lane (into the first corner, a train of cars): a driver watches the
+   * cars beyond the one ahead, and a car braking hard further up the queue is a reason to brake
+   * now, before the car ahead does. Each car in the lane sets a safe speed (Gipps, as for the car
+   * ahead) with room left for the cars in between: a car length and the standstill gap each.
+   */
+  private queueLimit(nq: number, v: number): number {
+    const q = this.queue;
+    // Order by distance (insertion sort; a handful of cars).
+    for (let i = 1; i < nq; i++) {
+      const ds = q[i]!.ds;
+      const sp = q[i]!.speed;
+      let j = i - 1;
+      while (j >= 0 && q[j]!.ds > ds) {
+        q[j + 1]!.ds = q[j]!.ds;
+        q[j + 1]!.speed = q[j]!.speed;
+        j--;
+      }
+      q[j + 1]!.ds = ds;
+      q[j + 1]!.speed = sp;
+    }
+    const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
+    let limit = Number.POSITIVE_INFINITY;
+    for (let r = 1; r < nq; r++) {
+      const vl = Math.max(0, q[r]!.speed);
+      const room = q[r]!.ds - (r + 1) * (CAR_LENGTH + STANDSTILL_GAP);
+      const b = this.brakeAt(Math.min(v, vl));
+      const vKin = room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl;
+      const a = SPEED_GAIN * (vKin - v);
+      if (a < limit) limit = a;
+    }
+    return limit;
   }
 
   /** The deceleration this car can be counted on for at speed `v`, m/s² (on its own plan's grip). */
