@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './base';
+import { openMenu } from './helpers';
 import { DEFAULT_CIRCUIT } from '@undercut/protocol';
 
 // Keep DOM/network traces; continuous raster captures compete with two software renderers.
@@ -29,7 +30,10 @@ test('two players race, rematch, leave and migrate the host', async ({
   const state = (p: Page) => p.evaluate(() => window.__undercut!.online());
   try {
     await host.goto('/?debug=1&quality=lite');
-    await host.getByRole('button', { name: 'Online rooms', exact: true }).click();
+    // Online Rooms is a mode of the main menu; its start button opens the lobby.
+    await openMenu(host);
+    await host.locator('[data-action=mode-online]').click();
+    await host.locator('[data-action=start]').click();
     await host.getByLabel('Driver name').fill('Host');
     await host.getByRole('button', { name: 'Create room', exact: true }).click();
     await expect(host.getByTestId('invite')).toBeVisible();

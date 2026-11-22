@@ -6,8 +6,8 @@ export interface MinimapPlan {
   height: number;
   /** Closed SVG path of the centreline. */
   path: string;
-  /** Map position of a world point. */
-  project(x: number, z: number): [number, number];
+  /** Map position of a world point; writes into `out` when given (no allocation per call). */
+  project(x: number, z: number, out?: [number, number]): [number, number];
   /** Start/finish line as a short segment across the track. */
   startLine: [number, number, number, number];
 }
@@ -43,10 +43,11 @@ export function buildMinimap(
   );
   const ox = (width - (maxX - minX) * scale) / 2;
   const oy = (height - (maxZ - minZ) * scale) / 2;
-  const project = (x: number, z: number): [number, number] => [
-    ox + (x - minX) * scale,
-    oy + (z - minZ) * scale,
-  ];
+  const project = (x: number, z: number, out: [number, number] = [0, 0]): [number, number] => {
+    out[0] = ox + (x - minX) * scale;
+    out[1] = oy + (z - minZ) * scale;
+    return out;
+  };
   const parts: string[] = [];
   for (let i = 0; i < n; i += stride) {
     const [px, py] = project(lap.x[i] as number, lap.z[i] as number);

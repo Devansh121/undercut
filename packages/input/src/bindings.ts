@@ -46,6 +46,8 @@ const KEYBOARD_DEFAULTS: Record<ActionId, string[]> = {
   menuRight: ['ArrowRight', 'KeyD'],
   menuAccept: ['Enter', 'Space'],
   menuBack: ['Escape', 'Backspace'],
+  menuTabPrev: ['KeyQ'],
+  menuTabNext: ['KeyE'],
 };
 
 // Standard gamepad mapping: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 LT, 7 RT, 8 View, 9 Menu,
@@ -70,6 +72,8 @@ const GAMEPAD_DEFAULTS: Record<ActionId, string[]> = {
   menuRight: ['pad:b15', 'pad:a0+'],
   menuAccept: ['pad:b0'],
   menuBack: ['pad:b1'],
+  menuTabPrev: ['pad:b4'],
+  menuTabNext: ['pad:b5'],
 };
 
 // The touch overlay has a fixed layout; its controls map one to one.
