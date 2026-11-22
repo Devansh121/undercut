@@ -9,7 +9,7 @@ import { SINE_MASK, SINE_STEPS, SINE_TABLE } from './sine';
  * from seeded noise and sines; nothing is a loop, so nothing repeats audibly.
  *
  * - Crowd: two decorrelated noise streams band-passed at 700 Hz (Q 0.5, the speech band of a
- *   murmur), with two slow swells (0.13 and 0.31 Hz). Lights out raises it by up to +8 dB with
+ *   murmur) and low-passed at 2.2 kHz (one pole: distance), with two slow swells (0.13 and 0.31 Hz). Lights out raises it by up to +8 dB with
  *   a 0.8 s rise and a 6 s fall (a cheer).
  * - Trees: decorrelated noise band-passed at 550 Hz (Q 0.8) under a gust envelope from two
  *   slow sines (0.07 and 0.19 Hz). Forest full, parkland about half.
@@ -36,15 +36,18 @@ export const AMBIENCE_PROFILES: Readonly<
 const CROWD_GAIN = 0.25;
 const TREES_GAIN = 0.08;
 const BIRD_GAIN = 0.02;
-const RUMBLE_GAIN = 0.35;
-const INSECT_GAIN = 0.04;
+const RUMBLE_GAIN = 0.25;
+const INSECT_GAIN = 0.12;
+/** Floodlight hum partials at 100, 200 and 300 Hz. */
+const HUM_1 = 0.008;
+const HUM_2 = 0.004;
+const HUM_3 = 0.002;
+/** A crowd 20 m and more away loses its top: one-pole low-pass at 2.2 kHz after the band-pass. */
+const CROWD_TOP = 2200;
 /** Level changes follow the listener over half a second. */
 const LEVEL_TIME = 0.5;
 
-/** Sine of a phase in turns, for once-per-chunk use only (per-sample reads are inline). */
-function slowSine(turns: number): number {
-  return Math.sin(2 * Math.PI * turns);
-}
+const TWO_PI = 2 * Math.PI;
 
 export class Ambience {
   private readonly sampleRate: number = 48_000;
@@ -77,6 +80,9 @@ export class Ambience {
   treesLevel = 0;
   birdsLevel = 0;
   cityLevel = 0;
+  private readonly crowdTop: number;
+  private crowdLowL = 0;
+  private crowdLowR = 0;
   private crowdFromL = 0;
   private crowdFromR = 0;
   private treesFrom = 0;
@@ -113,19 +119,21 @@ export class Ambience {
     this.rumbleL = new Biquad(sampleRate).lowpass(140, 0.7);
     this.rumbleR = new Biquad(sampleRate).lowpass(140, 0.7);
     this.insects = new Biquad(sampleRate).bandpass(Math.min(5200, 0.4 * sampleRate), 3);
+    this.crowdTop = 1 - Math.exp((-2 * Math.PI * CROWD_TOP) / sampleRate);
     this.kChunk = 1 - Math.exp(-CHUNK / (LEVEL_TIME * sampleRate));
     this.kCheerRise = 1 - Math.exp(-CHUNK / (0.8 * sampleRate));
     this.cheerFall = Math.exp(-CHUNK / (6 * sampleRate));
     this.birdWait = Math.round(sampleRate * (1 + 2 * this.events.unit()));
   }
 
-  set(kind: AmbienceKind, crowdLeft: number, crowdRight: number): void {
+  /** The circuit's bed, and the crowd level at each ear from `crowd[at]` and `crowd[at + 1]`. */
+  set(kind: AmbienceKind, crowd: Float64Array, at: number): void {
     const p = AMBIENCE_PROFILES[kind] ?? AMBIENCE_PROFILES.none;
     this.treesTarget = p.trees;
     this.birdsTarget = p.birds;
     this.cityTarget = p.city;
-    this.crowdTargetL = crowdLeft;
-    this.crowdTargetR = crowdRight;
+    this.crowdTargetL = crowd[at] as number;
+    this.crowdTargetR = crowd[at + 1] as number;
   }
 
   /** Lights out: the stands cheer. */
@@ -156,11 +164,18 @@ export class Ambience {
       const g0R = this.crowdFromR;
       const stepL = (this.crowdLevelL - g0L) / CHUNK;
       const stepR = (this.crowdLevelR - g0R) / CHUNK;
+      const top = this.crowdTop;
+      let lowL = this.crowdLowL;
+      let lowR = this.crowdLowR;
       for (let i = 0; i < n; i++) {
         const j = offset + i + 1;
-        left[i] = (left[i] as number) + (c[i] as number) * (g0L + stepL * j) * lift;
-        right[i] = (right[i] as number) + (d[i] as number) * (g0R + stepR * j) * lift;
+        lowL += ((c[i] as number) - lowL) * top;
+        lowR += ((d[i] as number) - lowR) * top;
+        left[i] = (left[i] as number) + lowL * (g0L + stepL * j) * lift;
+        right[i] = (right[i] as number) + lowR * (g0R + stepR * j) * lift;
       }
+      this.crowdLowL = lowL;
+      this.crowdLowR = lowR;
     }
 
     if (this.treesAwake) {
@@ -215,7 +230,7 @@ export class Ambience {
         k = q & mask;
         const pulse =
           (table[k] as number) + (x - q) * ((table[k + 1] as number) - (table[k] as number));
-        const tone = 0.004 * h1 + 0.002 * h2 + 0.001 * h3;
+        const tone = HUM_1 * h1 + HUM_2 * h2 + HUM_3 * h3;
         const insect = (a[i] as number) * INSECT_GAIN * wave * pulse * pulse;
         left[i] = (left[i] as number) + g * ((c[i] as number) * RUMBLE_GAIN + tone + insect);
         right[i] =
@@ -247,10 +262,11 @@ export class Ambience {
     this.birdsAwake = this.birdsLevel > 1e-4 || this.birdNotes > 0;
     this.cheer += (this.cheerTarget - this.cheer) * this.kCheerRise;
     this.cheerTarget *= this.cheerFall;
-    const swell = 0.75 + 0.15 * slowSine(0.13 * t) + 0.1 * slowSine(0.31 * t + 0.4);
+    const swell =
+      0.75 + 0.15 * Math.sin(TWO_PI * (0.13 * t)) + 0.1 * Math.sin(TWO_PI * (0.31 * t + 0.4));
     this.crowdLift = CROWD_GAIN * swell * (1 + 1.5 * this.cheer);
-    this.gust = 0.55 + 0.45 * slowSine(0.07 * t) * slowSine(0.19 * t + 0.25);
-    this.insectWave = Math.max(0, slowSine(0.11 * t));
+    this.gust = 0.55 + 0.45 * Math.sin(TWO_PI * (0.07 * t)) * Math.sin(TWO_PI * (0.19 * t + 0.25));
+    this.insectWave = Math.max(0, Math.sin(TWO_PI * (0.11 * t)));
   }
 
   private renderBirds(left: Float64Array, right: Float64Array, n: number): void {

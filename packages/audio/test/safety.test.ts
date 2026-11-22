@@ -5,7 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { dcOffset, maxStep, samplePeak, truePeak } from '../src/analysis/index';
 import { DEFAULT_LIMITER, softClip } from '../src/dsp/limiter';
 import { SoftLimiter } from '../src/dsp/limiter';
-import { AudioCore, CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../src/index';
+import {
+  AudioCore,
+  CAR_STATE_LENGTH,
+  packCarState,
+  packScene,
+  rpmToRadPerSecond,
+  type AudioCarState,
+} from '../src/index';
 import { engineState, FS, render, type Clip } from './helpers';
 
 /** Everything at once, every gain at its maximum. */
@@ -294,8 +301,25 @@ describe('cost', () => {
     // State arrives packed, as the worklet receives it from the main thread.
     const packed = packCarState(everything(0), new Float64Array(CAR_STATE_LENGTH));
     const out = [new Float32Array(128), new Float32Array(128)];
+    // The scene arrives packed too: nineteen cars in range (six voiced, the rest summed), the
+    // city bed and a crowd, lamps and cues coming and going.
+    const scene = packScene({
+      cars: Array.from({ length: 19 }, (_, i) => ({
+        x: 3 + i * 9,
+        z: i % 2 ? -4 : 4,
+        vx: -25,
+        vz: 1,
+        engineSpeed: rpmToRadPerSecond(8000 + i * 150),
+        throttle: (i % 4) / 3,
+      })),
+      ambience: 'city-night',
+      crowdLeft: 1,
+      crowdRight: 0.5,
+      lights: 0,
+    });
     // The same input pattern as the measured loop: state every third block, a gear change
-    // every 300 blocks, the limiter cutting, every layer on.
+    // every 300 blocks, the limiter cutting, every layer on; the scene every sixth block with
+    // the cars moving, a lamp every 400 blocks and a menu cue every 250.
     const run = (blocks: number) => {
       for (let i = 0; i < blocks; i++) {
         if (i % 3 === 0) {
@@ -303,6 +327,12 @@ describe('cost', () => {
           packed[6] = i % 600 < 300 ? 1 : -1; // shift direction
           core.setCarState(packed);
         }
+        if (i % 6 === 0) {
+          for (let c = 0; c < 19; c++) scene[5 + c * 6] = 3 + c * 9 - (i % 1200) * 0.05;
+          scene[4] = Math.floor(i / 400) % 7;
+          core.setScene(scene);
+        }
+        if (i % 250 === 0) core.cue(i % 500 === 0 ? 'accept' : 'focus');
         core.process(out, 128);
       }
     };

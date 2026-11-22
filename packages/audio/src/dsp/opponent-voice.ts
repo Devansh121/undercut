@@ -149,21 +149,21 @@ export class OpponentVoice {
   }
 
   /**
-   * Point the voice at a car. Listener-relative position (x forward, z right) and velocity in
-   * m and m/s; engine speed in rad/s; throttle 0–1; `level` is the pool's gain for the slot.
+   * Point the voice at a car: six values from `car[at]` on, as in a packed scene: listener-
+   * relative position (x forward, z right) and velocity in m and m/s, engine speed in rad/s,
+   * throttle 0–1, all already range-checked. Set `targetGain` (the pool's level for the slot)
+   * first. The values travel in the array, not as arguments: a call that is not inlined boxes
+   * every fractional argument, and this runs on the audio thread at frame rate.
    */
-  aim(
-    x: number,
-    z: number,
-    vx: number,
-    vz: number,
-    engineSpeed: number,
-    throttle: number,
-    level: number,
-  ): void {
-    const d = Math.hypot(x, z);
+  aim(car: Float64Array, at: number): void {
+    const x = car[at] as number;
+    const z = car[at + 1] as number;
+    const vx = car[at + 2] as number;
+    const vz = car[at + 3] as number;
+    const engineSpeed = car[at + 4] as number;
+    const throttle = car[at + 5] as number;
+    const d = Math.sqrt(x * x + z * z);
     const r = Math.max(1, d);
-    this.targetGain = level;
     this.targetHz = engineSpeed / (4 * Math.PI); // cycle frequency, rpm / 120
     this.targetLoad = throttle;
     this.targetDoppler = dopplerRatio((x * vx + z * vz) / r);

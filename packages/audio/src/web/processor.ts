@@ -74,6 +74,8 @@ export class CarAudioProcessor extends scope.AudioWorkletProcessor {
           processMs: this.profileMs,
           audioMs: ((this.profileBlocks * 128) / scope.sampleRate) * 1000,
           clock: 'Date.now (coarse aggregate)',
+          audibleCars: this.core.scene.audibleCount,
+          fieldLevel: this.core.scene.fieldLevel,
         });
     }
     return true;
