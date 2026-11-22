@@ -1,3 +1,4 @@
+import { registerOffline } from './pwa/register';
 import '../../../design/mock/tokens.css';
 import './styles/kit.css';
 import './styles/menu.css';
@@ -274,3 +275,5 @@ if (debugEnabled()) {
     onlineSettings: (patch: SettingsPatch) => online?.session.changeSettings(patch) ?? false,
   });
 }
+
+registerOffline();

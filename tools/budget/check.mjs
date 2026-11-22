@@ -110,7 +110,7 @@ const missing = [];
 const results = [];
 for (const [name, q] of Object.entries(presets)) {
   if (name.startsWith('$') || name === 'lite') continue;
-  const files = new Set([...code, 'assets/index.json', ...masks, ...draco]);
+  const files = new Set([...code, 'manifest.webmanifest', 'assets/index.json', ...masks, ...draco]);
   const sky = index.skies[CIRCUIT_SKY.monza];
   files.add(`assets/${sky[q.skyTier]}`);
   for (const t of Object.values(index.textures))
