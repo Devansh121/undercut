@@ -26,6 +26,49 @@ it('retains addressable emissive materials and lamp aim through all LODs', () =>
     expect(p.attachments.filter((a) => a.direction).every((a) => a.direction[1] < 0)).toBe(true);
   }
 });
+it('ships alpha-tested forest cards with the same physical albedo as near needles', () => {
+  for (const id of ['forest-spruce', 'forest-fir']) {
+    const [high, , far] = prop(id).lods.map(gltf);
+    const near = high.materials.find((m) => m.name === id + '-needles');
+    const card = far.materials.find((m) => m.name === id + '-needles');
+    expect(card.alphaMode).toBe('MASK');
+    expect(card.pbrMetallicRoughness.roughnessFactor).toBe(
+      near.pbrMetallicRoughness.roughnessFactor,
+    );
+    expect(card.emissiveFactor).toBeUndefined();
+    expect(card.doubleSided ?? false).toBe(false);
+  }
+});
+
+it('keeps opposing forest card faces visible from every quadrant', async () => {
+  const { decodeGlb } = await import('./draco.mjs');
+  for (const id of ['forest-spruce', 'forest-fir']) {
+    const mesh = decodeGlb('apps/web/public/' + prop(id).lods[2].file).find((m) =>
+      m.material.includes('needles'),
+    );
+    const signs = new Set();
+    const p = mesh.POSITION.values;
+    for (let i = 0; i < mesh.indices.length; i += 3) {
+      const [a, b, c] = mesh.indices.slice(i, i + 3).map((v) => v * 3);
+      const u = [0, 1, 2].map((j) => p[b + j] - p[a + j]);
+      const v = [0, 1, 2].map((j) => p[c + j] - p[a + j]);
+      const x = u[1] * v[2] - u[2] * v[1];
+      const z = u[0] * v[1] - u[1] * v[0];
+      if (Math.abs(x) > 0.01) signs.add(x > 0 ? '+X' : '-X');
+      if (Math.abs(z) > 0.01) signs.add(z > 0 ? '+Z' : '-Z');
+    }
+    expect([...signs].sort()).toEqual(['+X', '+Z', '-X', '-Z']);
+    // Cards keep their geometric (horizontal) normals; the shading of the near tree comes from
+    // the card material's normal atlas, not from tilted vertex normals.
+    for (let i = 1; i < mesh.NORMAL.values.length; i += 3)
+      expect(Math.abs(mesh.NORMAL.values[i])).toBeLessThan(0.05);
+    const bytes = fs.readFileSync('apps/web/public/' + prop(id).lods[2].file);
+    const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
+    const leaf = gltf.materials.find((m) => m.name.includes('needles'));
+    expect(leaf.normalTexture).toBeDefined();
+  }
+});
+
 it('preserves lit window masks through backdrop LOD changes', () => {
   for (const id of ['marina-office', 'marina-hotel', 'marina-pavilion']) {
     let panes;
