@@ -116,6 +116,16 @@ export interface CircuitWorldOptions {
   propKit?: PropKitAssets | null;
 }
 
+/**
+ * How far (to the sphere's edge) world chunks draw, m. Haze hides them well before this; the
+ * gates only skip drawing what cannot be seen, so they are set long to avoid pop-in.
+ */
+const FAR_BUILDINGS = 4000;
+const FAR_STANDS = 3200;
+const FAR_BRIDGES = 3000;
+const FAR_BOARDS = 1200;
+const FAR_DECALS = 900;
+
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
 const WOOD_DENSITY = 1 / 42;
 /** Clear ground between the barrier and the first trees, m. */
@@ -444,7 +454,7 @@ export class CircuitWorld {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       this.group.add(mesh);
-      this.addWorldChunk(mesh, ch.centre, ch.radius, 1800, 240);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
     });
 
     // Garage team fascia boards consolidated into one atlas texture and one draw call.
@@ -464,7 +474,13 @@ export class CircuitWorld {
       this.group.add(boardMesh);
       const bs = boardGeo.boundingSphere;
       if (bs) {
-        this.addWorldChunk(boardMesh, [bs.center.x, bs.center.y, bs.center.z], bs.radius, 750, 0);
+        this.addWorldChunk(
+          boardMesh,
+          [bs.center.x, bs.center.y, bs.center.z],
+          bs.radius,
+          FAR_BOARDS,
+          0,
+        );
       }
     }
     this.counts.garageBays = pit.bays.length;
@@ -773,7 +789,7 @@ export class CircuitWorld {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       this.group.add(mesh);
-      this.addWorldChunk(mesh, ch.centre, ch.radius, 2200, 220);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_BUILDINGS, 220);
     });
   }
 
@@ -795,7 +811,7 @@ export class CircuitWorld {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       this.group.add(mesh);
-      this.addWorldChunk(mesh, ch.centre, ch.radius, 1800, 240);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
     });
 
     // Crowd: fuller near the start line and the first chicane, thinner at the back of big stands.
@@ -874,7 +890,13 @@ export class CircuitWorld {
         m.castShadow = m.castShadow && quality.sceneryShadows;
         const bs = m.geometry.boundingSphere;
         if (bs) {
-          this.addWorldChunk(m, [bs.center.x, bs.center.y, bs.center.z], bs.radius, 1600, 240);
+          this.addWorldChunk(
+            m,
+            [bs.center.x, bs.center.y, bs.center.z],
+            bs.radius,
+            FAR_BRIDGES,
+            240,
+          );
         }
       }
     }
@@ -893,7 +915,7 @@ export class CircuitWorld {
           banking.mesh,
           [bs.center.x, bs.center.y, bs.center.z],
           bs.radius,
-          1800,
+          FAR_STANDS,
           220,
         );
       }
@@ -932,7 +954,7 @@ export class CircuitWorld {
       m.matrixAutoUpdate = false;
       const bs = m.geometry.boundingSphere;
       if (bs) {
-        this.addWorldChunk(m, [bs.center.x, bs.center.y, bs.center.z], bs.radius, 650, 0);
+        this.addWorldChunk(m, [bs.center.x, bs.center.y, bs.center.z], bs.radius, FAR_DECALS, 0);
       }
     }
   }
