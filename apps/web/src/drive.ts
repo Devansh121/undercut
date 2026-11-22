@@ -119,6 +119,8 @@ const ERS_MODE_LABEL: Record<number, string> = {
   [ErsMode.Overtake]: S.hud.ersModes.overtake,
 };
 const FRAME_LOG = 7200;
+/** A retired car fades out of the scene and off the map over this long, s. */
+const RETIRED_FADE_S = 3;
 
 /** The page's renderer, created by the first session and reused by every later one. */
 let pageRenderer: ReturnType<typeof createRenderer> | null = null;
@@ -890,6 +892,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const ghostPose = createCarPose();
   const fleetPoses = Array.from({ length: session.quickRace ? 19 : 0 }, createCarPose);
   const fleetDrs = new Array<number>(fleetPoses.length).fill(0);
+  // A retired car is a ghost parked out of the race: it fades out of the scene and off the map.
+  const fleetOpacity = new Array<number>(fleetPoses.length).fill(1);
   // The AI cars on the minimap, in their team's colour.
   const fleetDots = fleetPoses.map((_, i) => ({
     x: 0,
@@ -972,7 +976,44 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     message: null,
   };
 
-  function raceStatusText(): string {
+  /** The race readout as lines, and which line is the player's own (−1: none). */
+  /**
+   * The readout, one element per line, rebuilt only when it changes. In the standings the
+   * player's own row is marked and kept in view (a landscape phone shows eight rows); a fade at
+   * the bottom edge says there are more.
+   */
+  let statusKey = '';
+  let statusPlayer = -1;
+  function showRaceStatus(): void {
+    const { lines, player } = raceStatusLines();
+    const key = lines.join('\n');
+    if (key !== statusKey) {
+      statusKey = key;
+      raceStatus.replaceChildren(
+        ...lines.map((text, i) => {
+          const div = document.createElement('div');
+          div.className = i === 0 && lines.length > 1 ? 'race-status__head' : 'race-status__row';
+          if (i === player) div.classList.add('is-player');
+          div.textContent = text;
+          return div;
+        }),
+      );
+      // Into view once per standings (when the player's row moves), not against the reader's
+      // own scrolling every rebuild.
+      if (player > 0 && player !== statusPlayer) {
+        const el = raceStatus.children[player] as HTMLElement | undefined;
+        if (el) {
+          const top = el.offsetTop - raceStatus.clientHeight / 2 + el.offsetHeight / 2;
+          raceStatus.scrollTop = Math.max(0, top);
+        }
+      }
+      statusPlayer = player;
+    }
+    const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
+    raceStatus.toggleAttribute('data-more', more);
+  }
+
+  function raceStatusLines(): { lines: string[]; player: number } {
     const c = session.race.control;
     const standings = c.standings();
     const row = standings.find((r) => r.car === 0);
@@ -986,38 +1027,49 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             ? ` · +${row.gap.toFixed(1)}s`
             : ''
         : '';
-    return session.result
-      ? 'Race result\n' +
-          session.result.entries
-            .map((e) => {
-              const g =
-                e.gap === null
-                  ? ''
-                  : 'laps' in e.gap
-                    ? `  +${e.gap.laps}L`
-                    : `  +${e.gap.time.toFixed(3)}s`;
-              return `${e.position}  ${e.code}  ${e.status}${g}`;
-            })
-            .join('\n')
-      : session.playerFinished
-        ? `Chequered flag · P${row?.position ?? 20} · provisional\n` +
-          standings
-            .map((r) => {
-              const code = session.race.entrants[r.car]?.code ?? '';
-              const state =
-                r.status === 'running'
-                  ? `racing, lap ${Math.min(r.lap, totalLaps)}`
-                  : r.status === 'finished'
-                    ? 'finished'
-                    : r.status;
-              return `${r.position}  ${code}  ${state}`;
-            })
-            .join('\n')
-        : c.phase === 'grid'
-          ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
-          : c.phase === 'lights'
-            ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
-            : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+    if (session.result) {
+      const entries = session.result.entries;
+      return {
+        lines: [
+          'Race result',
+          ...entries.map((e) => {
+            const g =
+              e.gap === null
+                ? ''
+                : 'laps' in e.gap
+                  ? `  +${e.gap.laps}L`
+                  : `  +${e.gap.time.toFixed(3)}s`;
+            return `${e.position}  ${e.code}  ${e.status}${g}`;
+          }),
+        ],
+        player: 1 + entries.findIndex((e) => e.car === 0),
+      };
+    }
+    if (session.playerFinished) {
+      return {
+        lines: [
+          `Chequered flag · P${row?.position ?? 20} · provisional`,
+          ...standings.map((r) => {
+            const code = session.race.entrants[r.car]?.code ?? '';
+            const state =
+              r.status === 'running'
+                ? `racing, lap ${Math.min(r.lap, totalLaps)}`
+                : r.status === 'finished'
+                  ? 'finished'
+                  : r.status;
+            return `${r.position}  ${code}  ${state}`;
+          }),
+        ],
+        player: 1 + standings.findIndex((r) => r.car === 0),
+      };
+    }
+    const line =
+      c.phase === 'grid'
+        ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
+        : c.phase === 'lights'
+          ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
+          : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+    return { lines: [line], player: -1 };
   }
 
   const frame = (): void => {
@@ -1107,15 +1159,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         const c = session.race.worldCar(i + 1);
         interpolateCarPose(c.previousPose, c.pose, loop.alpha, p);
         fleetDrs[i] = c.state.drsPosition;
+        const status = session.race.control.cars[i + 1]!.status;
+        const retired = status === 'dnf' || status === 'dsq';
+        fleetOpacity[i] = retired ? Math.max(0, fleetOpacity[i]! - dt / RETIRED_FADE_S) : 1;
         const dot = fleetDots[i]!;
         dot.x = p.x;
         dot.z = p.z;
+        dot.opacity = fleetOpacity[i]!;
       });
-      view.setRaceCars(fleetPoses, fleetDrs);
+      view.setRaceCars(fleetPoses, fleetDrs, fleetOpacity);
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
-      hud.root.toggleAttribute('data-finished', session.playerFinished || session.result !== null);
+      const finished = session.playerFinished || session.result !== null;
+      hud.root.toggleAttribute('data-finished', finished);
+      document.documentElement.toggleAttribute('data-race-finished', finished);
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
@@ -1124,8 +1182,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (statusClock >= STATUS_PERIOD || (session.result !== null) !== statusHadResult) {
         statusClock = 0;
         statusHadResult = session.result !== null;
-        const text = raceStatusText();
-        if (raceStatus.textContent !== text) raceStatus.textContent = text;
+        showRaceStatus();
       }
     }
     view.setDrivingLine(session.assists.racingLine ?? 'off');
@@ -1214,6 +1271,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         h.record = null;
         h.liveDelta = null;
         h.ghost = false;
+        // After the flag (or a retirement) the clock stops: the last lap's time stands, and the
+        // cooldown lap is not timed.
+        if (session.playerFinished || session.result !== null) {
+          h.running = timer.lastLap !== null;
+          h.lapTime = timer.lastLap ?? 0;
+          for (const slot of h.sectors) {
+            slot.state = 'none';
+            slot.time = null;
+            slot.delta = null;
+          }
+        }
       }
       h.message = message;
       if (others) h.others = others;
@@ -1380,6 +1448,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.quit();
     ext?.detach?.();
     overlay?.destroy();
+    document.documentElement.removeAttribute('data-race-finished');
     phone?.destroy();
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     view.dispose();

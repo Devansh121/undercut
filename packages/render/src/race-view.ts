@@ -617,7 +617,15 @@ export class RaceView {
    * clears them.
    */
   /** Interpolated race fleet, player excluded. Livery indices follow entrant order. */
-  setRaceCars(poses: readonly CarPose[], drs: readonly number[]): void {
+  /**
+   * The race's other cars this frame: poses, DRS flap and, optionally, opacity (1 opaque, 0 not
+   * drawn; a retired car fades out).
+   */
+  setRaceCars(
+    poses: readonly CarPose[],
+    drs: readonly number[],
+    opacity?: readonly number[],
+  ): void {
     if (this.fleet.size !== poses.length) {
       this.fleet.clear();
       poses.forEach((pose, i) => {
@@ -626,7 +634,10 @@ export class RaceView {
       });
       this.environment.register(this.fleet.group);
     }
-    poses.forEach((pose, i) => this.fleet.setPose(i, pose, drs[i] ?? 0));
+    poses.forEach((pose, i) => {
+      this.fleet.setPose(i, pose, drs[i] ?? 0);
+      this.fleet.setOpacity(i, opacity?.[i] ?? 1);
+    });
   }
 
   setGridCars(count: number, playerPose: CarPose): void {

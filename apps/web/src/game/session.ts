@@ -509,7 +509,13 @@ export class DriveSession {
    */
   private onRaceEvent(e: RaceEvent, events: SessionEvent[]): void {
     if (this.quickRace) {
-      const n = raceNotice(e);
+      // At the flag, the place the standings give (a car a lap down may take the flag first and
+      // still be classified behind), the same as the standings panel shows.
+      const place =
+        e.type === 'finish'
+          ? this.race.control.standings().find((r) => r.car === 0)?.position
+          : undefined;
+      const n = raceNotice(e, place);
       if (n) events.push(n);
       return;
     }
@@ -658,8 +664,14 @@ const PENALTY_TEXT: Record<string, string> = {
   blueFlags: 'Ignoring blue flags',
 };
 
-/** What race control tells the player about one of the player's own race events, if anything. */
-export function raceNotice(e: RaceEvent): Extract<SessionEvent, { type: 'notice' }> | null {
+/**
+ * What race control tells the player about one of the player's own race events, if anything.
+ * `place`: the player's place in the standings at a finish (else the order of taking the flag).
+ */
+export function raceNotice(
+  e: RaceEvent,
+  place?: number,
+): Extract<SessionEvent, { type: 'notice' }> | null {
   switch (e.type) {
     case 'penalty':
       return {
@@ -688,7 +700,12 @@ export function raceNotice(e: RaceEvent): Extract<SessionEvent, { type: 'notice'
     case 'penaltyServed':
       return { type: 'notice', tag: 'Penalty served', text: `${e.seconds} s`, tone: 'info' };
     case 'finish':
-      return { type: 'notice', tag: 'Chequered flag', text: `P${e.position}`, tone: 'info' };
+      return {
+        type: 'notice',
+        tag: 'Chequered flag',
+        text: `P${place ?? e.position}`,
+        tone: 'info',
+      };
     default:
       return null;
   }

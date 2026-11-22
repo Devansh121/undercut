@@ -1723,6 +1723,7 @@ body {
 
 /* Race readout: position and laps while racing, the standings after the flag. */
 .race-status {
+  position: relative;
   padding: 8px 16px;
   white-space: pre-line;
   text-align: center;
@@ -1730,10 +1731,30 @@ body {
   overflow: auto;
   pointer-events: auto;
 }
+/* The player's own row in the standings. */
+.race-status__row.is-player {
+  color: var(--c-text-inverse);
+  background: var(--c-accent);
+  border-radius: 2px;
+}
+/* More rows below: the list fades out at its bottom edge. */
+.race-status[data-more] {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent);
+}
 /* After the player's flag the standings take the screen: the driving cluster and the
    first-lap coach go. */
 .hud[data-finished] .hud-cluster,
 .hud[data-finished] ~ .onboarding {
+  display: none;
+}
+/* The touch driving controls go too (the camera and pause buttons stay). */
+html[data-race-finished] .ut-touch__steer,
+html[data-race-finished] .ut-touch__pedal,
+html[data-race-finished] .ut-touch__btn--gearUp,
+html[data-race-finished] .ut-touch__btn--gearDown,
+html[data-race-finished] .ut-touch__btn--drs,
+html[data-race-finished] .ut-touch__btn--overtake {
   display: none;
 }
 /* On a short screen the standings leave room for Skip to results under them. */
