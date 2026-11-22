@@ -46,7 +46,24 @@ export interface TrackViewOptions {
   sets: Readonly<Record<TrackTextureId, PbrSet>>;
   /** Racing-line lateral offset per lap sample (m), e.g. from the AI's line; estimated if absent. */
   racingLine?: ArrayLike<number> | null;
+  /** Draw the track package's own ground grid (false when the circuit's world brings terrain). */
+  terrain?: boolean;
 }
+
+/**
+ * Grass colour variation (shader chunk for the surface material): a coarser sample of the same
+ * texture faded in with distance so the tile never repeats toward the horizon, lush-to-dry
+ * patches. Shared with the world's ground so the verges and the land match.
+ */
+export const GRASS_COLOUR = `
+      {
+        float far = smoothstep(12.0, 60.0, length(vSurfWorld - cameraPosition));
+        vec3 coarse = texture2D(map, vMapUv * 0.21 + 0.13).rgb;
+        diffuseColor.rgb = mix(diffuseColor.rgb, coarse * diffuseColor.a, far * 0.6);
+        vec3 lush = vec3(0.84, 0.86, 0.66);
+        vec3 dry = vec3(1.12, 1.0, 0.72);
+        diffuseColor.rgb *= mix(lush, dry, smoothstep(0.25, 0.88, macro.r)) * mix(0.8, 1.1, macro.g);
+      }`;
 
 const MAX_GRID = 24;
 /** Linear gain on the asphalt set's colour (see buildMaterials). */
@@ -64,6 +81,8 @@ export class TrackView {
   private readonly materials: Material[] = [];
   private readonly textures: Texture[] = [];
   private readonly geometries: BufferGeometry[] = [];
+  /** The drivable meshes' data (road, lines, kerbs, run-off, pit, markings), for the world's ground. */
+  readonly drivable: readonly MeshData[];
 
   constructor(options: TrackViewOptions) {
     const { track, quality } = options;
@@ -84,7 +103,15 @@ export class TrackView {
         this.group.add(mesh);
       }
     };
-    add(meshes.terrain, 'terrain');
+    this.drivable = [
+      meshes.road,
+      meshes.lines,
+      meshes.kerbs,
+      meshes.runoff,
+      meshes.pit,
+      meshes.markings,
+    ];
+    if (options.terrain !== false) add(meshes.terrain, 'terrain');
     add(meshes.runoff, 'runoff');
     add(meshes.road, 'road');
     add(meshes.pit, 'pit');
@@ -272,15 +299,7 @@ export class TrackView {
 
     // Grass: real grass, its colour broken by two noise scales, and a coarser sample of the same
     // texture faded in with distance so the tile never repeats visibly toward the horizon.
-    const grassColour = `
-      {
-        float far = smoothstep(12.0, 60.0, length(vSurfWorld - cameraPosition));
-        vec3 coarse = texture2D(map, vMapUv * 0.21 + 0.13).rgb;
-        diffuseColor.rgb = mix(diffuseColor.rgb, coarse * diffuseColor.a, far * 0.6);
-        vec3 lush = vec3(0.86, 0.95, 0.8);
-        vec3 dry = vec3(1.1, 1.04, 0.82);
-        diffuseColor.rgb *= mix(lush, dry, smoothstep(0.3, 0.9, macro.r)) * mix(0.84, 1.08, macro.g);
-      }`;
+    const grassColour = GRASS_COLOUR;
     const grass = this.keep(
       surfaceMaterial(
         sets.grass,

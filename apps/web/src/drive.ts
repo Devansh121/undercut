@@ -43,8 +43,21 @@ import {
   type EnvelopeArtefact,
 } from '@undercut/ai';
 import teams from '../../../design/teams.json';
+import brandsData from '../../../design/brands.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
+import monzaDressing from '@undercut/render/data/monza.dressing.json?url';
+
+/**
+ * The prop catalogue, when this build has one (packages/render/data/props.catalog.json, written by
+ * the prop kit's build). Globbed so its arrival is a data change: no file, procedural stand-ins.
+ */
+const propCatalog: unknown = Object.values(
+  import.meta.glob('../../../packages/render/data/props.catalog.json', {
+    eager: true,
+    import: 'default',
+  }),
+)[0];
 // The AI's racing line and measured vehicle envelope, for the rubbered line, the driving-line
 // assist and the driving line's advised speeds (braking help).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
@@ -216,6 +229,11 @@ function toneMapParam(): ToneMap {
   return t === 'aces' || t === 'agx' ? t : 'neutral';
 }
 
+/** `?world=lite`: no dressing on any preset, the track's own ground (software-WebGL tests). */
+function worldDetailParam(): 'preset' | 'lite' {
+  return new URLSearchParams(window.location.search).get('world') === 'lite' ? 'lite' : 'preset';
+}
+
 function racingLineOffsets(count: number): Float64Array | null {
   const raw = monzaLine as { count: number; offsetTenthMm: number[] };
   if (raw.count !== count) return null;
@@ -317,10 +335,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          dressingUrl: monzaDressing,
+          propCatalog,
+          garageTeams: teams.teams.map((t) => ({
+            name: t.name,
+            code: t.code,
+            primary: t.colours.primary,
+            secondary: t.colours.secondary,
+          })),
+          brands: brandsData.brands,
           drivingLine,
           drivingLineMode: session.assists.racingLine ?? 'off',
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
+          worldDetail: worldDetailParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
           compound: compoundLook('medium'),
           timeOfDay: tod,

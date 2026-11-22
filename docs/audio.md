@@ -51,6 +51,8 @@ On top of that:
 
 **Allocation and determinism.** `AudioCore.process` renders in chunks of at most 32 frames aligned to its own sample clock, and does control-rate work (filter retuning, waking or sleeping optional layers) only on chunk boundaries of that clock, so the output is bit-identical however the host splits its blocks. Hot loops work on typed arrays and call nothing that returns a fractional number, every mutable field is initialised with a number, and filters are retuned by writing fields and calling `design()`. In V8 the other patterns (a non-inlined call returning a double, a field declared without an initialiser, a list of voices of different classes at one call site) each allocate per sample; together they produced a garbage collection every 20 ms before this was fixed.
 
+**Cost.** Work whose result is already known is skipped without changing a bit of output: the limiter's true-peak interpolator (128 multiply-adds per stereo sample) runs only on blocks whose largest sample times the interpolator's largest gain (1.85) could reach the threshold, and while its gain rests at exactly 1 only the delay line runs; settled gain smoothers, control signals that hold still and silent impact envelopes are not recomputed. The turbo, MGU-K and gear-whine partials read a 4096-step interpolated sine table (`sine.ts`) instead of `Math.sin`; its error is at most 2.9e-7 of a partial (−131 dB), and renders differ from `Math.sin` by at most one float32 step (−150.5 dBFS; in the 16-bit reference renders at most 1 sample in 13 000 moves, by one step) with every measurement unchanged. In Node (tests, offline renders) the module runner reads each imported binding as a property of its module, so hot loops copy imported constants into locals first.
+
 ## Browser
 
 ```ts
@@ -99,7 +101,7 @@ Unit tests (`npm test`): `packages/audio/test/` and `tools/audio/*.test.ts`, abo
 | Loudness spread, scenarios with the car moving | ≤ 8 LU | The player should not ride the volume between manoeuvres; idle and the stationary sweep are excluded |
 | Determinism | identical bits for the same seed and inputs, and for block sizes 1 to 4096 at 22.05 and 48 kHz, through limiter cuts, dense overrun pops at 15 000 rpm and rapid shifts | Offline renders must predict the browser |
 | Allocation | young generation grows < 16 kB and no scavenge runs over 40 s of audio, state passed packed as the worklet receives it | The audio thread must not trigger garbage collection; one boxed number per block would be 240 kB. Measured after warm-up, a forced collection and a re-settle, since a collection can discard optimised code and the interpreter boxes numbers until it is rebuilt |
-| Speed | > 10× real time (CI margin); measured 36–38× on this laptop (Ryzen 7 7435HS) | One car at about 3 % of one core; the true-peak detector costs about a quarter of it |
+| Speed | > 10× real time, the best of five 10 s runs after a warm-up run; measured 52.5–53.0× on this laptop (Ryzen 7 7435HS), against 29.4–30.2× before the cost pass | One car at about 2 % of one core. Load on a shared runner only slows a run, so the fastest run is the cost; every run's factor is printed |
 
 ## Results
 
@@ -206,14 +208,18 @@ same-RPM tone, and the new layer tests for off-road surfaces and collisions (a c
 lap does not exercise gravel or impacts). A human still needs to judge realism, balance and
 phone/headphone playback; objective gates cannot award the audio scorecard rating.
 
-Reference evidence from this pass (48 kHz stereo, 84.97 s, 1343 steady windows per view):
+Reference evidence (48 kHz stereo, 84.88 s, 1348 steady windows per view):
 
 | View | LUFS | dBTP | Pitch error median / max | DC | Core speed |
 | --- | --- | --- | --- | --- | --- |
-| Cockpit | −17.1 | −6.48 | 0.024 / 0.348 % | 3.43e-7 | 15.5–19.8× real time |
-| Trackside | −19.0 | −9.43 | 0.015 / 0.323 % | 1.76e-7 | 18.1–27× real time |
+| Cockpit | −17.1 | −6.55 | 0.023 / 0.275 % | 1.59e-7 | 41.6× real time |
+| Trackside | −19.0 | −9.30 | 0.014 / 0.252 % | 1.16e-7 | 44.8× real time |
 
-Speed ranges are two renders of the same lap on the loaded laptop; the sample hashes in `summary.json` were identical across them. Re-rendered after widening the kerb rumble range: only the kerb layer moved (−52.6 to −52.7 dBFS). The core cost is about 4–7% of one CPU core for this one-car render on the loaded laptop,
-excluding analysis and file writing; this is not a mobile AudioWorklet CPU measurement. Both
+Re-rendered after the cost pass. The lap itself had changed earlier, with track format 3 (M4),
+so the hashes first committed here no longer matched master; master rendered this lap at
+26.9× and 25.3×, and every measurement above, including each layer's level, is the same
+as master's render of it. Only the sine table changes samples (see Cost). The core cost is
+about 2.3% of one CPU core for this one-car render, excluding analysis and file writing;
+this is not a mobile AudioWorklet CPU measurement. Both
 views pass the gates and block-size hash comparison. Silent layers are `null` in the JSON
 (the JSON representation of −infinity dBFS).

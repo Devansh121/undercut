@@ -26,7 +26,7 @@ export const test = base.extend<{ drive: DriveFixture }, { sharedPage: Page }>({
         baseURL: u.baseURL ?? `http://127.0.0.1:${process.env.TEST_PORT ?? 4173}`,
       });
       const page = await context.newPage();
-      await page.goto('/?debug=1&quality=lite');
+      await page.goto('/?debug=1&quality=lite&world=lite');
       await page.getByRole('button', { name: 'Time Trial', exact: true }).click();
       await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
       await use(page);

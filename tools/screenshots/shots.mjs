@@ -91,7 +91,7 @@ const drive =
 
 const STATIONS = [
   {
-    // The full field from in front of the pole slot, twenty cars in ten liveries.
+    // The full field from in front of the pole slot, twenty cars in ten liveries, five red lights on.
     name: 'grid-front',
     camera: 'tv',
     run: async (page) => {
@@ -100,12 +100,17 @@ const STATIONS = [
         u.restartLap();
         u.setTimeScale(0);
         u.gridCars(19);
+        u.setStartLights(31);
         const eye = u.trackPoint(5812, 3.5, 1.7);
         const aim = u.trackPoint(5716, -0.5, 0.6);
         u.tvCamera(eye.x, eye.y, eye.z, 24, aim);
       });
     },
-    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+    after: (page) =>
+      page.evaluate(() => {
+        globalThis.__undercut.setStartLights(0);
+        globalThis.__undercut.gridCars(0);
+      }),
   },
   { name: 'chicane-braking', camera: 'chase-near', run: drive(380, 300, 545) },
   { name: 'fast-corner', camera: 'chase-far', run: drive(900, 250, 1060) },
@@ -162,6 +167,105 @@ const STATIONS = [
           y: b.y + 0.45,
           z: b.z + fz * 0.3,
         });
+      });
+    },
+    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+  },
+  {
+    // Down the start straight from main-grandstand height: pit complex, pit wall, gantry, crowd, corridor.
+    name: 'stand-straight',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        u.setStartLights(31);
+        const eye = u.trackPoint(5520, 22, 11.5);
+        const aim = u.trackPoint(5775, -14, 3.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 32, aim);
+      });
+    },
+    after: (page) =>
+      page.evaluate(() => {
+        globalThis.__undercut.setStartLights(0);
+        globalThis.__undercut.gridCars(0);
+      }),
+  },
+  {
+    // Outside the first chicane: braking boards, catch fencing, run-off aprons, grandstands, trees.
+    name: 'chicane-outside',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(612, 0.5, 95);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(685, 22, 5.2);
+        const aim = u.trackPoint(585, -2, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 34, aim);
+      });
+    },
+  },
+  {
+    // Through the Lesmo woodland corridor: dense trees, angled grass-verge boards, marshal post.
+    name: 'lesmo-trees',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(2440, -1.5, 195);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(2540, 12, 3.6);
+        const aim = u.trackPoint(2420, -2, 1.4);
+        u.tvCamera(eye.x, eye.y, eye.z, 28, aim);
+      });
+    },
+  },
+  {
+    // Elevated camera-tower angle over Variante Ascari: chicane kerbs, stands, big screen, woodland.
+    name: 'ascari-tower',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(3710, -1.0, 175);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(3820, -24, 14.0);
+        const aim = u.trackPoint(3690, 2, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 34, aim);
+      });
+    },
+  },
+  {
+    // Outside Curva Alboreto (Parabolica): sweeping corner, gravel, stands, bridge, distant treeline.
+    name: 'parabolica-outside',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(4960, -1.5, 210);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(5085, 34, 9.5);
+        const aim = u.trackPoint(4940, -4, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 36, aim);
+      });
+    },
+  },
+  {
+    // High three-quarter helicopter view framing the start straight, pit complex, grandstands, and Turn 1.
+    name: 'sector1-heli',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        const eye = u.trackPoint(5520, 105, 68);
+        const aim = u.trackPoint(90, -10, 4);
+        u.tvCamera(eye.x, eye.y, eye.z, 38, aim);
       });
     },
     after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),

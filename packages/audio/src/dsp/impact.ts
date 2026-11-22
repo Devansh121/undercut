@@ -98,16 +98,18 @@ export class ImpactVoice {
         this.serial = s;
         const v = speed[i] as number;
         if (v >= IMPACT_MIN_SPEED) {
+          // Silent until now in this chunk: the samples before this one are zeros.
+          if (!this.live) {
+            this.thudBuf.fill(0, 0, i);
+            this.bBuf.fill(0, 0, i);
+            this.cBuf.fill(0, 0, i);
+          }
           this.pendingSpeed = v;
           this.start();
         }
       }
+      // While silent the envelope buffers are not read, so nothing is written to them.
       if (this.live) this.envelopes(i);
-      else {
-        this.thudBuf[i] = 0;
-        this.bBuf[i] = 0;
-        this.cBuf[i] = 0;
-      }
     }
     if (!this.live) {
       out.fill(0, 0, n);

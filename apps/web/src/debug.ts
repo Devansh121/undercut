@@ -98,6 +98,10 @@ export interface DebugApi {
   carScreenRect(): { left: number; top: number; right: number; bottom: number };
   /** The RaceView itself, for render experiments from tools. */
   view(): unknown;
+  /** Set start gantry lights bitmask (bits 0..4 red, bit 5 green). */
+  setStartLights(mask: number): void;
+  /** Counts of placed world dressing objects and props. */
+  worldCounts(): Record<string, number> | null;
   quit(): void;
 }
 
@@ -264,6 +268,11 @@ export function installDebugApi(
     setQuality: async (name) => {
       if (!isQuality(name)) throw new Error(`unknown preset ${name}`);
       await need().setQuality(name);
+    },
+    setStartLights: (mask) => need().view.world?.setStartLights(mask),
+    worldCounts: () => {
+      const w = need().view.world;
+      return w ? { ...w.counts, propsTotal: need().view.props.instanceCount } : null;
     },
     quit: () => need().quit(),
   };
