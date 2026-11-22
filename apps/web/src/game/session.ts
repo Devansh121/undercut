@@ -1,6 +1,7 @@
 import {
   InputController,
   RaceSession,
+  circuitInfo,
   type LapResult,
   type LapTimer,
   type RaceEvent,
@@ -155,6 +156,8 @@ export class DriveSession {
     const limits = options.limits;
     this.race = new RaceSession({
       track: this.track,
+      // Timed from the control line the track file carries (format 3), for every circuit.
+      circuit: circuitInfo(this.track, { timingLine: this.track.timingLine }),
       session: { kind: 'timeTrial' },
       seed: options.seed,
       params: this.params,

@@ -11,15 +11,30 @@ export function watchProblems(page: Page): string[] {
   return problems;
 }
 
-/** Load the launch screen with the debug API and press Start with a real click. */
+/** From the launch screen to the main menu, with a real click on the prompt. */
+export async function openMenu(page: Page): Promise<void> {
+  await page.locator('[data-action=press-start]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
+}
+
 /**
- * Launch to a driving session without the circuit's surroundings (`world=lite`): the full world
- * is tested once, in world-dressing.spec.ts, and its start-up cost on the GPU
- * (`npm run shots -- monza --perf`).
+ * From the launch screen through the main menu into a time-trial session (real clicks; the
+ * Start press is the audio gesture). Waits for the loading to begin, not for the session.
+ */
+export async function startTimeTrial(page: Page): Promise<void> {
+  await openMenu(page);
+  await page.locator('[data-action=mode-timeTrial]').click();
+  await page.locator('[data-action=start]').click();
+}
+
+/**
+ * Load the launch screen with the debug API and start Time Trial with real clicks, without the
+ * circuit's surroundings (`world=lite`): the full world is tested once, in world-dressing.spec.ts,
+ * and its start-up cost on the GPU (`npm run shots -- monza --perf`).
  */
 export async function coldStart(page: Page, quality: 'lite' | 'mobile'): Promise<void> {
   await page.goto(`/?debug=1&quality=${quality}&world=lite`);
-  await page.getByRole('button', { name: /Start/ }).click();
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await expect(page.locator('[data-testid=hud]')).toBeVisible();
 }

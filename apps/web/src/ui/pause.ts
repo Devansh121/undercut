@@ -1,5 +1,10 @@
+import type { ActionId } from '@undercut/input';
 import { ControlsPanel, type ControlsSource } from './controls-help';
-import { el, icon, type IconKey } from './dom';
+import { el } from './dom';
+import { button } from './kit/components';
+import { glyph, refreshGlyphs } from './kit/glyph';
+import type { IconKey } from './kit/icons';
+import { S } from './strings';
 
 export interface Choice<T extends string | number> {
   value: T;
@@ -13,6 +18,9 @@ export interface PauseSetting<T extends string | number = string | number> {
   choices: Choice<T>[];
   get(): T;
   set(value: T): void;
+  /** Not available right now (steering help on a keyboard); `hint` says why. */
+  disabled?: () => boolean;
+  hint?: string;
 }
 
 /** A 0–1 level shown as a percentage, adjusted in tenths. */
@@ -33,17 +41,30 @@ export interface PauseActions {
   quitLabel?: string;
 }
 
+const CONTROL_ITEMS: readonly { label: string; actions: readonly ActionId[] }[] = [
+  { label: S.pause.controlLabels.steer, actions: ['steerLeft', 'steerRight'] },
+  { label: S.pause.controlLabels.throttle, actions: ['throttle'] },
+  { label: S.pause.controlLabels.brake, actions: ['brake'] },
+  { label: S.pause.controlLabels.shift, actions: ['gearDown', 'gearUp'] },
+  { label: S.pause.controlLabels.drs, actions: ['drs'] },
+  { label: S.pause.controlLabels.ers, actions: ['overtake'] },
+  { label: S.pause.controlLabels.camera, actions: ['nextCamera'] },
+  { label: S.pause.controlLabels.reset, actions: ['resetToTrack'] },
+  { label: S.pause.controlLabels.pause, actions: ['pause'] },
+];
+
 /**
- * The pause menu: actions on the left, settings on the right (camera and assists), over a
- * scrim. Driven by mouse, touch, and by the input layer's menu actions (up, down, left, right,
- * accept, back) for keyboard and gamepad.
+ * The pause menu: actions on the left, settings on the right (camera, graphics, assists and
+ * audio), and a live-device controls strip underneath, over a scrim. Driven by mouse, touch, and
+ * by the input layer's menu actions (up, down, left, right, accept, back) for keyboard and
+ * gamepad.
  */
 export class PauseMenu {
   readonly root: HTMLElement;
   private readonly focusables: HTMLElement[] = [];
   private readonly rows = new Map<
     string,
-    { setting: PauseSetting; buttons: HTMLButtonElement[] }
+    { setting: PauseSetting; buttons: HTMLButtonElement[]; hint: HTMLElement | null }
   >();
   private readonly sliders = new Map<
     string,
@@ -70,7 +91,7 @@ export class PauseMenu {
 
     const card = el('div', 'pause__card');
     const head = el('header', 'pause__head');
-    const title = el('h2', 'pause__title', 'Paused');
+    const title = el('h2', 'pause__title', S.pause.title);
     title.id = 'pause-title';
     const sub = el('span', 'label pause__sub');
     head.append(title, sub);
@@ -79,27 +100,31 @@ export class PauseMenu {
     };
 
     const list = el('div', 'pause__actions');
-    const action = (
+    const addAction = (
       label: string,
-      glyph: IconKey,
+      iconName: IconKey,
       fn: () => void,
       id: string,
       primary = false,
     ): void => {
-      const b = el('button', `pause__action${primary ? ' is-primary' : ''}`);
-      b.type = 'button';
-      b.dataset.action = id;
-      b.append(icon(glyph), el('span', '', label));
-      b.addEventListener('click', fn);
+      const b = button({
+        label,
+        icon: iconName,
+        variant: primary ? 'primary' : 'secondary',
+        ...(primary ? { glyph: 'menuAccept' as const } : {}),
+        action: id,
+        onClick: fn,
+      });
+      b.classList.add('pause__action');
       list.append(b);
       this.focusables.push(b);
     };
-    action('Resume', 'play', actions.resume, 'resume', true);
-    if (actions.restartLap) action('Restart lap', 'restart', actions.restartLap, 'restart');
-    action('Reset to track', 'reset', actions.resetToTrack, 'reset');
+    addAction(S.pause.resume, 'play', actions.resume, 'resume', true);
+    if (actions.restartLap) addAction(S.pause.restartLap, 'restart', actions.restartLap, 'restart');
+    addAction(S.pause.resetToTrack, 'reset', actions.resetToTrack, 'reset');
     this.controls = controls ? new ControlsPanel(controls) : null;
     const panel = this.controls;
-    if (panel) action('Controls', 'keys', () => panel.show(), 'controls');
+    if (panel) addAction(S.controls.title, 'keyboard', () => panel.show(), 'controls');
 
     const grid = el('div', 'pause__settings');
     for (const setting of settings) {
@@ -111,6 +136,11 @@ export class PauseMenu {
         help.id = `pause-help-${setting.id}`;
         name.append(help);
         row.setAttribute('aria-describedby', help.id);
+      }
+      const hint = setting.hint ? el('small', 'pause__hint', setting.hint) : null;
+      if (hint) {
+        hint.hidden = true;
+        name.append(hint);
       }
       const seg = el('div', 'seg');
       seg.setAttribute('role', 'radiogroup');
@@ -131,7 +161,7 @@ export class PauseMenu {
       this.focusables.push(buttons[0] as HTMLButtonElement);
       row.append(name, seg);
       grid.append(row);
-      this.rows.set(setting.id, { setting, buttons });
+      this.rows.set(setting.id, { setting, buttons, hint });
     }
 
     for (const slider of sliders) {
@@ -159,16 +189,33 @@ export class PauseMenu {
       this.sliders.set(slider.id, { slider, input, output });
     }
 
-    const quit = el('button', 'pause__quit');
-    quit.type = 'button';
-    quit.dataset.action = 'quit';
-    quit.append(icon('exit'), el('span', '', actions.quitLabel ?? 'Quit to launch'));
-    quit.addEventListener('click', actions.quit);
+    const legend = el('section', 'pause__controls');
+    legend.setAttribute('aria-label', S.pause.controls);
+    const controlsList = el('div', 'pause__controls-list');
+    for (const item of CONTROL_ITEMS) {
+      const cell = el('span', 'pause__control');
+      const keys = el('span', 'pause__control-keys');
+      for (const id of item.actions) keys.append(glyph(id));
+      cell.append(keys, el('span', 'pause__control-label', item.label));
+      controlsList.append(cell);
+    }
+    legend.append(el('span', 'label', S.pause.controls), controlsList);
+
+    const quit = button({
+      label: actions.quitLabel ?? S.pause.quit,
+      icon: 'exit',
+      variant: 'quiet',
+      action: 'quit',
+      onClick: actions.quit,
+    });
+    quit.classList.add('pause__quit');
     this.focusables.push(quit);
 
     const body = el('div', 'pause__body');
     body.append(list, grid);
-    card.append(head, body, quit);
+    const foot = el('footer', 'pause__foot');
+    foot.append(quit);
+    card.append(head, body, legend, foot);
     root.append(card);
     if (panel) root.append(panel.root);
   }
@@ -182,6 +229,7 @@ export class PauseMenu {
   show(): void {
     this.sync();
     this.refreshNote();
+    refreshGlyphs(this.root);
     this.root.hidden = false;
     this.focusIndex = 0;
     this.focus();
@@ -200,13 +248,16 @@ export class PauseMenu {
       input.style.setProperty('--v', `${v * 100}%`);
       output.textContent = `${Math.round(v * 100)}%`;
     }
-    for (const { setting, buttons } of this.rows.values()) {
+    for (const { setting, buttons, hint } of this.rows.values()) {
       const current = String(setting.get());
+      const disabled = setting.disabled?.() ?? false;
       for (const b of buttons) {
         const on = b.dataset.value === current;
         b.classList.toggle('is-on', on);
         b.setAttribute('aria-checked', String(on));
+        b.disabled = disabled;
       }
+      if (hint) hint.hidden = !disabled;
     }
   }
 
@@ -239,7 +290,13 @@ export class PauseMenu {
         );
         const step = action === 'menuDown' ? 1 : -1;
         const n = this.focusables.length;
-        this.focusIndex = ((index < 0 ? 0 : index) + step + n) % n;
+        // Skip what cannot take focus now (a disabled setting).
+        let next = index < 0 ? 0 : index;
+        for (let k = 0; k < n; k++) {
+          next = (next + step + n) % n;
+          if (!(this.focusables[next] as HTMLButtonElement).disabled) break;
+        }
+        this.focusIndex = next;
         this.focus();
         return true;
       }
@@ -255,6 +312,7 @@ export class PauseMenu {
         }
         const row = rowOf(active);
         if (!row) return false;
+        if (row.setting.disabled?.()) return true;
         const values = row.setting.choices.map((c) => c.value);
         const i = values.findIndex((v) => String(v) === String(row.setting.get()));
         const next =

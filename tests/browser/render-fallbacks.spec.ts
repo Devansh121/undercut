@@ -1,5 +1,5 @@
 import { expect, takePresetViolations, test } from './base';
-import { viewPixels, watchProblems } from './helpers';
+import { startTimeTrial, viewPixels, watchProblems } from './helpers';
 
 /**
  * The renderer adapts to what the GPU can do (the preset guard and the direct-path fallback
@@ -93,7 +93,7 @@ test('without renderable float targets the HDR preset takes the direct path and 
   // Mobile has the HDR pipeline (half-float target, MSAA, PMREM) like High, at a fraction of
   // the software-rendering cost; effectiveQuality is unit-tested on every preset.
   await page.goto('/?debug=1&quality=mobile&world=lite');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.evaluate(() => window.__undercut?.drive({ throttle: 1, steer: 0 }));
   await page.waitForFunction(() => (window.__undercut?.state().tick as number) > 20);

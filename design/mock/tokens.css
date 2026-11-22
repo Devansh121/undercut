@@ -43,7 +43,7 @@
   /* ---------- Colour: text ---------- */
   --c-text-1: #f2f0eb;         /* primary, warm white */
   --c-text-2: #b9b7b1;         /* secondary */
-  --c-text-3: #7d7c78;         /* tertiary, labels */
+  --c-text-3: #8d8c88;         /* tertiary, labels: 4.5:1 or more on ink-0 to ink-3 (WCAG AA) */
   --c-text-inverse: #0b0c0e;
 
   /* ---------- Colour: brand ---------- */

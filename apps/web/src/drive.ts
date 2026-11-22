@@ -7,6 +7,7 @@
 import { Track } from '@undercut/track';
 import {
   ErsMode,
+  SurfaceKind,
   computeMass,
   createCarPose,
   interpolateCarPose,
@@ -45,8 +46,12 @@ import {
 import teams from '../../../design/teams.json';
 import brandsData from '../../../design/brands.json';
 import compounds from '../../../design/compounds.json';
-import monza from '@undercut/track/data/monza.json';
-import monzaDressing from '@undercut/render/data/monza.dressing.json?url';
+/** Each circuit's dressing (stands, buildings, woods), when it has one; fetched by the view. */
+const DRESSINGS = import.meta.glob<string>('../../../packages/render/data/*.dressing.json', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+});
 
 /**
  * The prop catalogue, when this build has one (packages/render/data/props.catalog.json, written by
@@ -58,10 +63,8 @@ const propCatalog: unknown = Object.values(
     import: 'default',
   }),
 )[0];
-// The AI's racing line and measured vehicle envelope, for the rubbered line, the driving-line
-// assist and the driving line's advised speeds (braking help).
-import monzaLine from '../../../packages/ai/data/monza-low.line.json';
-import monzaEnvelope from '../../../packages/ai/data/monza-low.envelope.json';
+// The AI's racing line and measured vehicle envelope are loaded per circuit below, for the
+// rubbered line, the driving-line assist, and the driving line's advised speeds (braking help).
 import { defaultCarState } from '@undercut/audio';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
@@ -77,23 +80,27 @@ import { GameLoop, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
-import { Hud, type HudMessage, type HudState } from './ui/hud';
+import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
+import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import { saveQuality } from './game/quality-setting';
+import type { AssistConfig } from './game/assists';
+import type { DeviceKind } from '@undercut/input';
+import { S } from './ui/strings';
 
-/** The team whose colours the player's car wears in M1. */
-const TEAM_ID = 'kestrel';
+/** The team whose colours the player's car wears when the menu chose none. */
+const DEFAULT_TEAM = 'calder';
 const REV_START = 10500;
 const REV_FULL = 12200;
 const REV_FLASH = 12350;
 const ERS_MODE_LABEL: Record<number, string> = {
-  [ErsMode.None]: 'Off',
-  [ErsMode.Balanced]: 'Balanced',
-  [ErsMode.Overtake]: 'Overtake',
+  [ErsMode.None]: S.hud.ersModes.off,
+  [ErsMode.Balanced]: S.hud.ersModes.balanced,
+  [ErsMode.Overtake]: S.hud.ersModes.overtake,
 };
 const FRAME_LOG = 7200;
 
@@ -136,6 +143,21 @@ export interface DriveOptions {
   audio?: DriveAudio;
   /** No saved or requested preset: benchmark the first seconds and pick one. */
   autoQuality?: boolean;
+  /** Circuit id (packages/track/data); Monza when absent. */
+  circuit?: string;
+  /** The player's team (design/teams.json id) and driver (0 or 1). */
+  team?: string;
+  driver?: 0 | 1;
+  /** Time-of-day preset id (render TIMES_OF_DAY); `?tod=` in the URL wins. */
+  timeOfDay?: string;
+  /** The player's assist choices on top of the device preset. */
+  assists?: Partial<AssistConfig>;
+  /** An assist changed in the pause menu (to remember it for that device). */
+  onAssist?: <K extends keyof AssistConfig>(
+    device: DeviceKind,
+    key: K,
+    value: NonNullable<AssistConfig[K]>,
+  ) => void;
   /** A mode on top of the drive screen (online racing). */
   extension?: DriveExtension;
 }
@@ -184,12 +206,13 @@ export class LoadCancelled extends Error {
   }
 }
 
-/** Every driver's car look, from design/teams.json: the player's team first. */
-function liveries(first: string): CarLivery[] {
+/** Every driver's car look, from design/teams.json: the player's car first. */
+function liveries(first: string, driver: 0 | 1): CarLivery[] {
   const out: CarLivery[] = [];
   const ordered = [...teams.teams].sort((a, b) => (a.id === first ? -1 : b.id === first ? 1 : 0));
   for (const t of ordered) {
-    for (const d of t.drivers) {
+    const drivers = t.id === first && driver === 1 ? [...t.drivers].reverse() : t.drivers;
+    for (const d of drivers) {
       out.push({
         team: t.id,
         primary: t.colours.primary,
@@ -226,10 +249,46 @@ function worldDetailParam(): 'preset' | 'lite' {
   return new URLSearchParams(window.location.search).get('world') === 'lite' ? 'lite' : 'preset';
 }
 
-function racingLineOffsets(count: number): Float64Array | null {
-  const raw = monzaLine as { count: number; offsetTenthMm: number[] };
-  if (raw.count !== count) return null;
-  return Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
+/** Every circuit's track file, each its own chunk, fetched when a session there starts. */
+const TRACK_FILES = import.meta.glob<unknown>('../../../packages/track/data/*.json', {
+  import: 'default',
+});
+
+async function loadTrack(id: string): Promise<Track> {
+  const load =
+    TRACK_FILES[`../../../packages/track/data/${id}.json`] ??
+    TRACK_FILES['../../../packages/track/data/monza.json'];
+  if (!load) throw new Error('no track files in the build');
+  return Track.fromJSON(await load());
+}
+
+/** The AI's racing lines and measured envelopes per circuit and trim, fetched with a session. */
+const AI_LINES = import.meta.glob<unknown>('../../../packages/ai/data/*.line.json', {
+  import: 'default',
+});
+const AI_ENVELOPES = import.meta.glob<unknown>('../../../packages/ai/data/*.envelope.json', {
+  import: 'default',
+});
+
+/**
+ * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, and the
+ * driving line for braking help. The guide's advised speeds come from the envelope of the car
+ * the line was built for, so it is used only when that is the player's trim (low downforce).
+ */
+async function racingLine(
+  track: Track,
+): Promise<{ offsets: Float64Array; guide: EnvelopeArtefact | null } | null> {
+  const prefix = `../../../packages/ai/data/${track.id}-`;
+  const key = Object.keys(AI_LINES).find((k) => k.startsWith(prefix));
+  const load = key ? AI_LINES[key] : undefined;
+  if (!key || !load) return null;
+  const raw = (await load()) as { count: number; offsetTenthMm: number[] };
+  if (raw.count !== track.lap.count) return null;
+  const offsets = Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
+  const envelope = key.endsWith('-low.line.json')
+    ? AI_ENVELOPES[key.replace('.line.json', '.envelope.json')]
+    : undefined;
+  return { offsets, guide: envelope ? ((await envelope()) as EnvelopeArtefact) : null };
 }
 
 export interface DriveHandle {
@@ -261,6 +320,7 @@ export interface DriveHandle {
   clumsyPilot(seed: number): void;
   events(): SessionEvent[];
   hudText(): Record<string, string>;
+  setHudVisible(on: boolean): void;
   quit(): void;
   /** Start-up phase times, ms. */
   loadTimes(): Record<string, number>;
@@ -273,17 +333,17 @@ export interface DriveHandle {
 
 export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const loadStart = performance.now();
-  const track = Track.fromJSON(monza);
+  const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const line = racingLineOffsets(track.lap.count);
-  const drivingLine = line
-    ? new DrivingLine(
-        buildPlan(track, line, decodeEnvelope(monzaEnvelope as EnvelopeArtefact), {
-          scale: DRIVING_LINE_SCALE,
-        }),
-      )
-    : null;
+  const ai = await racingLine(track);
+  const line = ai?.offsets ?? null;
+  const drivingLine =
+    ai && ai.guide
+      ? new DrivingLine(
+          buildPlan(track, ai.offsets, decodeEnvelope(ai.guide), { scale: DRIVING_LINE_SCALE }),
+        )
+      : null;
   const session = new DriveSession({
     track,
     seed: o.seed,
@@ -292,6 +352,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
+  for (const [key, value] of Object.entries(o.assists ?? {}) as [keyof AssistConfig, never][]) {
+    session.setAssist(key, value);
+  }
+  /** Change an assist from the pause menu and remember it for the device in use. */
+  const setAssist = <K extends keyof AssistConfig>(
+    key: K,
+    value: NonNullable<AssistConfig[K]>,
+  ): void => {
+    session.setAssist(key, value);
+    o.onAssist?.(session.device, key, value);
+  };
   const params = session.params;
   const mass = computeMass(session.car.state.model, TIME_TRIAL_FUEL, {
     total: 0,
@@ -303,7 +374,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     yawInertia: 0,
   });
   const ext = o.extension;
-  const all = liveries(TEAM_ID);
+  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
+  const all = liveries(teamId, o.driver ?? 0);
   const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -326,7 +398,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
-          dressingUrl: monzaDressing,
+          dressingUrl: DRESSINGS[`../../../packages/render/data/${track.id}.dressing.json`] ?? null,
           propCatalog,
           garageTeams: teams.teams.map((t) => ({
             name: t.name,
@@ -359,11 +431,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       }
     }
   };
-  // `?tod=overcast-day|night-floodlit` (render tests); Monza's afternoon otherwise.
+  // `?tod=overcast-day|night-floodlit` (render tests), else the menu's choice, else the afternoon.
   const tod =
-    TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ?? MONZA_AFTERNOON;
+    TIMES_OF_DAY[new URLSearchParams(window.location.search).get('tod') ?? ''] ??
+    TIMES_OF_DAY[o.timeOfDay ?? ''] ??
+    MONZA_AFTERNOON;
   let quality = o.quality;
-  const loading = mountLoadingScreen(o.host, track.name, ext?.label ?? 'Time trial');
+  const loading = mountLoadingScreen(o.host, track.name, ext?.label ?? S.loading.timeTrial);
   let view: RaceView;
   try {
     view = await loadView(quality, loading);
@@ -387,9 +461,23 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
-  const hud = new Hud(plan, ext?.label ?? 'Time trial');
+  const teamInfo = teams.teams.find((t) => t.id === playerLivery.team) ?? teams.teams[0];
+  const mediumInfo = compounds.compounds.find((c) => c.id === 'medium') ?? compounds.compounds[0];
+  const hudIdentity: HudIdentity | undefined =
+    teamInfo && mediumInfo
+      ? {
+          teamColour: teamInfo.colours.tower,
+          driverCode: playerLivery.code,
+          driverNumber: playerLivery.number,
+          compoundCode: mediumInfo.code,
+          compoundColour: mediumInfo.colour,
+          compoundSlots: mediumInfo.slots,
+        }
+      : undefined;
+  const hud = new Hud(plan, hudIdentity, ext?.label ?? S.hud.timeTrial);
   const results = new ResultsStrip();
   let quitting = false;
+  let hudVisible = true;
   const restartLap = (): void => {
     onEvents(loop.restartLap());
     pilot.pilot.reset();
@@ -405,18 +493,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     quit: () => quit(),
     ...(ext?.quitLabel ? { quitLabel: ext.quitLabel } : {}),
   };
+  // The same labels as the main menu's session settings.
   const levels = [
-    { value: 0, label: 'Off' },
-    { value: 1, label: 'Low' },
-    { value: 2, label: 'Med' },
-    { value: 3, label: 'High' },
+    { value: 0, label: S.setup.levels.off },
+    { value: 1, label: S.setup.levels.low },
+    { value: 2, label: S.setup.levels.medium },
+    { value: 3, label: S.setup.levels.high },
   ];
   const pause = new PauseMenu(
     actions,
     [
       {
         id: 'camera',
-        label: 'Camera',
+        label: S.pause.camera,
         choices: CAMERA_ORDER.map((c) => ({
           value: c,
           label: CAMERA_LABELS[c].replace(' chase', ''),
@@ -426,7 +515,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'quality',
-        label: 'Graphics',
+        label: S.pause.graphics,
         choices: PLAYER_QUALITIES.map((q) => ({ value: q, label: QUALITY[q].label })),
         get: () => quality,
         set: (v) => {
@@ -436,83 +525,88 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'tc',
-        label: 'Traction control',
-        description: 'Reduces engine drive when the rear tyres slip.',
+        label: S.setup.tractionControl,
+        description: S.setup.help.tractionControl,
         choices: levels,
         get: () => session.assists.tractionControl,
-        set: (v) => session.setAssist('tractionControl', Number(v)),
+        set: (v) => setAssist('tractionControl', Number(v)),
       },
       {
         id: 'abs',
-        label: 'ABS',
-        description: 'Eases braking to prevent wheel locking.',
+        label: S.setup.abs,
+        description: S.setup.help.abs,
         choices: [
-          { value: 0, label: 'Off' },
-          { value: 2, label: 'On' },
+          { value: 0, label: S.setup.off },
+          { value: 2, label: S.setup.on },
         ],
         get: () => (session.assists.abs > 0 ? 2 : 0),
-        set: (v) => session.setAssist('abs', Number(v)),
+        set: (v) => setAssist('abs', Number(v)),
       },
       {
         id: 'stability',
-        label: 'Stability help',
-        description: 'Brakes one wheel and trims the engine when the car starts to slide or push.',
+        label: S.setup.stability,
+        description: S.setup.help.stability,
         choices: [
-          { value: 0, label: 'Off' },
-          { value: 1, label: 'On' },
+          { value: 0, label: S.setup.off },
+          { value: 1, label: S.setup.on },
         ],
         get: () => session.assists.stability ?? 0,
-        set: (v) => session.setAssist('stability', Number(v)),
+        set: (v) => setAssist('stability', Number(v)),
       },
       {
         id: 'braking',
-        label: 'Braking help',
-        description:
-          'Brakes for you when you arrive at a corner faster than the driving line. On by default for keys (Low) and touch (Medium).',
+        label: S.setup.braking,
+        description: S.setup.help.braking,
         choices: levels,
+        // Braking help follows the driving line, which exists at Monza only for now.
+        disabled: () => drivingLine === null,
+        hint: S.setup.brakingNoLine,
         get: () => session.assists.braking,
-        set: (v) => session.setAssist('braking', Number(v)),
+        set: (v) => setAssist('braking', Number(v)),
       },
       {
         id: 'gears',
-        label: 'Gears',
-        description: 'Shifts automatically at the engine speed limits.',
+        label: S.setup.gears,
+        description: S.setup.help.gears,
         choices: [
-          { value: 'auto', label: 'Auto' },
-          { value: 'manual', label: 'Manual' },
+          { value: 'auto', label: S.setup.gearChoices.auto },
+          { value: 'manual', label: S.setup.gearChoices.manual },
         ],
         get: () => (session.assists.autoGears ? 'auto' : 'manual'),
-        set: (v) => session.setAssist('autoGears', v === 'auto'),
+        set: (v) => setAssist('autoGears', v === 'auto'),
       },
       {
         id: 'steering',
-        label: 'Steering help',
-        description: 'Reduces analog steering lock as speed rises. Keys use their own ramps.',
+        label: S.setup.steering,
+        description: S.setup.help.steering,
         choices: levels,
+        // The keyboard shapes its own steering; as in the main menu, the help is for sticks and touch.
+        disabled: () => session.device === 'keyboard',
+        hint: S.setup.steeringKeyboard,
         get: () => session.assists.steering,
-        set: (v) => session.setAssist('steering', Number(v)),
+        set: (v) => setAssist('steering', Number(v)),
       },
       {
         id: 'line',
-        label: 'Driving line',
-        description: 'Shows the racing line and where to lift or brake.',
+        label: S.setup.drivingLine,
+        description: S.setup.help.drivingLine,
         choices: [
-          { value: 'off', label: 'Off' },
-          { value: 'braking', label: 'Braking' },
-          { value: 'full', label: 'Full' },
+          { value: 'off', label: S.setup.lineChoices.off },
+          { value: 'braking', label: S.setup.lineChoices.braking },
+          { value: 'full', label: S.setup.lineChoices.full },
         ],
         get: () => session.assists.racingLine ?? 'off',
-        set: (v) => session.setAssist('racingLine', v as DrivingLineMode),
+        set: (v) => setAssist('racingLine', v as DrivingLineMode),
       },
     ],
     () =>
-      `Monza · ${session.device === 'touch' ? 'Touch' : session.device === 'gamepad' ? 'Gamepad' : 'Keyboard'} assists${records.persistent ? '' : ' · Records last until the page closes'}${o.soundNote?.() ? ` · ${o.soundNote()}` : ''}`,
+      `${S.pause.assistsNote(track.name, S.menu.deviceNames[session.device])}${records.persistent ? '' : ` · ${S.pause.recordsNote}`}${o.soundNote?.() ? ` · ${o.soundNote()}` : ''}`,
     o.audio
       ? (
           [
-            ['master', 'Volume'],
-            ['engine', 'Engine'],
-            ['effects', 'Effects'],
+            ['master', S.pause.volume],
+            ['engine', S.pause.engine],
+            ['effects', S.pause.effects],
           ] as const
         ).map(([id, label]) => ({
           id,
@@ -556,16 +650,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // The storage warning goes first; the first-start controls hint follows it.
   let queued: HudMessage | null = takeFirstStartHint()
     ? {
-        tag: 'Controls',
+        tag: S.controls.hintTag,
         text: controlsHint(input.profile.bindings, input.activeDevice),
         tone: 'info',
       }
     : null;
   if (!records.persistent)
-    say({ tag: 'Storage', text: 'Records last until the page closes', tone: 'info' }, 5);
+    say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
+  let invalidReason: string = S.hud.trackLimits;
   function onEvents(events: readonly SessionEvent[]): void {
     for (const e of events) {
       log.push(e);
@@ -574,22 +669,24 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         case 'lap':
           results.show(e.result);
           lastLap = { time: e.result.time, cls: e.result.class };
+          invalidReason = S.hud.trackLimits;
           break;
         case 'record':
           if (ext) break;
           void records.save(e.circuit, e.update).then(() => {
             if (!records.persistent)
-              say({ tag: 'Storage', text: 'Record kept until the page closes', tone: 'info' }, 4);
+              say({ tag: S.hud.storage, text: S.hud.recordKept, tone: 'info' }, 4);
           });
           break;
         case 'invalidated':
-          // The flag shows an invalid lap for as long as it lasts; a message as well showed the
-          // same words twice.
-          hud.setInvalidReason(e.reason === 'limits' ? 'Track limits' : 'Reset to track');
+          invalidReason = e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits;
           break;
         case 'reset':
           view.snapCamera();
-          if (e.reason === 'restart') results.hide();
+          if (e.reason === 'restart') {
+            results.hide();
+            invalidReason = S.hud.trackLimits;
+          }
           break;
         default:
           break;
@@ -639,6 +736,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // Frame loop.
   const pose = createCarPose();
   const ghostPose = createCarPose();
+  const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
@@ -646,6 +744,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let clock = 0;
   let handle = 0;
   let lookBack = false;
+  let lastHudDevice: DeviceKind = input.activeDevice;
+  setGlyphContext(lastHudDevice, input.profile.bindings);
   const hudState: HudState = {
     circuit: track.name,
     lengthKm: (track.length / 1000).toFixed(3),
@@ -656,21 +756,29 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     lap: 0,
     running: false,
     valid: true,
+    invalidReason: S.hud.trackLimits,
     lapTime: 0,
     liveDelta: null,
-    sectors: [],
+    sectors: [
+      { state: 'none', time: null, delta: null },
+      { state: 'none', time: null, delta: null },
+      { state: 'none', time: null, delta: null },
+    ],
     last: null,
     lastClass: null,
     best: null,
     record: null,
+    ghost: false,
     ers: 0,
     ersLap: 1,
-    ersMode: 'Balanced',
+    ersMode: S.hud.ersModes.balanced,
     drs: 'off',
     carX: 0,
     carZ: 0,
     ghostX: null,
     ghostZ: null,
+    wrongWay: false,
+    stopped: false,
     message: null,
   };
 
@@ -693,7 +801,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       for (const action of r.actions) {
         if (action === 'nextCamera') {
           const name = view.nextCamera();
-          say({ tag: 'Camera', text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
+          say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
         }
       }
       if (loop.paused) openPause();
@@ -708,6 +816,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         if (e.action === 'pause' || e.action === 'menuBack') resume();
       }
       lookBack = false;
+    }
+
+    if (input.activeDevice !== lastHudDevice) {
+      lastHudDevice = input.activeDevice;
+      setGlyphContext(lastHudDevice, input.profile.bindings);
     }
 
     const playing = session.phase === 'running';
@@ -754,44 +867,69 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     });
 
     // HUD.
-    const timer = session.timer;
-    const h = hudState;
-    h.speed = t.speed;
-    h.gear = t.gear;
-    h.rpm = t.engineRpm;
-    h.revLights = revLights;
-    h.lap = timer.lap;
-    h.running = timer.running;
-    h.valid = timer.valid;
-    h.lapTime = session.lapTimeAt(renderTime);
-    h.liveDelta = session.liveDelta();
-    const done = timer.currentSectors;
-    const classes = timer.currentSectorClasses;
-    const ref = timer.bestSectors;
-    h.sectors = [0, 1, 2].map((i) => {
-      if (i < done.length) {
-        const time = done[i] as number;
-        const r = ref?.[i];
-        return { state: classes[i] ?? 'slower', time, delta: r === undefined ? null : time - r };
+    if (hudVisible) {
+      const timer = session.timer;
+      const h = hudState;
+      h.speed = t.speed;
+      h.gear = t.gear;
+      h.rpm = t.engineRpm;
+      h.revLights = revLights;
+      h.lap = timer.lap;
+      h.running = timer.running;
+      h.valid = timer.valid;
+      h.invalidReason = invalidReason;
+      h.lapTime = session.lapTimeAt(renderTime);
+      h.liveDelta = session.liveDelta();
+      const done = timer.currentSectors;
+      const classes = timer.currentSectorClasses;
+      const ref = timer.bestSectors;
+      for (let i = 0; i < 3; i++) {
+        const slot = h.sectors[i]!;
+        if (i < done.length) {
+          const time = done[i] as number;
+          const r = ref?.[i];
+          slot.state = classes[i] ?? 'slower';
+          slot.time = time;
+          slot.delta = r === undefined ? null : time - r;
+        } else if (timer.running && i === timer.sector) {
+          slot.state = 'run';
+          slot.time = null;
+          slot.delta = null;
+        } else {
+          slot.state = 'none';
+          slot.time = null;
+          slot.delta = null;
+        }
       }
-      if (timer.running && i === timer.sector) return { state: 'run', time: null, delta: null };
-      return { state: 'none', time: null, delta: null };
-    });
-    h.last = lastLap?.time ?? null;
-    h.lastClass = lastLap?.cls ?? null;
-    h.best = timer.bestLap;
-    h.record = timer.record.lap;
-    h.ers = Math.max(0, Math.min(1, t.ersStore / params.ers.storeWindow));
-    h.ersLap = Math.max(0, Math.min(1, 1 - t.ersDeployLap / params.ers.deployPerLap));
-    h.ersMode = ERS_MODE_LABEL[t.ersMode] ?? 'Balanced';
-    h.drs = t.drs > 0.5 ? 'open' : session.drsAvailable ? 'available' : 'off';
-    h.carX = pose.x;
-    h.carZ = pose.z;
-    h.ghostX = ghostOn ? ghostPose.x : null;
-    h.ghostZ = ghostOn ? ghostPose.z : null;
-    h.message = message;
-    if (others) h.others = others;
-    hud.update(h);
+      h.last = lastLap?.time ?? null;
+      h.lastClass = lastLap?.cls ?? null;
+      h.best = timer.bestLap;
+      h.record = timer.record.lap;
+      h.ghost = session.ghost !== null;
+      h.ers = Math.max(0, Math.min(1, t.ersStore / params.ers.storeWindow));
+      h.ersLap = Math.max(0, Math.min(1, 1 - t.ersDeployLap / params.ers.deployPerLap));
+      h.ersMode = ERS_MODE_LABEL[t.ersMode] ?? S.hud.ersModes.balanced;
+      h.drs = t.drs > 0.5 ? 'open' : session.drsAvailable ? 'available' : 'off';
+      h.carX = pose.x;
+      h.carZ = pose.z;
+      h.ghostX = ghostOn ? ghostPose.x : null;
+      h.ghostZ = ghostOn ? ghostPose.z : null;
+      if (t.speed > 3) {
+        track.tangentAt(session.s, trackTangent);
+        const dot = Math.cos(pose.yaw) * trackTangent.x - Math.sin(pose.yaw) * trackTangent.z;
+        h.wrongWay = dot < -0.35;
+      } else {
+        h.wrongWay = false;
+      }
+      h.stopped =
+        playing &&
+        session.world.time > 2 &&
+        t.speed < 1.5 &&
+        session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      h.message = message;
+      if (others) h.others = others;
+      hud.update(h);
+    }
     overlay?.update();
 
     // Engine and road sound, through the audio seam.
@@ -1030,6 +1168,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         message: q('hud-message'),
       };
     },
+    setHudVisible: (on) => {
+      hudVisible = on;
+      hud.setVisible(on);
+    },
     quit,
     loadTimes: () => ({ ...loadTimes }),
     resetForTest: () => {
@@ -1038,6 +1180,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       input.releaseAll();
       input.sample(0, 0);
       if (session.phase === 'paused') resume();
+      hudVisible = true;
+      hud.setVisible(true);
       setSource('human');
       loop.timeScale = 1;
       session.resetAssists();

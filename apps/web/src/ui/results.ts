@@ -1,6 +1,7 @@
 import { formatDelta, formatLapTime } from '../game/format';
 import type { LapResult } from '../game/timing';
 import { el } from './dom';
+import { S } from './strings';
 
 /** How long the strip stays up after a lap, in real seconds. */
 const SHOW_FOR = 7;
@@ -38,7 +39,7 @@ export class ResultsStrip {
   }
 
   show(r: LapResult): void {
-    this.lap.textContent = `Lap ${r.lap}`;
+    this.lap.textContent = S.results.lapN(r.lap);
     this.time.textContent = formatLapTime(r.time);
     this.time.dataset.tone = r.class;
     this.delta.textContent = r.deltaToBest === null ? '' : formatDelta(r.deltaToBest);
@@ -49,7 +50,13 @@ export class ResultsStrip {
       s.textContent = formatLapTime(t, true);
       s.dataset.tone = r.sectorClasses[i] ?? '';
     });
-    const tag = !r.valid ? 'Invalid' : r.record ? 'Record' : r.personalBest ? 'Session best' : '';
+    const tag = !r.valid
+      ? S.results.invalid
+      : r.record
+        ? S.results.record
+        : r.personalBest
+          ? S.results.sessionBest
+          : '';
     this.tag.textContent = tag;
     this.tag.dataset.tone = !r.valid ? 'invalid' : r.record ? 'overall' : 'personal';
     this.tag.hidden = tag === '';

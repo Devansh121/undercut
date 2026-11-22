@@ -1,5 +1,5 @@
 import { expect, test } from './base';
-import { viewPixels, watchProblems } from './helpers';
+import { startTimeTrial, viewPixels, watchProblems } from './helpers';
 
 /**
  * Context loss and full Mobile-preset view rebuild (including PMREM environment rebake). Two full
@@ -15,7 +15,7 @@ test('losing and restoring the WebGL context pauses, rebakes the lighting and dr
   test.setTimeout(120_000);
   const problems = watchProblems(page);
   await page.goto('/?debug=1&quality=mobile&world=lite');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.waitForFunction(() => (window.__undercut?.state().tick as number) > 20);
   const builds = await page.evaluate(() => window.__undercut?.state().viewBuilds as number);
