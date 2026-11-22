@@ -39,6 +39,7 @@ export {
   type KerbProfile,
   type Pose,
   type SideIndex,
+  type TrackOptions,
 } from './track';
 export { HIGH_KERB, SURFACE_PROPERTIES, TrackSurface, type SurfaceProperties } from './surface';
 export {

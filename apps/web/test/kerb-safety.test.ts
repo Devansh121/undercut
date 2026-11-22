@@ -65,12 +65,14 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
  * reset. Open cases run as expected failures, so each one turns this suite red the moment it
  * starts passing and must then move into this list.
  */
+// One more passes since the folded run-off is filled (docs/track-data.md 5.8): 610,8,-0.1,0.
 const FIXED = new Set([
   '300,8,-0.1,2',
   '540,8,-0.1,0',
   '540,8,-0.1,2',
   '540,8,0,0',
   '610,0,0.1,0',
+  '610,8,-0.1,0',
   '650,8,-0.1,0',
   '650,8,-0.1,2',
   '650,8,0,0',
