@@ -124,12 +124,26 @@ export function catalogAssetPath(file: string): string {
   return file.replace(/^assets\//, '');
 }
 
-/** Pick the LODs to fetch for a given quality preset (drops `_high.glb` on mobile/lite). */
+/**
+ * A circuit's near-tree models (world-props.json `circuits.<id>.nearTrees`): drawn only inside the
+ * near-tree swap distance, where the cards take over, so their far level is never fetched.
+ */
+export function nearTreePropIds(circuit: string): ReadonlySet<string> {
+  return new Set(CIRCUIT_PROPS[circuit]?.nearTrees ?? []);
+}
+
+/**
+ * Pick the LODs to fetch for a given quality preset (drops `_high.glb` on mobile/lite, and
+ * `_far.glb` when `withoutFar`).
+ */
 export function selectCatalogLods(
   entry: PropCatalogEntry,
   quality: Pick<Quality, 'name'>,
+  withoutFar = false,
 ): PropCatalogLod[] {
-  const sorted = [...entry.lods].sort((a, b) => a.maxDistance - b.maxDistance);
+  const sorted = [...entry.lods]
+    .sort((a, b) => a.maxDistance - b.maxDistance)
+    .filter((l) => !withoutFar || !/_far\.glb$/i.test(l.file));
   if (quality.name === 'mobile' || quality.name === 'lite') {
     const light = sorted.filter((l) => !/_high\.glb$/i.test(l.file));
     if (light.length > 0) return light;
@@ -523,6 +537,8 @@ export class PropKitAssets {
     quality: Quality,
     dracoPath: string,
     wantedIds: readonly string[] = WORLD_CATALOG_PROP_IDS,
+    /** Ids loaded without their far level (`nearTreePropIds`). */
+    withoutFar: ReadonlySet<string> = new Set(),
   ): Promise<PropKitAssets> {
     const kit = new PropKitAssets();
     const wanted = new Set(wantedIds);
@@ -537,7 +553,7 @@ export class PropKitAssets {
 
     // Declare every file first so the loading progress bar reflects the full prop kit bytes.
     const plan: { entry: PropCatalogEntry; lods: PropCatalogLod[] }[] = targets.map((entry) => {
-      const lods = selectCatalogLods(entry, quality);
+      const lods = selectCatalogLods(entry, quality, withoutFar.has(entry.id));
       for (const lod of lods) loader.expect(catalogAssetPath(lod.file), lod.bytes);
       return { entry, lods };
     });

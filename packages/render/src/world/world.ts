@@ -699,8 +699,9 @@ export class CircuitWorld {
             tintSlots: [`${id}-needles`],
             // Measured against the spruce cards they replace (shots --tree-swap-check).
             colourScale: NEAR_CONIFER_TONE,
-            // The finest level only very near; nothing beyond the swap band.
-            distanceCaps: [NEAR_CONIFER_HIGH, wq.treeCloud + 15, wq.treeCloud + 15],
+            // High and Mobile levels only (the far level is not fetched: cards draw beyond the
+            // swap band); the finest very near, nothing past the band.
+            distanceCaps: [NEAR_CONIFER_HIGH, wq.treeCloud + 15],
           });
           if (!lods) continue;
           const nearId = `${k.id}-near-${id}`;

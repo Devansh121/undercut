@@ -52,7 +52,12 @@ import {
 import { estimateRacingLine } from './racing-line';
 import { GRASS_COLOUR, TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 import { isDressingFile, type DressingFile } from './world/dressing';
-import { PropKitAssets, isPropCatalog, worldCatalogPropIds } from './props/catalog';
+import {
+  PropKitAssets,
+  isPropCatalog,
+  nearTreePropIds,
+  worldCatalogPropIds,
+} from './props/catalog';
 import type { BrandSpec } from './world/brands';
 import type { GarageTeam } from './world/pit-building';
 import { CircuitWorld } from './world/world';
@@ -343,6 +348,7 @@ export class RaceView {
             q,
             options.dracoPath,
             worldCatalogPropIds(options.track.id, { world: worldQ }),
+            nearTreePropIds(options.track.id),
           )
         : Promise.resolve(null);
     // Settle all of them before deciding: a car that finishes after another file failed is

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import catalogJson from '../data/props.catalog.json';
 import spaDressingJson from '../data/spa.dressing.json';
-import { WORLD_CATALOG_PROP_IDS, worldCatalogPropIds } from '../src/props/catalog';
+import {
+  WORLD_CATALOG_PROP_IDS,
+  nearTreePropIds,
+  selectCatalogLods,
+  worldCatalogPropIds,
+  type PropCatalogEntry,
+} from '../src/props/catalog';
 import { buildBuildings } from '../src/world/buildings';
 import { decodeTerrain, gridHeight, type DressingFile } from '../src/world/dressing';
 import { SPECIES } from '../src/world/tree-atlas';
@@ -70,6 +76,20 @@ describe('prop ids per circuit', () => {
     expect(mobile).not.toContain('forest-fir');
     for (const id of high) expect(catalogIds.has(id), id).toBe(true);
     for (const kit of worldTheme('spa').conifers!.kit) expect(high).toContain(kit);
+  });
+});
+
+describe('near-tree models', () => {
+  it('load without their far level, which the cards replace', () => {
+    expect([...nearTreePropIds('spa')].sort()).toEqual(['forest-fir', 'forest-spruce']);
+    expect(nearTreePropIds('monza').size).toBe(0);
+    const spruce = (catalogJson as { props: PropCatalogEntry[] }).props.find(
+      (p) => p.id === 'forest-spruce',
+    )!;
+    const all = selectCatalogLods(spruce, { name: 'high' });
+    const near = selectCatalogLods(spruce, { name: 'high' }, true);
+    expect(all.some((l) => l.file.endsWith('_far.glb'))).toBe(true);
+    expect(near.map((l) => l.file.replace(/^.*_/, ''))).toEqual(['high.glb', 'mobile.glb']);
   });
 });
 
