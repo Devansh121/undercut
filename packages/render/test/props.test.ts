@@ -1,4 +1,4 @@
-import type { InstancedMesh} from 'three';
+import type { InstancedMesh } from 'three';
 import { BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { PropRegistry, bucketBySector, chunkLod, sectorOf } from '../src/props/registry';
