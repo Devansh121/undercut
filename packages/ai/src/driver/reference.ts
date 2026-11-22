@@ -157,6 +157,11 @@ export class ReferenceDriver implements Driver {
    */
   brakeFloor = 0;
   /**
+   * The least share of the throttle kept whatever the wheelspin feel says (0 to 1). At walking
+   * pace on grass a touch of throttle reads as wheelspin, and a car pulling away there crawled.
+   */
+  throttleFloor = 0;
+  /**
    * The most curvature the lateral feedback may add to the line's, 1/m. At walking pace a car
    * turns far tighter than this, and a racing driver pulling away off the line uses it.
    */
@@ -404,7 +409,7 @@ export class ReferenceDriver implements Driver {
     if (lockOver > 0) this.brakeCap -= g.lockGain * lockOver * dt;
     else this.brakeCap += g.lockRecover * dt;
     this.brakeCap = Math.max(0, Math.min(1, this.brakeCap));
-    throttle = Math.min(throttle, this.throttleCap);
+    throttle = Math.min(throttle, Math.max(this.throttleCap, this.throttleFloor));
     brake = Math.min(brake, Math.max(this.brakeCap, this.brakeFloor));
     if (betaOver > 0) brake *= Math.max(0, 1 - g.slideBrakeRelease * betaOver);
     // Sliding with the brakes off: never let engine braking act on the rear (lift-off
