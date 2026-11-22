@@ -319,12 +319,15 @@ export class RaceView {
     return view;
   }
 
-  /** Release downloaded session assets that no view took (a prefetch, a failed load). */
+  /**
+   * Release downloaded session assets that no view took (a prefetch, a failed load), as a view's
+   * dispose does: the textures and models made for it. The decoded images (the sky's among them)
+   * belong to the page's download cache (AssetLoader) and stay for the next session.
+   */
   static releaseAssets(assets: SessionAssets): void {
     for (const s of Object.values(assets.sets)) disposeSet(s);
     assets.car.dispose();
     assets.propKit?.dispose();
-    assets.sky.image.close();
   }
 
   static async fetchAssets(options: RaceViewOptions): Promise<SessionAssets> {

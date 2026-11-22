@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from './base';
-import { startTimeTrial } from './helpers';
+import { startTimeTrial, waitForDraws, watchProblems } from './helpers';
 
 /**
  * The budget check's first-race inventory (apps/web/dist/first-race.json, written by
@@ -128,6 +128,7 @@ test('the High first race at Singapore, with its world, requests what the budget
       })(),
     );
   });
+  const problems = watchProblems(page);
   await page.goto('/?quality=mobile&debug=1&world=lite');
   await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
@@ -160,4 +161,14 @@ test('the High first race at Singapore, with its world, requests what the budget
   console.log(
     `High at singapore: ${fetched.size} requests; ${assets.length} assets in the inventory`,
   );
+
+  // A prefetch releases only what it made: a new session still draws its sky and textures from
+  // the page's cached downloads, the very images a prefetch on its preset decoded too.
+  await page.evaluate(() => window.__undercut!.prefetch('mobile'));
+  await page.evaluate(() => window.__undercut!.quit());
+  await expect(page.locator('html')).not.toHaveAttribute('data-ready', '');
+  await page.evaluate(() => window.__undercut!.start());
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
+  await waitForDraws(page, 3);
+  expect(problems).toEqual([]);
 });
