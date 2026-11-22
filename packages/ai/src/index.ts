@@ -13,6 +13,19 @@ export {
 } from './driver/reference';
 export { lockExcess, spinExcess } from './driver/feel';
 export {
+  DEFAULT_RACE_SKILL,
+  RaceDriver,
+  driverSkillFor,
+  type RaceDriverOptions,
+  type RaceSkill,
+} from './driver/race';
+export {
+  createTrafficCar,
+  createTrafficView,
+  type TrafficCar,
+  type TrafficView,
+} from './driver/traffic';
+export {
   FOLLOWER_GAINS,
   PathFollower,
   type FollowPoint,
@@ -69,10 +82,12 @@ export {
   type Zone,
 } from './export/racing-line';
 export {
+  createRaceDriver,
   createReferenceDriver,
   planFromRacingLine,
   referenceCorridor,
   referenceLineConfig,
+  type RaceDriverSetup,
   type ReferenceDriverSetup,
 } from './reference-setup';
 export {

@@ -56,7 +56,9 @@ const MODE_ICON: Record<ModeId, IconKey> = {
 };
 
 /** Modes that start a session in this build. */
-const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial', 'online']);
+const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial', 'quickRace', 'online']);
+/** Circuits a Quick Race runs on in this build (its AI field and grid are set up for these). */
+const QUICK_RACE_CIRCUITS: ReadonlySet<string> = new Set(['monza']);
 
 const kmText = (m: number): string => (m / 1000).toFixed(3);
 
@@ -295,7 +297,7 @@ export class HubScreen implements Screen {
   /** Start as if the start button was pressed (keyboard, gamepad accept, tests). */
   startSession(): void {
     const p = this.o.prefs.get();
-    if (!PLAYABLE.has(p.mode) || this.start.disabled) return;
+    if (!this.canStart(p.mode, this.circuit().id) || this.start.disabled) return;
     if (p.mode === 'online') {
       this.o.onOnline();
       return;
@@ -313,7 +315,8 @@ export class HubScreen implements Screen {
   }
 
   setLoading(loading: boolean): void {
-    this.start.disabled = loading || !PLAYABLE.has(this.o.prefs.get().mode);
+    const p = this.o.prefs.get();
+    this.start.disabled = loading || !this.canStart(p.mode, this.circuit().id);
     this.root.setAttribute('aria-busy', String(loading));
     setButtonLabel(this.start, loading ? S.menu.loading : S.modes[this.o.prefs.get().mode].start);
   }
@@ -402,7 +405,7 @@ export class HubScreen implements Screen {
       ? (this.o.circuits.find((x) => x.id === 'monza') ?? this.circuit())
       : this.circuit();
     this.changeCircuit.hidden = online;
-    const playable = PLAYABLE.has(mode);
+    const playable = this.canStart(mode, c.id);
     for (const [m, row] of this.modeRows) row.setAttribute('aria-current', String(m === mode));
     this.root.dataset.mode = mode;
 
@@ -451,6 +454,7 @@ export class HubScreen implements Screen {
     // Session settings for time trial; otherwise a note: what online rooms offer (their own
     // settings are in the lobby), or that race sessions are not in this build.
     const settings = mode === 'timeTrial';
+    const race = mode === 'quickRace';
     this.settingsCard.hidden = !settings;
     this.summaryCard.hidden = !settings;
     this.noticeCard.hidden = settings;
@@ -458,16 +462,26 @@ export class HubScreen implements Screen {
       const h = el('header', 'notice__head');
       h.append(
         icon('info'),
-        el('h2', 'notice__title', online ? S.notices.onlineTitle : S.notices.racesTitle),
+        el(
+          'h2',
+          'notice__title',
+          online ? S.notices.onlineTitle : race ? S.notices.quickRaceTitle : S.notices.racesTitle,
+        ),
       );
       this.noticeCard.replaceChildren(
         h,
         el(
           'p',
-          online ? 'notice__body' : 'notice__body notice__body--races',
-          online ? S.notices.onlineBody : S.notices.racesBody,
+          online || race ? 'notice__body' : 'notice__body notice__body--races',
+          online
+            ? S.notices.onlineBody
+            : race
+              ? QUICK_RACE_CIRCUITS.has(c.id)
+                ? S.notices.quickRaceBody
+                : S.notices.quickRaceCircuits(c.name)
+              : S.notices.racesBody,
         ),
-        ...(!online && !c.raceReady
+        ...(!online && !race && !c.raceReady
           ? [el('p', 'notice__body notice__body--circuit', S.circuit.noRaceLine(c.name))]
           : []),
       );
@@ -538,6 +552,12 @@ export class HubScreen implements Screen {
     setButtonLabel(this.start, S.modes[mode].start);
     this.start.disabled = !playable;
     this.start.title = playable ? '' : S.notices.unavailable;
+  }
+
+  /** A mode that starts in this build, on this circuit. */
+  private canStart(mode: ModeId, circuit: string): boolean {
+    if (!PLAYABLE.has(mode)) return false;
+    return mode !== 'quickRace' || QUICK_RACE_CIRCUITS.has(circuit);
   }
 
   private summaryPart(a: string, b: string): HTMLElement {

@@ -61,6 +61,33 @@ driver reads (slips, loads, sideslip, position on the line), not only lag and no
 writes (`reaction`, `steerNoise`, `pedalNoise`). An AI that reads the car exactly, as this
 controller does, regulates slip better than any player can.
 
+## Racing
+
+`createRaceDriver({ track, line, envelope, params, skill })` returns a `RaceDriver`: the
+reference controller underneath (same steering, pedals and gears, same physics, no cheats), on a
+plan made with the driver's `RaceSkill` (pace, braking, consistency, reaction, sensing, aggression),
+with racecraft on top. The race passes it a `TrafficView` before each tick (`sense`).
+
+- **Sensing limits** (the requirement above): the slip and load it feels lag by `senseLag` and
+  carry noise; its position on the track carries an error that drifts with distance driven (up to
+  0.15 m); other cars are seen 300 m ahead and 40 m behind, where they were 0.12 s ago, with the
+  width they take across the track (more when spun).
+- **Gap keeping**: a time gap of 0.15 to 0.3 s on a straight, 0.35 to 0.6 s into braking zones and
+  corners (by aggression), never closer than Gipps' safe speed: able to stop to the other car's
+  speed if it braked as hard as this car can at the slower of the two speeds, after its perception
+  and reaction delay.
+- **Lanes**: an offset from the racing line, side by side a car's width and 0.8 m of air from the
+  other car, never across it; where there is no room for both, the car further back falls in
+  behind. Into a braking zone the car ahead owns the corner unless the other is alongside. Off line
+  in a corner it slows for the tighter radius.
+- **Passing**: on a straight, with a pace advantage or after being held up, it moves out to a side
+  with room; it gives up if not alongside by the braking zone.
+- **Blue flag**: off line to the side away from the car lapping it, held until it is by.
+- **Recovery**: facing the wrong way or stuck, it waits on the racing surface for the traffic, turns
+  round with forward and reverse lock, and rejoins off line while cars approach.
+
+Decision tests: `test/race-driver.test.ts`; closed loop on the sim: `packages/race/validation`.
+
 ## Validation
 
 `validation/reference-lap.test.ts` (physics job) drives an out-lap and one timed lap at Monza,

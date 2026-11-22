@@ -280,14 +280,19 @@ test.describe('menus, keyboard only', () => {
     await page.keyboard.press('Enter');
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
 
-    // Q and E step through the modes; the notice replaces the settings for race modes.
+    // Q and E step through the modes; the notice replaces the settings for race modes. Quick
+    // Race starts at Monza (the default circuit).
     await page.keyboard.press('KeyE');
     await expect(page.locator('[data-action=mode-quickRace]')).toHaveAttribute(
       'aria-current',
       'true',
     );
     await expect(page.locator('[data-testid=mode-notice]')).toBeVisible();
+    await expect(page.locator('[data-action=start]')).toBeEnabled();
+    await expect(page.locator('[data-action=start]')).toContainText('Start race');
+    await page.keyboard.press('KeyE');
     await expect(page.locator('[data-action=start]')).toBeDisabled();
+    await page.keyboard.press('KeyQ');
     await page.keyboard.press('KeyQ');
     await expect(page.locator('[data-action=mode-timeTrial]')).toHaveAttribute(
       'aria-current',

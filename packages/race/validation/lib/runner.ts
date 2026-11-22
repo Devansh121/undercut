@@ -22,6 +22,11 @@ export interface RaceRunOptions {
   /** Skill spread across the field, 0 to 1. */
   spread?: number;
   /**
+   * How far pace is shuffled against the grid order, 0 (pole is fastest, as by default in the
+   * library) to 1. Default 0.5 here: qualifying does not sort a field exactly by race pace.
+   */
+  gridNoise?: number;
+  /**
    * One stop (tyres) per car: the lap each car is asked in on, or null for no stops. Default
    * for races of five laps or more: around half distance, spread over three laps across the
    * field (car k on lap mid - 1 + k mod 3).
@@ -49,6 +54,18 @@ export interface CarSummary {
   allOffTicks: number;
   /** Largest |d| from the centreline outside the pit lane, m. */
   maxOffset: number;
+  /** Ticks in contact with another car, the largest closing speed at a contact (m/s), and the total impulse (N·s). */
+  contactTicks: number;
+  maxContactSpeed: number;
+  contactImpulse: number;
+  /** Longest unbroken spell in contact with another car, s. */
+  longestContact: number;
+  /** Largest distance of the CoG past the barrier line on its side, m (negative: never reached it). */
+  beyondBarrier: number;
+  /** Spins after the start (heading more than 0.8 rad off the track's direction, outside the pit lane). */
+  spins: number;
+  /** Through the first corners on lap 1 cleanly, or what went wrong there. */
+  turnOne: 'clean' | 'contact' | 'spin' | 'off' | 'stopped' | 'pending';
 }
 
 /** Cars that would have touched on the first lap if the sim had car-to-car contact. */
@@ -70,6 +87,18 @@ export interface RaceRun {
   /** The first lap: who led at the line and how far behind the last car crossed it, s. */
   firstLap: { leader: number; spread: number } | null;
   overlaps: FirstLapOverlaps;
+  racing: RacingStats;
+}
+
+/** How close the racing was, sampled every 0.25 s from 20 s after the start. */
+export interface RacingStats {
+  /** On-track position swaps between two cars both out of the pit lane (laps included). */
+  overtakes: number;
+  /** Closest time gap between a car and the one ahead on track at racing speed, s. */
+  closestGap: number;
+  /** Share of samples, over followers above 30 m/s, within 0.5 s and within 1 s of the car ahead. */
+  within05: number;
+  within10: number;
 }
 
 /** Default stop lap for car k in a race of `laps` laps, or null. */
@@ -107,7 +136,7 @@ function load(): Loaded {
 /** Build a session of AI cars. */
 export function aiSession(
   spec: SessionSpec,
-  o: Pick<RaceRunOptions, 'cars' | 'seed' | 'spread' | 'rules' | 'grid'>,
+  o: Pick<RaceRunOptions, 'cars' | 'seed' | 'spread' | 'rules' | 'grid' | 'gridNoise'>,
 ): RaceSession {
   const { track, line, envelope } = load();
   const params = createCarParams(MONZA.trim);
@@ -119,6 +148,7 @@ export function aiSession(
     count: o.cars,
     seed: o.seed,
     ...(o.spread !== undefined ? { spread: o.spread } : {}),
+    gridNoise: o.gridNoise ?? 0.5,
     ...(o.rules ? { rules: o.rules } : {}),
   });
   const entrants = entrantsFor(o.cars);
@@ -157,7 +187,19 @@ export function runSession(
     maxWheelsOff: 0,
     allOffTicks: 0,
     maxOffset: 0,
+    contactTicks: 0,
+    maxContactSpeed: 0,
+    contactImpulse: 0,
+    longestContact: 0,
+    beyondBarrier: Number.NEGATIVE_INFINITY,
+    spins: 0,
+    turnOne: 'pending',
   }));
+  const contactRun = new Float64Array(n);
+  const spinning = new Array<boolean>(n).fill(false);
+  const offTime = new Float64Array(n);
+  const tangent = { x: 0, y: 0, z: 0 };
+  const track = session.track;
   const asked = new Array<boolean>(n).fill(false);
   let firstLap: RaceRun['firstLap'] = null;
   let leaderLap1At = 0;
@@ -168,6 +210,13 @@ export function runSession(
   const cornerFrom = corner1 ? corner1.start - 150 : 0;
   const cornerTo = session.track.corners[1]?.end ?? (corner1 ? corner1.end : 0);
   const t0 = o.clock?.() ?? null;
+  const stats: RacingStats = { overtakes: 0, closestGap: Infinity, within05: 0, within10: 0 };
+  let racingSamples = 0;
+  let nextSample = 0;
+  const prevDist = new Float64Array(n);
+  const prevOn = new Array<boolean>(n).fill(false);
+  const nowOn = new Array<boolean>(n).fill(false);
+  const byDist: number[] = [];
   const maxTime = o.maxTime ?? 7200;
   const c = session.control;
   while (!session.ended && session.time < maxTime) {
@@ -206,6 +255,46 @@ export function runSession(
         overlaps.peakAtS = session.carFacts(c.order[0]!).s;
       }
     }
+    const green = c.lightsOutAt ?? c.greenTime;
+    if (
+      c.strategy.kind === 'race' &&
+      green !== null &&
+      session.time >= green + 20 &&
+      session.time >= nextSample
+    ) {
+      nextSample = session.time + 0.25;
+      byDist.length = 0;
+      for (let i = 0; i < n; i++) {
+        const f = session.carFacts(i);
+        nowOn[i] = c.racing(i) && !f.inPitLane && c.pitPhase(i) === 'none';
+        if (nowOn[i]) byDist.push(i);
+      }
+      for (let i = 0; i < n; i++) {
+        if (!nowOn[i] || !prevOn[i]) continue;
+        for (let j = i + 1; j < n; j++) {
+          if (!nowOn[j] || !prevOn[j]) continue;
+          const before = prevDist[i]! - prevDist[j]!;
+          const after = c.cars[i]!.dist - c.cars[j]!.dist;
+          if (before * after < 0) stats.overtakes++;
+        }
+      }
+      byDist.sort((a, b) => c.cars[b]!.dist - c.cars[a]!.dist);
+      for (let k = 1; k < byDist.length; k++) {
+        const lead = byDist[k - 1]!;
+        const fol = byDist[k]!;
+        const v = session.carFacts(fol).speed;
+        if (v < 30) continue;
+        const gap = (c.cars[lead]!.dist - c.cars[fol]!.dist - 5.6) / v;
+        racingSamples++;
+        if (gap < 0.5) stats.within05++;
+        if (gap < 1) stats.within10++;
+        if (gap < stats.closestGap) stats.closestGap = gap;
+      }
+      for (let i = 0; i < n; i++) {
+        prevOn[i] = nowOn[i]!;
+        prevDist[i] = c.cars[i]!.dist;
+      }
+    }
     for (let i = 0; i < n; i++) {
       const f = session.carFacts(i);
       const s = cars[i]!;
@@ -218,6 +307,34 @@ export function runSession(
         s.maxWheelsOff = Math.max(s.maxWheelsOff, f.wheelsOff);
         if (f.wheelsOff >= 4) s.allOffTicks++;
         s.maxOffset = Math.max(s.maxOffset, Math.abs(f.d));
+        const st = session.worldCar(i).state;
+        const dt = session.world.step;
+        if (st.carContacts > 0) {
+          s.contactTicks++;
+          contactRun[i] = contactRun[i]! + dt;
+          s.longestContact = Math.max(s.longestContact, contactRun[i]!);
+        } else contactRun[i] = 0;
+        s.maxContactSpeed = Math.max(s.maxContactSpeed, st.carContactSpeed);
+        s.contactImpulse += st.carContactImpulse;
+        const side = f.d >= 0 ? 0 : 1;
+        const barrier = track.lap.interpolate(track.barrier[side], f.s);
+        s.beyondBarrier = Math.max(s.beyondBarrier, Math.abs(f.d) - barrier);
+        track.tangentAt(f.s, tangent);
+        const err = st.yaw - Math.atan2(-tangent.z, tangent.x);
+        const off = Math.abs(Math.atan2(Math.sin(err), Math.cos(err)));
+        if (off > 0.8 && !spinning[i]) s.spins++;
+        spinning[i] = off > 0.8 ? true : off < 0.3 ? false : spinning[i]!;
+        offTime[i] = f.wheelsOff >= 4 ? offTime[i]! + dt : 0;
+        // Turn one: lap 1, from the grid to 50 m past the end of the first corners.
+        if (s.turnOne === 'pending' && c.strategy.kind === 'race') {
+          const sinceGreen = session.time - (c.lightsOutAt ?? 0);
+          if (c.timer(i).lap > 1 || (f.s > cornerTo + 50 && f.s < cornerTo + 2000)) {
+            s.turnOne = 'clean';
+          } else if (st.carContactSpeed > 3) s.turnOne = 'contact';
+          else if (off > 0.8) s.turnOne = 'spin';
+          else if (offTime[i]! > 0.5) s.turnOne = 'off';
+          else if (sinceGreen > 10 && f.speed < 3) s.turnOne = 'stopped';
+        }
       }
       const lap = o.pitLap ? o.pitLap(i) : null;
       if (lap !== null && !asked[i] && c.timer(i).lap === lap && c.racing(i)) {
@@ -227,6 +344,10 @@ export function runSession(
     }
   }
   const wall = t0 !== null && o.clock ? (o.clock() - t0) / 1000 : null;
+  if (racingSamples > 0) {
+    stats.within05 /= racingSamples;
+    stats.within10 /= racingSamples;
+  }
   overlaps.pairs = seenPairs.size;
   overlaps.pairsInFirstCorner = cornerPairs.size;
   return {
@@ -237,6 +358,7 @@ export function runSession(
     wallSeconds: wall,
     firstLap,
     overlaps,
+    racing: stats,
   };
 }
 

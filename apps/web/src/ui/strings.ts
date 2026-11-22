@@ -46,6 +46,8 @@ export const S = {
       `Brake in a straight line before turning in. The driving line turns red where you need to brake. Brake: ${input}.`,
     limits:
       'Four wheels past the white lines invalidates this lap. It cannot set a record. Keep driving for a clean lap.',
+    limitsRace:
+      'Four wheels past the white lines is a track-limits strike. Strikes bring warnings, then the black and white flag, then a time penalty. Keep at least one wheel inside.',
     pause: (input: string) =>
       `Pause with ${input} for controls and settings. Skip or replay this intro from the pause menu.`,
     row: 'First-lap intro',
@@ -118,6 +120,11 @@ export const S = {
     racesTitle: 'Race sessions open in the next update',
     racesBody:
       'The race rules are built: start lights, flags, track limits, penalties, pit stops and points. The race screen that runs them is not in this build yet. Time Trial runs on the same rules today.',
+    quickRaceTitle: 'Five laps against nineteen cars',
+    quickRaceBody:
+      'A standing start from the middle of the grid, the full race rules, pit stops and race control. Race length and grid position arrive with the race setup screen.',
+    quickRaceCircuits: (name: string) =>
+      `Quick Race runs at Monza in this build; ${name} is Time Trial only for now.`,
     onlineTitle: 'Private rooms',
     onlineBody:
       'Create a room and share its invite, or join one with a room code. Up to eight drivers race at Monza on equal cars; the host sets the laps and which assists are allowed.',
@@ -219,11 +226,13 @@ export const S = {
     restoring: 'Restoring graphics',
     graphics: (preset: string) => `Graphics: ${preset}`,
     timeTrial: 'Time trial',
+    quickRace: 'Quick race',
     mb: (loaded: string, total: string) => `${loaded} / ${total} MB`,
   },
 
   hud: {
     timeTrial: 'Time trial',
+    quickRace: 'Quick race',
     lap: 'Lap',
     lapN: (n: number) => `Lap ${n}`,
     outLap: 'Out lap',
@@ -257,6 +266,8 @@ export const S = {
     resetToTrack: 'Reset to track',
     storage: 'Storage',
     recordsUntilClose: 'Records last until the page closes',
+    blockingGhostOn: 'Cars held up behind you pass through your car',
+    blockingGhostOff: 'Your car is solid again',
     recordKept: 'Record kept until the page closes',
     camera: 'Camera',
     ersModes: { off: 'Off', balanced: 'Balanced', overtake: 'Overtake' },
@@ -286,6 +297,8 @@ export const S = {
     title: 'Paused',
     resume: 'Resume',
     restartLap: 'Restart lap',
+    restartRace: 'Restart race',
+    skipToResults: 'Skip to results',
     resetToTrack: 'Reset to track',
     quit: 'Quit to menu',
     camera: 'Camera',

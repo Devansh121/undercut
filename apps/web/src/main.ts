@@ -34,6 +34,7 @@ import { timeOfDayOf } from './ui/screens/session-settings';
 import { Shell } from './ui/shell';
 
 type DriveModule = typeof DriveModuleNs;
+import type { QuickRaceOptions } from './game/session';
 
 const app = document.getElementById('app');
 const canvas = document.getElementById('view');
@@ -193,11 +194,20 @@ function showOnline(code: string | null): void {
   );
 }
 
+/** A Quick Race to start again as soon as the current one has quit (Restart race). */
+let restartWith: { choice: SessionChoice; quickRace: QuickRaceOptions } | null = null;
+
+/**
+ * Start a session from the menus' choice: a Quick Race (`choice.mode`, or race options from the
+ * debug API), an online extension, or a time trial.
+ */
 async function start(
   choice: SessionChoice = currentChoice(),
   extension?: DriveExtension,
   quit?: () => void,
+  raceOptions?: QuickRaceOptions,
 ): Promise<DriveHandle> {
+  const quickRace = raceOptions ?? (choice.mode === 'quickRace' ? {} : undefined);
   if (drive) return drive;
   if (starting) return starting;
   if (!extension) hub.setLoading(true);
@@ -220,6 +230,15 @@ async function start(
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
+        ...(quickRace ? { quickRace } : {}),
+        ...(quickRace
+          ? {
+              onRestartRace: () => {
+                restartWith = { choice, quickRace };
+                drive?.quit();
+              },
+            }
+          : {}),
         circuit: choice.circuit,
         team: choice.team,
         driver: choice.driver,
@@ -232,7 +251,11 @@ async function start(
         ...(extension ? { extension } : {}),
         onQuit: () => {
           drive = null;
-          if (quit) {
+          if (restartWith) {
+            const again = restartWith;
+            restartWith = null;
+            start(again.choice, undefined, undefined, again.quickRace).catch(() => undefined);
+          } else if (quit) {
             // Back to the online screens, on the menu input.
             menuInput.start();
             quit();
@@ -266,7 +289,15 @@ if (invite) showOnline(invite);
 if (debugEnabled()) {
   installDebugApi(
     () => drive,
-    () => start(),
+    (o) =>
+      o?.quickRace
+        ? start(
+            { ...currentChoice(), mode: 'quickRace', circuit: 'monza' },
+            undefined,
+            undefined,
+            o.quickRace,
+          )
+        : start(),
     () =>
       driveModule?.rendererInfo() ?? { geometries: 0, textures: 0, programs: 0, programRefs: 0 },
     () => driveModule?.rendererPrograms() ?? [],

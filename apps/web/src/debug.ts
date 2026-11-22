@@ -11,6 +11,7 @@
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
  *   __undercut.drive({ throttle: 1 })        // hold a scripted ControlInput; drive(null) ends it
  *   __undercut.autopilot(true)               // keyboard-only autopilot through the input layer
+ *   __undercut.raceDriver(true)              // Quick Race: the player's car on its racing driver
  *   __undercut.clumsyPilot(7)                // the same, as a clumsy player (seeded mistakes)
  *   __undercut.camera('cockpit')             // set the camera; camera() reads it
  *   __undercut.pause() / resume() / restartLap() / resetToTrack()
@@ -23,6 +24,7 @@
 import type { SettingsPatch } from '@undercut/protocol';
 import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
+import type { QuickRaceOptions } from './game/session';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
 import type { OnlineState } from './online/session';
@@ -35,12 +37,15 @@ export interface DebugApi {
   };
   onlineSettings(patch: SettingsPatch): boolean;
   start(): Promise<void>;
+  startQuickRace(laps?: number, options?: Omit<QuickRaceOptions, 'laps'>): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
   teleport(s: number, d?: number, kmh?: number): void;
   setTimeScale(scale: number): void;
   drive(control: Partial<ControlInput> | null): void;
   autopilot(on: boolean): void;
+  /** Quick Race: the player's car driven by its racing driver, in the sim step (frame-rate free). */
+  raceDriver(on: boolean): void;
   clumsyPilot(seed: number): void;
   camera(name?: CameraName): string;
   drivingLine(mode?: DrivingLineMode): DrivingLineState;
@@ -126,7 +131,7 @@ export function debugEnabled(): boolean {
 
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
-  start: () => Promise<DriveHandle>,
+  start: (o?: { quickRace?: QuickRaceOptions }) => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   rendererPrograms: () => { name: string; key: string; used: number; uniforms: string }[],
   audioStatus: () => string,
@@ -151,6 +156,26 @@ export function installDebugApi(
     return {
       screen: 'drive',
       phase: s.phase,
+      racePhase: s.race.control.phase,
+      cars: s.race.world.cars.length,
+      raceResult: s.result,
+      // The player has the flag and the field is still finishing (standings provisional).
+      provisional: s.playerFinished && s.result === null,
+      standings: s.race.control.standings(),
+      raceEvents: s.raceEvents.slice(-30),
+      // Cars within 120 m of the player along the lap (evidence captures look for a pack).
+      nearby: (() => {
+        const me = s.race.carFacts(0);
+        const L = s.track.length;
+        let n = 0;
+        for (let i = 1; i < s.race.world.cars.length; i++) {
+          const f = s.race.carFacts(i);
+          if (f.inPitLane) continue;
+          const ds = Math.abs(((f.s - me.s + 1.5 * L) % L) - L / 2);
+          if (ds < 120) n++;
+        }
+        return n;
+      })(),
       paused: d.loop.paused,
       tick: s.world.tick,
       time: s.world.time,
@@ -179,11 +204,18 @@ export function installDebugApi(
       ghost: s.ghost !== null,
     };
   };
+  const needQuit = (): void => {
+    getDrive()?.quit();
+  };
   window.__undercut = {
     online: () => ({ state: null, race: null }),
     onlineSettings: () => false,
     start: async () => {
       if (!getDrive()) await start();
+    },
+    startQuickRace: async (laps = 5, options?: Omit<QuickRaceOptions, 'laps'>) => {
+      needQuit();
+      await start({ quickRace: { laps, ...options } });
     },
     state,
     telemetry,
@@ -193,6 +225,9 @@ export function installDebugApi(
     },
     drive: (control) => need().drive(control),
     autopilot: (on) => need().autopilot(on),
+    raceDriver: (on) => {
+      need().session.scriptedRaceDriver = on;
+    },
     clumsyPilot: (seed) => need().clumsyPilot(seed),
     camera: (name) => {
       const d = need();

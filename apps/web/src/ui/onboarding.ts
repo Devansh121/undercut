@@ -28,7 +28,11 @@ export class Onboarding {
   private device = '';
   private cue = false;
   private shownTitle = '';
-  constructor(private readonly source: ControlsSource) {
+  /** `race`: a race, not a lap session: the track-limits tip speaks of strikes and penalties. */
+  constructor(
+    private readonly source: ControlsSource,
+    private readonly race = false,
+  ) {
     this.root.dataset.testid = 'onboarding';
     this.root.setAttribute('aria-label', S.intro.title);
     this.root.setAttribute('aria-live', 'polite');
@@ -122,7 +126,7 @@ export class Onboarding {
             this.input('pause'),
           ),
         () => S.intro.brake(this.input('brake')),
-        () => S.intro.limits,
+        () => (this.race ? S.intro.limitsRace : S.intro.limits),
         () => S.intro.pause(this.input('pause')),
       ][this.steps.step]?.() ?? '';
   }

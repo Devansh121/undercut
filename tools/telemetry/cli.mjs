@@ -214,7 +214,22 @@ function printRun(lib, run) {
   for (const c of run.cars) {
     console.log(
       `  ${c.code}  after lap 1 P${c.positionAfterLap1 ?? '-'}  min ${c.minSpeedKmh.toFixed(0)} km/h at s=${c.minSpeedAt.toFixed(0)}  ` +
-        `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m`,
+        `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m  ` +
+        `contact ${(c.contactTicks / 240).toFixed(2)} s (longest ${c.longestContact.toFixed(2)} s, ` +
+        `${c.maxContactSpeed.toFixed(1)} m/s, ${c.contactImpulse.toFixed(0)} N·s)  spins ${c.spins}  ` +
+        `turn one ${c.turnOne}  barrier ${c.beyondBarrier > 0 ? `${c.beyondBarrier.toFixed(1)} m past` : 'clear'}`,
+    );
+  }
+  if (run.result.kind === 'race') {
+    const clean = run.cars.filter((c) => c.turnOne === 'clean').length;
+    console.log(
+      `\nTurn one: ${clean} of ${run.cars.length} clean; longest contact ${Math.max(...run.cars.map((c) => c.longestContact)).toFixed(2)} s; ` +
+        `spins ${run.cars.reduce((a, c) => a + c.spins, 0)}; past a barrier line ${run.cars.filter((c) => c.beyondBarrier > 0).length}`,
+    );
+    const r = run.racing;
+    console.log(
+      `Racing: ${r.overtakes} on-track position changes; closest gap ${r.closestGap.toFixed(2)} s; ` +
+        `at racing speed ${(100 * r.within05).toFixed(1)} % of the time within 0.5 s of the car ahead, ${(100 * r.within10).toFixed(1)} % within 1 s`,
     );
   }
   const a = run.result.anomalies;
@@ -229,7 +244,7 @@ function printRun(lib, run) {
   if (run.result.kind === 'race') {
     const o = run.overlaps;
     console.log(
-      `First lap (cars are ghosts to each other): ${o.pairs} car pairs overlapped (${o.pairsInFirstCorner} in the first corner), ` +
+      `First lap, footprints overlapping: ${o.pairs} car pairs overlapped (${o.pairsInFirstCorner} in the first corner), ` +
         `at most ${o.peak} at once near s=${o.peakAtS.toFixed(0)}; last car crossed the line ${run.firstLap ? run.firstLap.spread.toFixed(3) : '-'} s after the leader.`,
     );
   }
@@ -255,6 +270,7 @@ async function race(options, weekend = false) {
   };
   if (options.spread !== undefined) o.spread = Number(options.spread);
   if (options['no-pit'] !== undefined) o.pitLap = null;
+  if (options['grid-noise'] !== undefined) o.gridNoise = Number(options['grid-noise']);
   fs.mkdirSync(outDir, { recursive: true });
   const runs = [];
   if (weekend) {
@@ -332,7 +348,7 @@ if (name === 'list' || options.help) {
     `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
   );
   console.log(
-    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --no-pit)`,
+    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit)`,
   );
   console.log(
     `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,

@@ -1728,6 +1728,62 @@ body {
   min-height: 24px;
 }
 
+/* Quick Race: the time-trial tower (best lap, record, ghost) has no meaning in a race; the race
+   panel shows position, gap and laps until the broadcast tower takes race data. */
+.hud[data-mode='race'] .hud-tower {
+  display: none;
+}
+
+/* Race readout: position and laps while racing, the standings after the flag. */
+.race-status {
+  position: relative;
+  padding: 8px 16px;
+  white-space: pre-line;
+  text-align: center;
+  max-height: 60vh;
+  overflow: auto;
+  pointer-events: auto;
+}
+/* The heading stays put while the rows scroll under it. */
+.race-status__head {
+  position: sticky;
+  top: -8px;
+  margin: -8px -16px 0;
+  padding: 8px 16px 2px;
+  background: var(--c-ink-1);
+}
+/* The player's own row in the standings: the kit's selection marker. */
+.race-status__row.is-player {
+  color: var(--c-text-1);
+  background: var(--c-ink-3);
+  box-shadow: inset 3px 0 0 var(--c-brand);
+}
+/* More rows below: the list fades out at its bottom edge. */
+.race-status[data-more] {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent);
+}
+/* After the player's flag the standings take the screen: the driving cluster and the
+   first-lap coach go. */
+.hud[data-finished] .hud-cluster,
+.hud[data-finished] ~ .onboarding {
+  display: none;
+}
+/* The touch driving controls go too (the camera and pause buttons stay). */
+html[data-race-finished] .ut-touch__steer,
+html[data-race-finished] .ut-touch__pedal,
+html[data-race-finished] .ut-touch__btn--gearUp,
+html[data-race-finished] .ut-touch__btn--gearDown,
+html[data-race-finished] .ut-touch__btn--drs,
+html[data-race-finished] .ut-touch__btn--overtake {
+  display: none;
+}
+/* On a short screen the standings leave room for Skip to results under them. */
+@media (max-height: 500px) {
+  .race-status {
+    max-height: calc(100vh - 200px);
+  }
+}
 html[data-screen='drive']:not([data-paused]) {
   touch-action: none;
   user-select: none;

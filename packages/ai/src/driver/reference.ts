@@ -140,6 +140,36 @@ export class ReferenceDriver implements Driver {
   private brakeOut = 0;
   private wander = 0;
 
+  /**
+   * Seams for a race driver built on this one (`RaceDriver`), set before each `drive`: a lateral
+   * offset from the racing line to hold, m (positive left), and a ceiling on the acceleration
+   * the pedals are asked for, m/s² (following a slower car, a corner taken off line). The
+   * defaults leave the reference driver exactly as it is.
+   */
+  offset = 0;
+  /** How fast that offset changes along the lap, m/m: steered for, so the car keeps up with it. */
+  offsetSlope = 0;
+  accelLimit = Number.POSITIVE_INFINITY;
+  /**
+   * The least share of the brake pedal kept whatever the lock-up feel says (0 to 1). At walking
+   * pace a wheel light on a kerb reads as locked at a touch of brake, and a car that has to stop
+   * for traffic stops all the same.
+   */
+  brakeFloor = 0;
+  /**
+   * The most curvature the lateral feedback may add to the line's, 1/m. At walking pace a car
+   * turns far tighter than this, and a racing driver pulling away off the line uses it.
+   */
+  maxCorrection = 0.05;
+  /**
+   * The most heading toward the path the lateral feedback asks for, rad (infinite: no limit).
+   * A car far off its path at walking pace otherwise turns ever more across the road, on full
+   * lock, and off it.
+   */
+  headingLimit = Number.POSITIVE_INFINITY;
+  /** Below this speed, m/s, the yaw-rate integral does not build up (0: always does). */
+  integrateFrom = 0;
+
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
   readonly last = {
     s: 0,
@@ -274,23 +304,32 @@ export class ReferenceDriver implements Driver {
       this.wander += this.rng.range(-1, 1) * this.skill.lineWander * Math.sqrt(dt);
       this.wander = Math.max(-this.skill.lineWander, Math.min(this.skill.lineWander, this.wander));
     }
-    const e = q.d - lineD - this.wander;
-    const ePsi = wrapAngle(course - heading);
+    const eRaw = q.d - lineD - this.wander - this.offset;
+    const ePsi = wrapAngle(course - heading - Math.atan(this.offsetSlope));
     const kAhead = this.sampleAhead(line.curvature, s, v * g.steerPreview);
     const w = Math.max(g.lateralOmegaMin, Math.min(g.lateralOmegaMax, g.lateralOmegaSpeed / v));
+    // With a heading limit, the lateral error counts only up to the error whose steady heading
+    // toward the path is that limit (the feedback balances at sin(ePsi) = -w e / (2 zeta v)).
+    const eMax = Number.isFinite(this.headingLimit)
+      ? (2 * g.lateralDamping * v * Math.sin(this.headingLimit)) / w
+      : Number.POSITIVE_INFINITY;
+    const e = Math.max(-eMax, Math.min(eMax, eRaw));
     let correction = -(w * w * e) / (v * v) - (2 * g.lateralDamping * w * Math.sin(ePsi)) / v;
     // At walking pace the feedback would ask for more curvature than the car has; keep it sane.
-    const maxCorr = 0.05;
+    const maxCorr = this.maxCorrection;
     correction = Math.max(-maxCorr, Math.min(maxCorr, correction));
     const kCmd = kAhead + correction;
     const yawTarget = v * kCmd;
     const L = p.geometry.wheelbase;
     const maxSteer = p.geometry.maxSteerAngle;
     const yawErr = yawTarget - yawRate;
-    const integral = Math.max(
-      -0.5,
-      Math.min(0.5, this.yawIntegral + ((g.yawKi * yawErr) / v) * dt),
-    );
+    // Standing still the car cannot turn, and the yaw error it cannot correct would wind the
+    // integral up to full lock (held there as it pulls away): below `integrateFrom` it bleeds
+    // away instead.
+    const integral =
+      tel.speed < this.integrateFrom
+        ? this.yawIntegral * Math.max(0, 1 - dt / 0.5)
+        : Math.max(-0.5, Math.min(0.5, this.yawIntegral + ((g.yawKi * yawErr) / v) * dt));
     let steer = (L * kCmd) / maxSteer + (g.yawKp * yawErr) / v + integral;
     // Past the front tyres' peak slip angle more lock only scrubs: the wheel goes light. Hold
     // the road-wheel angle within the peak of where the front axle is pointing, and do not wind
@@ -309,8 +348,9 @@ export class ReferenceDriver implements Driver {
       saturated = yawErr < 0;
     }
     // The rear stepping out: steer toward the slide beyond the sideslip the driver accepts, and
-    // hold the yaw integrator (it would otherwise wind up against the countersteer).
-    const beta = wrapAngle(course - tel.yaw);
+    // hold the yaw integrator (it would otherwise wind up against the countersteer). Below
+    // walking pace (4 m/s) `course - yaw` is kinematic Ackermann geometry, not a tyre slide.
+    const beta = tel.speed > 4 ? wrapAngle(course - tel.yaw) : 0;
     const betaOver = Math.max(0, Math.abs(beta) - g.sideslipLimit);
     if (betaOver > 0) steer += (Math.sign(beta) * g.counterSteer * betaOver) / maxSteer;
     if (!saturated && betaOver === 0) this.yawIntegral = integral;
@@ -326,7 +366,7 @@ export class ReferenceDriver implements Driver {
     // under the target here at every braking onset.)
     const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview);
     const aFf = v < vAhead - 1 ? Math.max(aHere, aAhead) : aAhead;
-    const aDemand = aFf + g.speedGain * (vTarget - v);
+    const aDemand = Math.min(aFf + g.speedGain * (vTarget - v), this.accelLimit);
     const drsHere = plan.drsZone[i] === 1 && prof.phase[i] !== Phase.Brake;
     const deployHere = prof.deploying[i] === 1 && (this.crossedLine || this.deployBeforeLine);
     const model = plan.model;
@@ -347,7 +387,7 @@ export class ReferenceDriver implements Driver {
     const peak = p.tyre.peakSlipRatio;
     // The rear stepping out: combined slip past the peak, or the car sliding (sideslip).
     const spin = spinExcess(tel.slipRatio, tel.slipAngle, peak, p.tyre.peakSlipTan);
-    const sideslip = Math.abs(wrapAngle(course - tel.yaw));
+    const sideslip = Math.abs(beta);
     const slide = sideslip - g.sideslipLimit;
     if (spin > 0 || slide > 0) {
       this.throttleCap -= (g.spinGain * Math.max(spin, 0) + g.slideGain * Math.max(slide, 0)) * dt;
@@ -365,7 +405,7 @@ export class ReferenceDriver implements Driver {
     else this.brakeCap += g.lockRecover * dt;
     this.brakeCap = Math.max(0, Math.min(1, this.brakeCap));
     throttle = Math.min(throttle, this.throttleCap);
-    brake = Math.min(brake, this.brakeCap);
+    brake = Math.min(brake, Math.max(this.brakeCap, this.brakeFloor));
     if (betaOver > 0) brake *= Math.max(0, 1 - g.slideBrakeRelease * betaOver);
     // Sliding with the brakes off: never let engine braking act on the rear (lift-off
     // oversteer). Hold at least the throttle that cancels the engine's drag.

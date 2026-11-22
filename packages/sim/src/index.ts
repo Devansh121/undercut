@@ -85,6 +85,19 @@ export {
   type InvariantOptions,
 } from './invariants';
 export {
+  CAR_FRICTION,
+  CAR_RESTITUTION,
+  CONTACT_PASSES,
+  CONTACT_SLOP,
+  carFootprint,
+  carOverlap,
+  createCarContacts,
+  resolveCarContacts,
+  type CarContacts,
+  type CarFootprint,
+  type ContactBody,
+} from './car-contact';
+export {
   PATCH_ACROSS,
   PATCH_ALONG,
   PATCH_HINTS,

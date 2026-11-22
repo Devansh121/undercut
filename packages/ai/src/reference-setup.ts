@@ -1,6 +1,7 @@
 import type { CarParams } from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import { REFERENCE_SKILL, ReferenceDriver } from './driver/reference';
+import { RaceDriver, driverSkillFor, type RaceSkill } from './driver/race';
 import type { DriverSkill } from './driver/driver';
 import type { Envelope } from './envelope/envelope';
 import type { LineConfig } from './line/build';
@@ -81,4 +82,23 @@ export function createReferenceDriver(setup: ReferenceDriverSetup): ReferenceDri
     skill,
     ...(setup.deployBeforeLine === undefined ? {} : { deployBeforeLine: setup.deployBeforeLine }),
   });
+}
+
+export interface RaceDriverSetup {
+  track: Track;
+  line: RacingLineData;
+  envelope: Envelope;
+  params: CarParams;
+  skill: RaceSkill;
+}
+
+/** A racing driver on a shipped racing line, its speeds planned at its own skill. */
+export function createRaceDriver(setup: RaceDriverSetup): RaceDriver {
+  const plan = planFromRacingLine(
+    setup.track,
+    setup.line,
+    setup.envelope,
+    driverSkillFor(setup.skill),
+  );
+  return new RaceDriver({ plan, params: setup.params, skill: setup.skill });
 }

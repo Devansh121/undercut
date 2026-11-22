@@ -57,7 +57,7 @@ or 240 s after the flag.
 | Stop in the box | within 3 m along and 2.5 m across the box position, slower than 0.3 m/s | Estimate |
 | Service time | tyres 2.4 s, plus uniform 0–0.8 s per stop, seeded | Estimate: 2.0–2.5 s stationary times are typical |
 | Team-mates sharing a box | the second car waits until the first is serviced | As in the real pit lane |
-| Release | waits while a moving car in the lane is between 20 m behind and 5 m ahead of the box | Estimate (unsafe-release avoidance) |
+| Release | waits while a moving car in the lane is between 60 m behind and 5 m ahead of the box (60 m is about 2.7 s at 80 km/h, the time a car needs to leave its box) | Estimate (unsafe-release avoidance); was 20 m, which released cars into the path of cars coming down the lane |
 | Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish. A penalty awarded during a hold is not part of it: it stays outstanding for the next stop or the finish | [2]; the in-hold case is a decision |
 | Classified | 90 % of the winner's laps, whether or not the car took the flag | [2] |
 | Exact ties in the final classification | the order the cars took the flag (by time, then position before the tick), then the live order; never the car number | Decision |
@@ -123,10 +123,29 @@ A car stationary or making no progress for 60 s (from when it stopped) is retire
 except a human driver in time trial or practice: they keep the warning and can reset or
 restart, which puts them back in the session.
 
+A retired car (dnf or dsq) is parked out of the race where it stopped: it becomes a ghost that no
+other car touches and the AI drivers no longer see, so it can never block the road. It is not
+moved: a car lifted elsewhere could land on another car or a barrier. Before it retires, a car
+standing still in the road is an obstacle the AI drivers go round (`packages/ai`, race driver),
+except where the racing line sweeps across the road beside it (a chicane): there they stop 10 m
+behind it.
+
+A car standing still on the road with traffic held up behind it is a ghost too, for as long as
+it blocks: once a car within 60 m behind it (on the road, anywhere across it) has been held
+under 5 m/s for 6 s, the stopped car becomes a ghost and the cars behind drive on through it.
+Only the car at the head counts (no other car standing still within 40 m ahead of it). It is
+solid again once it moves off at over 5 m/s clear of every car, with no solid car behind it
+in an overlapping lane that would close the gap within 2 s at its closing speed. The drivers see
+it again, as traffic, as soon as it moves faster than 2 m/s, so the cars behind plan round it
+before it turns solid. The race screen draws a blocking ghost at half strength and tells the
+player when their own car is one. Only cars racing and under way
+count (not in the pit lane, not held by the pit crew, and not cars that have yet to move off the
+grid). The state is carried in `RaceSession.snapshot` (`blockers`).
+
 ## Snapshots and cost
 
 `RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 2) adds
-the world, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
+the world, the blocking-ghost state, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
 follower's path) and every search hint, so a session restored from it continues bit for bit
 (checked at the lights, mid-race, on the pit approach and mid-service).
 
@@ -139,19 +158,24 @@ per-tick path uses reused buffers and passes no loose numbers into calls that mi
 `AiController` wraps a racing driver from `packages/ai` (the reference driver on the circuit's
 racing line) with what a lap driver does not do: it holds the car on the grid, goes at lights
 out after its reaction time and launches with wheelspin control until it is past 25 m/s and its
-racing driver asks for full throttle, lifts (throttle at most 0.85) while shown a blue flag, and
+racing driver asks for full throttle, lifts (throttle at most 0.85) while shown a blue flag (its racing driver also moves off line to
+the side away from the car lapping it), and
 drives the pit lane: when asked in it turns for the pit lane 120 m before it leaves the lap,
 follows the lane at the limit (reaching it 15 m before the first line, 0.8 m/s under), stops in
-its box, waits while held and drives out to the track. The pit-lane driving is a plain path
+its box, waits while held and drives out to the track, where its racing driver takes over as the
+car leaves the pit-lane surface and rejoins off line while the traffic passes. A car knocked off
+its path short of its box (stopped 3 s, not held) gives the stop up, drives out and comes in
+again next lap. The pit-lane driving is a plain path
 follower (`PathFollower` in `packages/ai`); a player can have the same as an assist.
 
 ## Known gaps
 
-- Cars do not touch each other (no contact in the sim) and the AI has no racecraft: in a race
-  they drive through each other as ghosts. In the 20-car, 5-lap acceptance run all 20 converge
-  on the racing line into the first chicane: 38 car pairs overlap on lap 1, at most 30 at once,
-  and the order after lap 1 is the grid order. The racecraft slice must give the AI a sense of
-  the cars around it (keep a lane, brake for the car ahead, pick a gap) before contact is on.
+- Cars touch (car-to-car contact in the sim, planar boxes, no damage yet) and the AI races with the
+  racing driver of `packages/ai` (gap keeping, lanes, passing, blue flags, spin recovery). There is
+  no slipstream or dirty air yet, so passes come from pace differences and DRS; no active defending
+  (one move) yet. In the 20-car, 5-lap proof at Monza with one stop per car (seeds 1, 2, 3, 4, 17,
+  404): no watchdog findings, 18 to 20 of 20 clean through turn one, longest contact under 2 s,
+  6 to 13 on-track position changes per race.
 - Pit loss at Monza comes out at about 33.2 s against the published 24.3 s (physics-validation
   4.5). Most of it is the track file's speed-limit lines, 511 m apart (110 m from each end of the
   OpenStreetMap pit way), so about 23 s at 80 km/h; the follower's conservative approach and stop

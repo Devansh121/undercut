@@ -79,10 +79,15 @@ import {
   KeyboardAutopilot,
   ScriptedControlSource,
 } from './game/autopilot';
-import { GameLoop, type ControlSource } from './game/loop';
+import { GameLoop, MAX_TIME_SCALE, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
-import { DriveSession, TIME_TRIAL_FUEL, type SessionEvent } from './game/session';
+import {
+  DriveSession,
+  TIME_TRIAL_FUEL,
+  type QuickRaceOptions,
+  type SessionEvent,
+} from './game/session';
 import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
 import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
@@ -116,6 +121,10 @@ const ERS_MODE_LABEL: Record<number, string> = {
   [ErsMode.Overtake]: S.hud.ersModes.overtake,
 };
 const FRAME_LOG = 7200;
+/** A retired car fades out of the scene and off the map over this long, s. */
+const RETIRED_FADE_S = 3;
+/** A car that is a ghost for holding up traffic is drawn at this opacity. */
+const BLOCKING_GHOST_OPACITY = 0.5;
 
 /** The page's renderer, created by the first session and reused by every later one. */
 let pageRenderer: ReturnType<typeof createRenderer> | null = null;
@@ -184,7 +193,10 @@ export interface DriveOptions {
   touch: boolean;
   seed: number;
   today: string;
+  quickRace?: QuickRaceOptions;
   onQuit(): void;
+  /** Quick Race: start the same race again from the grid (the page rebuilds the session). */
+  onRestartRace?(): void;
   /** The player's car's sound (see game/audio-seam.ts); silent when absent. */
   onCarAudioState?: CarAudioSink;
   /** A short note for the pause menu about sound ('' when sound works). */
@@ -404,6 +416,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     seed: o.seed,
     record,
     today: o.today,
+    ...(o.quickRace ? { quickRace: o.quickRace } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
@@ -502,7 +515,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     TIMES_OF_DAY[o.timeOfDay ?? ''] ??
     MONZA_AFTERNOON;
   let quality = o.quality;
-  const loading = mountLoadingScreen(o.host, track.name, ext?.label ?? S.loading.timeTrial);
+  const modeLabel = ext?.label ?? (session.quickRace ? S.loading.quickRace : S.loading.timeTrial);
+  const loading = mountLoadingScreen(o.host, track.name, modeLabel);
   let view: RaceView;
   try {
     // Auto's saved pick may be a preset the offline cache does not hold: fall back to that one.
@@ -548,7 +562,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           compoundSlots: mediumInfo.slots,
         }
       : undefined;
-  const hud = new Hud(plan, hudIdentity, ext?.label ?? S.hud.timeTrial);
+  const hud = new Hud(
+    plan,
+    hudIdentity,
+    ext?.label ?? (session.quickRace ? S.hud.quickRace : S.hud.timeTrial),
+  );
   const results = new ResultsStrip();
   let quitting = false;
   let hudVisible = true;
@@ -557,10 +575,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     pilot.pilot.reset();
     resume();
   };
-  const intro = new Onboarding({
-    bindings: () => input.profile.bindings,
-    device: () => input.activeDevice,
-  });
+  // In a Quick Race the restart is the whole race, from the grid; a lap restart would teleport
+  // the player out of the race.
+  const restartRace = (): void => {
+    if (o.onRestartRace) o.onRestartRace();
+    else quit();
+  };
+  const intro = new Onboarding(
+    {
+      bindings: () => input.profile.bindings,
+      device: () => input.activeDevice,
+    },
+    session.quickRace,
+  );
   let autoQuality = o.autoQuality ?? false;
   // Rows at the end of the pause settings, so Resume, Restart and Reset stay in view.
   const commands: PauseCommand[] = [
@@ -617,7 +644,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   ];
   const actions = {
     resume: () => resume(),
-    ...(ext ? {} : { restartLap }),
+    ...(ext
+      ? {}
+      : session.quickRace
+        ? { restartLap: restartRace, restartLabel: S.pause.restartRace }
+        : { restartLap }),
     resetToTrack: () => {
       onEvents(loop.resetToTrack());
       resume();
@@ -845,6 +876,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
               say({ tag: S.hud.storage, text: S.hud.recordKept, tone: 'info' }, 4);
           });
           break;
+        case 'notice':
+          say({ tag: e.tag, text: e.text, tone: e.tone }, 4);
+          break;
         case 'invalidated':
           invalidReason = e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits;
           break;
@@ -906,6 +940,47 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // Frame loop.
   const pose = createCarPose();
   const ghostPose = createCarPose();
+  const fleetPoses = Array.from({ length: session.quickRace ? 19 : 0 }, createCarPose);
+  const fleetDrs = new Array<number>(fleetPoses.length).fill(0);
+  // A retired car is a ghost parked out of the race: it fades out of the scene and off the map.
+  const fleetOpacity = new Array<number>(fleetPoses.length).fill(1);
+  let playerWasGhost = false;
+  // The AI cars on the minimap, in their team's colour.
+  const fleetDots = fleetPoses.map((_, i) => ({
+    x: 0,
+    z: 0,
+    colour: (all[(i + 1) % all.length] ?? playerLivery).primary,
+    opacity: 1,
+  }));
+  const raceStatus = document.createElement('div');
+  raceStatus.className = 'panel race-status';
+  raceStatus.dataset.testid = 'race-status';
+  // After the player's flag: the field is still finishing; skip runs the race to its end at
+  // the fastest time scale.
+  const skipResults = document.createElement('button');
+  skipResults.type = 'button';
+  skipResults.className = 'button';
+  skipResults.dataset.testid = 'skip-results';
+  skipResults.textContent = S.pause.skipToResults;
+  skipResults.hidden = true;
+  skipResults.style.pointerEvents = 'auto';
+  let skippingToResults = false;
+  // The race readout is text that changes a few times a second at most: rebuilt at 4 Hz (and at
+  // once when the result comes in), not every frame.
+  const STATUS_PERIOD = 0.25;
+  let statusClock = STATUS_PERIOD;
+  let statusHadResult = false;
+  skipResults.addEventListener('click', () => {
+    skippingToResults = true;
+    loop.timeScale = MAX_TIME_SCALE;
+    skipResults.hidden = true;
+  });
+  if (session.quickRace) {
+    const control = hud.root.querySelector('.hud-control') ?? o.host;
+    control.append(raceStatus, skipResults);
+    hud.root.dataset.mode = 'race';
+  }
+
   const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
@@ -954,6 +1029,106 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     stopped: false,
     message: null,
   };
+
+  /** The race readout as lines, and which line is the player's own (−1: none). */
+  /**
+   * The readout, one element per line, rebuilt only when it changes. In the standings the
+   * player's own row is marked and kept in view (a landscape phone shows eight rows); a fade at
+   * the bottom edge says there are more.
+   */
+  let statusKey = '';
+  let statusPlayer = -1;
+  function showRaceStatus(): void {
+    const { lines, player } = raceStatusLines();
+    const key = lines.join('\n');
+    if (key !== statusKey) {
+      statusKey = key;
+      raceStatus.replaceChildren(
+        ...lines.map((text, i) => {
+          const div = document.createElement('div');
+          div.className = i === 0 && lines.length > 1 ? 'race-status__head' : 'race-status__row';
+          if (i === player) div.classList.add('is-player');
+          div.textContent = text;
+          return div;
+        }),
+      );
+      // Into view once per standings (when the player's row moves), not against the reader's
+      // own scrolling every rebuild.
+      if (player > 0 && player !== statusPlayer) {
+        const el = raceStatus.children[player] as HTMLElement | undefined;
+        if (el) {
+          // Just into view, under the heading (which stays put).
+          const head = (raceStatus.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+          const bottom = el.offsetTop + el.offsetHeight - raceStatus.clientHeight + 8;
+          const top = el.offsetTop - head - 8;
+          if (raceStatus.scrollTop < bottom) raceStatus.scrollTop = bottom;
+          else if (raceStatus.scrollTop > top) raceStatus.scrollTop = Math.max(0, top);
+        }
+      }
+      statusPlayer = player;
+    }
+    const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
+    raceStatus.toggleAttribute('data-more', more);
+  }
+
+  function raceStatusLines(): { lines: string[]; player: number } {
+    const c = session.race.control;
+    const standings = c.standings();
+    const row = standings.find((r) => r.car === 0);
+    const totalLaps = o.quickRace?.laps ?? 5;
+    const lap = Math.max(1, Math.min(session.timer.lap, totalLaps));
+    const gapText =
+      row && row.position > 1
+        ? row.lapsDown > 0
+          ? ` · +${row.lapsDown}L`
+          : row.gap !== null
+            ? ` · +${row.gap.toFixed(1)}s`
+            : ''
+        : '';
+    if (session.result) {
+      const entries = session.result.entries;
+      return {
+        lines: [
+          'Race result',
+          ...entries.map((e) => {
+            const g =
+              e.gap === null
+                ? ''
+                : 'laps' in e.gap
+                  ? `  +${e.gap.laps}L`
+                  : `  +${e.gap.time.toFixed(3)}s`;
+            return `${e.position}  ${e.code}  ${e.status}${g}`;
+          }),
+        ],
+        player: 1 + entries.findIndex((e) => e.car === 0),
+      };
+    }
+    if (session.playerFinished) {
+      return {
+        lines: [
+          `Chequered flag · P${row?.position ?? 20} · provisional`,
+          ...standings.map((r) => {
+            const code = session.race.entrants[r.car]?.code ?? '';
+            const state =
+              r.status === 'running'
+                ? `racing, lap ${Math.min(r.lap, totalLaps)}`
+                : r.status === 'finished'
+                  ? 'finished'
+                  : r.status;
+            return `${r.position}  ${code}  ${state}`;
+          }),
+        ],
+        player: 1 + standings.findIndex((r) => r.car === 0),
+      };
+    }
+    const line =
+      c.phase === 'grid'
+        ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
+        : c.phase === 'lights'
+          ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
+          : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+    return { lines: [line], player: -1 };
+  }
 
   const frame = (): void => {
     const now = performance.now();
@@ -1008,7 +1183,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         braking: car.brakeApplied > 0.1,
         invalid: !session.timer.valid,
         paused: session.phase === 'paused',
-        laps: lapsDone,
+        // (In a race the lap events are the race's: its timer counts the laps.)
+        laps: session.quickRace ? session.race.control.timer(0).lapsCompleted : lapsDone,
       });
     }
     const playing = session.phase === 'running';
@@ -1037,6 +1213,55 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             0,
             Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
           );
+    if (session.quickRace) {
+      fleetPoses.forEach((p, i) => {
+        const c = session.race.worldCar(i + 1);
+        interpolateCarPose(c.previousPose, c.pose, loop.alpha, p);
+        fleetDrs[i] = c.state.drsPosition;
+        const status = session.race.control.cars[i + 1]!.status;
+        const retired = status === 'dnf' || status === 'dsq';
+        // A car that is a ghost for holding up traffic is drawn at half strength while it is
+        // one, so the cars passing through it read as the rule they are.
+        const goal = retired ? 0 : session.race.blockingGhost(i + 1) ? BLOCKING_GHOST_OPACITY : 1;
+        const step = dt / RETIRED_FADE_S;
+        const now = fleetOpacity[i]!;
+        fleetOpacity[i] = now > goal ? Math.max(goal, now - step) : Math.min(goal, now + step);
+        const dot = fleetDots[i]!;
+        dot.x = p.x;
+        dot.z = p.z;
+        dot.opacity = fleetOpacity[i]!;
+      });
+      view.setRaceCars(fleetPoses, fleetDrs, fleetOpacity);
+      // The player's own car: a notice when it becomes a ghost and when it is solid again.
+      const playerGhost = session.race.blockingGhost(0);
+      if (playerGhost !== playerWasGhost) {
+        playerWasGhost = playerGhost;
+        say(
+          {
+            tag: S.hud.ghost,
+            text: playerGhost ? S.hud.blockingGhostOn : S.hud.blockingGhostOff,
+            tone: 'info',
+          },
+          3,
+        );
+      }
+      skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
+      // After the player's flag, or any final result (a retirement too), the standings take the
+      // screen; the driving cluster is done.
+      const finished = session.playerFinished || session.result !== null;
+      hud.root.toggleAttribute('data-finished', finished);
+      document.documentElement.toggleAttribute('data-race-finished', finished);
+      if (session.result && skippingToResults) {
+        skippingToResults = false;
+        loop.timeScale = 1;
+      }
+      statusClock += dt;
+      if (statusClock >= STATUS_PERIOD || (session.result !== null) !== statusHadResult) {
+        statusClock = 0;
+        statusHadResult = session.result !== null;
+        showRaceStatus();
+      }
+    }
     view.setDrivingLine(session.assists.racingLine ?? 'off');
     view.render({
       pose,
@@ -1125,8 +1350,29 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         session.world.time > 2 &&
         t.speed < 1.5 &&
         session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      if (session.quickRace) {
+        // A race has no out lap, no lap invalidation (track limits are strikes, shown as
+        // notices) and no time-trial record or ghost.
+        h.lap = Math.max(1, Math.min(timer.lap, o.quickRace?.laps ?? 5));
+        h.valid = true;
+        h.record = null;
+        h.liveDelta = null;
+        h.ghost = false;
+        // After the flag (or a retirement) the clock stops: the last lap's time stands, and the
+        // cooldown lap is not timed.
+        if (session.playerFinished || session.result !== null) {
+          h.running = timer.lastLap !== null;
+          h.lapTime = timer.lastLap ?? 0;
+          for (const slot of h.sectors) {
+            slot.state = 'none';
+            slot.time = null;
+            slot.delta = null;
+          }
+        }
+      }
       h.message = message;
       if (others) h.others = others;
+      else if (session.quickRace) h.others = fleetDots;
       hud.update(h);
     }
     overlay?.update();
@@ -1292,6 +1538,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.quit();
     ext?.detach?.();
     overlay?.destroy();
+    document.documentElement.removeAttribute('data-race-finished');
     phone?.destroy();
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     view.dispose();
@@ -1366,7 +1613,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     pause: doPause,
     resume,
     restartLap: () => {
-      if (!ext) restartLap();
+      if (!ext && !session.quickRace) restartLap();
     },
     resetToTrack: actions.resetToTrack,
     teleport: (s, d, speed) => {
@@ -1380,7 +1627,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         setSource('script');
       }
     },
-    autopilot: (on) => setSource(on ? 'pilot' : 'human'),
+    autopilot: (on) => {
+      if (session.quickRace) session.scriptedRaceDriver = on;
+      else setSource(on ? 'pilot' : 'human');
+    },
     clumsyPilot: (seed) => {
       if (source === 'clumsy') setSource('human');
       clumsy = new AutopilotControlSource(
@@ -1425,7 +1675,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       view.setDrivingLine(session.assists.racingLine ?? 'off');
       view.setSkyProbe(null);
       view.setCamera('chase-near');
-      if (!ext) restartLap();
+      if (!ext && !session.quickRace) restartLap();
       results.hide();
       message = null;
     },

@@ -53,7 +53,7 @@ export {
   type RaceRules,
 } from './rules';
 export type { PitPhase } from './systems/pit';
-export { createAiField, type AiFieldOptions } from './session/ai-field';
+export { JUMP_START_CHANCE, createAiField, type AiFieldOptions } from './session/ai-field';
 export {
   AiController,
   InputController,

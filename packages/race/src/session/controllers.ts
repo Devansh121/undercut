@@ -1,5 +1,19 @@
-import { PathFollower, type Driver, type DriverMemory, type FollowerState } from '@undercut/ai';
-import { NEUTRAL_INPUT, type CarParams, type CarTelemetry, type ControlInput } from '@undercut/sim';
+import {
+  PathFollower,
+  createTrafficCar,
+  createTrafficView,
+  type Driver,
+  type DriverMemory,
+  type FollowerState,
+  type TrafficView,
+} from '@undercut/ai';
+import {
+  BODY_HALF_WIDTH,
+  NEUTRAL_INPUT,
+  type CarParams,
+  type CarTelemetry,
+  type ControlInput,
+} from '@undercut/sim';
 import type { Track } from '@undercut/track';
 import type { CircuitInfo } from '../circuit';
 import type { RaceControl } from '../control';
@@ -27,6 +41,17 @@ export interface ControlContext {
   readonly control: RaceControl;
   readonly track: Track;
   readonly circuit: CircuitInfo;
+  /**
+   * Every car's facts, this one's included (index = car number): where the others are, as a
+   * driver sees them from the cockpit and the mirrors. Racing drivers read it; humans ignore it.
+   */
+  readonly field: readonly CarFacts[];
+  /**
+   * Cars the drivers do not see this tick (index = car number): retired, parked out of the
+   * race as ghosts, or standing still as a ghost for holding up traffic (see `RaceSession`).
+   * A blocking ghost that moves off is seen again, as traffic, before it turns solid.
+   */
+  readonly unseen: readonly boolean[];
 }
 
 export interface CarController {
@@ -46,15 +71,27 @@ export interface ControllerState {
   driver?: DriverMemory;
   launching?: boolean;
   launchCap?: number;
+  /** Sim time the fifth light came on (a jump start counts from it), or null. */
+  fifthAt?: number | null;
   pit?: PitLaneState | null;
 }
 
 interface PitLaneState {
   mode: 'none' | 'in' | 'out';
   follower: FollowerState;
+  /** Seconds stopped in the lane short of the box (bumped off the path), s. */
+  still?: number;
 }
 
+/** Half a car's length, m (5.6 m nose to tail). */
+const CAR_HALF_LENGTH = 2.8;
+/** Seconds stopped short of the box before a car gives the stop up and drives out. */
+const PIT_STALL = 3;
+/** How far past the track edge a car in the pit lane still counts as traffic, m. */
+const PIT_SEEN = 3;
+
 function hold(out: ControlInput, steer = 0): void {
+  out.wheelBrake = undefined;
   out.steer = steer;
   out.throttle = 0;
   out.brake = 1;
@@ -80,23 +117,30 @@ class PitLaneDriving {
   mode: PitMode = 'none';
   /** Metres before the pit lane leaves the lap at which the car turns for it. */
   readonly takeover: number;
+  private still = 0;
 
-  constructor(params: CarParams, takeover = 120) {
+  /** Hand the car back as soon as it leaves the pit lane (a racing driver that can rejoin). */
+  readonly handBackOnExit: boolean;
+
+  constructor(params: CarParams, takeover = 120, handBackOnExit = false) {
     this.follower = new PathFollower(params);
     this.takeover = takeover;
+    this.handBackOnExit = handBackOnExit;
   }
 
   reset(): void {
     this.mode = 'none';
+    this.still = 0;
     this.follower.reset();
   }
 
   getState(): PitLaneState {
-    return { mode: this.mode, follower: this.follower.getState() };
+    return { mode: this.mode, follower: this.follower.getState(), still: this.still };
   }
 
   setState(s: PitLaneState): void {
     this.mode = s.mode;
+    this.still = s.still ?? 0;
     this.follower.setState(s.follower);
   }
 
@@ -128,11 +172,26 @@ class PitLaneDriving {
         }
       }
     }
+    // Stopped in the lane short of the box and not held (knocked off the path by another car):
+    // drive on out, and come in again next lap.
+    const stopped = this.mode === 'in' && phase === 'lane' && ctx.telemetry.speed < 0.5;
+    this.still = stopped ? this.still + ctx.dt : 0;
+    if (this.still > PIT_STALL) {
+      this.still = 0;
+      this.mode = 'out';
+      this.follower.reset();
+      this.follower.setPath(pitOutPath(ctx.track, ctx.circuit, f.pitS, f.pitD), false);
+    }
     if (this.mode === 'in' && phase === 'lane' && !c.pitRequested(i)) {
       // Missed the box (or the stop was cancelled): drive on out.
       this.mode = 'out';
       this.follower.reset();
       this.follower.setPath(pitOutPath(ctx.track, ctx.circuit, f.pitS, 0), false);
+    }
+    // Off the pit-lane surface the car is back on the lap: the driver takes over there (a racing
+    // driver rejoins off line while the traffic passes; the follower would slow it on the lap).
+    if (this.mode === 'out' && phase === 'none' && !f.inPitLane && this.handBackOnExit) {
+      this.mode = 'none';
     }
     if (this.mode === 'out' && phase === 'none' && !f.inPitLane && this.follower.remaining() < 2) {
       this.mode = 'none';
@@ -153,6 +212,11 @@ export interface AiControllerOptions {
   launchSpeed?: number;
   /** Throttle kept under a blue flag (lifting to let the faster car by). */
   blueThrottle?: number;
+  /**
+   * A jump start: the driver goes this long after the fifth light comes on, whether or not the
+   * lights are out yet (null: never; the field draws it with a small seeded chance).
+   */
+  jumpAfter?: number | null;
 }
 
 /**
@@ -172,15 +236,19 @@ export class AiController implements CarController {
   private readonly launchSpeed: number;
   private readonly blueThrottle: number;
   private readonly race: ControlInput = { ...NEUTRAL_INPUT };
+  readonly jumpAfter: number | null;
+  private readonly traffic: TrafficView = createTrafficView(0);
   private launching = true;
   private launchCap = 0.6;
+  private fifthAt: number | null = null;
 
   constructor(o: AiControllerOptions) {
     this.driver = o.driver;
     this.reaction = o.reaction;
-    this.pit = new PitLaneDriving(o.params);
+    this.pit = new PitLaneDriving(o.params, 120, o.driver.sense !== undefined);
     this.launchSpeed = o.launchSpeed ?? 25;
     this.blueThrottle = o.blueThrottle ?? 0.85;
+    this.jumpAfter = o.jumpAfter ?? null;
   }
 
   reset(): void {
@@ -193,6 +261,7 @@ export class AiController implements CarController {
       driver: this.driver.snapshot(),
       launching: this.launching,
       launchCap: this.launchCap,
+      fifthAt: this.fifthAt,
       pit: this.pit.getState(),
     };
   }
@@ -202,13 +271,69 @@ export class AiController implements CarController {
     this.driver.restore(s.driver);
     this.launching = s.launching === true;
     this.launchCap = s.launchCap ?? this.launchCap;
+    this.fifthAt = s.fifthAt ?? null;
     this.pit.setState(s.pit);
+  }
+
+  /** The cars around this one, from the field's facts, for a racing driver. */
+  private sense(ctx: ControlContext): void {
+    const driver = this.driver;
+    if (!driver.sense) return;
+    const view = this.traffic;
+    const field = ctx.field;
+    while (view.cars.length < field.length) view.cars.push(createTrafficCar());
+    const me = ctx.facts;
+    view.self.id = ctx.car;
+    view.self.s = me.s;
+    view.self.d = me.d;
+    view.self.speed = me.speed;
+    let n = 0;
+    const track = ctx.track;
+    for (let j = 0; j < field.length; j++) {
+      const f = field[j]!;
+      if (j === ctx.car) continue;
+      // A ghost (a retired car parked out of the race, or a stopped car the queue behind it
+      // drives through) is no traffic until it moves off again.
+      if (ctx.unseen[j]) continue;
+      // A car in the pit lane is seen only where the lane meets the track (entry and exit):
+      // behind the pit wall it is no traffic.
+      if (f.inPitLane) {
+        const edge = track.halfWidthAt(track.wrap(f.s), f.d >= 0 ? 0 : 1);
+        if (Math.abs(f.d) > edge + PIT_SEEN) continue;
+      }
+      const c = view.cars[n++]!;
+      c.id = j;
+      c.s = f.s;
+      c.d = f.d;
+      c.speed = f.speed;
+      // The footprint across the track: half its width aligned, up to half its length across.
+      const h = f.heading;
+      c.halfWidth =
+        CAR_HALF_LENGTH * Math.abs(Math.sin(h)) + BODY_HALF_WIDTH * Math.abs(Math.cos(h));
+    }
+    view.count = n;
+    const c = ctx.control;
+    view.blueBy = c.blueFlag(ctx.car);
+    view.blueFlag = view.blueBy >= 0;
+    const out0 = c.lightsOutAt;
+    view.active =
+      (c.phase === 'green' || c.phase === 'chequered') &&
+      c.cars[ctx.car]!.status === 'running' &&
+      !c.held(ctx.car) &&
+      this.pit.mode === 'none' &&
+      c.pitPhase(ctx.car) === 'none' &&
+      (out0 === null || ctx.time >= out0 + this.reaction);
+    view.launching = this.launching && out0 !== null;
+    driver.sense(view);
   }
 
   control(ctx: ControlContext, out: ControlInput): void {
     const c = ctx.control;
     const i = ctx.car;
     const tel = ctx.telemetry;
+    // AI drivers never set the per-wheel brake (only the player's stability assist does).
+    out.wheelBrake = undefined;
+    this.sense(ctx);
     this.driver.drive(tel, ctx.dt, this.race);
     const phase = c.phase;
     const status = c.cars[i]!.status;
@@ -216,12 +341,21 @@ export class AiController implements CarController {
       hold(out);
       return;
     }
-    if (phase === 'grid' || phase === 'lights') {
-      hold(out);
-      return;
-    }
     const out0 = c.lightsOutAt;
-    if (out0 !== null && ctx.time < out0 + this.reaction) {
+    let jumping = false;
+    if (phase === 'grid' || phase === 'lights') {
+      if (phase === 'lights' && c.lightsCount >= 5 && this.fifthAt === null) {
+        this.fifthAt = ctx.time;
+      }
+      jumping =
+        this.jumpAfter !== null &&
+        this.fifthAt !== null &&
+        ctx.time >= this.fifthAt + this.jumpAfter;
+      if (!jumping) {
+        hold(out);
+        return;
+      }
+    } else if (out0 !== null && ctx.time < out0 + this.reaction) {
       hold(out);
       return;
     }
@@ -230,14 +364,18 @@ export class AiController implements CarController {
       return;
     }
     Object.assign(out, this.race);
-    if (this.launching && out0 !== null) {
+    if (this.launching && (out0 !== null || jumping)) {
       // Launch from rest: the racing driver's steering and gears, throttle held under the
-      // grip of the driven wheels until it asks for full throttle itself at speed.
+      // grip of the driven wheels until it asks for full throttle itself at speed. A car ahead
+      // still has the last word on the pedals.
       const slip = Math.max(tel.slipRatio[2] ?? 0, tel.slipRatio[3] ?? 0);
       if (slip > 0.12) this.launchCap = Math.max(0.1, this.launchCap - 4 * ctx.dt);
       else this.launchCap = Math.min(1, this.launchCap + 1.5 * ctx.dt);
       if (tel.speed > this.launchSpeed && (this.race.throttle > 0.9 || this.race.brake > 0)) {
         this.launching = false;
+      } else if (this.driver.following) {
+        out.throttle = Math.min(this.race.throttle, this.launchCap);
+        if (tel.gear < 1) out.gearShift = 1;
       } else {
         out.throttle = this.launchCap;
         out.brake = 0;

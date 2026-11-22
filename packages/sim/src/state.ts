@@ -136,6 +136,14 @@ export class CarState {
    */
   readonly tyreDamping = new Float64Array(4);
   plankForce = 0;
+  /**
+   * Car-to-car contact on the last step (`car-contact.ts`), outputs like the two above: the
+   * total impulse other cars gave this one, N·s, the largest closing speed at a contact, m/s,
+   * and how many cars it touched. For damage and audio later.
+   */
+  carContactImpulse = 0;
+  carContactSpeed = 0;
+  carContacts = 0;
 
   constructor(model: CarModel) {
     this.model = model;

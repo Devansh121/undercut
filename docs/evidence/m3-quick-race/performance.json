@@ -1,0 +1,50 @@
+[
+  {
+    "name": "desktop",
+    "quality": "high",
+    "grid": true,
+    "frames": 158,
+    "medianMs": 17.5,
+    "p95Ms": 29.100000023841858,
+    "stats": {
+      "calls": 459,
+      "triangles": 2572813,
+      "geometries": 123,
+      "textures": 79,
+      "textureMiB": 380.7,
+      "pixelRatio": 1,
+      "renderScale": 1,
+      "gpuMs": 8.17,
+      "width": 1920,
+      "height": 1080,
+      "cars": 20,
+      "renderPath": "hdr",
+      "environmentBakes": 1,
+      "quality": "high"
+    }
+  },
+  {
+    "name": "phone",
+    "quality": "mobile",
+    "grid": true,
+    "frames": 173,
+    "medianMs": 16.600000023841858,
+    "p95Ms": 24.19999998807907,
+    "stats": {
+      "calls": 128,
+      "triangles": 616347,
+      "geometries": 75,
+      "textures": 49,
+      "textureMiB": 84.7,
+      "pixelRatio": 1,
+      "renderScale": 1,
+      "gpuMs": 4.26,
+      "width": 844,
+      "height": 390,
+      "cars": 20,
+      "renderPath": "hdr",
+      "environmentBakes": 1,
+      "quality": "mobile"
+    }
+  }
+]

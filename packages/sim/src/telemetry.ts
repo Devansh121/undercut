@@ -56,6 +56,13 @@ export interface CarTelemetry {
   z: number;
   yaw: number;
   distance: number;
+  /**
+   * Contact with other cars on the last step: how many it touched, the total impulse they gave
+   * it, N·s, and the largest closing speed at a contact, m/s. For damage and audio.
+   */
+  carContacts: number;
+  carContactImpulse: number;
+  carContactSpeed: number;
   /** Largest speed into a barrier at a contact on the last step, m/s; 0 when nothing hit. */
   wallImpact: number;
   /** A body corner is touching a barrier. */
@@ -99,6 +106,9 @@ export function createCarTelemetry(): CarTelemetry {
     z: 0,
     yaw: 0,
     distance: 0,
+    carContacts: 0,
+    carContactImpulse: 0,
+    carContactSpeed: 0,
     wallImpact: 0,
     wallContact: false,
   };
@@ -147,6 +157,9 @@ export function readCarTelemetry(
   out.z = state.z;
   out.yaw = state.yaw;
   out.distance = state.distance;
+  out.carContacts = state.carContacts;
+  out.carContactImpulse = state.carContactImpulse;
+  out.carContactSpeed = state.carContactSpeed;
   out.wallImpact = state.wallImpactSpeed;
   out.wallContact = state.wallContact !== 0;
   return out;

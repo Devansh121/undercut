@@ -47,6 +47,16 @@ export async function startTimeTrial(page: Page): Promise<void> {
 }
 
 /**
+ * From the launch screen through the main menu into a Quick Race at Monza (real clicks). Waits
+ * for the loading to begin, not for the session.
+ */
+export async function startQuickRace(page: Page): Promise<void> {
+  await openMenu(page);
+  await page.locator('[data-action=mode-quickRace]').click();
+  await page.locator('[data-action=start]').click();
+}
+
+/**
  * Load the launch screen with the debug API and start Time Trial with real clicks, without the
  * circuit's surroundings (`world=lite`): the full world is tested once, in world-dressing.spec.ts,
  * and its start-up cost on the GPU (`npm run shots -- monza --perf`).

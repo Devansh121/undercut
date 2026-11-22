@@ -21,12 +21,17 @@ declare global {
     };
     onlineSettings(patch: Record<string, unknown>): boolean;
     start(): Promise<void>;
+    startQuickRace(
+      laps?: number,
+      options?: { gridPosition?: number; skillSpread?: number; fieldStartDelay?: number },
+    ): Promise<void>;
     state(): Record<string, unknown>;
     telemetry(): Record<string, unknown>;
     teleport(s: number, d?: number, kmh?: number): void;
     setTimeScale(scale: number): void;
     drive(control: Record<string, number | boolean> | null): void;
     autopilot(on: boolean): void;
+    raceDriver(on: boolean): void;
     /** The keyboard autopilot as a clumsy player, mistakes seeded. */
     clumsyPilot(seed: number): void;
     camera(name?: string): string;
