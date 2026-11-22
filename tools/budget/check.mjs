@@ -7,10 +7,13 @@
 // - JS: the JavaScript the game can load, as sent (the input lab and the unused copies of the
 //   Draco decoder that three.js's loader drags into the bundle are not counted).
 // - First-race transfer, per quality preset: what a player downloads from opening the page to the
-//   first frame of a race at Monza on that preset. The page, code, styles and fonts; the asset
+//   first frame of a race at Monza on that preset. The page, code, styles and fonts (and the menu's
+//   team car images, all of them, though the menu shows one at a time); the asset
 //   index; the sky and every track texture set at the preset's tiers
 //   (packages/render/src/presets.json, apps/web/dist/assets/index.json); the car levels of detail
-//   the preset loads and every livery mask (a full grid wears all of them); the Draco decoder.
+//   the preset loads and every livery mask (a full grid wears all of them); the Draco decoder;
+//   the catalogue props the world places (packages/render/data/world-props.json) at the levels
+//   the preset loads.
 //   The largest preset must fit the budget.
 //
 // The inventory (path → bytes sent, per preset) is written to apps/web/dist/first-race.json; a
@@ -77,13 +80,15 @@ function sent(rel) {
   return sentCache.has(rel) ? sentCache.get(rel) : null;
 }
 // Build outputs the game loads: everything outside assets/{tex,env,car,draco,props} and the asset
-// index, except source maps, the input lab and the bundler's unused Draco decoder copies.
+// index, except source maps, the diagnostic pages (input lab, UI gallery) and the bundler's unused
+// Draco decoder copies.
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
     !/^assets\/(tex|env|car|draco|props)\//.test(f) &&
     f !== 'assets/index.json' &&
     !/input-?lab/i.test(f) &&
+    !/ui-?gallery/i.test(f) &&
     !/^assets\/draco_(decoder|wasm_wrapper)-/.test(f),
 );
 const index = JSON.parse(fs.readFileSync(path.join(dist, 'assets/index.json'), 'utf8'));
@@ -93,6 +98,12 @@ const draco = all.filter((f) => f.startsWith('assets/draco/'));
 let jsSent = 0;
 for (const f of code) if (/\.m?js$/.test(f)) jsSent += sent(f) ?? 0;
 
+const propCatalogue = JSON.parse(
+  fs.readFileSync(path.join(root, 'packages/render/data/props.catalog.json'), 'utf8'),
+);
+const worldPropIds = JSON.parse(
+  fs.readFileSync(path.join(root, 'packages/render/data/world-props.json'), 'utf8'),
+).ids;
 const mb = (n) => `${(n / 1024 / 1024).toFixed(2)} MiB`;
 let failed = false;
 const missing = [];
@@ -105,7 +116,14 @@ for (const [name, q] of Object.entries(presets)) {
   for (const t of Object.values(index.textures))
     for (const f of Object.values(t[q.textureTier])) files.add(`assets/${f}`);
   for (const lod of new Set([...q.carLods, q.playerLod])) files.add(`assets/${CAR_FILES[lod]}`);
-  const groups = { code: 0, sky: 0, textures: 0, car: 0, draco: 0, other: 0 };
+  // The catalogue props the world places, at the levels this preset loads (catalog.ts).
+  for (const entry of propCatalogue.props) {
+    if (!worldPropIds.includes(entry.id)) continue;
+    const light = entry.lods.filter((l) => !/_high\.glb$/i.test(l.file));
+    const lods = (name === 'mobile' || name === 'lite') && light.length > 0 ? light : entry.lods;
+    for (const l of lods) files.add(l.file);
+  }
+  const groups = { code: 0, sky: 0, textures: 0, car: 0, props: 0, draco: 0, menu: 0, other: 0 };
   let total = 0;
   const inventory = {};
   for (const f of files) {
@@ -122,11 +140,15 @@ for (const [name, q] of Object.entries(presets)) {
         ? 'textures'
         : /assets\/car\//.test(f)
           ? 'car'
-          : /assets\/draco\//.test(f)
-            ? 'draco'
-            : code.includes(f)
-              ? 'code'
-              : 'other';
+          : /assets\/props\//.test(f)
+            ? 'props'
+            : /assets\/draco\//.test(f)
+              ? 'draco'
+              : /assets\/ui\//.test(f)
+                ? 'menu'
+                : code.includes(f)
+                  ? 'code'
+                  : 'other';
     groups[g] += n;
   }
   results.push({ name, total, groups, inventory });
@@ -162,19 +184,8 @@ fs.writeFileSync(
     2,
   )}\n`,
 );
-const propCatalogue = JSON.parse(
-  fs.readFileSync(path.join(root, 'packages/render/data/props.catalog.json'), 'utf8'),
-);
-// Reserve every prop LOD until the dressing consumer defines the fetched subset. Keep the
-// first-race inventory exact: these files are delivered but not loaded by the game yet.
-const propReserve = propCatalogue.totalBytes;
 const checks = [
   ['JS, as sent', jsSent, budget.jsGzipMaxBytes],
-  [
-    'First race plus complete prop kit reserve',
-    worst.total + propReserve,
-    budget.firstRaceTransferMaxBytes,
-  ],
   [
     `First-race transfer (${worst.name}, the largest preset)`,
     worst.total,

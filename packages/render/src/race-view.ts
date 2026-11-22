@@ -49,7 +49,12 @@ import {
   type DrivingLineState,
 } from './driving-line';
 import { estimateRacingLine } from './racing-line';
-import { TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
+import { GRASS_COLOUR, TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
+import { isDressingFile, type DressingFile } from './world/dressing';
+import { PropKitAssets, isPropCatalog } from './props/catalog';
+import type { BrandSpec } from './world/brands';
+import type { GarageTeam } from './world/pit-building';
+import { CircuitWorld } from './world/world';
 
 /**
  * The page's one WebGL renderer. Sessions come and go but the renderer (and its GL context and
@@ -116,6 +121,26 @@ export interface RaceViewOptions {
   dracoPath: string;
   toneMap?: ToneMap;
   onProgress?: (p: Progress) => void;
+  /**
+   * URL of the circuit's dressing file (packages/render/data/<id>.dressing.json): the terrain,
+   * woods, buildings and stands around it. Without it the circuit sits on the track package's
+   * own ground grid.
+   */
+  dressingUrl?: string | null;
+  /** Team names/codes/colours for garage boards, pit-wall canopies and pit crew. */
+  garageTeams?: readonly GarageTeam[];
+  /** Invented brands for trackside hoardings and bridge banners. */
+  brands?: readonly BrandSpec[];
+  /**
+   * The prop catalogue (packages/render/data/props.catalog.json) when the build has one: its
+   * models replace the world's procedural stand-ins kind by kind. Absent or invalid: stand-ins.
+   */
+  propCatalog?: unknown;
+  /**
+   * 'lite' gives any preset the Lite preset's world, which loads no dressing (the track
+   * package's own ground): for software-WebGL tests of other things than the world.
+   */
+  worldDetail?: 'preset' | 'lite';
 }
 
 /** Everything the view needs for one frame, already interpolated by the game loop. */
@@ -173,6 +198,8 @@ export interface SessionAssets {
   sky: { meta: SkyMeta; image: ImageBitmap };
   sets: Record<TrackTextureId, PbrSet>;
   car: CarAssets;
+  dressing: DressingFile | null;
+  propKit: PropKitAssets | null;
 }
 
 /**
@@ -189,6 +216,8 @@ export class RaceView {
   readonly environment: Environment;
   private readonly canvas: HTMLCanvasElement;
   private readonly trackView: TrackView;
+  /** The place around the circuit, when the session has a dressing file. */
+  readonly world: CircuitWorld | null;
   private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
@@ -271,12 +300,33 @@ export class RaceView {
       }),
     );
     const carP = CarAssets.load(loader, q, teams, options.dracoPath);
-    // Settle all three before deciding: a car that finishes after another file failed is
+    // Lite (and `worldDetail: 'lite'`) loads no dressing: the track package's own ground.
+    const worldQ = options.worldDetail === 'lite' ? QUALITY.lite.world : q.world;
+    const dressingUrl = worldQ.enabled ? options.dressingUrl : null;
+    const dressingP = dressingUrl
+      ? loader.json<unknown>(dressingUrl).then((d) => {
+          if (!isDressingFile(d)) throw new Error('not a dressing file');
+          return d;
+        })
+      : Promise.resolve(null);
+    // The prop kit is only placed with the structures.
+    const kitP =
+      dressingUrl && worldQ.structures && isPropCatalog(options.propCatalog)
+        ? PropKitAssets.load(loader, options.propCatalog, q, options.dracoPath)
+        : Promise.resolve(null);
+    // Settle all of them before deciding: a car that finishes after another file failed is
     // released here, never left behind.
-    const [skyR, setR, carR] = await Promise.allSettled([skyP, setP, carP]);
-    const failure = [skyR, setR, carR].find((r) => r.status === 'rejected');
+    const [skyR, setR, carR, dressingR, kitR] = await Promise.allSettled([
+      skyP,
+      setP,
+      carP,
+      dressingP,
+      kitP,
+    ]);
+    const failure = [skyR, setR, carR, dressingR, kitR].find((r) => r.status === 'rejected');
     if (failure) {
       if (carR.status === 'fulfilled') carR.value.dispose();
+      if (kitR.status === 'fulfilled') kitR.value?.dispose();
       throw (failure as PromiseRejectedResult).reason;
     }
     const skyImage = (skyR as PromiseFulfilledResult<ImageBitmap>).value;
@@ -284,13 +334,19 @@ export class RaceView {
     const car = (carR as PromiseFulfilledResult<CarAssets>).value;
     const sets = {} as Record<TrackTextureId, PbrSet>;
     for (const [id, img] of setImages) sets[id] = pbrSet(img, img.sizeM, q.anisotropy);
-    return { index, sky: { meta: skyMeta, image: skyImage }, sets, car };
+    const dressing = (dressingR as PromiseFulfilledResult<DressingFile | null>).value;
+    const propKit = (kitR as PromiseFulfilledResult<PropKitAssets | null>).value;
+    return { index, sky: { meta: skyMeta, image: skyImage }, sets, car, dressing, propKit };
   }
 
   constructor(canvas: HTMLCanvasElement, options: RaceViewOptions, assets: SessionAssets) {
     this.canvas = canvas;
     // The preset as this GPU can run it (no renderable half float: the direct path).
-    this.quality = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
+    const preset = effectiveQuality(QUALITY[options.quality], renderCapabilities(options.renderer));
+    this.quality =
+      options.worldDetail === 'lite'
+        ? Object.freeze({ ...preset, world: QUALITY.lite.world })
+        : preset;
     this.track = options.track;
     this.assets = assets;
     this.fleetLiveries = options.fleetLiveries ?? [];
@@ -313,8 +369,28 @@ export class RaceView {
       quality: q,
       sets: assets.sets,
       racingLine: options.racingLine ?? null,
+      terrain: assets.dressing === null,
     });
     this.scene.add(this.trackView.group);
+    this.props = new PropRegistry(options.track.length, 200, (root) =>
+      this.environment.register(root),
+    );
+    const tw = performance.now();
+    this.world = assets.dressing
+      ? new CircuitWorld({
+          track: options.track,
+          dressing: assets.dressing,
+          quality: q,
+          drivable: this.trackView.drivable,
+          grass: assets.sets.grass,
+          grassColour: GRASS_COLOUR,
+          props: this.props,
+          garageTeams: options.garageTeams,
+          brands: options.brands,
+          propKit: assets.propKit,
+        })
+      : null;
+    if (this.world) this.scene.add(this.world.group);
     const lineOffsets =
       options.racingLine && options.racingLine.length === options.track.lap.count
         ? options.racingLine
@@ -351,9 +427,7 @@ export class RaceView {
     const contactOpacity = contactShadowOpacity(q, this.environment.csm !== null);
     this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity) : null;
     if (this.contact) this.scene.add(this.contact.mesh);
-    this.props = new PropRegistry(options.track.length, 200, (root) =>
-      this.environment.register(root),
-    );
+    this.props.build();
     this.checkRegistration = options.checkRegistration ?? false;
     this.scene.add(this.props.group);
     this.environment.register(this.scene);
@@ -364,7 +438,12 @@ export class RaceView {
       this.camera,
       (this.toneMap = options.toneMap ?? 'neutral'),
     );
-    this.loadTimes = { environment: t1 - t0, track: t2 - t1, cars: performance.now() - t2 };
+    this.loadTimes = {
+      environment: t1 - t0,
+      track: tw - t1,
+      world: t2 - tw,
+      cars: performance.now() - t2,
+    };
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
@@ -661,6 +740,7 @@ export class RaceView {
     this.environment.update(this.camera, this.focus, true);
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
     this.props.update(this.camera.position);
+    this.world?.update(frame.time);
     if (this.contact) {
       const c = this.contact;
       c.begin();
@@ -853,9 +933,11 @@ export class RaceView {
     this.fleet.dispose();
     this.contact?.dispose();
     this.props.dispose();
+    this.world?.dispose();
     this.environment.dispose();
     for (const s of Object.values(this.assets.sets)) disposeSet(s);
     this.assets.car.dispose();
+    this.assets.propKit?.dispose();
     this.scene.environment = null;
     this.scene.clear();
     this.renderer.renderLists.dispose();

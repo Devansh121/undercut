@@ -5,3 +5,9 @@ interface ImportMetaEnv {
   /** Optional build-time override of the rooms service URL. Defaults to same-origin /rooms. */
   readonly VITE_ROOMS_URL?: string;
 }
+
+/** The circuit catalog built from packages/track/data by vite.config.ts. */
+declare module 'virtual:undercut/circuits' {
+  import type { CircuitSummary } from './ui/data/circuit-summary';
+  export const CIRCUITS: CircuitSummary[];
+}

@@ -56,29 +56,42 @@ beforeAll(async () => {
     `export const a = ${JSON.stringify('y'.repeat(5000))};\n`,
   );
   execFileSync(process.execPath, [path.join(REPO_ROOT, 'tools/serve/precompress.mjs'), dir]);
-  ports = { PORT: await freePort(), HTTPS_PORT: await freePort(), ROOMS_PORT: await freePort() };
-  child = spawn(process.execPath, [path.join(REPO_ROOT, 'tools/serve/start.mjs')], {
-    cwd: REPO_ROOT,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      CLIENT_DIR: dir,
-      ...Object.fromEntries(Object.entries(ports).map(([k, v]) => [k, String(v)])),
-    },
-  });
-  child.stdout.on('data', (d) => (output += d));
-  child.stderr.on('data', (d) => (output += d));
-  const deadline = Date.now() + 90_000;
-  for (;;) {
-    try {
-      const res = await get(ports.PORT, '/', false);
-      if (res.statusCode === 200) break;
-    } catch {
-      // not up yet
+  // freePort hands out a port that is free now; another runtime starting beside this test can
+  // take it before start.mjs binds it. That (and only that) starts again on fresh ports.
+  for (let attempt = 1; ; attempt++) {
+    ports = { PORT: await freePort(), HTTPS_PORT: await freePort(), ROOMS_PORT: await freePort() };
+    output = '';
+    child = spawn(process.execPath, [path.join(REPO_ROOT, 'tools/serve/start.mjs')], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        CLIENT_DIR: dir,
+        ...Object.fromEntries(Object.entries(ports).map(([k, v]) => [k, String(v)])),
+      },
+    });
+    child.stdout.on('data', (d) => (output += d));
+    child.stderr.on('data', (d) => (output += d));
+    const deadline = Date.now() + 90_000;
+    let taken = false;
+    for (;;) {
+      try {
+        const res = await get(ports.PORT, '/', false);
+        if (res.statusCode === 200) break;
+      } catch {
+        // not up yet
+      }
+      if (child.exitCode !== null) {
+        if (/EADDRINUSE/.test(output) && attempt < 3) {
+          taken = true;
+          break;
+        }
+        throw new Error(`start.mjs exited:\n${output}`);
+      }
+      if (Date.now() > deadline) throw new Error(`start.mjs did not answer:\n${output}`);
+      await new Promise((r) => setTimeout(r, 300));
     }
-    if (child.exitCode !== null) throw new Error(`start.mjs exited:\n${output}`);
-    if (Date.now() > deadline) throw new Error(`start.mjs did not answer:\n${output}`);
-    await new Promise((r) => setTimeout(r, 300));
+    if (!taken) break;
   }
 }, 120_000);
 

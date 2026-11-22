@@ -1,4 +1,5 @@
 import { expect, test } from './base';
+import { startTimeTrial } from './helpers';
 
 /**
  * The loading screen: progress by bytes, and when a file fails, a plain message with Try again
@@ -22,7 +23,7 @@ test('a failed download shows Try again, and trying again starts the session', a
     }
   });
   await page.goto('/?debug=1&quality=lite');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await startTimeTrial(page);
   const loading = page.locator('[data-testid=loading]');
   await expect(loading).toBeVisible();
   await expect(loading).toHaveAttribute('data-state', 'error', { timeout: 30_000 });
@@ -63,7 +64,7 @@ test('a failed load leaves no decoder workers running, even when other files arr
     await route.continue();
   });
   await page.goto('/?debug=1&quality=lite');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await startTimeTrial(page);
   const loading = page.locator('[data-testid=loading]');
   await expect(loading).toHaveAttribute('data-state', 'error', { timeout: 30_000 });
   // Long after the delayed files have arrived: every worker that was started has been stopped.

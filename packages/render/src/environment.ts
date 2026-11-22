@@ -359,7 +359,7 @@ export class Environment {
     this.envTarget?.dispose();
     this.envTarget = target;
     this.scene.environment = target.texture;
-    this.scene.environmentIntensity = 1;
+    this.scene.environmentIntensity = 1.28;
   }
 
   /**

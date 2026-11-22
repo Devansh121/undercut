@@ -1,12 +1,12 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1303948,
-    "triangles": 119602,
-    "draw_calls": 36,
+    "bytes": 1427732,
+    "triangles": 119582,
+    "draw_calls": 40,
     "nodes": {
       "body": {
-        "triangles": 76118,
+        "triangles": 74726,
         "primitives": 7,
         "materials": [
           "paint",
@@ -28,7 +28,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 3240,
+        "triangles": 1512,
         "primitives": 1,
         "materials": [
           "paint"
@@ -53,12 +53,16 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 590,
-        "primitives": 3,
+        "triangles": 3690,
+        "primitives": 7,
         "materials": [
           "carbon",
+          "wheel_controls",
+          "dark",
           "display",
-          "paint"
+          "paint",
+          "metal_dark",
+          "glove"
         ],
         "morph_targets": 0
       },
@@ -154,6 +158,11 @@
         "bytes": 9486
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 1052
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 19804
@@ -162,6 +171,16 @@
         "name": "carbon_base",
         "mimeType": "image/webp",
         "bytes": 2862
+      },
+      {
+        "name": "wheel_controls",
+        "mimeType": "image/webp",
+        "bytes": 4624
+      },
+      {
+        "name": "glove_suede",
+        "mimeType": "image/webp",
+        "bytes": 11930
       },
       {
         "name": "disc_glow",
@@ -183,6 +202,10 @@
       "body_detail": [
         1024,
         1024
+      ],
+      "carbon_aniso": [
+        128,
+        128
       ],
       "carbon_base": [
         512,
@@ -208,12 +231,12 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 607428,
-    "triangles": 39616,
-    "draw_calls": 23,
+    "bytes": 654436,
+    "triangles": 39950,
+    "draw_calls": 25,
     "nodes": {
       "body": {
-        "triangles": 22058,
+        "triangles": 21814,
         "primitives": 3,
         "materials": [
           "paint",
@@ -231,7 +254,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 920,
+        "triangles": 440,
         "primitives": 1,
         "materials": [
           "paint"
@@ -256,11 +279,13 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 416,
-        "primitives": 2,
+        "triangles": 1474,
+        "primitives": 4,
         "materials": [
           "carbon",
-          "display"
+          "dark",
+          "display",
+          "glove"
         ],
         "morph_targets": 0
       },
@@ -348,6 +373,11 @@
         "bytes": 3824
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 566
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 8710
@@ -356,6 +386,11 @@
         "name": "carbon_base",
         "mimeType": "image/webp",
         "bytes": 1018
+      },
+      {
+        "name": "glove_suede",
+        "mimeType": "image/webp",
+        "bytes": 3338
       },
       {
         "name": "disc_glow",
@@ -377,6 +412,10 @@
       "body_detail": [
         512,
         512
+      ],
+      "carbon_aniso": [
+        64,
+        64
       ],
       "carbon_base": [
         256,
@@ -402,12 +441,12 @@
   },
   "far": {
     "file": "car_far.glb",
-    "bytes": 191000,
-    "triangles": 10584,
+    "bytes": 195916,
+    "triangles": 10296,
     "draw_calls": 11,
     "nodes": {
       "body": {
-        "triangles": 8082,
+        "triangles": 7890,
         "primitives": 3,
         "materials": [
           "paint",
@@ -417,7 +456,7 @@
         "morph_targets": 0
       },
       "drs_flap": {
-        "triangles": 312,
+        "triangles": 216,
         "primitives": 1,
         "materials": [
           "paint"
@@ -481,6 +520,11 @@
         "bytes": 3824
       },
       {
+        "name": "carbon_aniso",
+        "mimeType": "image/webp",
+        "bytes": 566
+      },
+      {
         "name": "carbon_normal",
         "mimeType": "image/webp",
         "bytes": 8710
@@ -506,6 +550,10 @@
         512,
         512
       ],
+      "carbon_aniso": [
+        64,
+        64
+      ],
       "carbon_base": [
         256,
         256
@@ -530,38 +578,38 @@
   },
   "masks": {
     "aldermoor.png": {
-      "bytes": 39470
+      "bytes": 39496
     },
     "brevik.png": {
-      "bytes": 27327
+      "bytes": 27356
     },
     "calder.png": {
-      "bytes": 50258
+      "bytes": 50288
     },
     "index.json": {
       "bytes": 2060
     },
     "kestrel.png": {
-      "bytes": 30138
+      "bytes": 30167
     },
     "meridian.png": {
-      "bytes": 32864
+      "bytes": 32890
     },
     "norrland.png": {
-      "bytes": 50935
+      "bytes": 50964
     },
     "orrin.png": {
-      "bytes": 42703
+      "bytes": 42733
     },
     "quillon.png": {
-      "bytes": 38887
+      "bytes": 38915
     },
     "sable.png": {
-      "bytes": 58164
+      "bytes": 58192
     },
     "terraluce.png": {
-      "bytes": 24244
+      "bytes": 24276
     }
   },
-  "total_bytes": 2499426
+  "total_bytes": 2675421
 }

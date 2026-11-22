@@ -1,0 +1,186 @@
+{
+  "$comment": "Invented trackside brands. Every name, wordmark style and colour pairing is original and audited against real motorsport sponsors, tyre makers, watchmakers, airlines, oil companies, banks, beverage brands and tech companies. Renamed after review for being too close to real companies or sponsors: SOLVANT, TELMARK, FINVEX, ALPENGRID and MARETTI; teal-on-dark schemes removed (close to a real title sponsor).",
+  "version": 1,
+  "brands": [
+    {
+      "id": "kronwerk",
+      "name": "KRONWERK",
+      "sub": "PRECISION INSTRUMENTS",
+      "bg": "#151920",
+      "fg": "#EBE9E2",
+      "accent": "#9AA6B8",
+      "style": "horology"
+    },
+    {
+      "id": "caldera",
+      "name": "CALDERA",
+      "sub": "GRID SYSTEMS",
+      "bg": "#3B3832",
+      "fg": "#F2F4EC",
+      "accent": "#D4C64A",
+      "style": "stripe"
+    },
+    {
+      "id": "tervale",
+      "name": "TERVALE",
+      "sub": "SYNTHETIC FLUIDS",
+      "bg": "#13233A",
+      "fg": "#F4F1EA",
+      "accent": "#E09A2B",
+      "style": "chevron"
+    },
+    {
+      "id": "vassero",
+      "name": "VASSERO",
+      "sub": "TORREFAZIONE 1928",
+      "bg": "#2B1813",
+      "fg": "#F2E7D5",
+      "accent": "#C76D3C",
+      "style": "serif"
+    },
+    {
+      "id": "nordvik",
+      "name": "NORDVIK",
+      "sub": "CARGO LINES",
+      "bg": "#1C1F24",
+      "fg": "#F1F2EE",
+      "accent": "#B92D32",
+      "style": "boxed"
+    },
+    {
+      "id": "veltora",
+      "name": "VELTORA",
+      "sub": "SILICON FOUNDRY",
+      "bg": "#1D2244",
+      "fg": "#EDF4F8",
+      "accent": "#69BBD6",
+      "style": "tech"
+    },
+    {
+      "id": "halden",
+      "name": "HALDEN",
+      "sub": "INDUSTRIAL TOOLS",
+      "bg": "#23262B",
+      "fg": "#F0EFEA",
+      "accent": "#D85E26",
+      "style": "industrial"
+    },
+    {
+      "id": "verdantia",
+      "name": "VERDANTIA",
+      "sub": "BIOFUELS",
+      "bg": "#173A26",
+      "fg": "#EEF2EA",
+      "accent": "#8EC77E",
+      "style": "clean"
+    },
+    {
+      "id": "orveto",
+      "name": "ORVETO",
+      "sub": "ARCHITECTURAL GLASS",
+      "bg": "#E7E1D6",
+      "fg": "#1B1D20",
+      "accent": "#5A6572",
+      "style": "minimal"
+    },
+    {
+      "id": "korvin",
+      "name": "KORVIN",
+      "sub": "AEROSPACE",
+      "bg": "#1E3552",
+      "fg": "#F3EFE6",
+      "accent": "#D4BE8A",
+      "style": "wing"
+    },
+    {
+      "id": "calmonde",
+      "name": "CALMONDE",
+      "sub": "FIBRE NETWORK",
+      "bg": "#3A1E44",
+      "fg": "#F4F1F6",
+      "accent": "#C985D4",
+      "style": "tech"
+    },
+    {
+      "id": "brenner",
+      "name": "BRENNER",
+      "sub": "SPECIALTY ALLOYS",
+      "bg": "#202327",
+      "fg": "#EFECE6",
+      "accent": "#BE6C3E",
+      "style": "industrial"
+    },
+    {
+      "id": "sovera",
+      "name": "SOVERA",
+      "sub": "GENEVE",
+      "bg": "#111316",
+      "fg": "#EFECE4",
+      "accent": "#C6A45B",
+      "style": "horology"
+    },
+    {
+      "id": "rivano",
+      "name": "RIVANO",
+      "sub": "OTTICA MILANO",
+      "bg": "#ECEAE4",
+      "fg": "#15243A",
+      "accent": "#CE4E3E",
+      "style": "minimal"
+    },
+    {
+      "id": "velmoren",
+      "name": "VELMOREN",
+      "sub": "CLEARING HOUSE",
+      "bg": "#2A2A2E",
+      "fg": "#F1F3EF",
+      "accent": "#9DB04A",
+      "style": "boxed"
+    },
+    {
+      "id": "glacerne",
+      "name": "GLACERNE",
+      "sub": "HYDRO POWER",
+      "bg": "#164266",
+      "fg": "#F0F5F9",
+      "accent": "#76C2E8",
+      "style": "stripe"
+    },
+    {
+      "id": "morval",
+      "name": "MORVAL",
+      "sub": "RESERVE BLEND",
+      "bg": "#521A24",
+      "fg": "#F4ECE0",
+      "accent": "#DFBF76",
+      "style": "serif"
+    },
+    {
+      "id": "zentro",
+      "name": "ZENTRO",
+      "sub": "AUTOMATION",
+      "bg": "#E6E1D6",
+      "fg": "#1C1D21",
+      "accent": "#C8501E",
+      "style": "chevron"
+    },
+    {
+      "id": "tarsen",
+      "name": "TARSEN",
+      "sub": "RAIL FREIGHT",
+      "bg": "#6E281E",
+      "fg": "#F3ECE2",
+      "accent": "#E6B667",
+      "style": "boxed"
+    },
+    {
+      "id": "lindholm",
+      "name": "LINDHOLM",
+      "sub": "MARINE SYSTEMS",
+      "bg": "#23303E",
+      "fg": "#F2F1EC",
+      "accent": "#E2B532",
+      "style": "wing"
+    }
+  ]
+}

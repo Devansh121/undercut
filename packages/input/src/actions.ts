@@ -39,7 +39,14 @@ export const DRIVING_BUTTONS: readonly DrivingButton[] = [
 ];
 
 export type MenuButton =
-  'menuUp' | 'menuDown' | 'menuLeft' | 'menuRight' | 'menuAccept' | 'menuBack';
+  | 'menuUp'
+  | 'menuDown'
+  | 'menuLeft'
+  | 'menuRight'
+  | 'menuAccept'
+  | 'menuBack'
+  | 'menuTabPrev'
+  | 'menuTabNext';
 export const MENU_BUTTONS: readonly MenuButton[] = [
   'menuUp',
   'menuDown',
@@ -47,6 +54,8 @@ export const MENU_BUTTONS: readonly MenuButton[] = [
   'menuRight',
   'menuAccept',
   'menuBack',
+  'menuTabPrev',
+  'menuTabNext',
 ];
 
 export type ButtonAction = DrivingButton | MenuButton;
@@ -96,4 +105,6 @@ export const ACTION_LABELS: Readonly<Record<ActionId, string>> = Object.freeze({
   menuRight: 'Right',
   menuAccept: 'Accept',
   menuBack: 'Back',
+  menuTabPrev: 'Previous tab',
+  menuTabNext: 'Next tab',
 });

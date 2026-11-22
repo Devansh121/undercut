@@ -10,6 +10,7 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- M2 interface: a launch screen, then a main menu on one designed kit (tokens, icon set, prompt glyphs that follow the device, components) with the five modes, circuit select (Monza, Spa-Francorchamps and Singapore Marina Bay, each with its plan, length, corners, direction and the record on this device), team and driver pick with a studio image of the car in that livery, and session settings with per-device assist presets. Time Trial runs at any of the three circuits; Online Rooms opens the lobby; Quick Race, Race Weekend and Championship say plainly that they arrive with the race screen. The time-trial HUD is a timing tower top left with the map in the right column. Keyboard, gamepad (D-pad, A, B, LB and RB or Q and E for modes) and touch reach every control. Evidence: `docs/evidence/m2-ui/`.
 - M4 racing lines: Spa (medium trim) and Singapore (high trim) have racing lines, speed profiles and reference laps built with `npm run ai:build` like Monza. Spa 109.072 s against the 1:40.562 pole (+8.5 %, a recorded gap, mostly in the downforce sector), Singapore 91.817 s against 1:29.158 (+3.0 %, inside its band), both clean; ten-lap soaks nightly. `npm run telemetry -- lap --circuit spa` prints the tables (docs/physics-validation.md 7.8). The circuits are not in the game's menus yet.
 - M5 online client: Online rooms on the launch screen, create or join by invite, ready countdown, server-clock start lights, remote cars and minimap, official results and rematch. A desktop host and landscape phone guest complete the two-browser acceptance test against the local service.
 - Controls list: a Controls panel in the pause menu and on the launch screen lists every driving input for the device in use (keyboard, gamepad or touch), read from the live bindings, with the reverse-gear rule. The first start of a page session shows a six-second HUD hint with the brake and throttle inputs and how to open the list.
@@ -48,6 +49,18 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Known gaps
 
+- Interface, next slice (not built yet): the Settings screen (graphics, audio, controls with rebinding per device, assists, accessibility: reduced motion, colour-blind-safe timing colours, HUD scale, subtitles; units), race session setup (distance, AI skill, grid, equal cars or tiers), the loading briefing (grid or garage), results with classification, gaps and penalties, weekend progression and championship standings, credits from `CREDITS.md` and the asset manifest, and the race HUD on the race engine's events: the twenty-car tower with gaps and intervals, flags by sector, start lights, pit and penalty messages. The timing tower component is ready for it: `apps/web/src/ui/hud/tower.ts` (`TimingTower`: `setLap`, `setStatus`, `setFooter`, `update(rows)` with keyed rows that slide to new places, and the compact phone window `towerWindow`), shown with scripted standings in `apps/web/ui-gallery.html`.
+- Singapore is raced at night, but the floodlit night preset is not built yet: Singapore (and Spa) use the day preset (`overcast-day`) until it is. Spa and Singapore now have AI racing lines (#32), so the rubbered line is drawn there too and the menus no longer mark them Time Trial only. Those lines were built for medium and high downforce, not the player's low-downforce car, so braking help (which follows a driving line made for the player's car) is offered at Monza only and is disabled, with that reason, elsewhere.
+- The online lobby and results screens keep their own plain styling; they are not yet restyled on the interface kit. They are reached from the main menu (Online Rooms) and by invite link, and run on the menus' input loop.
+- Circuit dressing (PR #31 review, next slice; Monza only, so Spa and Singapore load without it), in priority order:
+  - Performance headroom: 1080p High is 9 to 14 ms of GPU with 450 to 767 draw calls and 2.9 to 4.5 M triangles (3 to 4 ms before the world). Buildings, stands, the pit building, terrain, bridges, the old banking and decals are single merged meshes outside the prop registry (no chunk culling, no levels of detail, every shadow cascade): chunk and cull them, give them levels of detail, and stop distant structures casting shadows. The world build is now 0.3 s on Lite, 0.5 s on Mobile and 1.1 s on High, all on the main thread; build it in slices or a worker.
+  - Look: flat card trees with a speckled leaf texture from trackside; the blocky crowd mosaics close up (the kit's crowd figures need an impostor before they can fill the seats); bare grey stand sides and backs and flat grey car parks; grey haze instead of a warm afternoon; plain white mapped buildings; plain absorber blocks at the chicane exits; no distant treeline or skyline.
+  - The kit's grandstands, pit building, pit wall, start gantry, crew, bridges and barriers are not placed yet; the world's own builders stand in for them.
+  - The race engine's `lights` events do not reach the app (Time Trial has no lights phase); the start gantry follows the online start only. A local race mode should call `startLightMask` from its `lights` events the same way.
+  - Review notes: a saturated magenta band along the top of the pit building in the 1440×900 capture; SOVERA's black and gold evokes a well-known cigarette-era livery, recolour it.
+  - Tests still to add: the 24 m minimum catch-fence run; `PropRegistry.update` makes a closure per chunk each frame (`props/registry.ts`).
+- Browser CI: Lite (and `?world=lite`) loads no dressing, so the software-WebGL tests run on the track package's own ground as before; the full Mobile world is tested once in `tests/browser/world-dressing.spec.ts` (placement counts, the dressing and prop files against the budget inventory, quitting), and the High lifecycle with the full world runs on the GPU (`npm run shots -- monza --lifecycle`).
+
 - Online Slice 1: remote cars are ghosts for contact. AI fill is kept off because no browser drives the AI online yet. Teams are assigned by seat because protocol v2 has no player team field. Running-race reload recovery and spectating remain Slice 2. Only Monza is available. The racing-line policy has no separate guide overlay to control yet.
 
 - Rendering (M2 review, not yet done): cloud compression and posterisation in the sky are visible at 1080p; the sky is stored as 8-bit sRGB WebP of radiance over a scale (`tools/assets/build_textures.py`), and a higher-precision encoding (RGBM in WebP alpha, or two exposures) is the fix. Cockpit surfaces and the faceted mirror reflections still look synthetic: the cockpit needs modelling detail, and the mirrors a smoother normal or a blurred rear view.
@@ -64,6 +77,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Menus without a framework (ADR 0009). The team cars on the main menu are pre-rendered studio images of the real car model, not a live 3D view. Label text was raised to `#8d8c88` so it meets 4.5:1 on every panel. Time trial's tower shows the green flag only: time trial has no other flags. The controls list opens from the menu's top bar and the pause menu.
 - Drivability (PR 26): the stability assist is yaw-rate control that brakes one wheel and trims engine torque through a new optional per-wheel brake demand in `ControlInput`; it never steers or eases the brake. On grass or gravel it keeps braking the outer front even when that wheel locks (a locked rear is still refused). Braking help, already a preset field, is implemented from the driving line and is on by default: `low` for keyboard, `medium` for touch, off for gamepad. On the review's clumsy keyboard driver it brakes about 13 s a lap and accounts for most of the drop in barrier strikes. Online rooms can switch both off. The validation harness charges a spin 5 s and counts it as time off the track, and resets a car stopped for 3 s as a spin; without that charge, saving a slide reads as more time off the track than a spin.
 - Online Slice 1 uses deterministic seat liveries, equal cars and no AI fill, without extending protocol v2. Everyone marks ready (including the host) to begin the server countdown; the host can cancel by unreadying.
 - Invite links use the local server’s Wi-Fi origin when available; the same-origin network-info endpoint supplies only interface addresses. Outside that server the page origin remains usable.
@@ -123,6 +137,9 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - M2: Khronos PBR Neutral tone map rather than AgX (the visual direction's choice) or ACES. Compared on the same frames with the real car and HDRI: AgX desaturated liveries and grass, ACES shifted blue toward purple; Neutral keeps authored colours (`docs/render.md`).
 - M2: WebP textures with GPU mipmaps, not KTX2/Basis: the transcoder could not be verified on a phone-class GPU here. The first race is 7.8 MiB on High, 2.9 MiB on Mobile as the server sends it (Brotli for text), well inside 25 MB.
 - M2: Monza's sun elevation is the HDRI's own (48°), not the 35° in the visual direction, so shadows match the sky; the bearing (235°, south-west) is the visual direction's.
+- M2 dressing: trees, ground cover, brand boards and the tree atlas are generated at load by script (canvas), not downloaded: no third-party tree assets, and the first race on High grows by only the dressing file (7.98 MiB in all).
+- M2 dressing: the old oval's mapped concrete is built only more than 32 m from the circuit or where it crosses it, because its ways share Monza's main straight.
+- M2 dressing: invented brand "MARETTI" renamed "VASSERO": one letter from a famous real brand.
 - M2: the Poly Haven asphalt scan (fresh black tarmac, albedo 0.015) is lifted to about 0.08, the grey of a used circuit surface.
 - M2: grass is ambientCG Grass001 (a mowed lawn) instead of the survey's Poly Haven sparse_grass, which is dry grass over dirt.
 - M2: three cascades of shadow from three.js CSM with the cascade-blend fade, PCF; a blob contact shadow under every car on Mobile and Lite, and on any preset when no key light casts shadows (night).
@@ -172,9 +189,24 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
 
+### Decided for you — cockpit pass and crew polish
+
+- The cockpit had about 400 triangles of headroom on High and Mobile. Its new wheel, hands and padding are paid for by the floor (32 stations along it instead of 40; it is seen edge-on or not at all) and the DRS flap (10 spanwise stations instead of 22; it is straight). The car build now fails above 120k / 40k / 12k.
+- Gloves are a light grey suede material rather than team paint: the team's dark primary made the hands black lumps against the black wheel, by day and at night.
+- Carbon tows are 3 mm (3K-class twill) instead of 6 mm. The carbon carries fibre anisotropy (`KHR_materials_anisotropy` with a twill direction map); the presets without clear coat (Mobile, Lite) turn it off for shader cost.
+- Squashed metric UVs on carbon are re-projected at export and stored at 14 bits instead of 12 (+4 % car size): the anisotropy otherwise met zero tangent frames and turned the frame black. The car shader also guards a zero frame.
+- On Mobile the wheel's push buttons are left off: the phone's driver cluster covers the wheel face, and the triangles went to smoother hands.
+- Seated figures sit at one height across LODs (0.424–0.425 m); the props build fails on a mismatch over 6 mm.
+
 ### Decided for you — modular prop kit
 
 - Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
 - Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
 - Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
 - Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.
+
+### Decided for you — cockpit review follow-up
+
+- The gauntlet joins are derived from the steering-column transform and the sleeve endpoints; rear caps sit inside the sleeve and the thumbs curl around the grips. High wheel legends and rotary indicators use a texture on existing polygons; glove seam and restrained wear detail use a small suede texture.
+- The crouched mechanic uses one connected garment surface across the torso, pelvis and thigh roots, replacing the overlapping hip shell.
+- Track separately: the Mobile HUD obscures the wheel display, the mirrors remain dark in some lighting, and the halo weave reads as coarse zigzags at Mobile resolution. These need HUD/render review; this asset correction keeps their existing pipelines.

@@ -1,5 +1,5 @@
 import { expect, takePresetViolations, test } from './base';
-import { viewPixels, watchProblems } from './helpers';
+import { startTimeTrial, viewPixels, watchProblems } from './helpers';
 
 /**
  * The renderer adapts to what the GPU can do and survives losing its context. One project
@@ -91,8 +91,8 @@ test('without renderable float targets the HDR preset takes the direct path and 
   await page.addInitScript(hideFloatTargets);
   // Mobile has the HDR pipeline (half-float target, MSAA, PMREM) like High, at a fraction of
   // the software-rendering cost; effectiveQuality is unit-tested on every preset.
-  await page.goto('/?debug=1&quality=mobile');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await page.goto('/?debug=1&quality=mobile&world=lite');
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.evaluate(() => window.__undercut?.drive({ throttle: 1, steer: 0 }));
   await page.waitForFunction(() => (window.__undercut?.state().tick as number) > 20);
@@ -116,8 +116,8 @@ test('losing and restoring the WebGL context pauses, rebakes the lighting and dr
   test.skip(info.project.name !== 'desktop', 'runs on the desktop project');
   test.setTimeout(120_000);
   const problems = watchProblems(page);
-  await page.goto('/?debug=1&quality=mobile');
-  await page.getByRole('button', { name: /Start/ }).click();
+  await page.goto('/?debug=1&quality=mobile&world=lite');
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.waitForFunction(() => (window.__undercut?.state().tick as number) > 20);
   const builds = await page.evaluate(() => window.__undercut?.state().viewBuilds as number);

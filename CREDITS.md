@@ -24,14 +24,14 @@ Code in this repository is MIT licensed (see `LICENSE`). Third-party code and as
 | [selfsigned](https://github.com/jfromaniello/selfsigned) | MIT |
 | [gitleaks](https://github.com/gitleaks/gitleaks) (CI only) | MIT |
 
-## Track data
+## Track and circuit dressing data
 
-The circuit files in `packages/track/data/` are databases derived from open geodata and are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md).
+The circuit files in `packages/track/data/` and `packages/render/data/` are databases derived from open geodata and are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md) and [`packages/render/data/LICENSE-DATA.md`](packages/render/data/LICENSE-DATA.md).
 
 | Source | Use | Licence |
 | --- | --- | --- |
-| [OpenStreetMap](https://www.openstreetmap.org/copyright) | Centrelines, pit lanes, mapped gravel and barriers | Open Database License 1.0 |
-| [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/) | Heights along the track | Licence for the use of the Copernicus WorldDEM-30 |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) | Centrelines, pit lanes, mapped gravel and barriers; surrounding woods, trees, meadows, service roads, grandstands, paddock buildings, bridges and historic banking | Open Database License 1.0 |
+| [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/) | Heights along the track and surrounding terrain grid | Licence for the use of the Copernicus WorldDEM-30 |
 
 © OpenStreetMap contributors. The data is available under the Open Database License, see https://www.openstreetmap.org/copyright.
 
@@ -84,6 +84,8 @@ Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Crea
 ### Car
 
 The car (`apps/web/public/assets/car/`: three GLB levels of detail, ten team livery masks and the livery index) is generated from nothing by the repository's own scripts in `tools/car/` (`npm run car:build`) and is under the same MIT licence as the code. Its textures (carbon twill, bodywork panel detail, tyre sidewall with an invented maker's mark and compound ticks, brake-disc glow) are drawn procedurally; no third-party image or model is used. The build runs [Blender](https://www.blender.org/) 5.2 LTS (GPL-2.0-or-later) as a tool; Blender is not shipped. The studio lighting in the committed Blender reference renders is Poly Haven's `studio_small_09` HDRI (CC0), used for lighting only and not committed.
+
+The team car images on the main menu (`apps/web/public/assets/ui/cars/`) are renders of that car in each driver's livery, made by `tools/ui/team-cars.mjs` (`npm run ui:cars`) with the repository's car viewer, under the same MIT licence.
 
 ## Circuit prop kit
 

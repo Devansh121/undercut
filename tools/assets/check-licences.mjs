@@ -1,6 +1,7 @@
-// Asset licence check. Every file under assets/, apps/web/public/ and design/mock/fonts/
-// (other than the manifest itself) must have an entry in assets/MANIFEST.json with a matching sha256
-// and an allowed licence; every entry must point at a file that exists.
+// Asset licence check. Every file under assets/, apps/web/public/, design/mock/fonts/,
+// packages/track/data/ and packages/render/data/ (other than the manifest itself) must have an
+// entry in assets/MANIFEST.json with a matching sha256 and an allowed licence; every entry must
+// point at a file that exists.
 //
 // Manifest entry: { file, source_url, author, licence, changes, sha256 }
 // `file` is relative to the repository root.
@@ -11,8 +12,15 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIELDS = ['file', 'source_url', 'author', 'licence', 'changes', 'sha256'];
-// Directories that hold third-party files. design/mock/fonts holds the committed UI fonts.
-export const SCAN_DIRS = ['assets', 'apps/web/public', 'design/mock/fonts'];
+// Directories that hold third-party files. design/mock/fonts holds the committed UI fonts; the
+// track and render data folders hold databases derived from OpenStreetMap and Copernicus.
+export const SCAN_DIRS = [
+  'assets',
+  'apps/web/public',
+  'design/mock/fonts',
+  'packages/track/data',
+  'packages/render/data',
+];
 
 function* walk(dir) {
   if (!fs.existsSync(dir)) return;

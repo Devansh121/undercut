@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from './base';
+import { startTimeTrial } from './helpers';
 
 /**
  * The budget check's first-race inventory (apps/web/dist/first-race.json, written by
@@ -43,8 +44,10 @@ test('the budget inventory matches the requests of a real first race, byte for b
       })(),
     );
   });
-  await page.goto('/?quality=mobile&debug=1');
-  await page.getByRole('button', { name: /Start/ }).click();
+  // `world=lite` loads no dressing or prop models; world-dressing.spec.ts checks those against
+  // the inventory with the full Mobile world.
+  await page.goto('/?quality=mobile&debug=1&world=lite');
+  await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 90_000 });
   await page.waitForTimeout(1500);
   await Promise.all(pending);

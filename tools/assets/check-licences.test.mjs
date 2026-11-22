@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkAssets } from './check-licences.mjs';
+import { SCAN_DIRS, checkAssets } from './check-licences.mjs';
 
 const allowed = ['CC0-1.0', 'CC-BY-4.0'];
 const dirs = [];
@@ -75,5 +75,11 @@ describe('checkAssets', () => {
     expect(problems).toContain('licence "CC-BY-NC-4.0" is not in');
     expect(problems).toContain('assets/gone.png does not exist');
     expect(problems).toContain('assets/a.png: sha256 is');
+  });
+
+  it('scans the derived databases in the track and render data folders', () => {
+    // The committed track and dressing files are ODbL databases: a stale hash must fail.
+    expect(SCAN_DIRS).toContain('packages/track/data');
+    expect(SCAN_DIRS).toContain('packages/render/data');
   });
 });

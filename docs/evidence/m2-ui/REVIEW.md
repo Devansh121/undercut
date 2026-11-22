@@ -1,0 +1,70 @@
+# M2 UI, menus, and HUD — visual review
+
+Captured with `node tools/screenshots/ui-shots.mjs` against the production build (`npm run build`). Every image in this directory was inspected before committing.
+
+## Screens captured
+
+| Screen | Desktop (`1440×900`) | Laptop (`1280×720`) | Phone landscape (`844×390`) |
+| --- | --- | --- | --- |
+| Launch | `launch-1440x900.png` | — | `launch-844x390.png` |
+| Main menu (Time Trial) | `hub-1440x900.png` | `hub-1280x720.png` | `hub-844x390.png` |
+| Main menu (unavailable mode notice) | `hub-notice-1440x900.png` | — | — |
+| Session settings dialog | inline in `hub-1440x900.png` | inline in `hub-1280x720.png` | `hub-settings-dialog-844x390.png` |
+| Circuit select | `circuits-1440x900.png` | — | `circuits-844x390.png` |
+| Interface kit gallery | `ui-gallery-1440x900.png` | — | — |
+| Time-trial HUD (live straight) | `hud-drive-1440x900.png` | — | `hud-drive-844x390.png` |
+| Time-trial HUD (invalid lap banner) | `hud-invalid-1440x900.png` | — | — |
+| Pause menu | `pause-1440x900.png` | — | `pause-844x390.png` |
+| Controls list (from the menu's top bar, and from the pause menu) | `controls-menu-1440x900.png` | — | `controls-pause-844x390.png` |
+
+## Defects caught and fixed during visual inspection
+
+1. **Phone device chip stayed on Keyboard on first load (`hub-844x390.png`, `circuits-844x390.png`)**
+   - `Shell` initialised its device chip to `'keyboard'` and `MenuInput` only pushed updates when the active device changed, leaving touch-capable phones displaying `Keyboard` until another device fired.
+   - Fixed by syncing `shell.setDevice(input.activeDevice)` on startup in `apps/web/src/main.ts`, and syncing `setGlyphContext` from `input.activeDevice` in `apps/web/src/drive.ts`. Verified both phone menu screens now display `Touch` immediately.
+2. **Stacked duplicate `LAP INVALID` banners (`hud-invalid-1440x900.png`)**
+   - Resetting to track displayed both the persistent invalid-lap flag (`LAP INVALID · TRACK LIMITS`) and a transient toast (`LAP INVALID · RESET TO TRACK`) stacked beneath it.
+   - Fixed by passing the actual invalidation reason (`Track limits` or `Reset to track`) onto the single flag banner in `apps/web/src/ui/hud.ts` and removing the redundant toast in `apps/web/src/drive.ts`. Verified a single `LAP INVALID · RESET TO TRACK` banner renders.
+3. **Circuit record text wrapped across three lines on phone (`circuits-844x390.png`)**
+   - `No lap yet` broke onto three narrow lines inside `.ccard__record`.
+   - Fixed with `white-space: nowrap` and `flex-shrink: 0` on `.ccard__record b` and widening the phone landscape circuit grid minimum column width to `300px` in `apps/web/src/styles/menu.css`. Verified single-line rendering.
+4. **Phone landscape footer button sat too close to the viewport bottom (`hub-844x390.png`)**
+   - Reduced phone landscape `.actionbar` minimum height and button height (`38px`) with balanced vertical padding in `apps/web/src/styles/menu.css`.
+5. **Phone landscape pause menu clipped `Effects` and pushed `QUIT TO MENU` below the fold (`pause-844x390.png`)**
+   - Switched `.pause__card` on short landscape viewports (`max-height: 500px`) to a fixed-height grid (`auto minmax(0, 1fr) auto`) with a scrollable right settings pane and tightened row height (`30px`) in `apps/web/src/styles.css`. Verified all 9 settings rows and `QUIT TO MENU` fit cleanly at `844×390` with zero clipping and touch glyphs hidden.
+
+6. **Time-trial HUD did not read like a broadcast tower (`hud-drive-1440x900.png`, `hud-drive-844x390.png`)**
+   - The top-left panel was a label list (lap, record, ghost) and the map sat bottom left. Rebuilt it as a timing tower: lap counter in the head with the team hairline, a flag banner (green in time trial, which has no other flags), and one row per car on the clock (position, team colour bar, driver code, best lap; the record below it with a dashed purple bar). The map moved to the right column under the lap timing, larger. On a phone the tower stays top left in a compact form (no footer) clear of the steering pad and the top-centre timing.
+
+7. **Controls list from master (#20) in the old pause style**
+   - Folded into the kit: a kit dialog (title, device with its icon, two columns of setting rows, the reverse note on a raised strip, Back with its prompt glyph), opened from a Controls button in the menu's top bar (every menu screen) and from the pause menu. Unbound inputs read in the label colour. Checked at `1440×900` (keyboard rows) and `844×390` (touch rows): two columns fit, nothing clipped.
+
+8. **Three circuits after Spa and Singapore landed (`circuits-1440x900.png`, `circuits-844x390.png`)**
+   - On desktop Monza's tall plan widened its card's content past the card edge ("Race laps" and the record cut off): the card's grid track is now pinned to the card width, and the three cards fill the row. On a phone the cards wrapped to a second row below the fold: they now sit three across in a compact form (smaller plan, two facts), with the screen title left to the breadcrumb.
+   - Spa and Singapore carried a "Time Trial only" mark until their AI racing lines landed (#32); a circuit without one still gets the mark, and the race-mode notice says why in one sentence. Braking help is disabled, with the reason, where no driving line exists for the player's car (Spa and Singapore for now).
+9. **Tower footer wrapped "Singapore Marina Bay" onto two lines (`hud-drive-1440x900.png`)**
+   - The map already names the circuit, so the tower's footer now shows only the ghost: "On track" or "After a valid lap".
+
+10. **Review of PR #30 (four blocking findings)**
+    - Time of day went stale after a circuit change (Spa showed "Afternoon" while the chip said Overcast): both settings panels now rebuild whenever the circuit or the device changes. Test: `time of day follows the circuit` in `tests/browser/menus.spec.ts`.
+    - Phone touch targets under 44 px: buttons, segments, the switch (now a 48 x 44 button with the track drawn inside), Change circuit, Controls, drivers and every pause-menu control are 44 px or more at 844 x 390; the ten-team grid becomes one team at a time with previous and next, and the car image is back on the phone (`hub-844x390.png`). The phone layout sweep and a pause-menu test assert it.
+    - "SPA- / FRANCORCH / AMPS": names break only between words or after a hyphen, and a name with a long word steps down a size (`hub-spa-1440x900.png`). The layout sweep now checks every heading word sits on one line, at all three circuits.
+    - Online Rooms no longer shows a team picker that does nothing: one line says the room assigns cars by seat (`hub-online-1440x900.png`).
+    - Also: focus moves to the selected mode when a shoulder-button mode switch hides the focused control; pause-menu labels match the menu (Medium, Anti-lock brakes, Automatic) and Steering help is disabled there for the keyboard as in the menu; "Not yet available" tags on the three race modes; HUD update no longer allocates arrays per frame; no sticky hover after a tap on touch screens.
+
+## HUD frame-time benchmark
+
+Measured at `1440×900`, `high` quality preset, with vsync and frame-rate cap disabled (`--disable-gpu-vsync --disable-frame-rate-limit`), driving Monza on autopilot with the HUD visible vs hidden via `window.__undercut.setHudVisible` (`docs/evidence/m2-ui/report.json`):
+
+| State | Frames | Mean (ms) | Median (ms) | p95 (ms) | p99 (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HUD on | 3102 | 1.963 | 0.9 | 2.2 | 41.7 |
+| HUD off | 3122 | 1.943 | 0.8 | 1.6 | 32.2 |
+| **Delta (on − off)** | — | **+0.020** | **+0.1** | **+0.6** | **+9.5** |
+
+Re-measured after the review fixes. A first run with the new tower component measured +0.78 ms
+mean: the tower re-assigned `hidden` on its tyre mark and footer every frame, which costs a style
+recalculation even when the value is unchanged. With those writes guarded the HUD costs 0.02 ms
+mean (0.1 ms median); the tails are noise from the shared GPU.
+
+Car framing check (`window.__undercut.carScreenRect()` vs `.hud-drive` bounding box): zero overlap on both `1440×900` and `844×390`.

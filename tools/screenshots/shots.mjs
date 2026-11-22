@@ -3,6 +3,8 @@
 //
 //   npm run build && npm run shots -- monza            every station, both sizes
 //   npm run shots -- monza --only grid,cockpit         some stations
+//   npm run shots -- monza --only cockpit,cockpit-chicane,cockpit-lesmo --query tod=night-floodlit
+//                                                      the cockpit tour at night
 //   npm run shots -- monza --perf                      also frame-time runs (drive, full grid) at
 //                                                      1080p High and 844x390 Mobile, vsync off
 //   npm run shots -- monza --moving                    also a 10 s recording cut into frame strips
@@ -91,7 +93,7 @@ const drive =
 
 const STATIONS = [
   {
-    // The full field from in front of the pole slot, twenty cars in ten liveries.
+    // The full field from in front of the pole slot, twenty cars in ten liveries, five red lights on.
     name: 'grid-front',
     camera: 'tv',
     run: async (page) => {
@@ -100,16 +102,24 @@ const STATIONS = [
         u.restartLap();
         u.setTimeScale(0);
         u.gridCars(19);
+        u.setStartLights(31);
         const eye = u.trackPoint(5812, 3.5, 1.7);
         const aim = u.trackPoint(5716, -0.5, 0.6);
         u.tvCamera(eye.x, eye.y, eye.z, 24, aim);
       });
     },
-    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+    after: (page) =>
+      page.evaluate(() => {
+        globalThis.__undercut.setStartLights(0);
+        globalThis.__undercut.gridCars(0);
+      }),
   },
   { name: 'chicane-braking', camera: 'chase-near', run: drive(380, 300, 545) },
   { name: 'fast-corner', camera: 'chase-far', run: drive(900, 250, 1060) },
   { name: 'cockpit', camera: 'cockpit', run: drive(4980, 200, 5180) },
+  // The cockpit at two more places round the lap: braking for the first chicane, and Lesmo.
+  { name: 'cockpit-chicane', camera: 'cockpit', run: drive(380, 300, 520) },
+  { name: 'cockpit-lesmo', camera: 'cockpit', run: drive(1450, 280, 1640) },
   { name: 'tcam', camera: 'tcam', run: drive(1450, 280, 1700) },
   { name: 'straight', camera: 'chase-near', run: drive(5300, 260, 5640) },
   {
@@ -166,6 +176,105 @@ const STATIONS = [
     },
     after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
   },
+  {
+    // Down the start straight from main-grandstand height: pit complex, pit wall, gantry, crowd, corridor.
+    name: 'stand-straight',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        u.setStartLights(31);
+        const eye = u.trackPoint(5520, 22, 11.5);
+        const aim = u.trackPoint(5775, -14, 3.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 32, aim);
+      });
+    },
+    after: (page) =>
+      page.evaluate(() => {
+        globalThis.__undercut.setStartLights(0);
+        globalThis.__undercut.gridCars(0);
+      }),
+  },
+  {
+    // Outside the first chicane: braking boards, catch fencing, run-off aprons, grandstands, trees.
+    name: 'chicane-outside',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(612, 0.5, 95);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(685, 22, 5.2);
+        const aim = u.trackPoint(585, -2, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 34, aim);
+      });
+    },
+  },
+  {
+    // Through the Lesmo woodland corridor: dense trees, angled grass-verge boards, marshal post.
+    name: 'lesmo-trees',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(2440, -1.5, 195);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(2540, 12, 3.6);
+        const aim = u.trackPoint(2420, -2, 1.4);
+        u.tvCamera(eye.x, eye.y, eye.z, 28, aim);
+      });
+    },
+  },
+  {
+    // Elevated camera-tower angle over Variante Ascari: chicane kerbs, stands, big screen, woodland.
+    name: 'ascari-tower',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(3710, -1.0, 175);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(3820, -24, 14.0);
+        const aim = u.trackPoint(3690, 2, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 34, aim);
+      });
+    },
+  },
+  {
+    // Outside Curva Alboreto (Parabolica): sweeping corner, gravel, stands, bridge, distant treeline.
+    name: 'parabolica-outside',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.teleport(4960, -1.5, 210);
+        u.setTimeScale(0);
+        const eye = u.trackPoint(5085, 34, 9.5);
+        const aim = u.trackPoint(4940, -4, 1.5);
+        u.tvCamera(eye.x, eye.y, eye.z, 36, aim);
+      });
+    },
+  },
+  {
+    // High three-quarter helicopter view framing the start straight, pit complex, grandstands, and Turn 1.
+    name: 'sector1-heli',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        const eye = u.trackPoint(5520, 105, 68);
+        const aim = u.trackPoint(90, -10, 4);
+        u.tvCamera(eye.x, eye.y, eye.z, 38, aim);
+      });
+    },
+    after: (page) => page.evaluate(() => globalThis.__undercut.gridCars(0)),
+  },
 ];
 
 const VIEWPORTS = [
@@ -207,11 +316,20 @@ function startServer() {
 async function waitForServer(server) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
+    let body = null;
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/`);
-      if (res.ok) return;
+      if (res.ok) body = await res.text();
     } catch {
       // not up yet
+    }
+    if (body !== null) {
+      // Another checkout's server on the same port would answer too, and the stations would
+      // capture its game. Only this checkout's build will do.
+      const ours = fs.readFileSync(path.join(root, 'apps/web/dist/index.html'), 'utf8');
+      if (body !== ours)
+        throw new Error(`port ${PORT} serves another build (set SHOTS_PORT to a free port)`);
+      return;
     }
     if (server.child.exitCode !== null) throw new Error(`server exited:\n${server.output()}`);
     await new Promise((r) => setTimeout(r, 300));
@@ -266,7 +384,9 @@ async function shots(browser, report) {
   for (const vp of VIEWPORTS) {
     if (sizes && !sizes.includes(vp.label)) continue;
     const launchFile = path.join(outDir, `launch-${vp.label}.png`);
-    const { context, page, errors } = await openGame(browser, vp, '', launchFile);
+    // `--query tod=night-floodlit` (or any extra URL parameters) applies to every station.
+    const query = option('query') ? `&${option('query')}` : '';
+    const { context, page, errors } = await openGame(browser, vp, query, launchFile);
     console.log(`  ${path.relative(root, launchFile)}`);
     for (const station of STATIONS) {
       if (only && !only.includes(station.name)) continue;
