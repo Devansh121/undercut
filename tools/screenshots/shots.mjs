@@ -601,6 +601,12 @@ const PERF_VIEWPORTS = [
   },
 ];
 
+/**
+ * Where the perf drive starts, per circuit: Monza's Lesmo woods, Spa's spruce plantation before
+ * Blanchimont (the most near trees), Singapore's waterfront.
+ */
+const PERF_DRIVE_S = { monza: 4300, spa: 5200, singapore: 3300 };
+
 async function perf(report) {
   for (const vsync of flag('phone-audit') ? [true] : [true, false]) await perfRuns(report, vsync);
 }
@@ -630,32 +636,43 @@ async function perfRuns(report, vsync) {
       for (const run of flag('phone-audit')
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
-        await page.evaluate((run) => {
-          const u = globalThis.__undercut;
-          u.autopilot(false);
-          u.drive(null);
-          u.gridCars(0);
-          if (run === 'drive') {
-            u.camera('chase-near');
-            u.teleport(4300, 0, 250);
-            u.autopilot(true);
-          } else if (run !== 'grid') {
-            u.camera('chase-near');
-            u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
-            u.drive({ throttle: 0, brake: 1, steer: 0 });
-          } else {
-            // From the last slot looking up the grid: nineteen cars ahead, all in view.
-            u.restartLap();
-            u.gridCars(19);
-            u.camera('chase-far');
-            u.drive({ throttle: 0, brake: 1, steer: 0 });
-          }
-        }, run);
+        await page.evaluate(
+          ([run, driveS]) => {
+            const u = globalThis.__undercut;
+            u.autopilot(false);
+            u.drive(null);
+            u.gridCars(0);
+            if (run === 'drive') {
+              u.camera('chase-near');
+              u.teleport(driveS, 0, 250);
+              u.autopilot(true);
+            } else if (run !== 'grid') {
+              u.camera('chase-near');
+              u.teleport({ chicane: 600, lesmo: 2400, parabolica: 5400 }[run], 0, 0);
+              u.drive({ throttle: 0, brake: 1, steer: 0 });
+            } else {
+              // From the last slot looking up the grid: nineteen cars ahead, all in view.
+              u.restartLap();
+              u.gridCars(19);
+              u.camera('chase-far');
+              u.drive({ throttle: 0, brake: 1, steer: 0 });
+            }
+          },
+          [run, PERF_DRIVE_S[circuit]],
+        );
         await page.waitForTimeout(3000);
-        await page.evaluate(() => globalThis.__undercut.resetFrameTimes());
+        // Frame times are the page's animation frames; the pacer skips the draw on a frame when
+        // the GPU is two frames behind, so the frames actually drawn are counted as well.
+        const before = await page.evaluate(() => {
+          globalThis.__undercut.resetFrameTimes();
+          const st = globalThis.__undercut.renderStats();
+          return { drawn: st.drawnFrames, skipped: st.skippedDraws, t: performance.now() };
+        });
         await page.waitForTimeout(Number(option('perf-seconds') ?? 20) * 1000);
         const times = await page.evaluate(() => globalThis.__undercut.frameTimes());
         const stats = await page.evaluate(() => globalThis.__undercut.renderStats());
+        const seconds = ((await page.evaluate(() => performance.now())) - before.t) / 1000;
+        const drawnFps = (stats.drawnFrames - before.drawn) / seconds;
         const gpu = await page.evaluate(() => {
           const gl = globalThis.document.createElement('canvas').getContext('webgl2');
           const ext = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -669,6 +686,9 @@ async function perfRuns(report, vsync) {
           quality,
           vsync,
           ...summarise(times),
+          drawnFps: +drawnFps.toFixed(1),
+          drawnFrameMs: +(1000 / drawnFps).toFixed(2),
+          skippedDraws: stats.skippedDraws - before.skipped,
           gpu,
           render: stats,
           memory: await page.evaluate(() => ({
