@@ -470,4 +470,49 @@ test.describe('drive', () => {
     expect((await state(page)).device).toBe('touch');
     expect(problems).toEqual([]);
   });
+
+  test('shows every assist with a description in the pause menu and toggles stability', async ({
+    drive: { page, problems },
+  }) => {
+    await page.keyboard.press('Escape');
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    for (const id of ['tc', 'abs', 'stability', 'braking', 'gears', 'steering']) {
+      const row = menu.locator(`[data-setting=${id}]`);
+      await expect(row).toBeVisible();
+      await expect(row.locator('.pause__help')).not.toBeEmpty();
+    }
+    const stab = menu.locator('[data-setting=stability]');
+    await stab.getByRole('radio', { name: 'Off' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(0);
+    await stab.getByRole('radio', { name: 'On' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(1);
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(menu).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+
+  test('a clumsy keyboard lap on the default assists completes without a spin', async ({
+    drive: { page, problems },
+  }) => {
+    // The keyboard autopilot as a clumsy player (late and early braking, flooring the throttle
+    // before the exits, slow feet), through the real key events, shaping and assists. The same
+    // seed spins with the stability assist off (apps/web/test/clumsy-lap.test.ts).
+    const before = (await state(page)).spins as number;
+    await page.evaluate(() => {
+      window.__undercut?.clumsyPilot(3);
+      window.__undercut?.setTimeScale(8);
+    });
+    let lastLap: number | null = null;
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline && lastLap === null) {
+      lastLap = ((await state(page)).lastLap as number | null | undefined) ?? null;
+      if (lastLap === null) await page.waitForTimeout(200);
+    }
+    const after = await state(page);
+    expect(lastLap).not.toBeNull();
+    expect((after.spins as number) - before).toBe(0);
+    expect(after.safetyResets).toBe(0);
+    expect(problems).toEqual([]);
+  });
 });

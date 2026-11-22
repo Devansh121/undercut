@@ -27,6 +27,13 @@ export interface ControlInput {
   overtake: boolean;
   /** Pit-lane speed limiter engaged. */
   pitLimiter: boolean;
+  /**
+   * Optional friction brake per wheel (FL, FR, RL, RR) on top of the pedal, each in [0, 1] as a
+   * share of that wheel's own full braking torque. Only the stability assist sets it (one wheel
+   * at a time, the way road-car stability control brakes a single corner); drivers never do.
+   * Absent, the car is exactly the unassisted car.
+   */
+  wheelBrake?: ArrayLike<number> | undefined;
 }
 
 /** A car with no driver demand: wheel straight, pedals released, nothing pressed. */
@@ -42,6 +49,7 @@ export const NEUTRAL_INPUT: Readonly<ControlInput> = Object.freeze({
 
 /** Writes neutral demand into `out` and returns it. Lets hot loops reuse one object. */
 export function resetControlInput(out: ControlInput): ControlInput {
+  out.wheelBrake = undefined;
   out.steer = 0;
   out.throttle = 0;
   out.brake = 0;
