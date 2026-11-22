@@ -16,6 +16,7 @@ from carlib.ao import bake
 
 args = argparse.ArgumentParser()
 args.add_argument('--out', required=True)
+args.add_argument('--kits-only', action='store_true')
 a = args.parse_args(sys.argv[sys.argv.index('--') + 1:])
 os.makedirs(a.out, exist_ok=True)
 
@@ -573,6 +574,9 @@ specs += [
     ('screen-tower', 0), ('camera-tower', 0),
 ]
 
+from kits import SPECS, build as build_kit
+specs = SPECS if a.kits_only else specs + SPECS
+
 catalog = {'version': 1, 'units': 'm', 'up': '+Y', 'front': '+X', 'pivot': 'ground-centre', 'props': []}
 
 for ident, module in specs:
@@ -582,7 +586,10 @@ for ident, module in specs:
         bpy.ops.object.delete(use_global=False)
         objects, attachments = [], []
 
-        if ident.startswith('armco'):
+        if ident in dict(SPECS):
+            build_kit(globals(), ident)
+
+        elif ident.startswith('armco'):
             count = 2 if ident == 'armco-two' else 3
             for i in range(count):
                 rail(.42 + i * .32)
@@ -894,7 +901,7 @@ for ident, module in specs:
         entry['lods'].append({
             'file': f'assets/props/{filename}',
             'maxDistance': (80, 250, 1200)[lod],
-            'triangleBudget': (30000, 12000, 2500)[lod],
+            'triangleBudget': ((1000, 500, 100) if ident.startswith('forest-') else (4000, 2200, 1800) if ident == 'temporary-grandstand' else (30000, 12000, 2500))[lod],
         })
     catalog['props'].append(entry)
 

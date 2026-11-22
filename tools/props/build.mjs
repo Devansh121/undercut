@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
+const kitsOnly = process.argv.includes('--kits-only');
 const out = 'apps/web/public/assets/props';
 const scratch = path.join(os.homedir(), '.cache/undercut/scratch/m2-3d-models');
 fs.mkdirSync(scratch, { recursive: true });
@@ -25,6 +26,7 @@ const log = execFileSync(
     '--',
     '--out',
     path.resolve(out),
+    ...(kitsOnly ? ['--kits-only'] : []),
   ],
   { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
 );
@@ -32,9 +34,12 @@ fs.writeFileSync(path.join(scratch, 'build.log'), log);
 if (/Traceback|Error:/.test(log)) throw new Error(`Blender failed; see ${scratch}/build.log`);
 const catalog = JSON.parse(fs.readFileSync(`${out}/catalog.json`, 'utf8'));
 fs.unlinkSync(`${out}/catalog.json`);
-const manifest = JSON.parse(fs.readFileSync('assets/MANIFEST.json', 'utf8')).filter(
-  (e) => !e.file.startsWith(`${out}/`),
-);
+if (kitsOnly) {
+  const previous = JSON.parse(fs.readFileSync('packages/render/data/props.catalog.json'));
+  const ids = new Set(catalog.props.map((p) => p.id));
+  catalog.props.unshift(...previous.props.filter((p) => !ids.has(p.id)));
+}
+const manifest = JSON.parse(fs.readFileSync('assets/MANIFEST.json', 'utf8'));
 let total = 0;
 for (const prop of catalog.props) {
   for (const lod of prop.lods) {
@@ -49,7 +54,7 @@ for (const prop of catalog.props) {
     if (lod.triangles > lod.triangleBudget)
       throw new Error(`${lod.file}: ${lod.triangles} exceeds ${lod.triangleBudget}`);
     total += bytes.length;
-    manifest.push({
+    const record = {
       file,
       source_url: 'tools/props/props.py (this repository)',
       author: 'Project contributors',
@@ -57,7 +62,10 @@ for (const prop of catalog.props) {
       changes:
         'Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression',
       sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-    });
+    };
+    const previous = manifest.find((e) => e.file === file);
+    if (previous) Object.assign(previous, record);
+    else manifest.push(record);
   }
 }
 catalog.totalBytes = total;

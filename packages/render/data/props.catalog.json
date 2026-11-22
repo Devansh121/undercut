@@ -1367,7 +1367,556 @@
       },
       "attachments": [],
       "materials": ["concrete", "dark-steel", "galvanised", "glazing", "rubber"]
+    },
+    {
+      "id": "street-block",
+      "pivot": [0, 0, 0],
+      "tiles": true,
+      "moduleLength": 4,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/street-block_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 88,
+          "bytes": 6112
+        },
+        {
+          "file": "assets/props/street-block_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 88,
+          "bytes": 6016
+        },
+        {
+          "file": "assets/props/street-block_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 40,
+          "bytes": 3592
+        }
+      ],
+      "bounds": {
+        "min": [-0.4000000059604645, -3.4969112050475815e-8, -2],
+        "max": [0.4059999883174896, 1.162500023841858, 2]
+      },
+      "attachments": [{ "name": "fence", "position": [-0.12, 1.15, 0] }],
+      "materials": ["board-face", "concrete", "dark-steel"]
+    },
+    {
+      "id": "street-fence",
+      "pivot": [0, 0, 0],
+      "tiles": true,
+      "moduleLength": 4,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/street-fence_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 948,
+          "bytes": 15828
+        },
+        {
+          "file": "assets/props/street-fence_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 448,
+          "bytes": 9304
+        },
+        {
+          "file": "assets/props/street-fence_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 192,
+          "bytes": 6332
+        }
+      ],
+      "bounds": {
+        "min": [-0.07999977469444275, 0.00500035285949707, -2.080000162124634],
+        "max": [0.5784956812858582, 4.234827995300293, 2.0047554969787598]
+      },
+      "attachments": [],
+      "materials": ["dark-steel", "galvanised"]
+    },
+    {
+      "id": "street-fence-end",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/street-fence-end_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 84,
+          "bytes": 4872
+        },
+        {
+          "file": "assets/props/street-fence-end_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 52,
+          "bytes": 4468
+        },
+        {
+          "file": "assets/props/street-fence-end_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 52,
+          "bytes": 4468
+        }
+      ],
+      "bounds": {
+        "min": [-0.08000005036592484, 0, -0.07999999821186066],
+        "max": [0.5784956812858582, 4.234827995300293, 0.07999999821186066]
+      },
+      "attachments": [],
+      "materials": ["dark-steel", "galvanised"]
+    },
+    {
+      "id": "floodlight-mast",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/floodlight-mast_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 568,
+          "bytes": 15640
+        },
+        {
+          "file": "assets/props/floodlight-mast_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 172,
+          "bytes": 8696
+        },
+        {
+          "file": "assets/props/floodlight-mast_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 172,
+          "bytes": 8696
+        }
+      ],
+      "bounds": {
+        "min": [-0.75, -5.960464477539063e-8, -1.5],
+        "max": [0.75, 13.389999389648438, 1.5000001192092896]
+      },
+      "attachments": [
+        {
+          "name": "lamp-0",
+          "position": [0.4, 13.15, -1],
+          "material": "floodlight-emitter",
+          "direction": [1, -0.7, 0]
+        },
+        {
+          "name": "lamp-1",
+          "position": [0.4, 13.15, 0],
+          "material": "floodlight-emitter",
+          "direction": [1, -0.7, 0]
+        },
+        {
+          "name": "lamp-2",
+          "position": [0.4, 13.15, 1],
+          "material": "floodlight-emitter",
+          "direction": [1, -0.7, 0]
+        }
+      ],
+      "materials": ["concrete", "dark-steel", "floodlight-emitter", "galvanised"]
+    },
+    {
+      "id": "lighting-truss",
+      "pivot": [0, 0, 0],
+      "tiles": true,
+      "moduleLength": 4,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/lighting-truss_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 884,
+          "bytes": 16712
+        },
+        {
+          "file": "assets/props/lighting-truss_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 412,
+          "bytes": 9496
+        },
+        {
+          "file": "assets/props/lighting-truss_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 412,
+          "bytes": 9496
+        }
+      ],
+      "bounds": {
+        "min": [-0.34279775619506836, 0.0049998462200164795, -2.020923376083374],
+        "max": [0.4000000059604645, 0.7900000214576721, 2.020923137664795]
+      },
+      "attachments": [
+        { "name": "support-left", "position": [0, 0, -2] },
+        { "name": "support-right", "position": [0, 0, 2] },
+        {
+          "name": "lamp-0",
+          "position": [0.4, 0.55, -1],
+          "material": "floodlight-emitter",
+          "direction": [1, -0.7, 0]
+        },
+        {
+          "name": "lamp-1",
+          "position": [0.4, 0.55, 1],
+          "material": "floodlight-emitter",
+          "direction": [1, -0.7, 0]
+        }
+      ],
+      "materials": ["dark-steel", "floodlight-emitter", "galvanised"]
+    },
+    {
+      "id": "temporary-grandstand",
+      "pivot": [0, 0, 0],
+      "tiles": true,
+      "moduleLength": 8,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/temporary-grandstand_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 4000,
+          "triangles": 2904,
+          "bytes": 38880
+        },
+        {
+          "file": "assets/props/temporary-grandstand_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 2200,
+          "triangles": 1912,
+          "bytes": 28220
+        },
+        {
+          "file": "assets/props/temporary-grandstand_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 1800,
+          "triangles": 1552,
+          "bytes": 22092
+        }
+      ],
+      "bounds": {
+        "min": [-3.2245287895202637, -5.960464477539063e-8, -4],
+        "max": [3.614875078201294, 5.1883320808410645, 4]
+      },
+      "attachments": [
+        {
+          "name": "crowd-row-0",
+          "position": [3.08, 1.22, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-1",
+          "position": [2.2800000000000002, 1.64, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-2",
+          "position": [1.48, 2.06, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-3",
+          "position": [0.6799999999999998, 2.48, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-4",
+          "position": [-0.12, 2.9, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-5",
+          "position": [-0.9199999999999998, 3.3200000000000003, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-6",
+          "position": [-1.7200000000000006, 3.74, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        },
+        {
+          "name": "crowd-row-7",
+          "position": [-2.5200000000000005, 4.16, -3.35],
+          "axis": [0, 0, 1],
+          "spacing": 0.55,
+          "count": 12
+        }
+      ],
+      "materials": ["concrete", "dark-steel", "galvanised", "seat"]
+    },
+    {
+      "id": "marina-office",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/marina-office_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 652,
+          "bytes": 13852
+        },
+        {
+          "file": "assets/props/marina-office_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 524,
+          "bytes": 10836
+        },
+        {
+          "file": "assets/props/marina-office_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 440,
+          "bytes": 10276
+        }
+      ],
+      "bounds": {
+        "min": [-5.5, -4.76837158203125e-7, -9.5],
+        "max": [5.5, 21.850000381469727, 9.5]
+      },
+      "attachments": [
+        { "name": "window-mask", "position": [0, 0, 0], "material": "window-emissive-mask" }
+      ],
+      "materials": ["concrete", "dark-steel", "facade-mineral", "glazing", "window-emissive-mask"]
+    },
+    {
+      "id": "marina-hotel",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/marina-hotel_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 752,
+          "bytes": 14524
+        },
+        {
+          "file": "assets/props/marina-hotel_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 624,
+          "bytes": 11304
+        },
+        {
+          "file": "assets/props/marina-hotel_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 516,
+          "bytes": 10636
+        }
+      ],
+      "bounds": {
+        "min": [-6.5, -5.662441253662109e-7, -7.5],
+        "max": [6.5, 27.44999885559082, 7.5]
+      },
+      "attachments": [
+        { "name": "window-mask", "position": [0, 0, 0], "material": "window-emissive-mask" }
+      ],
+      "materials": ["concrete", "dark-steel", "facade-mineral", "glazing", "window-emissive-mask"]
+    },
+    {
+      "id": "marina-pavilion",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/marina-pavilion_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 336,
+          "bytes": 12244
+        },
+        {
+          "file": "assets/props/marina-pavilion_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 208,
+          "bytes": 9364
+        },
+        {
+          "file": "assets/props/marina-pavilion_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 208,
+          "bytes": 9364
+        }
+      ],
+      "bounds": {
+        "min": [-6.5, -5.662441253662109e-7, -11.5],
+        "max": [6.5, 7.849999904632568, 11.5]
+      },
+      "attachments": [
+        { "name": "window-mask", "position": [0, 0, 0], "material": "window-emissive-mask" }
+      ],
+      "materials": ["concrete", "dark-steel", "facade-mineral", "glazing", "window-emissive-mask"]
+    },
+    {
+      "id": "hill-pit-garage",
+      "pivot": [0, 0, 0],
+      "tiles": true,
+      "moduleLength": 6,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/hill-pit-garage_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 30000,
+          "triangles": 1448,
+          "bytes": 36680
+        },
+        {
+          "file": "assets/props/hill-pit-garage_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 12000,
+          "triangles": 696,
+          "bytes": 18920
+        },
+        {
+          "file": "assets/props/hill-pit-garage_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 2500,
+          "triangles": 444,
+          "bytes": 15916
+        }
+      ],
+      "bounds": {
+        "min": [-5.050000190734863, -4.3958425521850586e-7, -3],
+        "max": [7.5, 8.149999618530273, 3]
+      },
+      "attachments": [
+        {
+          "name": "garage-crew--1.8",
+          "position": [6.2, 0, -1.8],
+          "front": "+X",
+          "role": "mechanic"
+        },
+        { "name": "garage-crew-0", "position": [6.2, 0, 0], "front": "+X", "role": "mechanic" },
+        { "name": "garage-crew-1.8", "position": [6.2, 0, 1.8], "front": "+X", "role": "mechanic" },
+        { "name": "pit-box-crew", "position": [9, 0, 0], "front": "+X", "role": "mechanic" },
+        {
+          "name": "team-board",
+          "position": [4.98, 4.18, 0],
+          "size": [5.3, 0.7],
+          "uv": [0, 0, 1, 1]
+        }
+      ],
+      "materials": ["board-face", "concrete", "dark-steel", "galvanised", "glazing", "rubber"]
+    },
+    {
+      "id": "forest-spruce",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/forest-spruce_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 1000,
+          "triangles": 316,
+          "bytes": 9728
+        },
+        {
+          "file": "assets/props/forest-spruce_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 500,
+          "triangles": 124,
+          "bytes": 5596
+        },
+        {
+          "file": "assets/props/forest-spruce_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 100,
+          "triangles": 32,
+          "bytes": 4412
+        }
+      ],
+      "bounds": {
+        "min": [-2.8976798057556152, 0, -2.8711979389190674],
+        "max": [2.8281993865966797, 17.549999237060547, 2.68219256401062]
+      },
+      "attachments": [
+        { "name": "foliage", "position": [0, 9, 0], "material": "forest-spruce-needles" }
+      ],
+      "materials": ["forest-bark", "forest-spruce-needles"]
+    },
+    {
+      "id": "forest-fir",
+      "pivot": [0, 0, 0],
+      "tiles": false,
+      "moduleLength": 0,
+      "tileAxis": "+Z",
+      "lods": [
+        {
+          "file": "assets/props/forest-fir_high.glb",
+          "maxDistance": 80,
+          "triangleBudget": 1000,
+          "triangles": 316,
+          "bytes": 9772
+        },
+        {
+          "file": "assets/props/forest-fir_mobile.glb",
+          "maxDistance": 250,
+          "triangleBudget": 500,
+          "triangles": 124,
+          "bytes": 5524
+        },
+        {
+          "file": "assets/props/forest-fir_far.glb",
+          "maxDistance": 1200,
+          "triangleBudget": 100,
+          "triangles": 32,
+          "bytes": 4420
+        }
+      ],
+      "bounds": {
+        "min": [-2.4147331714630127, 0, -2.392664909362793],
+        "max": [2.35683274269104, 14.800000190734863, 2.2402288913726807]
+      },
+      "attachments": [
+        { "name": "foliage", "position": [0, 7.5, 0], "material": "forest-fir-needles" }
+      ],
+      "materials": ["forest-bark", "forest-fir-needles"]
     }
   ],
-  "totalBytes": 2422520
+  "totalBytes": 2854808
 }
