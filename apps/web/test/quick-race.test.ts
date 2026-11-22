@@ -39,3 +39,24 @@ it('Quick Race respects the requested starting grid position', () => {
   back.tick(NEUTRAL_INPUT, 'keyboard');
   expect(back.race.control.standings().find((r) => r.car === 0)?.position).toBe(20);
 });
+
+it('publishes the classification when the field has finished, not when the player has', () => {
+  const track = loadMonza();
+  const s = new DriveSession({ track, seed: 1, quickRace: { laps: 1, gridPosition: 1 } });
+  s.start();
+  s.scriptedRaceDriver = true;
+  // Up to the player's flag.
+  while (!s.playerFinished && s.world.time < 400) s.tick(NEUTRAL_INPUT, 'keyboard');
+  expect(s.playerFinished).toBe(true);
+  expect(s.result).toBeNull();
+  // Cars still racing are shown racing, not classified out.
+  const running = s.race.control.standings().filter((r) => r.status === 'running');
+  expect(running.length).toBeGreaterThan(0);
+  // The player's car keeps going on its cooldown lap (driven for the player).
+  s.scriptedRaceDriver = false;
+  for (let i = 0; i < 240; i++) s.tick(NEUTRAL_INPUT, 'keyboard');
+  expect(s.car.state.vx).toBeGreaterThan(10);
+  while (s.result === null && s.world.time < 600) s.tick(NEUTRAL_INPUT, 'keyboard');
+  expect(s.result).not.toBeNull();
+  expect(s.result!.entries.every((e) => e.status === 'finished')).toBe(true);
+}, 120_000);

@@ -140,6 +140,8 @@ export function installDebugApi(
       racePhase: s.race.control.phase,
       cars: s.race.world.cars.length,
       raceResult: s.result,
+      // The player has the flag and the field is still finishing (standings provisional).
+      provisional: s.playerFinished && s.result === null,
       standings: s.race.control.standings(),
       raceEvents: s.raceEvents.slice(-30),
       // Cars within 120 m of the player along the lap (evidence captures look for a pack).

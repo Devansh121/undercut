@@ -60,7 +60,7 @@ import {
   KeyboardAutopilot,
   ScriptedControlSource,
 } from './game/autopilot';
-import { GameLoop, type ControlSource } from './game/loop';
+import { GameLoop, MAX_TIME_SCALE, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
 import {
@@ -633,8 +633,24 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   raceStatus.dataset.testid = 'race-status';
   raceStatus.style.cssText =
     'padding:8px 16px;white-space:pre-line;text-align:center;max-height:60vh;overflow:auto;pointer-events:auto';
+  // After the player's flag: the field is still finishing; skip runs the race to its end at
+  // the fastest time scale.
+  const skipResults = document.createElement('button');
+  skipResults.type = 'button';
+  skipResults.className = 'button';
+  skipResults.dataset.testid = 'skip-results';
+  skipResults.textContent = 'Skip to results';
+  skipResults.hidden = true;
+  skipResults.style.pointerEvents = 'auto';
+  let skippingToResults = false;
+  skipResults.addEventListener('click', () => {
+    skippingToResults = true;
+    loop.timeScale = MAX_TIME_SCALE;
+    skipResults.hidden = true;
+  });
   if (session.quickRace) {
-    (hud.root.querySelector('.hud-control') ?? o.host).append(raceStatus);
+    const control = hud.root.querySelector('.hud-control') ?? o.host;
+    control.append(raceStatus, skipResults);
     hud.root.dataset.mode = 'race';
   }
 
@@ -757,6 +773,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
               ? ` · +${row.gap.toFixed(1)}s`
               : ''
           : '';
+      skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
+      if (session.result && skippingToResults) {
+        skippingToResults = false;
+        loop.timeScale = 1;
+      }
       raceStatus.textContent = session.result
         ? 'Race result\n' +
           session.result.entries
@@ -770,11 +791,26 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
               return `${e.position}  ${e.code}  ${e.status}${g}`;
             })
             .join('\n')
-        : c.phase === 'grid'
-          ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
-          : c.phase === 'lights'
-            ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
-            : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+        : session.playerFinished
+          ? `Chequered flag · P${row?.position ?? 20} · provisional\n` +
+            c
+              .standings()
+              .map((r) => {
+                const code = session.race.entrants[r.car]?.code ?? '';
+                const state =
+                  r.status === 'running'
+                    ? `racing, lap ${Math.min(r.lap, totalLaps)}`
+                    : r.status === 'finished'
+                      ? 'finished'
+                      : r.status;
+                return `${r.position}  ${code}  ${state}`;
+              })
+              .join('\n')
+          : c.phase === 'grid'
+            ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
+            : c.phase === 'lights'
+              ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
+              : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
     }
     view.render({
       pose,

@@ -29,6 +29,11 @@ test('Quick Race: grid, lights, moving field and player result', async ({ page }
   await page.evaluate(() => window.__undercut!.pause());
   await expect(page.locator('.pause__action[data-action="restart"]')).toHaveText('Restart race');
   await page.evaluate(() => window.__undercut!.resume());
+  // After the player's flag the standings are provisional until the field has finished.
+  await page.waitForFunction(() => window.__undercut!.state().provisional === true, null, {
+    timeout: 120_000,
+  });
+  expect(await page.evaluate(() => window.__undercut!.state().raceResult)).toBeNull();
   await page.waitForFunction(() => !!window.__undercut!.state().raceResult, null, {
     timeout: 120_000,
   });

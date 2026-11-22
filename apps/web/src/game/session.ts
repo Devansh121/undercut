@@ -113,6 +113,11 @@ export class DriveSession {
   readonly quickRace: boolean;
   private playerPilot: AiController | null = null;
   scriptedRaceDriver = false;
+  /**
+   * Quick Race: the player has taken the chequered flag. Standings are provisional until the
+   * session ends (`result`), and the race driver drives the cooldown lap.
+   */
+  playerFinished = false;
   readonly raceEvents: RaceEvent[] = [];
   result: SessionResult | null = null;
   readonly track: Track;
@@ -220,8 +225,9 @@ export class DriveSession {
         {
           entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0 },
           controller: new InputController((ctx, out) => {
-            if (this.scriptedRaceDriver && this.playerPilot) this.playerPilot.control(ctx, out);
-            else this.drive(out);
+            if ((this.scriptedRaceDriver || this.playerFinished) && this.playerPilot) {
+              this.playerPilot.control(ctx, out);
+            } else this.drive(out);
           }),
         },
         ...aiField.map((controller, i) => ({
@@ -433,7 +439,12 @@ export class DriveSession {
           this.result = this.race.result();
           this.end();
         }
-        if (e.type === 'finish' && e.car === 0) this.result = this.race.result();
+        // The player has the flag: the classification waits for the field (cars still racing
+        // are not "not classified"); the race driver takes the car round its cooldown lap.
+        if (e.type === 'finish' && e.car === 0 && !this.playerFinished) {
+          this.playerFinished = true;
+          this.playerPilot?.reset();
+        }
       }
       if (!('car' in e) || e.car === 0) this.onRaceEvent(e, events);
     }
