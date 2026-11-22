@@ -281,6 +281,8 @@ export class InputController implements CarController {
   }
 
   control(ctx: ControlContext, out: ControlInput): void {
+    // Only the player's assists set a per-wheel brake; the assisted pit lane never does.
+    out.wheelBrake = undefined;
     if (this.pit?.drive(ctx, out)) return;
     this.source(ctx, out);
   }

@@ -8,6 +8,7 @@ export * from './shaping';
 export * from './bindings';
 export * from './storage';
 export * from './assists';
+export * from './driver-aids';
 export { DeviceArbiter } from './arbiter';
 export { KeyboardAxisShaper, PASS_THROUGH, type AxisShaper, type Axes } from './axis-shaper';
 export { ActivityClock, type DeviceChange, type DeviceSource } from './sources/source';

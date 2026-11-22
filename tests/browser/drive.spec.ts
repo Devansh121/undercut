@@ -75,14 +75,25 @@ test.describe('drive', () => {
     const hudSpeed = Number(await page.locator('[data-testid=speed]').textContent());
     expect(hudSpeed).toBeGreaterThan(100);
 
-    // Steering left turns the car left (yaw grows).
-    await page.evaluate(() => window.__undercut?.drive({ throttle: 0.3, steer: 0.4 }));
-    await expect
-      .poll(async () => {
-        const t = await telemetry(page);
-        return Math.atan2(Math.sin(t.yaw - fast.yaw), Math.cos(t.yaw - fast.yaw));
-      })
-      .toBeGreaterThan(0.02);
+    // Steering left turns the car left (yaw grows). The yaw is read once 0.2 s of sim time has
+    // passed, at real time: about a second later the car meets the left wall of the straight and
+    // slides along it parallel to the straight, which hides the turn from a late reading (a slow
+    // runner's polls were that late). A frame advances at most 0.25 s, so this reads at 0.2 to
+    // 0.45 s.
+    const turned = await page.evaluate(async () => {
+      const u = window.__undercut!;
+      u.setTimeScale(1);
+      const yaw0 = u.telemetry().yaw as number;
+      const t0 = u.state().time as number;
+      u.drive({ throttle: 0.3, steer: 0.4 });
+      while ((u.state().time as number) < t0 + 0.2) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const yaw = u.telemetry().yaw as number;
+      u.setTimeScale(2);
+      return Math.atan2(Math.sin(yaw - yaw0), Math.cos(yaw - yaw0));
+    });
+    expect(turned).toBeGreaterThan(0.02);
 
     await page.evaluate(() => window.__undercut?.drive({ throttle: 0, brake: 1, steer: 0 }));
     await page.waitForFunction(() => (window.__undercut?.telemetry().speed as number) < 5, null, {
@@ -165,7 +176,11 @@ test.describe('drive', () => {
     await page.evaluate(
       ([s, d]) => {
         window.__undercut?.teleport(s, d, 108);
-        window.__undercut?.drive({ throttle: 1, steer: 0 });
+        // Every pedal explicitly: drive() merges into the held input, and the first test leaves
+        // the brake on. With it held (ABS trimming it to about 0.3) the car crawled at 30 m/s
+        // into the turn 1 run-off instead of making the owner's run, and parked where reverse
+        // could stall.
+        window.__undercut?.drive({ throttle: 1, brake: 0, steer: 0 });
         window.__undercut?.setTimeScale(8);
       },
       [slot.s, slot.d] as const,
@@ -453,6 +468,51 @@ test.describe('drive', () => {
     });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [point] });
     expect((await state(page)).device).toBe('touch');
+    expect(problems).toEqual([]);
+  });
+
+  test('shows every assist with a description in the pause menu and toggles stability', async ({
+    drive: { page, problems },
+  }) => {
+    await page.keyboard.press('Escape');
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    for (const id of ['tc', 'abs', 'stability', 'braking', 'gears', 'steering']) {
+      const row = menu.locator(`[data-setting=${id}]`);
+      await expect(row).toBeVisible();
+      await expect(row.locator('.pause__help')).not.toBeEmpty();
+    }
+    const stab = menu.locator('[data-setting=stability]');
+    await stab.getByRole('radio', { name: 'Off' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(0);
+    await stab.getByRole('radio', { name: 'On' }).click();
+    expect(((await state(page)).assists as { stability?: number }).stability).toBe(1);
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(menu).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+
+  test('a clumsy keyboard lap on the default assists completes without a spin', async ({
+    drive: { page, problems },
+  }) => {
+    // The keyboard autopilot as a clumsy player (late and early braking, flooring the throttle
+    // before the exits, slow feet), through the real key events, shaping and assists. The same
+    // seed spins with the stability assist off (apps/web/test/clumsy-lap.test.ts).
+    const before = (await state(page)).spins as number;
+    await page.evaluate(() => {
+      window.__undercut?.clumsyPilot(3);
+      window.__undercut?.setTimeScale(8);
+    });
+    let lastLap: number | null = null;
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline && lastLap === null) {
+      lastLap = ((await state(page)).lastLap as number | null | undefined) ?? null;
+      if (lastLap === null) await page.waitForTimeout(200);
+    }
+    const after = await state(page);
+    expect(lastLap).not.toBeNull();
+    expect((after.spins as number) - before).toBe(0);
+    expect(after.safetyResets).toBe(0);
     expect(problems).toEqual([]);
   });
 });

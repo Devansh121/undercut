@@ -11,6 +11,7 @@
  *   __undercut.setTimeScale(k)               // 0..8; 1 is real time
  *   __undercut.drive({ throttle: 1 })        // hold a scripted ControlInput; drive(null) ends it
  *   __undercut.autopilot(true)               // keyboard-only autopilot through the input layer
+ *   __undercut.clumsyPilot(7)                // the same, as a clumsy player (seeded mistakes)
  *   __undercut.camera('cockpit')             // set the camera; camera() reads it
  *   __undercut.pause() / resume() / restartLap() / resetToTrack()
  *   __undercut.capture()                     // state + telemetry + HUD text + recent events
@@ -38,6 +39,7 @@ export interface DebugApi {
   setTimeScale(scale: number): void;
   drive(control: Partial<ControlInput> | null): void;
   autopilot(on: boolean): void;
+  clumsyPilot(seed: number): void;
   camera(name?: CameraName): string;
   pause(): void;
   resume(): void;
@@ -148,6 +150,7 @@ export function installDebugApi(
       drsAvailable: s.drsAvailable,
       safetyResets: s.safetyResets,
       wallHits: s.wallHits,
+      spins: s.spins,
       camera: d.view.cameraName,
       viewBuilds: d.viewBuilds,
       device: s.device,
@@ -177,6 +180,7 @@ export function installDebugApi(
     },
     drive: (control) => need().drive(control),
     autopilot: (on) => need().autopilot(on),
+    clumsyPilot: (seed) => need().clumsyPilot(seed),
     camera: (name) => {
       const d = need();
       if (name) d.setCamera(name);
