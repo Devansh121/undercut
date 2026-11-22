@@ -57,12 +57,13 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
 
 /**
  * Cases that pass: fixed by the inelastic strike rule, or by it together with the contact patch
- * merged from master (#17). Every other case is still open. Traced in M4 (docs/track-data.md 5.6): the
- * three teleport(540, 8) cases and the run along the turn 2 run-off are thrown by the chicane's
- * 13 cm sausage kerbs (turn 1 inside, s 600–638, and turn 2), struck at speed, not by the
- * folded run-off ground beside them (which is real, up to 41 % at s 645–671, d 9–14, and pinned
- * in packages/track/test/runoff-grade.test.ts). Open cases run as expected failures, so each one turns this suite
- * red the moment it starts passing and must then move into this list.
+ * merged from master (#17). Every other case is still open. Traced in M4 (docs/track-data.md 5.6):
+ * the cases are decided by the grade through the first chicane's folded run-off (a 9 % ramp
+ * across a car's path inside turn 1, 41 % slopes inside turn 2, pinned in
+ * packages/track/test/runoff-grade.test.ts); with the elevation flattened the four traced runs
+ * pass, while changing the sausage kerb's height or the tyre's damping only reshuffles which
+ * reset. Open cases run as expected failures, so each one turns this suite red the moment it
+ * starts passing and must then move into this list.
  */
 // Eight more pass since the folded run-off is filled (docs/track-data.md 5.8), among them
 // 540,8,0.1,0, which had regressed with the contact patch.
@@ -89,7 +90,7 @@ const FIXED = new Set([
 ]);
 /**
  * Regressions: these passed with the strike fix before the merge with #17's contact patch and
- * fail after it (the patch changes each run's path; they end on the same open run-off ramps).
+ * fail after it (the patch changes each run's path through the chicane's folded run-off).
  * Listed on their own so they are not mistaken for cases that never passed.
  */
 export const REGRESSED_WITH_PATCH = ['610,8,-0.1,2', '5600,8,0,2'];
@@ -103,7 +104,7 @@ describe('flat-out kerb strikes in the game never need the safety net (review of
       session.teleport(s, d, 300 / 3.6);
       session.setAssist('tractionControl', tc);
       // The physics under test, not the stability assist: with it on, its wheel braking keeps
-      // some of these runs off the open run-off ramps and they would pass for that reason.
+      // some of these runs out of the chicane's folded run-off and they would pass for that reason.
       session.setAssist('stability', 0);
       const input = { ...NEUTRAL_INPUT, throttle: 1, steer };
       for (let k = 0; k < 240 * 15 && session.safetyResets === 0; k++)

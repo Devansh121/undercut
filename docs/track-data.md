@@ -303,18 +303,57 @@ ground excluded):
 The contract: off-track ground that is not a kerb is no steeper than the steepest centreline
 grade and bank within 50 m plus the drainage fall plus 5 %.
 
-**What it does not cause.** The PR 19 kerb-safety cases that block the low-trim downforce
-increase (docs/physics-validation.md 7.9: teleport(540, 8, 300 km/h) with steer −0.1 at TC 0
-and 2, and steer 0 at TC 0) were traced tick by tick. Each crosses the track at 300 km/h and
-strikes the turn 1 inside kerb's 13 cm sausage (the authored `chicane` profile, 1.75–2.05 m
-beyond the edge, s 600–638): three wheels unload, one meets the tyre's bottoming ceiling
-(23.7 kN), and the car is thrown and spins. With low-trim ClA 3.6 (master) the floor peaks at
-0.46 m and the wheel centres stay under their limit; with 3.9 the floor reaches 0.60 m and a
-wheel centre 1.02 m against 1.004, so the safety net acts. The car lands on the turn 1 inside
-run-off, which is smooth along its path. A run along the turn 2 inside run-off from (620, 11)
-at 300 km/h meets the barrier, scrapes along it at about 115 km/h and is thrown by the turn 2
-sausage from behind at s 660; the pocket it crosses rises about 4 % along its path. The note in
-STATUS that these were launches off the run-off ramps was wrong.
+**What launches the car (corrected).** The first version of this section (PR 41) blamed the
+chicane's 13 cm sausage kerbs. Measurements in the next step show the sausage does not decide
+the outcome; the grade through the folded run-off does. The PR 19 kerb-safety cases that block
+the low-trim downforce increase (docs/physics-validation.md 7.9) were run in the game session
+(seed 77123, 15 s from 300 km/h, stability assist off) with one thing changed at a time. Safety
+resets for teleport(540, 8) steer −0.1 at TC 0 / steer −0.1 at TC 2 / steer 0 at TC 0, and the
+run along the turn 2 inside run-off from (620, 11):
+
+| Variant | Low-trim ClA 3.6 | ClA 3.9 |
+|---|---|---|
+| As built | 0 / 0 / 0 / 1 | 1 / 1 / 1 / 1 |
+| Centreline elevation flattened (no grade) | 0 / 0 / 0 / 0 (floor ≤ 0.45 m) | 0 / 0 / 0 / 0 (floor ≤ 0.48 m) |
+| Elevation relief × 0.5 | 0 / 0 / 1 / 0 | 0 / 0 / 1 / 0 |
+| Elevation relief × 0.75 | 0 / 0 / 0 / 1 | 1 / 0 / 1 / 1 |
+| Sausage top 8 cm (same shape) | 1 / 0 / 0 / 1 | 1 / 1 / 0 / 1 |
+| Sausage top 5 cm (a flat kerb) | 1 / 1 / 0 / 1 | 1 / 1 / 0 / 1 |
+| Chicane kerb as the FIA's combination kerb (below) | 0 / 1 / 1 / 1 | 1 / 1 / 1 / 1 |
+| Tyre vertical damping 3 kN·s/m (from 7) | 1 / 0 / 1 / 1 | 1 / 0 / 1 / 1 |
+| Tyre vertical damping 1 kN·s/m | 0 / 0 / 1 / 1 | 0 / 0 / 1 / 1 |
+
+With no grade every run stays on its pose limits at both downforce levels; changing the kerb or
+the tyre's damping only reshuffles which runs reset. Inside turn 1 the run-off at d −8.6 rises
+0.49 m over 28 m of s, which the fold packs into about 6 m of the world: a 9 % ramp across the
+car's path at 300 km/h. Single runs are sensitive to their exact path (a flat-out car crossing
+kerbs at 300 km/h bounces 0.25–0.5 m even with no grade), so the table is evidence for the
+cause, not a per-case prediction.
+
+**Kerb dimensions.** No published height, profile or spacing was found for the raised element
+behind Monza's turn 1 kerbs in 2023–2025: the FIA's 2024 event notes say only "All kerbs have
+been replaced with new kerbs" [24]. Documented values elsewhere: the FIA circuit drawing
+standard's Type 4 combination kerb, "A smooth profile kerb, 80cm wide, rising to 12cm above
+track level, for the apex of all corners. This should be installed behind 5cm Vallelunga or
+Bevelled kerb" [25]; the race director in 2021 on current practice, "They are the 50mm ones
+that we normally have in a lot of places" [26]. The authored `chicane` profile (13 cm, a 0.3 m
+top 1.75–2.05 m out) has no source. Replacing it with the Type 4 element (12 cm, rounded,
+1.6–2.4 m out; the documented maximum) left every reference lap and racing line bit-identical
+but made two kerb-safety cases that pass with the authored profile reset with master's car
+(table above), and a 5 cm top did the same; the authored profile stays, recorded as unsourced.
+
+**The tyre at a kerb strike.** Through the turn 1 strike most of the tyre's vertical force is
+its damping term (for example 14.5 kN of 20.2 kN), and loads reach the bottoming ceiling (23.7
+kN). That term, 7 kN·s/m, is the documented stand-in for the body's heave damping, carried on
+the tyre's deflection rate (physics-validation 1.6), so at a kerb face it acts on how fast the
+kerb rises into the tyre. No measured damping coefficient for any racing slick was found in
+open sources (only a measured vertical stiffness of 130 kN/m for an F4 slick [27], and an F3
+car's tyres taking most of its axle travel [28], against the model's 300 kN/m for an 18-inch
+tyre, for which no figure was found); with
+no source and no effect on the outcome (table above), it is not changed. Past the bottoming
+depth `liftOutOfGround` lifts the whole car, body and wheels, inelastically; a rim strike would
+move that wheel into its suspension first. Recorded, not changed: the table shows the strike's
+details do not decide these cases.
 
 **Tried and not kept.** Two world-space treatments of the folded ground: a base blended to the
 centreline height averaged over world distance (gated by m), and the ground itself smoothed in
@@ -322,11 +361,11 @@ the world with a width growing as the frame folds. Both left the contract failin
 Spa 29–44 %, from the blend itself where m changes quickly along s), and neither changed the
 three cases or the turn 2 run at ClA 3.9. The turn 2 pocket is enclosed by the track before and
 after the chicane, 26 m apart along s (0.73 m in height) and 6–8 m apart in the world, so any
-ground joining them climbs about 10 % there, which is the contract's own bound at that spot; a
-fix needs a ground that interpolates between the bounding edges (or elevation data with less
-grade through the chicane), and a contract that allows that geometric minimum. The car's
-response to a sausage at 300 km/h (and the sausage's authored 13 cm, which has no source) is
-what decides the kerb-safety cases.
+ground joining them climbs about 10 % there. The elevation is the Copernicus profile opened over
+300 m and averaged over 90 m (section 2.3), whose relative accuracy is about 2 m [12]; the 0.7 m
+rise across this 26 m of lap is below what it resolves. The next step is the elevation through
+the chicane (or a ground that interpolates between the bounding track edges), with every passing
+check re-run.
 
 ### 5.7 Filling the folded run-off: the first version
 
@@ -444,3 +483,8 @@ All URLs were opened while doing this work (2026-11-21).
 21. Formula 1, Belgian Grand Prix 2025 event page. https://www.formula1.com/en/racing/2025/belgium
 22. Formula 1, Singapore Grand Prix 2025 event page. https://www.formula1.com/en/racing/2025/singapore
 23. FIA, 2024 Singapore Grand Prix, Event Notes: circuit map, pit lane drawing and red zones. https://www.fia.com/sites/default/files/decision-document/2024%20Singapore%20Grand%20Prix%20-%20Event%20Notes%20-%20Circuit%20Map,%20Pit%20Lane%20Drawing%20and%20Red%20Zones.pdf
+24. FIA, 2024 Italian Grand Prix, Race Director's Event Notes V3 (2024-08-31), section 25. https://fia.com/sites/default/files/decision-document/2024%20Italian%20Grand%20Prix%20-%20Race%20Director's%20Event%20Notes%20V3.pdf
+25. FIA, "List of Requirements for the Circuit Drawing", circuit drawing standard release 3.2 (2012-12-18), kerb types. https://www.fia.com/sites/default/files/regulation/file/List%20of%20Requirements%20for%20the%20Circuit%20Drawing%20-%20published%20on%2018.12.2012_0.pdf
+26. Motorsport.com, J. Noble, "Why the FIA rejected calls to ditch Paul Ricard sausage kerbs" (2021-06-22). https://www.motorsport.com/f1/news/why-the-fia-rejected-calls-to-ditch-paul-ricard-sausage-kerbs/6596554/
+27. C. Benini, M. Gadola, D. Chindamo et al., "The influence of suspension components friction on race car vertical dynamics", Vehicle System Dynamics 55(3) (2017): F4 car, "a 130 N/mm tyre vertical stiffness in running conditions". https://sites.usp.br/ldsv/wp-content/uploads/sites/1453/2024/08/The-influence-of-suspension-components-friction-on-race-car-vertical-dynamics_17.pdf
+28. Marchesin et al., "High downforce race car vertical dynamics: aerodynamic index", Vehicle System Dynamics (2017): F3 car, tyre deflection 15 of 22 mm front and 18 of 36 mm rear in a 0–230 km/h sweep. https://sites.usp.br/ldsv/wp-content/uploads/sites/1453/2024/08/High-downforce-race-car-vertical-dynamics-aerodynamic-index_17.pdf
