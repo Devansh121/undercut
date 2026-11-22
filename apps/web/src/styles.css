@@ -1893,3 +1893,34 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
     align-items: stretch;
   }
 }
+
+/* iPhone: how to get full screen (a home-screen launch). Launch screen only, top centre. */
+.home-hint {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: max(var(--safe), env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: max-content;
+  max-width: calc(100vw - 2 * max(var(--safe), env(safe-area-inset-left, 0px)));
+  box-sizing: border-box;
+  padding: 4px 4px 4px 14px;
+  background: var(--c-ink-1);
+  border-left: 3px solid var(--c-accent);
+  box-shadow: var(--e-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  line-height: 1.35;
+  color: var(--c-text-1);
+}
+.home-hint .ibtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+html:not([data-screen='launch']) .home-hint {
+  display: none;
+}

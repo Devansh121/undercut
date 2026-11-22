@@ -58,6 +58,10 @@ export const S = {
     ready: 'A new version is ready.',
     reload: 'Reload',
   },
+  homeScreen: {
+    hint: 'For full screen, add the game to your Home Screen: tap Share, then Add to Home Screen.',
+    close: 'Close',
+  },
   launch: {
     tagline: (teams: number, drivers: number) =>
       `Open-wheel racing on measured circuits. ${cap(words(teams))} teams, ${words(drivers)} drivers, one car built to the regulations.`,

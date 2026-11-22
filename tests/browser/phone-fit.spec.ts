@@ -125,3 +125,25 @@ for (const size of SIZES) {
     expect(problems).toEqual([]);
   });
 }
+
+test('an iPhone browser is told once how to get full screen', async ({ page }, info) => {
+  test.skip(!/phone/.test(info.project.name), 'phone projects only');
+  const hint = page.getByTestId('home-screen-hint');
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/');
+  await expect(page.locator('[data-action=press-start]')).toBeVisible();
+  if (info.project.name !== 'webkit-phone') {
+    // Android and desktop Chromium have their own fullscreen and install.
+    await expect(hint).toHaveCount(0);
+    return;
+  }
+  await expect(hint).toContainText('Add to Home Screen');
+  const box = (await hint.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  await hint.locator('[data-action=home-hint-close]').click();
+  await expect(hint).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-action=press-start]')).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});
