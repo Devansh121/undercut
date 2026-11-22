@@ -55,6 +55,11 @@ export interface OnlineRaceReport {
   elapsedRaceMs: number;
   /** Clock-sync error bound when the car was let go, ms. */
   clockErrorMs: number | null;
+  /**
+   * Most start lamps this browser's HUD has shown lit. The lights are on for about 3.5 s; a
+   * check made afterwards reads what the player saw here instead of having to catch it live.
+   */
+  lightsShownMax: number;
   laps: number;
   claims: { lap: number; raceMs: number; lapMs: number }[];
   timing: { lap: number; status: string; reason: string | null }[];
@@ -153,6 +158,7 @@ export class OnlineRace implements DriveExtension {
       releasedSimTime: null,
       elapsedRaceMs: 0,
       clockErrorMs: null,
+      lightsShownMax: 0,
       laps: 0,
       claims: [],
       timing: [],
@@ -420,6 +426,7 @@ export class OnlineRace implements DriveExtension {
       caption = 'On the grid';
     } else if (start && now !== null && now < start.lightsOutAt) {
       lights = lightsOn(start, now);
+      this.report.lightsShownMax = Math.max(this.report.lightsShownMax, lights);
     } else if (now !== null && now < this.goUntil) {
       caption = 'Lights out';
     }

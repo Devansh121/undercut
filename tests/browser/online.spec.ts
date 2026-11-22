@@ -4,7 +4,10 @@ import { openMenu } from './helpers';
 import { DEFAULT_CIRCUIT } from '@undercut/protocol';
 
 // Keep DOM/network traces; continuous raster captures compete with two software renderers.
-// Explicit lobby/lights/track screenshots below supply the visual evidence.
+// The lobby screenshots below are the visual evidence. Nothing is captured once the race is on:
+// on software WebGL one screenshot holds a page's frame loop for 5 to 13 s, longer than the start
+// lights (about 3.5 s), than the 6 s of silence after which the room marks a racing driver away
+// (and hands a silent host's role to a guest), and most of the 15 s finish window.
 test.use({ trace: { mode: 'retain-on-failure', screenshots: false } });
 
 test('two players race, rematch, leave and migrate the host', async ({
@@ -60,24 +63,14 @@ test('two players race, rematch, leave and migrate the host', async ({
     await guest.screenshot({ path: info.outputPath('lobby-phone.png') });
     await guest.getByRole('button', { name: 'Ready', exact: true }).click();
     await host.getByRole('button', { name: 'Ready to start', exact: true }).click();
-    await Promise.all(
-      (
-        [
-          [host, 'desktop'],
-          [guest, 'phone'],
-        ] as const
-      ).map(async ([page, label]) => {
-        await expect(page.locator('.online-lights__lamp.is-lit').first()).toBeVisible({
-          timeout: 90_000,
-        });
-        await expect(page.locator('.online-race__net')).toBeHidden();
-        await page.screenshot({ path: info.outputPath('lights-' + label + '.png') });
-      }),
-    );
+    // The lights are on for about 3.5 s: wait for the release, which stays true, and read back
+    // how many lamps each HUD showed rather than trying to catch a lit lamp live.
     for (const page of [host, guest]) {
       await expect
         .poll(async () => (await state(page)).race?.released, { timeout: 90_000 })
         .toBe(true);
+      expect((await state(page)).race?.lightsShownMax).toBeGreaterThanOrEqual(1);
+      await expect(page.locator('.online-race__net')).toBeHidden();
       await expect(page.locator('.online-lights')).toBeHidden();
       await expect(page.locator('.online-standing')).toBeVisible();
     }
@@ -92,17 +85,22 @@ test('two players race, rematch, leave and migrate the host', async ({
       expect(r.releasedServerAt! - r.start!.lightsOutAt).toBeLessThan(1000 / 240);
     }
     console.log('Online clock agreement', JSON.stringify({ host: a, guest: b }));
+    // Every shader is compiled before the lights: a first compile mid-race holds the page (a
+    // synchronous link check waits for the GPU queue) for seconds on software WebGL. Checked again
+    // once the host's lap is in: the cars are far apart by then (the remote car is at `far`), and
+    // both views are still up (they close with the results).
+    const programs = (p: Page) => p.evaluate(() => window.__undercut!.rendererInfo().programs);
+    const programsAtStart = [await programs(host), await programs(guest)];
     // Drive through the line only after the normal physical timing floor has elapsed.
     const floor = (await state(host)).state!.room!.settings.circuit.minLapMs;
     await expect
       .poll(async () => (await state(host)).race?.elapsedRaceMs ?? 0, { timeout: 90_000 })
       .toBeGreaterThan(floor + 1000);
-    for (const [page, label] of [
-      [host, 'desktop'],
-      [guest, 'phone'],
-    ] as const) {
+    for (const page of [host, guest])
       await expect.poll(async () => (await state(page)).race?.remote.length).toBe(1);
-      await page.screenshot({ path: info.outputPath('track-' + label + '.png') });
+    // Host first, so the result order is known. The host's crossing opens the 15 s finish window,
+    // so the guest sets off as soon as the host's lap is in, with nothing slow in between.
+    for (const page of [host, guest]) {
       await page.evaluate(() => {
         window.__undercut!.teleport(5460, 0, 180);
         window.__undercut!.drive({ throttle: 0.3 });
@@ -111,6 +109,8 @@ test('two players race, rematch, leave and migrate the host', async ({
         .poll(async () => (await state(page)).race?.claims.length, { timeout: 20_000 })
         .toBe(1);
       await expect.poll(async () => (await state(page)).race?.timing[0]?.status).toBe('accepted');
+      if (page === host)
+        expect([await programs(host), await programs(guest)]).toEqual(programsAtStart);
     }
     for (const page of [host, guest])
       await expect(page.getByTestId('online-results')).toBeVisible({ timeout: 30_000 });

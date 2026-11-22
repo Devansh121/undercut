@@ -14,6 +14,7 @@ declare global {
         start: { lightsOutAt: number } | null;
         lightsOutLocalEpoch: number | null;
         clockErrorMs: number | null;
+        lightsShownMax: number;
         remote: unknown[];
         claims: unknown[];
         timing: { status: string }[];
