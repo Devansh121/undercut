@@ -184,9 +184,24 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 - First Cloudflare deploy: run `npx wrangler login`, then `npm run deploy` (steps, rollback, takedown and Free plan numbers are in `docs/DEPLOY.md`). Nothing is deployed automatically from CI or from this branch.
 
+### Decided for you — cockpit pass and crew polish
+
+- The cockpit had about 400 triangles of headroom on High and Mobile. Its new wheel, hands and padding are paid for by the floor (32 stations along it instead of 40; it is seen edge-on or not at all) and the DRS flap (10 spanwise stations instead of 22; it is straight). The car build now fails above 120k / 40k / 12k.
+- Gloves are a light grey suede material rather than team paint: the team's dark primary made the hands black lumps against the black wheel, by day and at night.
+- Carbon tows are 3 mm (3K-class twill) instead of 6 mm. The carbon carries fibre anisotropy (`KHR_materials_anisotropy` with a twill direction map); the presets without clear coat (Mobile, Lite) turn it off for shader cost.
+- Squashed metric UVs on carbon are re-projected at export and stored at 14 bits instead of 12 (+4 % car size): the anisotropy otherwise met zero tangent frames and turned the frame black. The car shader also guards a zero frame.
+- On Mobile the wheel's push buttons are left off: the phone's driver cluster covers the wheel face, and the triangles went to smoother hands.
+- Seated figures sit at one height across LODs (0.424–0.425 m); the props build fails on a mismatch over 6 mm.
+
 ### Decided for you — modular prop kit
 
 - Deliver a versioned catalogue and GLBs without changing the world-dressing branch's placement code. The inspected branch has no catalogue loader. Modules tile along +Z, face +X and use metres; stand row dimensions match its existing procedural stands.
 - Leave tree impostors to the dressing slice. Use real coarse wire geometry for the near catch fence, reduced in the middle and absent in the far level; moving-camera shimmer remains an integration check.
 - Add team-tintable helmeted mechanics and pit-wall engineers with garage, pit-box and timing-stand anchors. Original scripted assets avoid third-party licence and transfer costs.
 - Seated figures expose their seat contact (thigh undersides, measured from the geometry), not the 0.50 m hip joint, as the `seat` attachment, so a figure placed on a row surface does not sink into it. Only the High crew get the detailed garment build; Mobile and Far stay simple for instancing. Helmeted mechanics wear a dark balaclava rather than showing a bare neck.
+
+### Decided for you — cockpit review follow-up
+
+- The gauntlet joins are derived from the steering-column transform and the sleeve endpoints; rear caps sit inside the sleeve and the thumbs curl around the grips. High wheel legends and rotary indicators use a texture on existing polygons; glove seam and restrained wear detail use a small suede texture.
+- The crouched mechanic uses one connected garment surface across the torso, pelvis and thigh roots, replacing the overlapping hip shell.
+- Track separately: the Mobile HUD obscures the wheel display, the mirrors remain dark in some lighting, and the halo weave reads as coarse zigzags at Mobile resolution. These need HUD/render review; this asset correction keeps their existing pipelines.

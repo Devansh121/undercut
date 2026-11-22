@@ -410,7 +410,9 @@ def inlet_roof(x):
 
 
 def build_floor(mesh_carbon, mesh_dark, q):
-    nx = q.n(40, 10)
+    # 32 stations along the floor (16 on Mobile): it is seen edge-on or not at all, and the
+    # triangles it gave up pay for the cockpit (wheel, gloves, padding) within the LOD budgets.
+    nx = q.n(32, 8)
     xs = [lerp(D.X_FLOOR_FRONT, D.X_DIFFUSER_EXIT, k / nx) for k in range(nx + 1)]
     xs = sorted(set(xs + [D.X_DIFFUSER_START, D.X_FLOOR_BODY_START]), reverse=True)
     n_in, n_out = q.n(20, 6), q.n(16, 4)

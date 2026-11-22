@@ -3,6 +3,8 @@
 //
 //   npm run build && npm run shots -- monza            every station, both sizes
 //   npm run shots -- monza --only grid,cockpit         some stations
+//   npm run shots -- monza --only cockpit,cockpit-chicane,cockpit-lesmo --query tod=night-floodlit
+//                                                      the cockpit tour at night
 //   npm run shots -- monza --perf                      also frame-time runs (drive, full grid) at
 //                                                      1080p High and 844x390 Mobile, vsync off
 //   npm run shots -- monza --moving                    also a 10 s recording cut into frame strips
@@ -115,6 +117,9 @@ const STATIONS = [
   { name: 'chicane-braking', camera: 'chase-near', run: drive(380, 300, 545) },
   { name: 'fast-corner', camera: 'chase-far', run: drive(900, 250, 1060) },
   { name: 'cockpit', camera: 'cockpit', run: drive(4980, 200, 5180) },
+  // The cockpit at two more places round the lap: braking for the first chicane, and Lesmo.
+  { name: 'cockpit-chicane', camera: 'cockpit', run: drive(380, 300, 520) },
+  { name: 'cockpit-lesmo', camera: 'cockpit', run: drive(1450, 280, 1640) },
   { name: 'tcam', camera: 'tcam', run: drive(1450, 280, 1700) },
   { name: 'straight', camera: 'chase-near', run: drive(5300, 260, 5640) },
   {
@@ -311,11 +316,20 @@ function startServer() {
 async function waitForServer(server) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
+    let body = null;
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/`);
-      if (res.ok) return;
+      if (res.ok) body = await res.text();
     } catch {
       // not up yet
+    }
+    if (body !== null) {
+      // Another checkout's server on the same port would answer too, and the stations would
+      // capture its game. Only this checkout's build will do.
+      const ours = fs.readFileSync(path.join(root, 'apps/web/dist/index.html'), 'utf8');
+      if (body !== ours)
+        throw new Error(`port ${PORT} serves another build (set SHOTS_PORT to a free port)`);
+      return;
     }
     if (server.child.exitCode !== null) throw new Error(`server exited:\n${server.output()}`);
     await new Promise((r) => setTimeout(r, 300));
@@ -370,7 +384,9 @@ async function shots(browser, report) {
   for (const vp of VIEWPORTS) {
     if (sizes && !sizes.includes(vp.label)) continue;
     const launchFile = path.join(outDir, `launch-${vp.label}.png`);
-    const { context, page, errors } = await openGame(browser, vp, '', launchFile);
+    // `--query tod=night-floodlit` (or any extra URL parameters) applies to every station.
+    const query = option('query') ? `&${option('query')}` : '';
+    const { context, page, errors } = await openGame(browser, vp, query, launchFile);
     console.log(`  ${path.relative(root, launchFile)}`);
     for (const station of STATIONS) {
       if (only && !only.includes(station.name)) continue;

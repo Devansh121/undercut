@@ -8,13 +8,13 @@ All under `apps/web/public/assets/car/` (served at `assets/car/` from the client
 
 | File | Use | Triangles | Draw calls | Size |
 | --- | --- | --- | --- | --- |
-| `car_high.glb` | Player car and close cars on the High preset | 119,602 | 36 | 1.31 MB |
-| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,616 | 23 | 0.61 MB |
-| `car_far.glb` | Distant cars on any preset | 10,584 | 11 | 0.19 MB |
+| `car_high.glb` | Player car and close cars on the High preset | 119,582 | 40 | 1.43 MB |
+| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,950 | 25 | 0.65 MB |
+| `car_far.glb` | Distant cars on any preset | 10,296 | 11 | 0.20 MB |
 | `livery/<team id>.png` | Livery mask, 1024 × 1024, one per team (ten) | | | 26–60 KB each |
 | `livery/index.json` | Team id → mask file and the three colours (from `design/teams.json`) | | | |
 
-Everything together is 2.5 MB. Triangles and draw calls are counted on the shipped files by `npm run car:build` and recorded per node in `docs/evidence/m2-car/stats.json`.
+Everything together is 2.7 MB. Triangles and draw calls are counted on the shipped files by `npm run car:build` and recorded per node in `docs/evidence/m2-car/stats.json`; the build fails if a level exceeds its triangle budget (120k, 40k, 12k).
 
 ## Loading
 
@@ -71,7 +71,7 @@ Names are the same in all LODs except where noted. Signs follow the right-hand r
 | `upright_*` | Wheel centre, under `steer_*` (front) or `suspension_*` (rear) | Does not spin. Carries the brake duct, caliper, wheel-wake deflector and the brake disc (a smooth solid of revolution, so it needs no spin). Brake glow: clone the `brake_disc` material per corner and set its `emissiveIntensity` (0 = cold, about 4 = glowing). The file's emissive factor is 1 with a ramp texture, so the renderer **must** set the intensity, starting at 0. Not in the far LOD | |
 | `suspension_links` | Car origin | All wishbones, track rods, push and pull rods, toe links and driveshafts in one mesh with six morph targets: `bump_FL/FR/RL/RR` (that corner at `extras.morph.bump_ref_m` = 0.03 m of bump) and `steer_FL/FR` (that front corner at `extras.morph.steer_ref_rad` = 0.35 rad of left steer). Set `influence = travel / 0.03` and `steer / 0.35`; negative influences give droop and right steer. Each target is the links rotated rigidly about their inboard joints, so the blend stays within about 1 mm over ±30 mm and ±20°. Not in the far LOD | All zero |
 | `drs_flap` | Spanwise hinge at the flap trailing edge | Rotate about +Z by `extras.open_deg` (22°) to open: the leading edge rises and the slot opens about 85 mm. The flap's tips stay in the static rolled wingtips | Closed |
-| `steering_wheel` | Wheel centre | Rotate about `extras.axis` (the column, pointing at the driver), positive = left. Carries the driver's gloves. A material `display` on its face is the dash display: set an emissive `CanvasTexture` (UV1 0..1 across the screen). Not in the far LOD | Centred |
+| `steering_wheel` | Wheel centre | Rotate about `extras.axis` (the column, pointing at the driver), positive = left. Carries the driver's gloves (closed fists on the grips, thumbs on the faceplate, gauntlets with wrist straps), the bevelled carbon faceplate, push buttons, rotary switches and rubber grips. A material `display` on its face, in a bezel, is the dash display: set an emissive `CanvasTexture` (UV1 0..1 across the screen, 1.6:1 like the 256 × 160 canvas). Not in the far LOD | Centred |
 | `helmet` | Neck, 0.10 m below the helmet centre | Rotate about +Y: head yaw, positive = left | Facing forward |
 | `rain_light` | Lamp behind the bezel on the crash-structure tip | Material `rain_light`: set `emissive` to red and drive `emissiveIntensity` (0 off) | Off |
 
@@ -96,4 +96,4 @@ Switch down at the threshold and back up only at 1.15 × the threshold, so a car
 
 ## Materials
 
-`paint` (clear coated, recoloured as above), `carbon` (twill normal map on UV1, soft clear coat), `carbon_matte` (floor, fences, diffuser), `tyre`, `rim`, `brake_disc`, `metal_dark`, `exhaust`, `dark`, `visor`, `mirror_glass`, `display`, `rain_light`, `decal`. The levels of detail merge minor materials to save draw calls (on Mobile, for example, `carbon_matte` becomes `carbon` and the wheel cover becomes `rim`), so look materials up by name and expect some to be absent.
+`paint` (clear coated, recoloured as above), `carbon` (2×2 twill with 3 mm tows: normal and base colour on UV1, soft clear coat, and `KHR_materials_anisotropy` with a direction texture that follows the tows, so highlights stretch along the fibres and alternate with the weave; three.js reads it as `anisotropyMap` and the presets without clear coat set `anisotropy` to 0), `carbon_matte` (floor, fences, diffuser), `tyre`, `rim`, `brake_disc`, `metal_dark`, `exhaust`, `dark`, `visor`, `mirror_glass`, `display`, `rain_light`, `decal`. The levels of detail merge minor materials to save draw calls (on Mobile, for example, `carbon_matte` becomes `carbon` and the wheel cover becomes `rim`), so look materials up by name and expect some to be absent.
