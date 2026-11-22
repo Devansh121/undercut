@@ -1730,8 +1730,10 @@ body {
   overflow: auto;
   pointer-events: auto;
 }
-/* After the player's flag the standings take the screen: the driving cluster goes. */
-.hud[data-finished] .hud-cluster {
+/* After the player's flag the standings take the screen: the driving cluster and the
+   first-lap coach go. */
+.hud[data-finished] .hud-cluster,
+.hud[data-finished] ~ .onboarding {
   display: none;
 }
 /* On a short screen the standings leave room for Skip to results under them. */
