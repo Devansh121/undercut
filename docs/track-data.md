@@ -367,6 +367,144 @@ rise across this 26 m of lap is below what it resolves. The next step is the ele
 the chicane (or a ground that interpolates between the bounding track edges), with every passing
 check re-run.
 
+### 5.7 Filling the folded run-off: the first version
+
+The first version of the fill (commit 0f42f90), measured before the changes of section 5.8.
+Wherever a bend folds before its barrier (the frame's stretch at the barrier, 1 − κd, below
+0.6), the run-off inside it, from the track edge to the barrier, is
+solved on a 0.5 m grid when the track is built: the least-squares plane through the fixed heights
+around the zone (the track edges, the unfolded run-off where the zone ends) plus the smoothest
+(harmonic) departure from it, barriers as free edges, and the ground normal from the world
+gradient. A plain harmonic fill does not work: on a bend with a steady grade the unfolded ground
+already rises with the angle round the bend's centre, which is harmonic, so Laplace's equation
+reproduces the fold. Outside those zones the ground is unchanged. Results, master → fill:
+
+| Measure | Master | Fill |
+|---|---|---|
+| Run-off contract, Monza worst | 40.8 % (turn 2 inside), 20.6 % (turn 1 inside) | 20.4 %, 10.2 %; 31 cells over (100) |
+| Run-off contract, Spa worst | 36.1 % (near s 3210) | 40.4 % near s 3219; 1100 cells over (1156) |
+| Run-off contract, Singapore | passes | passes |
+| Game kerb-review cases (ClA 3.6) | 11 pass | 27 pass: 18 open ones pass, but teleport(5600, 0) at TC 0 and 2 reset |
+| Sim kerb-review cases | 2 pass | 11 pass: 10 open ones pass, but seed 97513 fails (wheel centre 1.005 m against 1.004) |
+| Blocking runs at ClA 3.6: (540, 8) steer −0.1 TC 0 / TC 2 / steer 0; turn 2 run | 0 / 0 / 0 / 1 resets | 0 / 0 / 0 / 0 |
+| The same at ClA 3.9 | 1 / 1 / 1 / 1 | 1 / 1 / 0 / 0 |
+| Reference laps | 84.872 / 109.072 / 91.817 s | 84.864 / 109.066 / 91.820 s (two racing lines change) |
+| Track build | 89 / 56 / 31 ms | 293 / 251 / 52 ms |
+
+**Why it is not enough.** The pockets inside the chicane's turns are bounded by stretches of
+track 20–30 m apart along the lap but 4–8 m apart in the world: inside turn 2 the ground has to
+climb from about 0.2 m to 0.7 m across 4 m, inside turn 1 similarly, so any ground that meets the
+track edges there is 10–15 % steep, and a car crossing it at 300 km/h can still be thrown. The
+three regressed cases and the two remaining 3.9 cases are launched there; they passed on master
+because its folded ground happened to slope away from their paths. The grade itself is the
+Copernicus profile opened over 300 m and averaged over 90 m (section 2.3), about 3 % through the
+chicane; it is a trend at the scale the source resolves, so changing it would be editing below
+that resolution. With that elevation, a correct run-off and the kerb-review cases' zero-reset
+assertions conflict at the chicane: the fill fixes 28 open cases and the turn 2 run for three
+cases that pass now, which is a decision for the owner, not a tolerance this work may move.
+
+The owner chose not to trade: no passing check may regress. Section 5.8 is the model that
+meets that rule.
+
+### 5.8 The folded run-off, filled
+
+`Track.ground` now fills the run-off where the (s, d) frame folds (`packages/track/src/fold-ground.ts`;
+section 5.7 records the first version). The model:
+
+- **Where.** Beside a lap sample whose bend folds before its barrier (the frame's stretch at the
+  barrier, 1 − κd, below 0.6) and whose own edge is compressed by it (the stretch at the kerb's
+  outer edge below 0.8): a pocket the bend wraps around, such as Monza's first chicane, Spa's La
+  Source and Bus Stop or Singapore's turns 1–3. A wide run-off inside a gentle bend (Ascari, Spa
+  near s 3210), where the fold lies far out, keeps its ground. The kerb and 1 m beyond it keep
+  their ground exactly (a kerb is laid along the track edge and follows it): no grid node within
+  a cell's diagonal of that strip is filled, so no query in it reads one. The fill grows in over
+  the next metre.
+- **What.** On a 0.5 m grid built with the track: the least-squares plane through the fixed
+  ground around each zone (the track and kerbs, the unfolded run-off) plus the smoothest
+  (harmonic) departure from it, barriers as free edges with ghost values behind them, blended in
+  by a weight that grows with how far the bend folds. Laplace's equation alone reproduces the
+  fold (on a bend with a steady grade the edge height rises with the angle round the bend's
+  centre, which is harmonic). Normals come from the world gradient.
+- **The steepness rule, on the final ground.** A query reads H = O + W (F − O), with O the
+  original ground and W, F the bilinear weight and solved height, so
+  ∇H = ∇O + W (∇F − ∇O) + (F − O) ∇W. When the track is built, H is checked at points a quarter
+  of a cell (12.5 cm) apart in every cell the fill reaches, with O and ∇O read there exactly as
+  a query reads them: H may be no steeper than O, or than the run-off contract's bound there
+  (5.6) less 1 %, whichever is higher. The 1 % covers the original's slope changing between the
+  check points (it is piecewise along the lap). The weights are first scaled down until every
+  point holds, then grown back towards their targets in steps, each kept only if every point
+  around the node still holds. The rule holds at the check points and at the contract's 0.35 m
+  probe scale on all three circuits (zero probes broken on a dense 5 cm lattice). Measured at a
+  single point between check points, the slope can exceed it by up to about 1.5 percentage points
+  (Monza 30 of 79 275 lattice points, worst 11.65 % against 10.10 %; Spa 28 of 39 202; Singapore
+  none). Halving the spacing still leaves about 1.3 points, because the original ground's gradient
+  is piecewise, and adds about 20 ms to the build, so it stays at 12.5 cm.
+- **The pit lane** is its own surface, built from the original ground under it before the fill;
+  its blend band joins the two.
+
+`packages/track/test/runoff-grade.test.ts` checks the rule on every probe of the contract
+(0.35 m, a contact patch) against the same circuit built without the fill (`fillFolds: false`): every
+probe that met the contract without the fill still meets it, and no probe is steeper with the
+fill than without it unless still within the contract. It also checks the two patches the review
+of the first version of this section found directly: Monza s 649, d 11.5 (7.07 % became 15.39 %
+against 10.10 %) and Spa s 6679, d 13.5 (6.77 % became 17.74 % against 10.13 %). That version
+broke the contract at 22 probes at Monza and 15 at Spa that met it before, and fails all six
+checks; this one breaks none.
+
+Results against master and against that first version:
+
+| Measure | Master | Filled | First version |
+|---|---|---|---|
+| Run-off contract, Monza worst | 40.8 % turn 2 inside, 20.6 % turn 1 inside (100 cells over) | 36.9 %, 20.6 % (78 cells over); still open | 17.9 %, 11.3 % (41) |
+| Run-off contract, Spa worst | 36.1 % near s 3210 (1156 cells over) | 36.1 %, unchanged there (1124 cells over); still open | 36.1 % (1102) |
+| Run-off contract, Singapore | passes | passes | passes |
+| Probes that met the contract and no longer do (Monza / Spa / Singapore) | – | 0 / 0 / 0 | 22 / 15 / 0 |
+| Game kerb-review cases passing (40) | 11 | 12, none lost | 19 |
+| Sim kerb-review cases passing (18) | 1 | 1 | 1 |
+| Blocking runs at ClA 3.6: (540, 8) steer −0.1 TC 0 / TC 2 / steer 0; turn 2 run | 0 / 0 / 0 / 1 resets | 0 / 0 / 0 / 1 | 0 / 0 / 0 / 1 |
+| The same at ClA 3.9 | 1 / 1 / 1 / 1 | 1 / 1 / 0 / 1 | 1 / 1 / 0 / 1 |
+| Reference laps, s | 84.87247777781505 / 109.07156183055628 / 91.81685967115246 | identical, bit for bit, traps too | Singapore 91.81685832063064 (1.35 µs faster, trap 2·10⁻⁵ km/h lower; 44092 ticks both); the others identical |
+| Track build (best of five, warm) | 29 / 40 / 26 ms | 50 / 52 / 50 ms | 44 / 47 / 42 ms |
+| First build in a process (cold) | 101 / 49 / 28 ms | 174 / 64 / 55 ms | 123 / 92 / 58 ms |
+
+With the fill built before the pit lane's ground, Singapore's lap differed (91.81685811829566 s
+with this fill, 91.81685832063064 s with the first version): the pit lane's own ground was then
+built from the filled ground under it (s 4566–4582), and the pit lane's blend band carries it to
+the track edge. The car itself never reads filled ground on that lap. Building the pit lane's
+ground first restores the lap bit for bit.
+
+The build runs on the main thread when the game loads a track (`apps/web/src/drive.ts`, and the
+online flow). At 12–24 ms more when warm (up to 73 ms on a first build) it is not worth caching
+in the track build output yet; if the zones grow, the solved grid and weights can be written by
+the track pipeline and read back instead.
+
+**What the rule costs.** Seven of the eight game cases the first version recovered
+(teleport(0, ±8), (300, 8) steer 0, (540, 8) steer 0.1 at TC 0, (650, 8) steer 0.1 at TC 0
+and 2, (5600, −8)) reset again; teleport(610, 8) steer −0.1 at TC 0 still passes. They passed
+on ground the rule forbids: inside the chicane's pockets the climb between track edges 20–30 m
+apart along the lap and 4–8 m apart in the world (5.7) is spread across ground that was 5–9 %
+steep, which makes it 12–18 % against the contract's 10.1 %. Letting ground already over the
+contract get steeper as well (the other half of the rule; tried at a 0.5 m margin) brings none
+of them back: 11 pass, and teleport(540, 8) steer 0, which passes on master, resets. With that elevation the pockets
+cannot meet the contract everywhere, so at the chicane the contract and those seven cases
+conflict; the fill keeps the contract.
+
+**The margin.** With no margin beyond the kerb, the first version passed 27 game and 7 sim
+cases, but the disciplined keyboard driver's recorded drivability gap moved from 4 incidents to
+6 (barrier strikes past the Lesmo exits after its path changes through the chicane), so it used
+0.5 m. With this version's rule, 0.5 m lets that driver brush the fill's edge inside turn 2 on
+its second lap in two of its five seeds (s 655–656, d 8.5–8.6, weight at most 0.0003: under a
+micrometre of height and a small change of the ground's normal), and both laps go on to strike
+the barriers past the Lesmos: 8 incidents. At 0.75 m it still does; at 1 m its ten laps are the
+same as on master, to the millisecond, so the margin is 1 m. That run is chaotic at this scale:
+it shows the fill's edge is within reach of the driven line there, not that the ground is wrong.
+The first version (5.7) also raised Spa's worst slope: a plane fill across the wide run-off
+inside the bend near s 3210 is steeper near the barrier than the original ground; that run-off
+is not filled.
+
+Two of the three cases that block the low-trim downforce change still reset at ClA 3.9; the
+retry was not attempted.
+
 ## 6. Sources
 
 All URLs were opened while doing this work (2026-11-21).
