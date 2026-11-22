@@ -636,7 +636,11 @@ async function perfRuns(report, vsync) {
         )
       : PERF_VIEWPORTS) {
       const quality = option('perf-quality') ?? vp.quality;
-      const { context, page } = await openGame(browser, { ...vp, quality });
+      const { context, page } = await openGame(
+        browser,
+        { ...vp, quality },
+        option('query') ? `&${option('query')}` : '',
+      );
       for (const run of flag('phone-audit')
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
