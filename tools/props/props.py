@@ -865,6 +865,13 @@ for ident, module in specs:
             bm.free()
             merged.append(ob)
         bake(merged, rays=8 if lod == 0 else 4, max_dist=.3, floor=.65)
+        if ident.startswith('forest-'):
+            for ob in merged:
+                tint = ob.data.color_attributes.get('foliageTint')
+                if tint:
+                    ao = ob.data.color_attributes['AO']
+                    for base, colour in zip(ao.data, tint.data):
+                        base.color = tuple(base.color[i] * colour.color[i] for i in range(3)) + (1.0,)
         if ident.startswith('crew-engineer'):
             skin_tone(merged, head_pos, SKIN_TONE[ident])
         points = [v.co for ob in merged for v in ob.data.vertices]
@@ -906,7 +913,7 @@ for ident, module in specs:
         entry['lods'].append({
             'file': f'assets/props/{filename}',
             'maxDistance': (80, 250, 1200)[lod],
-            'triangleBudget': ((4000, 2200, 1800) if ident == 'temporary-grandstand' else (30000, 12000, 2500))[lod],
+            'triangleBudget': ((8000, 4000, 4000) if ident.startswith('forest-') else (4000, 2200, 1800) if ident == 'temporary-grandstand' else (30000, 12000, 2500))[lod],
         })
     catalog['props'].append(entry)
 

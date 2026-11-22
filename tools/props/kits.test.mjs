@@ -26,6 +26,21 @@ it('retains addressable emissive materials and lamp aim through all LODs', () =>
     expect(p.attachments.filter((a) => a.direction).every((a) => a.direction[1] < 0)).toBe(true);
   }
 });
+it('keeps the Mobile needle sprays at Far, double sided, with no card atlas', async () => {
+  const { decodeGlb } = await import('./draco.mjs');
+  for (const id of ['forest-spruce', 'forest-fir']) {
+    const [, mobile, far] = prop(id).lods;
+    expect(far.triangles).toBe(mobile.triangles);
+    const needles = (lod) =>
+      decodeGlb('apps/web/public/' + lod.file).find((m) => m.material.endsWith('-needles'));
+    expect(needles(far).POSITION.values).toEqual(needles(mobile).POSITION.values);
+    const material = gltf(far).materials.find((m) => m.name === id + '-needles');
+    expect(material.doubleSided).toBe(true);
+    expect(material.alphaMode ?? 'OPAQUE').toBe('OPAQUE');
+    expect(material.normalTexture).toBeUndefined();
+  }
+});
+
 it('preserves lit window masks through backdrop LOD changes', () => {
   for (const id of ['marina-office', 'marina-hotel', 'marina-pavilion']) {
     let panes;
