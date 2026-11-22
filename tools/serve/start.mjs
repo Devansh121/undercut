@@ -77,7 +77,8 @@ async function main() {
   if (process.argv.includes('--check-ports')) return;
 
   // Cleanup comes first: from here on, Ctrl-C at any moment stops whatever has started.
-  const rooms = createRoomsService({ port: config.roomsPort });
+  const roomVars = process.env.ROOM_TIMINGS ? { ROOM_TIMINGS: process.env.ROOM_TIMINGS } : {};
+  const rooms = createRoomsService({ port: config.roomsPort, vars: roomVars });
   const servers = [];
   let handlers = null;
   let stopping = false;
