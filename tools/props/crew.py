@@ -78,10 +78,15 @@ def build(pose, mechanic, finish, cloth, fabric, rubber, skin, glass, glasses=Fa
         # Standing: the thigh tops form the seat; the hips stay inside them below the waist.
         hips = [(-.13,.012,.02,0),(-.10,.05,.08,0),(-.05,.085,.13,0),(0,.104,.152,0),(.06,.11,.156,0),
                 (.10,.102,.146,0)]
-    rings('overall-hips', [(hip+torso_axis*t+Vector((cx,0,0)), d, w) for t, d, w, cx in hips], legs)
+    if not crouched:
+        rings('overall-hips', [(hip+torso_axis*t+Vector((cx,0,0)), d, w) for t, d, w, cx in hips], legs)
     # Continuous tailored torso above the belt, narrowing at the waist and neck.
-    sections = []
-    for t, depth, width in [(.03,.100,.145),(.07,.106,.151),(.10,.109,.153),(.18,.10,.145),
+    sections = [(hip+torso_axis*t+Vector((cx,0,0)), d, w) for t,d,w,cx in hips if t <= 0] if crouched else []
+    # The crouched overall runs from the seat to the chest with no pinch at the waist (a pinch
+    # read as a ledge across the lower back); the shirted engineers keep a waist.
+    waist = ([(.03,.106,.153),(.07,.106,.153),(.10,.106,.152),(.18,.107,.151)] if crouched else
+             [(.03,.104,.152),(.07,.106,.151),(.10,.109,.153),(.18,.10,.145)])
+    for t, depth, width in waist + [
                             (.24,.112,.158),(.40,.125,.174),(.62,.132,.19),(.79,.125,.205),
                             (.90,.11,.20),(1,.085,.16),(1.04,.065,.092)]:
         sections.append((hip+torso_axis*t, depth, width))

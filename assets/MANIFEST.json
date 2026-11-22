@@ -845,7 +845,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "dc71c1aaf51dc1fbfa1953382ecb39ef2241c4a6e06735b97f3310f00aa5fb85"
+    "sha256": "4511cc649a8d80b2aafff6aba4cf79bfd9d5099e81cbb282a7e368d7d1971c8c"
   },
   {
     "file": "apps/web/public/assets/props/crew-mechanic-standing_mobile.glb",
@@ -853,7 +853,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "78d0c6064d996c5aff084cbe1114f6c0b18520f9a36cccdb75e3e2cc3d5944f4"
+    "sha256": "ca2e3f7c6267761023e55898763a772a98f7a2ddc7ed6a68479a1e60b1038058"
   },
   {
     "file": "apps/web/public/assets/props/crew-mechanic-standing_far.glb",
@@ -861,7 +861,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "739a00c07c9978a1a19a77ffeba3b9a8363d683638ac006901cab3e557d02548"
+    "sha256": "7ed5b4a62432f722211767aece710ab8d5758792bb4b41be5e6cf22638e2c153"
   },
   {
     "file": "apps/web/public/assets/props/crew-mechanic-crouched_high.glb",
@@ -869,7 +869,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "bc8f1775eea4e09a916a3be1b7751100a786199c071269d5a5ad59d6e6f86b25"
+    "sha256": "74b72d29efcb2053c7102c30fd993cdc244bf8663e488fd9c5b3e26172ae5962"
   },
   {
     "file": "apps/web/public/assets/props/crew-mechanic-crouched_mobile.glb",
@@ -877,7 +877,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "b0bfc573c284c8e77f097fa87c277cc0ea421a0c91383060907f7adbd096694d"
+    "sha256": "1bbb9678bda8b6aa377be3b46ae15fea53f3e91436bff05d52e7c66982159b2a"
   },
   {
     "file": "apps/web/public/assets/props/crew-mechanic-crouched_far.glb",
@@ -885,7 +885,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "a81e75a8cb657af63949c21bb33e6bc9a38cb583d0d113e9af5307f22fe58158"
+    "sha256": "989acd123b7d7636b3869a3f2603130dcee6ee20a212fe7ea01b100e8d49dfb5"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-standing_high.glb",
@@ -893,7 +893,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "4a64ba4ce922b4e5a280bb585cf90b1883586799787034523945f3d2fab3927b"
+    "sha256": "8acc79492a4ae2a600e03cf8aecb32c20341be2ae00636a922de7d35da49a4f8"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-standing_mobile.glb",
@@ -901,7 +901,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "f03584049adf5a4b0f8ad37a59565c34aa27657b549765c4e4c8a339523ea464"
+    "sha256": "d53b459ce5be4531b4ed124fa78ed3a07ead6972884f7eb32085a805f24b137d"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-standing_far.glb",
@@ -909,7 +909,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "cb2fe9654393a3cd89c394b35f41cbed17f943f958bcc14cd57ad6535eef1691"
+    "sha256": "2c5c9dbc8f4c0eb74e51c13392f80f42c10741cd66f54a7fd317112ca723ed30"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-seated_high.glb",
@@ -917,7 +917,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "83e4278a665bfd03481dc3069a7ef23d225fb4dac5cea03ea0997742c9f65367"
+    "sha256": "767d0939e56b16eb3c14a73a455bb3c08c4f359db4cbf96e58368a680bb5fa2c"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-seated_mobile.glb",
@@ -925,7 +925,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "b27689795200d2f291cd77f3c7736633f36db2b5f4e5911318329b16c3ca644b"
+    "sha256": "f0cd2b44c0eba3dc33af0290a4c848e7f34e765000e846fd9fb95c17d46ed810"
   },
   {
     "file": "apps/web/public/assets/props/crew-engineer-seated_far.glb",
@@ -933,7 +933,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "fcd21ffbb5227f4680bac6ad2d7f04df3ae901dd9afa66931e98d2ac75361bcd"
+    "sha256": "d991ee2eb675ef94f0fc32e6b9bf31249a7549e88784b233f05b3281f849b987"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-0_high.glb",
@@ -941,7 +941,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "f359fc9e85c0d4fbb450ba190a987fc32d39f86c655b7fe153bcb7ed877a335b"
+    "sha256": "386e42a9b340f6b58944b5f36b86eab441a39240fd60ee3846dd751173e57df2"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-0_mobile.glb",
@@ -949,7 +949,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "c4f86d3a1a3d4d3b290e90abc1af793630d4e47baa667a5031e9464941f6cf3b"
+    "sha256": "0d6a22cb461ce53ca276bb4e521b2194e55bd7f3f9362a1bb9be5ec24abca062"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-0_far.glb",
@@ -957,7 +957,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "753ed0afe7024371075369c4588ca2aef5395627a0327588b6c3c5ab068736cc"
+    "sha256": "424af4ca269d916f4ae34d55f73545017d05f8d782aed9b2077b42300bee328c"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-1_high.glb",
@@ -965,7 +965,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "0faed896c6ebaeee8313a6dd72485eddb40df8f3720ea71bcc80c3d761eae6ed"
+    "sha256": "92c1d8fffb709e7f63cc5995019fbca7ff959fbbf7e950bd9f19141476108dc7"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-1_mobile.glb",
@@ -973,7 +973,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "9d4548f1619e52bcca39abab6f469682b1a590e8526182138143113aedd00784"
+    "sha256": "463a7452449f11f3f47f0533329395ee20c396d4795c0c437a35606393227ebb"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-1_far.glb",
@@ -981,7 +981,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "61d734548a9be533adf0c76cec61b0f7f2a328d7568753e3ea13a2f12587d80e"
+    "sha256": "d3336110e7597ee29b04861831217da42ebeb04e494fe1e9ea0b5782bf560c51"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-2_high.glb",
@@ -989,7 +989,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "1a97b8ab8965867e93c2c8b023029cc304fbbd5fd21254a90df9fc9fee3b375a"
+    "sha256": "ebb3bbca21010f5a123beb356dea217d92b9246e371d4fb2dc469bd4e9ab613d"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-2_mobile.glb",
@@ -997,7 +997,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "db920dfcb5378430986349385564ccb923c219bb78dd019145c1de49daa8cd01"
+    "sha256": "e1fc93c26370aefc8db6f77af8d7c0f3dae0b3272f174aafe5763144b2121e00"
   },
   {
     "file": "apps/web/public/assets/props/crowd-seated-2_far.glb",
@@ -1005,7 +1005,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "5a1ed082d453f00e6b621638eb54349c943724dde7241490a2ecc00278182d73"
+    "sha256": "814580b5784ab88ccb38df1360fec9f35b3355567f5e1cf65d2a512776ffd3fc"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-0_high.glb",
@@ -1013,7 +1013,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "a9f5b14791181383bbedc605aff9507de5afbce116e777edf6b512cb548f12e8"
+    "sha256": "bd32dd0f1958486a22e9bfbcdd6306c85793cf7e2e623702be8165bb46439167"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-0_mobile.glb",
@@ -1021,7 +1021,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "b2c299f0903a4a79d11a896a529bbce4701b8bca26b67b386ec5cf2f7093fd82"
+    "sha256": "b12fafd56ae038aba1c5c460818c8d13678b6ada0405a805311819f9a8e9247d"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-0_far.glb",
@@ -1029,7 +1029,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "3df690b567def9ae56a6320f4e61318b366e342fcc629c7cc7d8a1ce24c70a2f"
+    "sha256": "fe5a6cba25c49ecd737d65b7fada4670ad2beadb3acc70a94e2dbcbb313ad688"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-1_high.glb",
@@ -1037,7 +1037,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "06d01b4b7e8293ef29d4c4d6288ce779d35ed7ce25437e7f258d592d67b788cb"
+    "sha256": "466f2756f16cd0fd4177988927ff18de450059f863afce884ea3590696888ca2"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-1_mobile.glb",
@@ -1045,7 +1045,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "722a108b21c0027412924748da9c834b289951dfe9cd4ac4e03a44df5fd83ca6"
+    "sha256": "2a0f5074c477bbf661170f6289b2eafbcc6917b16db4357ee4ad3fc61042f516"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-1_far.glb",
@@ -1053,7 +1053,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "073699bbd4ca364ab778e0e3470e4f16456d2cb392eebd50f19c238f46a5d570"
+    "sha256": "2103ab0eb6e9080163a4ca45207b21b7523added40177190d1445e57bb479c92"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-2_high.glb",
@@ -1061,7 +1061,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "a26ebd867642a3d302ff3ebac79fb0c6791372d88e30e241061a212018fa8247"
+    "sha256": "f374ee30fcedbca7363dfa4a2ffc9c94b3e7b46a63f4bf9c3bd6794b1c26a709"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-2_mobile.glb",
@@ -1069,7 +1069,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "beb2040913999e876268afcfdb0e7710a01e9ab3e7e002442a94e06baaa28b3f"
+    "sha256": "3285b34a1604519475e2919c3d5dbf7e4e10fe103eecb382d2da2270f90b7f48"
   },
   {
     "file": "apps/web/public/assets/props/crowd-standing-2_far.glb",
@@ -1077,7 +1077,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
-    "sha256": "813ef2e893f193a5161762b0d3aded102012f1b5c3dc267ef72d2ca9316e99d8"
+    "sha256": "2f17cfc334bfe02b8b1802e67bf864585a5480b06073ef06e6e72fbb46712b32"
   },
   {
     "file": "apps/web/public/assets/props/braking-board_high.glb",
