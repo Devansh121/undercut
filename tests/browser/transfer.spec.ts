@@ -163,7 +163,9 @@ test('the High first race at Singapore, with its world, requests what the budget
   );
 
   // A prefetch releases only what it made: a new session still draws its sky and textures from
-  // the page's cached downloads, the very images a prefetch on its preset decoded too.
+  // the page's cached downloads, the very images a prefetch on its preset decoded too. (The HTTP
+  // cache is back on: only the page's own cache is under test here.)
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: false });
   await page.evaluate(() => window.__undercut!.prefetch('mobile'));
   await page.evaluate(() => window.__undercut!.quit());
   await expect(page.locator('html')).not.toHaveAttribute('data-ready', '');
