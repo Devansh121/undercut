@@ -540,7 +540,8 @@ test.describe('drive', () => {
       }, png.toString('base64'));
     };
 
-    // Default mode matches the device preset (braking on desktop, full on phone).
+    // Default mode matches the device preset: braking for keyboard and touch alike (the brief).
+    // On the phone a pedal tap first makes touch the active device.
     if (info.project.name === 'phone') {
       const pedal = await page.locator('[data-control=throttle]').boundingBox();
       if (!pedal) throw new Error('no throttle pedal');
@@ -552,7 +553,8 @@ test.describe('drive', () => {
     }
     await waitFrames();
     const initial = await page.evaluate(() => window.__undercut?.drivingLine());
-    expect(initial?.mode).toBe(info.project.name === 'phone' ? 'full' : 'braking');
+    expect((await state(page)).device).toBe(info.project.name === 'phone' ? 'touch' : 'keyboard');
+    expect(initial?.mode).toBe('braking');
 
     // Pause menu switches between Off, Full and Braking.
     await page.keyboard.press('Escape');
