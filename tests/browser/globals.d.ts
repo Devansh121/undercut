@@ -44,6 +44,8 @@ declare global {
     resetToTrack(): void;
     capture(): Record<string, unknown>;
     frameTimes(): number[];
+    /** Download what a session here would on a preset (its whole world), then release it. */
+    prefetch(quality: string): Promise<void>;
     quit(): void;
     resetForTest(): void;
     loadTimes(): Record<string, number>;
