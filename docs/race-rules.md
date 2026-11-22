@@ -134,7 +134,11 @@ A car standing still on the road with traffic held up behind it is a ghost too, 
 it blocks: once a car within 60 m behind it (on the road, anywhere across it) has been held
 under 5 m/s for 6 s, the stopped car becomes a ghost and the cars behind drive on through it.
 Only the car at the head counts (no other car standing still within 40 m ahead of it). It is
-solid again once it moves off at over 5 m/s clear of every car. Only cars racing and under way
+solid again once it moves off at over 5 m/s clear of every car, with no solid car behind it
+in an overlapping lane that would close the gap within 2 s at its closing speed. The drivers see
+it again, as traffic, as soon as it moves faster than 2 m/s, so the cars behind plan round it
+before it turns solid. The race screen draws a blocking ghost at half strength and tells the
+player when their own car is one. Only cars racing and under way
 count (not in the pit lane, not held by the pit crew, and not cars that have yet to move off the
 grid). The state is carried in `RaceSession.snapshot` (`blockers`).
 
