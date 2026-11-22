@@ -155,6 +155,9 @@ export class RaceDriver implements Driver {
   readonly skill: RaceSkill;
   readonly inner: ReferenceDriver;
   private readonly params: CarParams;
+  /** Shares of the envelope this driver plans with (traction, cornering). */
+  private readonly tractionShare: number;
+  private readonly lateralShare: number;
   /** Per line sample: distance to the next braking zone or corner, m (0 inside one). */
   private readonly cornerAhead: Float64Array;
   private view: TrafficView | null = null;
@@ -205,6 +208,9 @@ export class RaceDriver implements Driver {
     });
     this.rng = createRng((o.skill.seed ^ 0x9e3779b9) >>> 0);
     this.cornerAhead = cornerDistances(o.plan);
+    const shares = driverSkillFor(o.skill).envelope;
+    this.tractionShare = shares.traction;
+    this.lateralShare = shares.lateral;
   }
 
   get ersMode(): ReferenceDriver['ersMode'] {
@@ -693,6 +699,7 @@ export class RaceDriver implements Driver {
     }
     if (nq > 1) limit = Math.min(limit, this.queueLimit(nq, v));
     limit = Math.min(limit, this.offLineLimit(s0, v));
+    limit = Math.min(limit, this.gripLimit(s0, v));
     // Never ask for more than the brakes give: past the tyres' limit the wheels lock, and the
     // lock-up feel backs the pedal off further than the demand would have.
     limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
@@ -705,6 +712,22 @@ export class RaceDriver implements Driver {
     last.accelLimit = limit;
     last.passing = this.passId;
     last.yielding = yielding;
+  }
+
+  /**
+   * The friction circle on a corner exit: held up by traffic, a car arrives below its speed
+   * profile and the speed feedback would ask for full drive while the tyres still carry the
+   * corner. Ask for no more than the traction the cornering load leaves (at this driver's own
+   * shares of the envelope); on the profile this never binds, the profile already respects it.
+   */
+  private gripLimit(s0: number, v: number): number {
+    const model = this.plan.model;
+    const lat = Math.abs(this.at(this.plan.line.curvature, s0)) * v * v;
+    const latMax = this.lateralShare * model.lateral(v, 1);
+    if (!(latMax > 0)) return Number.POSITIVE_INFINITY;
+    const used = Math.min(1, lat / latMax);
+    if (used < 0.3) return Number.POSITIVE_INFINITY;
+    return this.tractionShare * model.traction(v, 1) * Math.sqrt(1 - used * used);
   }
 
   /**

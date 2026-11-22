@@ -101,6 +101,8 @@ button {
 
 .launch__bar {
   display: flex;
+  /* Narrow screens: the buttons wrap onto a second row rather than run off the edge. */
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-6);
   padding: var(--sp-5) var(--safe-r) max(var(--sp-5), env(safe-area-inset-bottom, 0px))
