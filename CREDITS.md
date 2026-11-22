@@ -24,14 +24,14 @@ Code in this repository is MIT licensed (see `LICENSE`). Third-party code and as
 | [selfsigned](https://github.com/jfromaniello/selfsigned) | MIT |
 | [gitleaks](https://github.com/gitleaks/gitleaks) (CI only) | MIT |
 
-## Track data
+## Track and circuit dressing data
 
-The circuit files in `packages/track/data/` are databases derived from open geodata and are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md).
+The circuit files in `packages/track/data/` and `packages/render/data/` are databases derived from open geodata and are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md) and [`packages/render/data/LICENSE-DATA.md`](packages/render/data/LICENSE-DATA.md).
 
 | Source | Use | Licence |
 | --- | --- | --- |
-| [OpenStreetMap](https://www.openstreetmap.org/copyright) | Centrelines, pit lanes, mapped gravel and barriers | Open Database License 1.0 |
-| [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/) | Heights along the track | Licence for the use of the Copernicus WorldDEM-30 |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) | Centrelines, pit lanes, mapped gravel and barriers; surrounding woods, trees, meadows, service roads, grandstands, paddock buildings, bridges and historic banking | Open Database License 1.0 |
+| [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/) | Heights along the track and surrounding terrain grid | Licence for the use of the Copernicus WorldDEM-30 |
 
 © OpenStreetMap contributors. The data is available under the Open Database License, see https://www.openstreetmap.org/copyright.
 

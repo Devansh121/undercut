@@ -27,9 +27,13 @@ export async function startTimeTrial(page: Page): Promise<void> {
   await page.locator('[data-action=start]').click();
 }
 
-/** Load the launch screen with the debug API and start Time Trial with real clicks. */
+/**
+ * Load the launch screen with the debug API and start Time Trial with real clicks, without the
+ * circuit's surroundings (`world=lite`): the full world is tested once, in world-dressing.spec.ts,
+ * and its start-up cost on the GPU (`npm run shots -- monza --perf`).
+ */
 export async function coldStart(page: Page, quality: 'lite' | 'mobile'): Promise<void> {
-  await page.goto(`/?debug=1&quality=${quality}`);
+  await page.goto(`/?debug=1&quality=${quality}&world=lite`);
   await startTimeTrial(page);
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await expect(page.locator('[data-testid=hud]')).toBeVisible();

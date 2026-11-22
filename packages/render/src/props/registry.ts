@@ -1,5 +1,6 @@
 import {
   CanvasTexture,
+  Color,
   Group,
   InstancedMesh,
   Matrix4,
@@ -22,9 +23,11 @@ import {
  */
 export interface PropLod {
   geometry: BufferGeometry;
-  material: Material;
+  material: Material | Material[];
   /** Drawn while the chunk centre is nearer than this, m (the last level: up to it, then culled). */
   maxDistance: number;
+  /** Shadow depth material (alpha-tested cards whose uv the vertex shader changes). */
+  depthMaterial?: Material;
 }
 
 export interface PropKind {
@@ -33,6 +36,11 @@ export interface PropKind {
   lods: PropLod[];
   castShadow?: boolean;
   receiveShadow?: boolean;
+  /**
+   * Chunk by a square world grid of this cell size (m) instead of by lap distance: for scenery
+   * spread over the land around the circuit (woods), where lap chunks would be long and thin.
+   */
+  gridCell?: number;
 }
 
 /** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
@@ -44,6 +52,8 @@ export interface PropPlacement {
   scale?: number;
   /** Lap distance of the place, m; decides the chunk. */
   s: number;
+  /** Per-instance colour multiplier (linear), e.g. leaf tint. */
+  colour?: readonly [number, number, number];
 }
 
 /** Chunk index of lap distance `s` for chunks of `length` metres. */
@@ -85,6 +95,23 @@ const pos = new Vector3();
 const scl = new Vector3();
 const UP = new Vector3(0, 1, 0);
 
+/** Group placements by a square world grid: cell key → placement indices (pure; tested). */
+export function bucketByGrid(
+  placements: readonly Pick<PropPlacement, 'x' | 'z'>[],
+  cell: number,
+): Map<number, number[]> {
+  const out = new Map<number, number[]>();
+  placements.forEach((p, i) => {
+    const k = Math.floor(p.x / cell) * 65536 + Math.floor(p.z / cell);
+    let list = out.get(k);
+    if (!list) out.set(k, (list = []));
+    list.push(i);
+  });
+  return out;
+}
+
+const tint = new Color();
+
 export class PropRegistry {
   readonly group = new Group();
   private readonly kinds = new Map<string, PropKind>();
@@ -123,7 +150,10 @@ export class PropRegistry {
     for (const [id, kind] of this.kinds) {
       const list = this.placements.get(id) ?? [];
       const chunks: Chunk[] = [];
-      for (const indices of bucketBySector(list, this.lapLength, this.chunkLength).values()) {
+      const buckets = kind.gridCell
+        ? bucketByGrid(list, kind.gridCell)
+        : bucketBySector(list, this.lapLength, this.chunkLength);
+      for (const indices of buckets.values()) {
         const centre = new Vector3();
         for (const i of indices) {
           const p = list[i] as PropPlacement;
@@ -142,7 +172,9 @@ export class PropRegistry {
             q.setFromAxisAngle(UP, p.yaw ?? 0);
             const s = p.scale ?? 1;
             im.setMatrixAt(k, m.compose(pos.set(p.x, p.y, p.z), q, scl.set(s, s, s)));
+            if (p.colour) im.setColorAt(k, tint.setRGB(p.colour[0], p.colour[1], p.colour[2]));
           });
+          if (lod.depthMaterial) im.customDepthMaterial = lod.depthMaterial;
           im.castShadow = kind.castShadow ?? true;
           im.receiveShadow = kind.receiveShadow ?? true;
           // Culling on the chunk's bounds (geometry radius added generously).
@@ -170,6 +202,11 @@ export class PropRegistry {
         c.meshes.forEach((im, i) => (im.visible = i === lod));
       }
     }
+  }
+
+  /** Instances placed of one kind (0 when the kind is unknown). */
+  count(kindId: string): number {
+    return this.placements.get(kindId)?.length ?? 0;
   }
 
   get instanceCount(): number {

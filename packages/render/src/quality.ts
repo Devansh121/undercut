@@ -1,4 +1,5 @@
 import presets from './presets.json';
+import type { WorldQuality } from './world/world';
 
 /**
  * Render quality presets. The numbers live in presets.json (data, also read by the budget
@@ -63,6 +64,8 @@ export interface Quality {
   readonly speedBlur: boolean;
   /** Frame-time target for dynamic resolution (0: off) and the lowest render scale. */
   readonly dynamicResolution: { readonly targetMs: number; readonly min: number };
+  /** The dressing around the circuit (docs/render.md, World). */
+  readonly world: Readonly<WorldQuality>;
 }
 
 export const QUALITY_NAMES: readonly QualityName[] = ['ultra', 'high', 'medium', 'mobile', 'lite'];

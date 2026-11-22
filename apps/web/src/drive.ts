@@ -44,7 +44,25 @@ import {
   type EnvelopeArtefact,
 } from '@undercut/ai';
 import teams from '../../../design/teams.json';
+import brandsData from '../../../design/brands.json';
 import compounds from '../../../design/compounds.json';
+/** Each circuit's dressing (stands, buildings, woods), when it has one; fetched by the view. */
+const DRESSINGS = import.meta.glob<string>('../../../packages/render/data/*.dressing.json', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+});
+
+/**
+ * The prop catalogue, when this build has one (packages/render/data/props.catalog.json, written by
+ * the prop kit's build). Globbed so its arrival is a data change: no file, procedural stand-ins.
+ */
+const propCatalog: unknown = Object.values(
+  import.meta.glob('../../../packages/render/data/props.catalog.json', {
+    eager: true,
+    import: 'default',
+  }),
+)[0];
 // The AI's racing line and measured vehicle envelope are loaded per circuit below, for the
 // rubbered line, the driving-line assist, and the driving line's advised speeds (braking help).
 import { defaultCarState } from '@undercut/audio';
@@ -226,6 +244,11 @@ function toneMapParam(): ToneMap {
   return t === 'aces' || t === 'agx' ? t : 'neutral';
 }
 
+/** `?world=lite`: no dressing on any preset, the track's own ground (software-WebGL tests). */
+function worldDetailParam(): 'preset' | 'lite' {
+  return new URLSearchParams(window.location.search).get('world') === 'lite' ? 'lite' : 'preset';
+}
+
 /** Every circuit's track file, each its own chunk, fetched when a session there starts. */
 const TRACK_FILES = import.meta.glob<unknown>('../../../packages/track/data/*.json', {
   import: 'default',
@@ -375,10 +398,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          dressingUrl: DRESSINGS[`../../../packages/render/data/${track.id}.dressing.json`] ?? null,
+          propCatalog,
+          garageTeams: teams.teams.map((t) => ({
+            name: t.name,
+            code: t.code,
+            primary: t.colours.primary,
+            secondary: t.colours.secondary,
+          })),
+          brands: brandsData.brands,
           drivingLine,
           drivingLineMode: session.assists.racingLine ?? 'off',
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
+          worldDetail: worldDetailParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
           compound: compoundLook('medium'),
           timeOfDay: tod,
@@ -555,12 +588,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       },
       {
         id: 'line',
-        label: 'Driving line',
-        description: 'Shows the racing line and where to lift or brake.',
+        label: S.setup.drivingLine,
+        description: S.setup.help.drivingLine,
         choices: [
-          { value: 'off', label: 'Off' },
-          { value: 'braking', label: 'Braking' },
-          { value: 'full', label: 'Full' },
+          { value: 'off', label: S.setup.lineChoices.off },
+          { value: 'braking', label: S.setup.lineChoices.braking },
+          { value: 'full', label: S.setup.lineChoices.full },
         ],
         get: () => session.assists.racingLine ?? 'off',
         set: (v) => setAssist('racingLine', v as DrivingLineMode),

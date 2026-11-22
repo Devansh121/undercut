@@ -40,6 +40,9 @@ export const S = {
     press: 'Press any key or tap to start',
     pressTouch: 'Tap to start',
     build: 'Build',
+    mapData: 'Map data ',
+    osm: '© OpenStreetMap contributors',
+    heights: '. Heights: Copernicus WorldDEM-30.',
   },
 
   menu: {
@@ -158,6 +161,8 @@ export const S = {
     stability: 'Stability help',
     braking: 'Braking help',
     brakingNoLine: 'Needs a driving line for this car: Monza only for now',
+    drivingLine: 'Driving line',
+    lineChoices: { off: 'Off', braking: 'Braking', full: 'Full' },
     help: {
       tractionControl: 'Reduces engine drive when the rear tyres slip.',
       abs: 'Eases braking to prevent wheel locking.',
@@ -166,6 +171,7 @@ export const S = {
       stability: 'Brakes one wheel and trims the engine when the car starts to slide or push.',
       braking:
         'Brakes for you when you arrive at a corner faster than the driving line. On by default for keys (Low) and touch (Medium).',
+      drivingLine: 'Shows the racing line and where to lift or brake.',
     },
   },
 

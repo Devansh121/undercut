@@ -155,9 +155,9 @@ export class RenderPipeline {
       this.gtao = new GTAOPass(scene, camera, 1, 1, { depthTexture });
       this.gtao.output = GTAOPass.OUTPUT.Off;
       this.gtao.updateGtaoMaterial({
-        radius: 0.6,
-        distanceExponent: 1.4,
-        thickness: 1.2,
+        radius: 0.44,
+        distanceExponent: 1.5,
+        thickness: 0.9,
         scale: 1,
         samples: 12,
       });

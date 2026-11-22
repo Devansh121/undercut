@@ -272,6 +272,23 @@
   }
 }
 
+/* Map-data credit (ODbL asks for it where the game is seen): quiet, bottom right of the stage. */
+.launch__credit {
+  position: absolute;
+  right: var(--safe-r);
+  bottom: var(--sp-3);
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+  text-align: right;
+}
+
+.launch__credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .launch__build code {
   font-size: var(--fs-11);
   letter-spacing: 0.04em;

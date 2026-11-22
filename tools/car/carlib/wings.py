@@ -291,7 +291,10 @@ def build_rear_wing(mesh_paint, mesh_carbon, flap_paint, patches, q):
     mesh_paint.merge(m.with_mirror()).merge(tip.with_mirror())
     # moving flap, straight, ending just inboard of its fairing
     f = Mesh()
-    ys_f = [y_f * k / n for k in range(n + 1)]
+    # The flap is straight with a near-constant section: 10 spanwise stations (4 on Mobile) hold
+    # its shape; the triangles saved pay for the cockpit within the LOD budgets.
+    nf = q.n(10, 4)
+    ys_f = [y_f * k / nf for k in range(nf + 1)]
     loft(f, [[Vector((x, y, z_ref + zz)) for (x, zz) in _rw_section(1, pf, z_ref)(y)] for y in ys_f], "paint",
          closed=True, cap1=True, patch_key="rw_flap", patches=patches, sharp_cols=(0,))
     rows = []

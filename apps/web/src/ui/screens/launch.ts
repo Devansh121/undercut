@@ -31,6 +31,15 @@ export class LaunchScreen implements Screen {
     const title = el('h1', 'launch__title', GAME_NAME);
     title.id = 'launch-title';
     stage.append(title, el('p', 'launch__tagline', S.launch.tagline(TEAMS.length, DRIVER_COUNT)));
+    // The circuit and its surroundings are built from OpenStreetMap (ODbL), which asks for a
+    // credit where the game is seen; heights from Copernicus WorldDEM-30 (credits in CREDITS.md).
+    const credit = el('p', 'launch__credit', S.launch.mapData);
+    const osm = el('a', '', S.launch.osm);
+    osm.href = 'https://www.openstreetmap.org/copyright';
+    osm.target = '_blank';
+    osm.rel = 'noopener';
+    credit.append(osm, S.launch.heights);
+    stage.append(credit);
     const bar = el('div', 'launch__bar');
     this.press = el('button', 'launch__press');
     this.press.type = 'button';
@@ -45,6 +54,8 @@ export class LaunchScreen implements Screen {
     root.append(stage, bar);
     // Any key or tap, not only the bound ones.
     root.addEventListener('pointerup', (e) => {
+      // The credit link opens its own page; it is not a start gesture.
+      if ((e.target as Element).closest('a')) return;
       if (e.target !== this.press && !this.press.contains(e.target as Node)) this.open();
     });
   }

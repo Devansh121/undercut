@@ -13,7 +13,7 @@
     "textureTier": "hi",
     "anisotropy": 16,
     "meshLod": "high",
-    "ao": { "enabled": true, "scale": 0.5, "intensity": 0.7 },
+    "ao": { "enabled": true, "scale": 0.5, "intensity": 0.45 },
     "bloom": { "enabled": true, "strength": 0.16, "threshold": 8.0 },
     "clearcoat": true,
     "carLods": ["high", "mobile", "far"],
@@ -23,7 +23,19 @@
     "grainVignette": true,
     "grain": 0.005,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.75 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.75 },
+    "world": {
+      "enabled": true,
+      "treeDensity": 1,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": true,
+      "crowd": 0.85,
+      "coverResolution": 1.5,
+      "treeNear": 260,
+      "treeFar": 4500,
+      "structures": true
+    }
   },
   "high": {
     "label": "High",
@@ -38,7 +50,7 @@
     "textureTier": "hi",
     "anisotropy": 8,
     "meshLod": "high",
-    "ao": { "enabled": true, "scale": 0.5, "intensity": 0.65 },
+    "ao": { "enabled": true, "scale": 0.5, "intensity": 0.42 },
     "bloom": { "enabled": true, "strength": 0.14, "threshold": 8.0 },
     "clearcoat": true,
     "carLods": ["high", "mobile", "far"],
@@ -48,7 +60,19 @@
     "grainVignette": true,
     "grain": 0.004,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.7 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.7 },
+    "world": {
+      "enabled": true,
+      "treeDensity": 1,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": true,
+      "crowd": 0.8,
+      "coverResolution": 2,
+      "treeNear": 220,
+      "treeFar": 4000,
+      "structures": true
+    }
   },
   "medium": {
     "label": "Medium",
@@ -73,7 +97,19 @@
     "grainVignette": true,
     "grain": 0.003,
     "speedBlur": true,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.65 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.65 },
+    "world": {
+      "enabled": true,
+      "treeDensity": 0.7,
+      "treeTile": 512,
+      "terrain": "high",
+      "wind": false,
+      "crowd": 0.6,
+      "coverResolution": 2,
+      "treeNear": 160,
+      "treeFar": 3000,
+      "structures": true
+    }
   },
   "mobile": {
     "label": "Mobile",
@@ -98,7 +134,19 @@
     "grainVignette": false,
     "grain": 0,
     "speedBlur": false,
-    "dynamicResolution": { "targetMs": 16.67, "min": 0.6 }
+    "dynamicResolution": { "targetMs": 16.67, "min": 0.6 },
+    "world": {
+      "enabled": true,
+      "treeDensity": 0.35,
+      "treeTile": 256,
+      "terrain": "mobile",
+      "wind": false,
+      "crowd": 0.3,
+      "coverResolution": 4,
+      "treeNear": 120,
+      "treeFar": 2000,
+      "structures": true
+    }
   },
   "lite": {
     "label": "Lite",
@@ -123,6 +171,18 @@
     "grainVignette": false,
     "grain": 0,
     "speedBlur": false,
-    "dynamicResolution": { "targetMs": 0, "min": 1 }
+    "dynamicResolution": { "targetMs": 0, "min": 1 },
+    "world": {
+      "enabled": false,
+      "treeDensity": 0.01,
+      "treeTile": 128,
+      "terrain": "lite",
+      "wind": false,
+      "crowd": 0.02,
+      "coverResolution": 8,
+      "treeNear": 60,
+      "treeFar": 800,
+      "structures": false
+    }
   }
 }
