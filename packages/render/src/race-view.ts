@@ -42,6 +42,13 @@ import {
   type QualityName,
   type RenderCapabilities,
 } from './quality';
+import {
+  DrivingLineRibbon,
+  type DrivingLineMode,
+  type DrivingLineSource,
+  type DrivingLineState,
+} from './driving-line';
+import { estimateRacingLine } from './racing-line';
 import { TRACK_TEXTURE_IDS, TrackView, type TrackTextureId } from './track-view';
 
 /**
@@ -98,6 +105,10 @@ export interface RaceViewOptions {
   localLights?: readonly LocalLight[];
   /** Racing-line lateral offset per lap sample (m), for the rubbered line. */
   racingLine?: ArrayLike<number> | null;
+  /** Live cue source for the on-track driving-line assist ribbon. */
+  drivingLine?: DrivingLineSource | null;
+  /** Initial display mode of the driving-line assist ('off' when absent). */
+  drivingLineMode?: DrivingLineMode;
   /** Liveries the other cars may wear (mask patterns are loaded for these). */
   fleetLiveries?: readonly CarLivery[];
   /** URL of the assets folder (ending in /) and of the Draco decoder folder. */
@@ -178,6 +189,7 @@ export class RaceView {
   readonly environment: Environment;
   private readonly canvas: HTMLCanvasElement;
   private readonly trackView: TrackView;
+  private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
   private readonly ghostCar: CarModel;
   private readonly fleet: CarFleet;
@@ -303,6 +315,14 @@ export class RaceView {
       racingLine: options.racingLine ?? null,
     });
     this.scene.add(this.trackView.group);
+    const lineOffsets =
+      options.racingLine && options.racingLine.length === options.track.lap.count
+        ? options.racingLine
+        : estimateRacingLine(options.track);
+    this.drivingLine = new DrivingLineRibbon(options.track, lineOffsets);
+    this.drivingLine.setSource(options.drivingLine ?? null);
+    this.drivingLine.setMode(options.drivingLineMode ?? 'off');
+    this.scene.add(this.drivingLine.mesh);
     const t2 = performance.now();
     const compound = options.compound ?? MEDIUM_COMPOUND;
     this.car = new CarModel(
@@ -424,6 +444,21 @@ export class RaceView {
 
   setAvoidRect(rect: ScreenRect | null): void {
     this.avoid = rect;
+  }
+
+  /** Set the on-track driving-line assist display mode ('off' | 'braking' | 'full'). */
+  setDrivingLine(mode: DrivingLineMode): void {
+    this.drivingLine.setMode(mode);
+  }
+
+  /** Attach or detach the cue source for the on-track driving line. */
+  setDrivingLineSource(source: DrivingLineSource | null): void {
+    this.drivingLine.setSource(source);
+  }
+
+  /** Latest state of the on-track driving-line ribbon (for diagnostics and tests). */
+  get drivingLineState(): Readonly<DrivingLineState> {
+    return this.drivingLine.snapshot();
   }
 
   get dashboard(): { gear: string; speed: string; revs: number } | null {
@@ -649,6 +684,8 @@ export class RaceView {
       }
       c.end();
     }
+    const exposure = this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1);
+    this.drivingLine.update(frame.pose.x, frame.pose.z, frame.speed, exposure);
     const speedBlur = Math.min(1, Math.max(0, (frame.speed - 45) / 45));
     // Without a context only the CPU side runs (cameras, poses), so screen-space queries such as
     // carScreenRect stay right; nothing touches GL.
@@ -671,7 +708,7 @@ export class RaceView {
     this.gpu.begin();
     const g = this.grade;
     // An onboard camera exposes for what fills its frame: +0.4 EV in the cockpit.
-    g.exposure = this.environment.exposure * (mode.name === 'cockpit' ? COCKPIT_EXPOSURE : 1);
+    g.exposure = exposure;
     g.speedBlur =
       mode.name === 'chase-near' ||
       mode.name === 'chase-far' ||
@@ -823,6 +860,7 @@ export class RaceView {
     this.gpu.dispose();
     this.pipeline.dispose();
     this.trackView.dispose();
+    this.drivingLine.dispose();
     this.car.dispose();
     this.ghostCar.dispose();
     this.fleet.dispose();

@@ -20,7 +20,7 @@
  *   __undercut.tvCamera(x, y, z, fov)        // trackside camera at a world point (stations)
  *   __undercut.quality() / setQuality('ultra')
  */
-import type { CameraName } from '@undercut/render';
+import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
 import type { QuickRaceOptions } from './game/session';
 import type { ControlInput } from '@undercut/sim';
@@ -43,6 +43,7 @@ export interface DebugApi {
   autopilot(on: boolean): void;
   clumsyPilot(seed: number): void;
   camera(name?: CameraName): string;
+  drivingLine(mode?: DrivingLineMode): DrivingLineState;
   pause(): void;
   resume(): void;
   restartLap(): void;
@@ -210,6 +211,14 @@ export function installDebugApi(
       const d = need();
       if (name) d.setCamera(name);
       return d.view.cameraName;
+    },
+    drivingLine: (mode) => {
+      const d = need();
+      if (mode) {
+        d.session.setAssist('racingLine', mode);
+        d.view.setDrivingLine(mode);
+      }
+      return { ...d.view.drivingLineState };
     },
     pause: () => need().pause(),
     resume: () => need().resume(),
