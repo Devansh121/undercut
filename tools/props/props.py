@@ -865,6 +865,12 @@ for ident, module in specs:
             bm.free()
             merged.append(ob)
         bake(merged, rays=8 if lod == 0 else 4, max_dist=.3, floor=.65)
+        if ident.startswith('forest-') and lod == 0:
+            import forest
+            foliage = [c.color[0] for ob in merged if ob.data.materials[0].name.endswith('-needles')
+                       for c in ob.data.color_attributes['AO'].data]
+            forest.MEAN_AO[ident] = sum(foliage) / len(foliage)
+            print('FOREST_MEAN_AO', ident, round(forest.MEAN_AO[ident], 3))
         if ident.startswith('forest-') and lod < 2:
             for ob in merged:
                 tint = ob.data.color_attributes.get('foliageTint')
@@ -872,17 +878,8 @@ for ident, module in specs:
                     ao = ob.data.color_attributes['AO']
                     for base, colour in zip(ao.data, tint.data):
                         base.color = tuple(base.color[i] * colour.color[i] for i in range(3)) + (1.0,)
-        if ident.startswith('forest-') and lod == 2:
-            # Cards represent upward-facing needle boughs, not vertical walls. Each direction
-            # has an explicitly wound face so backface normal inversion cannot darken it.
-            for ob in merged:
-                if 'needles' in ob.data.materials[0].name:
-                    normals = [(0, 0, 1)] * len(ob.data.loops)
-                    for poly in ob.data.polygons:
-                        n = Vector((poly.normal.x * .6, poly.normal.y * .6, .8)).normalized()
-                        for i in poly.loop_indices:
-                            normals[i] = n
-                    ob.data.normals_split_custom_set(normals)
+        # Far cards keep their geometric normals; their normal atlas (forest.py) carries the
+        # near foliage's own normals, so no upward tilt is faked here.
         if ident.startswith('crew-engineer'):
             skin_tone(merged, head_pos, SKIN_TONE[ident])
         points = [v.co for ob in merged for v in ob.data.vertices]

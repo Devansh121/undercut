@@ -10,6 +10,9 @@ from mathutils import Vector
 
 _CACHE = {}
 COLOUR = np.array((.023, .041, .018))
+# Mean baked AO of each species' near foliage, recorded by props.py after the High bake, so the
+# far cards carry the same occlusion as the geometry they replace.
+MEAN_AO = {}
 
 
 def authored(fir, detailed):
@@ -75,10 +78,17 @@ def authored(fir, detailed):
     return np.array(vertices), faces, np.array(tints), h, radius
 
 
-def atlas(vertices, faces, tints, height, radius, lin_to_srgb):
+def atlas(vertices, faces, tints, height, radius, lin_to_srgb, shade=1.0):
     """Three 256x512 view tiles, z-buffered triangle coverage with the authored vertex tints."""
     width, rows = 256, 512
     result = np.zeros((rows, width*3, 4), dtype=np.float32)
+    # Tangent-space normals of the covering triangle (u along the card, v up, z towards the
+    # viewer), flipped to face the viewer as the double-sided foliage renders. The cards then
+    # shade with the near tree's own normals under any light, with no light baked in.
+    normals = np.zeros((rows, width*3, 3), dtype=np.float32)
+    corners = vertices[np.array(faces)]
+    face_normals = np.cross(corners[:, 1]-corners[:, 0], corners[:, 2]-corners[:, 0])
+    face_normals /= np.maximum(np.linalg.norm(face_normals, axis=1, keepdims=True), 1e-9)
     for view in range(3):
         angle = view*math.pi/3
         normal = np.array((math.cos(angle), math.sin(angle), 0))
@@ -88,7 +98,9 @@ def atlas(vertices, faces, tints, height, radius, lin_to_srgb):
         depth = vertices @ normal
         zbuf = np.full((rows, width), -np.inf)
         tile = result[:, view*width:(view+1)*width]
-        for face in faces:
+        ntile = normals[:, view*width:(view+1)*width]
+        up = np.array((0., 0., 1.))
+        for index, face in enumerate(faces):
             ind = np.array(face)
             x, y = u[ind], v[ind]
             x0, x1 = max(0,int(np.floor(x.min()))), min(width-1,int(np.ceil(x.max())))
@@ -104,10 +116,14 @@ def atlas(vertices, faces, tints, height, radius, lin_to_srgb):
             mask = (a>=0)&(b>=0)&(c>=0)&(d>zbuf[y0:y1+1,x0:x1+1])
             tint = a*tints[ind[0]]+b*tints[ind[1]]+c*tints[ind[2]]
             # Same intrinsic albedo as near, with a small ambient branch-contact allowance.
-            rgb = lin_to_srgb(COLOUR[None,None,:]*tint[:,:,None]*.92)
+            rgb = lin_to_srgb(COLOUR[None,None,:]*tint[:,:,None]*shade)
             target = tile[y0:y1+1,x0:x1+1]
             target[mask,:3] = rgb[mask]
             target[mask,3] = 1
+            nf = face_normals[index]
+            if nf @ normal < 0:
+                nf = -nf
+            ntile[y0:y1+1,x0:x1+1][mask] = (nf @ lateral, nf @ up, nf @ normal)
             zbuf[y0:y1+1,x0:x1+1][mask] = d[mask]
         # Edge dilation carries albedo into transparent texels for mip filtering, not coverage.
         for _ in range(3):
@@ -117,15 +133,18 @@ def atlas(vertices, faces, tints, height, radius, lin_to_srgb):
                     other = np.roll(tile, shift, axis=axis)
                     m = (~opaque)&(other[:,:,3] > 0)
                     tile[m,:3] = other[m,:3]
-    return result
+                    nother = np.roll(ntile, shift, axis=axis)
+                    ntile[m] = nother[m]
+        empty = np.linalg.norm(ntile, axis=2) < .5
+        ntile[empty] = (0, 0, 1)
+    return result, normals
 
 
 def build(g, ident):
     fir = ident.endswith('fir')
     if ident not in _CACHE:
-        high = authored(fir, True)
-        _CACHE[ident] = (high, atlas(*high[:3], high[3], high[4], g['lin_to_srgb']))
-    high, pixels = _CACHE[ident]
+        _CACHE[ident] = authored(fir, True)
+    high = _CACHE[ident]
     vertices, faces, tints, h, radius = high if g['lod'] != 1 else authored(fir, False)
     name = ident+'-needles'
     # Each LOD owns a fresh material, so its atlas cannot leak into the next build.
@@ -157,6 +176,7 @@ def build(g, ident):
                 if g['lod'] == 0 and k % 2 == 0:
                     g['rod']('exposed-limb',(0,0,z),end,.018,bark,segs=4)
     else:
+        pixels, normals = atlas(*high[:3], high[3], high[4], g['lin_to_srgb'], MEAN_AO.get(ident, 1.0))
         image = bpy.data.images.new(ident+'-authored-views',width=768,height=512,alpha=True)
         image.pixels.foreach_set(pixels.ravel()); image.pack()
         nt = leaf.node_tree; bsdf = nt.nodes.get('Principled BSDF')
@@ -165,6 +185,17 @@ def build(g, ident):
         cut = nt.nodes.new('ShaderNodeMath'); cut.operation='GREATER_THAN';cut.inputs[1].default_value=.5
         nt.links.new(tex.outputs['Alpha'],cut.inputs[0]);nt.links.new(cut.outputs[0],bsdf.inputs['Alpha'])
         leaf.surface_render_method='DITHERED'
+        # Half-resolution normal atlas (384 x 256): smooth normals, a small Far file.
+        half = normals.reshape(256, 2, 384, 2, 3).mean(axis=(1, 3))
+        half /= np.maximum(np.linalg.norm(half, axis=2, keepdims=True), 1e-6)
+        rgba = np.concatenate([half*.5+.5, np.ones((256, 384, 1))], axis=2).astype(np.float32)
+        nimage = bpy.data.images.new(ident+'-authored-normals', width=384, height=256, alpha=False)
+        nimage.colorspace_settings.name = 'Non-Color'
+        nimage.pixels.foreach_set(rgba.ravel()); nimage.pack()
+        ntex = nt.nodes.new('ShaderNodeTexImage'); ntex.image = nimage
+        nmap = nt.nodes.new('ShaderNodeNormalMap'); nmap.uv_map = 'UVMap'
+        nt.links.new(ntex.outputs['Color'], nmap.inputs['Color'])
+        nt.links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
         for view in range(3):
             angle=view*math.pi/3
             lateral=Vector((-math.sin(angle),math.cos(angle),0))

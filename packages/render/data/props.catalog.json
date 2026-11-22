@@ -1867,7 +1867,7 @@
           "maxDistance": 1200,
           "triangleBudget": 100,
           "triangles": 40,
-          "bytes": 19984
+          "bytes": 39028
         }
       ],
       "bounds": {
@@ -1905,7 +1905,7 @@
           "maxDistance": 1200,
           "triangleBudget": 100,
           "triangles": 40,
-          "bytes": 19052
+          "bytes": 37324
         }
       ],
       "bounds": {
@@ -1918,5 +1918,5 @@
       "materials": ["forest-bark", "forest-fir-needles"]
     }
   ],
-  "totalBytes": 3531272
+  "totalBytes": 3568588
 }

@@ -65,9 +65,22 @@ try {
     if (
       Object.values(luma)
         .flat()
-        .some((r) => !Number.isFinite(r.relativeDelta) || r.relativeDelta > 0.25)
+        .some((r) => !Number.isFinite(r.relativeDelta) || r.relativeDelta > 0.15)
     )
-      throw new Error('Tree LOD luminance changes by more than 25%');
+      throw new Error('Tree LOD luminance changes by more than 15%');
+    // The Far cards come from the authored triangles: their silhouette must cover about what
+    // the Mobile tree covers and overlap it, from every view between the card planes.
+    for (const [id, views] of Object.entries(transition))
+      for (const v of views)
+        if (
+          v.coverageMobileOverFar < 0.85 ||
+          v.coverageMobileOverFar > 1.2 ||
+          v.iouMobileFar < 0.6 ||
+          v.iouHighFar < 0.6
+        )
+          throw new Error(
+            `${id}: Far silhouette departs from the authored tree (${JSON.stringify(v)})`,
+          );
   }
   if (process.env.PROP_ASSEMBLY) {
     await page.evaluate(

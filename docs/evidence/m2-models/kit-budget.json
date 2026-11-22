@@ -2,16 +2,16 @@
   "method": "Conservative reservation, not integrated Spa/Singapore request telemetry. Adds all twelve new props at all LODs and both circuits sky tiers to the existing Monza first race, without subtracting replaced assets.",
   "results": {
     "high": {
-      "existingFirstRace": 9297522,
-      "allNewLods": 432472,
+      "existingFirstRace": 9297523,
+      "allNewLods": 1146068,
       "bothSkiesAllTiers": 122510,
-      "ceiling": 9852504
+      "ceiling": 10566101
     },
     "mobile": {
-      "existingFirstRace": 3872716,
-      "allNewLods": 432472,
+      "existingFirstRace": 3872717,
+      "allNewLods": 1146068,
       "bothSkiesAllTiers": 122510,
-      "ceiling": 4427698
+      "ceiling": 5141295
     }
   },
   "props": [
@@ -23,13 +23,13 @@
     {
       "id": "temporary-grandstand",
       "triangles": [2904, 1912, 1552],
-      "bytes": [38880, 28220, 22092]
+      "bytes": [38840, 28252, 22116]
     },
     { "id": "marina-office", "triangles": [652, 524, 440], "bytes": [13852, 10836, 10276] },
     { "id": "marina-hotel", "triangles": [752, 624, 516], "bytes": [14524, 11304, 10636] },
     { "id": "marina-pavilion", "triangles": [336, 208, 208], "bytes": [12244, 9364, 9364] },
     { "id": "hill-pit-garage", "triangles": [1448, 696, 444], "bytes": [36680, 18920, 15916] },
-    { "id": "forest-spruce", "triangles": [316, 124, 36], "bytes": [9728, 5596, 4496] },
-    { "id": "forest-fir", "triangles": [316, 124, 36], "bytes": [9772, 5524, 4520] }
+    { "id": "forest-spruce", "triangles": [7062, 3254, 40], "bytes": [255372, 117188, 39028] },
+    { "id": "forest-fir", "triangles": [5540, 2564, 40], "bytes": [206620, 97684, 37324] }
   ]
 }
