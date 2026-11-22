@@ -477,7 +477,7 @@ test.describe('drive', () => {
     await page.keyboard.press('Escape');
     const menu = page.locator('[data-testid=pause-menu]');
     await expect(menu).toBeVisible();
-    for (const id of ['tc', 'abs', 'stability', 'braking', 'gears', 'steering']) {
+    for (const id of ['tc', 'abs', 'stability', 'braking', 'gears', 'steering', 'line']) {
       const row = menu.locator(`[data-setting=${id}]`);
       await expect(row).toBeVisible();
       await expect(row.locator('.pause__help')).not.toBeEmpty();
@@ -489,6 +489,127 @@ test.describe('drive', () => {
     expect(((await state(page)).assists as { stability?: number }).stability).toBe(1);
     await page.getByRole('button', { name: 'Resume' }).click();
     await expect(menu).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+
+  test('draws the driving line, toggles from pause and shifts braking with speed', async ({
+    drive: { page, problems },
+  }, info) => {
+    const waitFrames = async (n = 4): Promise<void> => {
+      await page.evaluate(
+        (count) =>
+          new Promise<void>((resolve) => {
+            let left = count;
+            const step = (): void => {
+              if (--left <= 0) resolve();
+              else requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+          }),
+        n,
+      );
+    };
+    const countWarmPixels = async (): Promise<number> => {
+      const png = await page
+        .locator('#view')
+        .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+      return page.evaluate(async (b64) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        await img.decode();
+        const canvas = new OffscreenCanvas(img.width, img.height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('no 2d context');
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(0, 0, img.width, img.height);
+        let warm = 0;
+        const yMin = Math.floor(img.height * 0.42);
+        const yMax = Math.floor(img.height * 0.85);
+        const xMin = Math.floor(img.width * 0.25);
+        const xMax = Math.floor(img.width * 0.75);
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = xMin; x < xMax; x++) {
+            const i = (y * img.width + x) * 4;
+            const r = data[i] ?? 0;
+            const g = data[i + 1] ?? 0;
+            const b = data[i + 2] ?? 0;
+            if (r > 135 && r > g + 45 && r > b + 45) warm++;
+          }
+        }
+        return warm;
+      }, png.toString('base64'));
+    };
+
+    // Default mode matches the device preset: braking for keyboard and touch alike (the brief).
+    // On the phone a pedal tap first makes touch the active device.
+    if (info.project.name === 'phone') {
+      const pedal = await page.locator('[data-control=throttle]').boundingBox();
+      if (!pedal) throw new Error('no throttle pedal');
+      const cdp = await page.context().newCDPSession(page);
+      const pt = { x: pedal.x + pedal.width / 2, y: pedal.y + pedal.height * 0.5, id: 1 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
+      await waitFrames(3);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt] });
+    }
+    await waitFrames();
+    const initial = await page.evaluate(() => window.__undercut?.drivingLine());
+    expect((await state(page)).device).toBe(info.project.name === 'phone' ? 'touch' : 'keyboard');
+    expect(initial?.mode).toBe('braking');
+
+    // Pause menu switches between Off, Full and Braking.
+    await page.keyboard.press('Escape');
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    const lineRow = menu.locator('[data-setting=line]');
+    await lineRow.getByRole('radio', { name: 'Off' }).click();
+    await waitFrames();
+    expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.mode).toBe('off');
+    expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.visible).toBe(false);
+    await lineRow.getByRole('radio', { name: 'Full' }).click();
+    await waitFrames();
+    expect((await page.evaluate(() => window.__undercut?.drivingLine()))?.mode).toBe('full');
+    await lineRow.getByRole('radio', { name: 'Braking' }).click();
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(menu).toBeHidden();
+
+    // Approaching Monza's first chicane: arriving faster moves the braking zone closer and widens it.
+    await page.evaluate(() => {
+      const u = window.__undercut;
+      u?.setTimeScale(0);
+      u?.camera('chase-near');
+      u?.teleport(420, 0, 120);
+    });
+    await waitFrames();
+    const slow = await page.evaluate(() => window.__undercut?.drivingLine());
+
+    await page.evaluate(() => {
+      window.__undercut?.teleport(420, 0, 310);
+    });
+    await waitFrames();
+    const fast = await page.evaluate(() => window.__undercut?.drivingLine());
+
+    expect(fast?.visible).toBe(true);
+    expect(fast?.brakeCount ?? 0).toBeGreaterThan(slow?.brakeCount ?? 0);
+    expect(fast?.firstBrakeDistance).not.toBeNull();
+    if (slow?.firstBrakeDistance !== null && slow?.firstBrakeDistance !== undefined) {
+      expect(fast?.firstBrakeDistance as number).toBeLessThan(slow.firstBrakeDistance);
+    }
+
+    // Rendered pixels on the WebGL canvas actually show the red braking ribbon and clear when off.
+    await page.evaluate(() => {
+      window.__undercut?.teleport(460, 0, 300);
+      window.__undercut?.drivingLine('braking');
+    });
+    await waitFrames(5);
+    const warmOn = await countWarmPixels();
+
+    await page.evaluate(() => {
+      window.__undercut?.drivingLine('off');
+    });
+    await waitFrames(5);
+    const warmOff = await countWarmPixels();
+
+    expect(warmOn).toBeGreaterThan(warmOff + 80);
     expect(problems).toEqual([]);
   });
 

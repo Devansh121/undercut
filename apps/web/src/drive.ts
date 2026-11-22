@@ -31,6 +31,7 @@ import {
   type CameraName,
   type CarLivery,
   type CompoundLook,
+  type DrivingLineMode,
   type QualityName,
   type ToneMap,
 } from '@undercut/render';
@@ -44,9 +45,8 @@ import {
 import teams from '../../../design/teams.json';
 import compounds from '../../../design/compounds.json';
 import monza from '@undercut/track/data/monza.json';
-// The AI's racing line, for the rubbered line on the asphalt (offsets in 0.1 mm per 2 m sample).
-// The AI's racing line and measured vehicle envelope, for the rubbered line and the driving
-// line's advised speeds (braking help).
+// The AI's racing line and measured vehicle envelope, for the rubbered line, the driving-line
+// assist and the driving line's advised speeds (braking help).
 import monzaLine from '../../../packages/ai/data/monza-low.line.json';
 import monzaEnvelope from '../../../packages/ai/data/monza-low.envelope.json';
 import { defaultCarState } from '@undercut/audio';
@@ -271,6 +271,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     seed: o.seed,
     record,
     today: o.today,
+    device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
   const params = session.params;
@@ -307,6 +308,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           fleetLiveries: all,
           car: carGeometry,
           racingLine: line,
+          drivingLine,
+          drivingLineMode: session.assists.racingLine ?? 'off',
           assetsBase: 'assets/',
           toneMap: toneMapParam(),
           checkRegistration: import.meta.env.DEV || debugEnabled(),
@@ -460,6 +463,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         choices: levels,
         get: () => session.assists.steering,
         set: (v) => session.setAssist('steering', Number(v)),
+      },
+      {
+        id: 'line',
+        label: 'Driving line',
+        description: 'Shows the racing line and where to lift or brake.',
+        choices: [
+          { value: 'off', label: 'Off' },
+          { value: 'braking', label: 'Braking' },
+          { value: 'full', label: 'Full' },
+        ],
+        get: () => session.assists.racingLine ?? 'off',
+        set: (v) => session.setAssist('racingLine', v as DrivingLineMode),
       },
     ],
     () =>
@@ -693,6 +708,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             0,
             Math.min(15, Math.ceil(((t.engineRpm - REV_START) / (REV_FULL - REV_START)) * 15)),
           );
+    view.setDrivingLine(session.assists.racingLine ?? 'off');
     view.render({
       pose,
       ghost: ghostOn ? ghostPose : null,
@@ -996,6 +1012,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (session.phase === 'paused') resume();
       setSource('human');
       loop.timeScale = 1;
+      session.resetAssists();
+      view.setDrivingLine(session.assists.racingLine ?? 'off');
       view.setSkyProbe(null);
       view.setCamera('chase-near');
       if (!ext) restartLap();
