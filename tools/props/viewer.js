@@ -79,6 +79,7 @@ function frame(prop, angle, aspect, elevation = 0.48) {
     );
   camera.lookAt(at);
   camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
   env.update(camera, at, true);
 }
 window.inspect = async (id, mode) => {
@@ -260,6 +261,7 @@ window.corridor = async () => {
   camera.position.set(4, 2.2, -42);
   camera.lookAt(-1, 4.8, 35);
   camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
   env.update(camera, new T.Vector3(0, 0, 20), true);
   renderer.render(scene, camera);
   window.corridorStats = {
@@ -313,6 +315,7 @@ window.artwork = async (id) => {
   camera.lookAt(center);
   camera.updateProjectionMatrix();
   renderer.setViewport(0, 0, 1600, 1000);
+  camera.updateMatrixWorld();
   env.update(camera, center, true);
   renderer.render(scene, camera);
 };
@@ -343,6 +346,8 @@ window.treeSwap = async (id, angle, distance, fov = 60) => {
   const aim = new T.Vector3(0, prop.bounds.max[1] / 2, 0);
   camera.position.set(Math.cos(angle) * distance, 1.5, Math.sin(angle) * distance);
   camera.lookAt(aim);
+  // The cascades fit the camera's world matrix: refresh it after moving the camera.
+  camera.updateMatrixWorld();
   env.update(camera, aim, true);
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, W, H);
@@ -544,6 +549,7 @@ window.kitScene = async (forest) => {
   camera.position.set(2, 2.8, -25);
   camera.lookAt(-1, 5, 30);
   camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
   env.update(camera, new T.Vector3(0, 0, 15), true);
   renderer.render(scene, camera);
 };

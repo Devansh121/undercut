@@ -1806,5 +1806,13 @@
     "licence": "MIT",
     "changes": "Scripted modular geometry, metric surface grain, vertex ambient occlusion, Draco compression",
     "sha256": "7bc9905700bcb7ea92f01987c70024e080a5f365bd13ba723b3906d8463f76e9"
+  },
+  {
+    "file": "packages/render/data/spa.dressing.json",
+    "source_url": "https://www.openstreetmap.org (Overpass query via https://overpass-api.de/api/interpreter, fetched 2026-11-22T15:33:43Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E005_00_DEM/Copernicus_DSM_COG_10_N50_00_E005_00_DEM.tif",
+    "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+    "licence": "ODbL-1.0",
+    "changes": "Derived database built by tools/dressing/build.py spa: OSM woods, tree rows, single trees, buildings, grandstands, bridges, roads, paths, water and car parks within 600 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 6 km with the forest roof (22 m) taken off inside mapped woods, a 150 m opening and a 100 m average. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "5e3f9a83a4ec09490b25bd376ecb3db5221780482a2461c7801c33e43820d7e3"
   }
 ]
