@@ -1,4 +1,4 @@
-import type { AudioScene, AudioCue } from '../dsp/scene';
+import type { AudioCue } from '../dsp/cues';
 import type { AudioView } from '../dsp/view';
 import type { GainId } from '../dsp/voice';
 
@@ -7,7 +7,8 @@ export const PROCESSOR_NAME = 'undercut-car-audio';
 
 /** Main thread → audio thread. */
 export type ToProcessor =
-  | { type: 'scene'; scene: AudioScene }
+  /** A scene packed by `packScene`. */
+  | { type: 'scene'; packed: Float64Array }
   | { type: 'cue'; cue: AudioCue }
   | { type: 'state'; packed: Float64Array }
   | { type: 'gain'; id: GainId; value: number }

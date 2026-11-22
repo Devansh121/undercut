@@ -1,10 +1,11 @@
-import type { AudioScene, AudioCue } from '../dsp/scene';
 /**
  * Main-thread facade over the audio worklet. The game talks to an `AudioEngine`; when the
  * browser has no Web Audio or no AudioWorklet, or loading fails, it gets a silent engine with
  * the same interface, and the game runs without sound instead of crashing.
  */
 import { MIN_SAMPLE_RATE } from '../dsp/core';
+import type { AudioCue } from '../dsp/cues';
+import { packScene, SCENE_LENGTH, type AudioScene } from '../dsp/scene';
 import { CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../dsp/state';
 import type { AudioView } from '../dsp/view';
 import type { GainId } from '../dsp/voice';
@@ -29,9 +30,11 @@ export interface AudioEngine {
   /** Fade out and suspend the audio context (tab hidden, game paused). */
   suspend(): Promise<void>;
   /** Latest state of the player's car. Cheap; call every sim step (60–240 Hz). */
-  setScene(scene: AudioScene): void;
-  cue(cue: AudioCue): void;
   setCarState(state: AudioCarState): void;
+  /** Other cars, circuit ambience and start lights. Cheap; call every frame. */
+  setScene(scene: Readonly<AudioScene>): void;
+  /** Play a menu or start-light cue on the UI bus (a cue asked for while loading plays once loaded). */
+  cue(cue: AudioCue): void;
   /** Bus volume, 0–1 (up to 2 is accepted): master, engine, effects, ui or ambience. */
   setVolume(id: GainId, value: number): void;
   /** Where the listener is (follows the camera): changes the car's balance, gliding. */
@@ -127,7 +130,8 @@ class WorkletAudioEngine implements AudioEngine {
   private chain: Promise<void> = Promise.resolve();
   private readonly packed = new Float64Array(CAR_STATE_LENGTH);
   private hasState = false;
-  private scene: AudioScene | undefined;
+  private readonly packedScene = new Float64Array(SCENE_LENGTH);
+  private hasScene = false;
   private pendingCue: AudioCue | undefined;
   private readonly gains = new Map<GainId, number>();
   private view: AudioView | undefined;
@@ -170,11 +174,16 @@ class WorkletAudioEngine implements AudioEngine {
     return this.reconcile();
   }
 
-  setScene(scene: AudioScene): void {
-    this.scene = scene;
-    this.post({ type: 'scene', scene });
+  setScene(scene: Readonly<AudioScene>): void {
+    if (this.status === 'silent') return;
+    packScene(scene, this.packedScene);
+    this.hasScene = true;
+    // Copied by postMessage, like the car state.
+    if (this.node) this.post({ type: 'scene', packed: this.packedScene });
   }
+
   cue(cue: AudioCue): void {
+    if (this.status === 'silent') return;
     if (!this.node) this.pendingCue = cue;
     else this.post({ type: 'cue', cue });
   }
@@ -275,7 +284,7 @@ class WorkletAudioEngine implements AudioEngine {
         processorOptions,
       });
       this.node = node;
-      if (this.scene) this.post({ type: 'scene', scene: this.scene });
+      if (this.hasScene) this.post({ type: 'scene', packed: this.packedScene });
       if (this.pendingCue) {
         this.post({ type: 'cue', cue: this.pendingCue });
         this.pendingCue = undefined;

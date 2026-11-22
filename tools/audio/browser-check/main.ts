@@ -3,6 +3,7 @@
  * in an OfflineAudioContext, and the facade starts, suspends, resumes and disposes a live one.
  */
 import {
+  packScene,
   CAR_STATE_LENGTH,
   defaultCarState,
   packCarState,
@@ -84,9 +85,11 @@ async function budget() {
         new Float64Array(CAR_STATE_LENGTH),
       ),
     });
+    // Worst case: all nineteen opponents in range (six voiced plus the summed far field), the
+    // city bed (the most filters) with a crowd on both sides.
     node.port.postMessage({
       type: 'scene',
-      scene: {
+      packed: packScene({
         cars: Array.from({ length: 19 }, (_, i) => ({
           x: 2 + i * 3,
           z: (i % 2 ? -1 : 1) * 4,
@@ -95,10 +98,11 @@ async function budget() {
           engineSpeed: rpmToRadPerSecond(8000 + i * 200),
           throttle: 1,
         })),
-        circuit: 'forest',
-        progress: 0,
+        ambience: 'city-night',
+        crowdLeft: 1,
+        crowdRight: 1,
         lights: 5,
-      },
+      }),
     });
     await new Promise((r) => setTimeout(r, 200));
     await ctx.resume();
@@ -108,7 +112,8 @@ async function budget() {
   return {
     ...measured,
     cpuPercent: (100 * measured.processMs) / measured.audioMs,
-    preset: 'Mobile workload: 19 sources, nearest 6; player, road, crowd, forest',
+    preset:
+      'Mobile workload: player car (engine, turbo, MGU-K, road), 19 opponents (6 voiced + far field), city bed, crowd both sides',
     hardware: 'Desktop Chromium, 844x390 mobile viewport; no device CPU emulation',
     budgetPercent: 10,
   };

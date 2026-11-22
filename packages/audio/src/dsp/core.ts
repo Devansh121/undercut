@@ -1,5 +1,5 @@
-import { SceneSound, type AudioScene, type AudioCue } from './scene';
 import { createRng } from '@undercut/core';
+import { SceneSound, type AudioScene, type AudioCue } from './scene';
 import { Biquad, onePoleCoefficient } from './biquad';
 import { CarControls, CHUNK } from './controls';
 import { Ducker } from './ducking';
@@ -117,9 +117,12 @@ export class AudioCore {
     this.kPause = onePoleCoefficient(0.008, sampleRate);
   }
 
-  setScene(scene: AudioScene): void {
+  /** Other cars, ambience and start lights (struct or packed). Cheap; call per frame. */
+  setScene(scene: Readonly<AudioScene> | ArrayLike<number>): void {
     this.scene.set(scene);
   }
+
+  /** Play a menu or start-light cue on the UI bus. */
   cue(cue: AudioCue): void {
     this.scene.cue(cue);
   }
