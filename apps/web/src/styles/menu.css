@@ -1028,6 +1028,15 @@
     padding-top: var(--sp-3);
     padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom, 0px));
   }
+  /* A thumb-sized hit area for the credit link; the text stays small and quiet. */
+  .launch__credit {
+    bottom: 0;
+  }
+  .launch__credit a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
 
   .hub__body {
     grid-template-columns: 196px minmax(0, 1fr) 236px;
