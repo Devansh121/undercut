@@ -32,7 +32,7 @@ describe('circuit summary', () => {
     });
   });
 
-  it('reads Spa and Singapore (track format 3): direction, corners, the day preset, no braking help line', () => {
+  it('reads Spa and Singapore (track format 3): direction, corners, their skies, no braking help line', () => {
     const at = (t: unknown) => {
       const f = t as TrackFileLike & { timingLine: { s: number } };
       // Both have AI racing lines (medium and high downforce), none at the player's low trim.
@@ -50,7 +50,7 @@ describe('circuit summary', () => {
       id: 'singapore',
       direction: 'anticlockwise',
       length: 4927,
-      timesOfDay: ['overcast-day'],
+      timesOfDay: ['night-floodlit', 'overcast-day'],
       raceReady: true,
       brakingHelp: false,
     });
@@ -84,8 +84,9 @@ describe('circuit summary', () => {
   });
 
   it('picks sky presets by circuit, else the day preset', () => {
-    // The floodlit night preset is not built yet: the day preset stands in.
-    expect(timesOfDayFor('singapore', 'floodlit')).toEqual(['overcast-day']);
+    // Singapore is raced at night under the floodlights its world places, and has a day session.
+    expect(timesOfDayFor('singapore', 'floodlit')).toEqual(['night-floodlit', 'overcast-day']);
+    // Elsewhere no circuit places floodlights yet: the day preset.
     expect(timesOfDayFor('elsewhere', 'floodlit')).toEqual(['overcast-day']);
     expect(timesOfDayFor('elsewhere', 'daylight')).toEqual(['overcast-day']);
   });

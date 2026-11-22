@@ -62,8 +62,8 @@ export interface CircuitPlan {
 const TIMES: Readonly<Record<string, readonly string[]>> = {
   monza: ['monza-afternoon', 'overcast-day'],
   spa: ['overcast-day'],
-  // Raced at night, but the floodlit night preset is not built yet: the day preset until it is.
-  singapore: ['overcast-day'],
+  // Raced at night under its floodlights (the world's lamp banks light it); a day session too.
+  singapore: ['night-floodlit', 'overcast-day'],
 };
 
 export function timesOfDayFor(id: string, lighting: string | undefined): string[] {
