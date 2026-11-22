@@ -2,7 +2,7 @@ import {
   Color,
   Group,
   Mesh,
-  PlaneGeometry,
+  Vector3,
   type BufferGeometry,
   type Material,
   type Texture,
@@ -10,10 +10,10 @@ import {
 import type { MeshData, Track } from '@undercut/track';
 import { macroNoise, surfaceMaterial, type PbrSet } from '../materials/surface';
 import type { PropKitAssets } from '../props/catalog';
-import { boardMaterial, type PropRegistry } from '../props/registry';
+import { boardMaterial, type PropPlacement, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
-import { buildBuildings, facadeMaterial } from './buildings';
+import { buildBuildingChunks, facadeMaterial } from './buildings';
 import { buildCoverMap, type CoverMap } from './cover';
 import { crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
 import {
@@ -32,7 +32,7 @@ import {
   type StartGantry,
 } from './furniture';
 import {
-  buildStands,
+  buildStandChunks,
   crowdSeats,
   fitStand,
   grandstandMaterial,
@@ -40,8 +40,9 @@ import {
 } from './grandstands';
 import { LapIndex } from './lap-index';
 import {
+  buildGarageBoardsGeometry,
   buildPitBuilding,
-  garageBoardTexture,
+  garageBoardAtlas,
   pitCrewGeometry,
   pitFacadeMaterial,
   pitWallCanopyGeometry,
@@ -52,7 +53,16 @@ import {
 import { buildSurfaceDecals } from './surface-decals';
 import { buildTerrain, TERRAIN_HIGH, TERRAIN_LITE, TERRAIN_MOBILE } from './terrain';
 import { treeAtlas } from './tree-atlas';
-import { treeCards, treeMaterials, type TreeMaterials } from './trees';
+import {
+  BROADLEAF_CLOUD,
+  COLUMNAR_CLOUD,
+  treeCards,
+  treeCloudGeometry,
+  treeCloudMaterials,
+  treeMaterials,
+  type TreeMaterials,
+  type TreeSwap,
+} from './trees';
 
 /** What a preset draws of the world (presets.json, `world`). */
 export interface WorldQuality {
@@ -75,6 +85,8 @@ export interface WorldQuality {
   /** Tree cards drawn near / far (m from the chunk centre). */
   treeNear: number;
   treeFar: number;
+  /** Trees nearer the eye than this are real geometry instead of cards, m (0: cards only). */
+  treeCloud: number;
   /**
    * Build the structures (pit complex, buildings, stands and crowd, trackside furniture,
    * bridges, decals). Off on Lite (software-WebGL tests): ground and a few trees only.
@@ -103,6 +115,16 @@ export interface CircuitWorldOptions {
    */
   propKit?: PropKitAssets | null;
 }
+
+/**
+ * How far (to the sphere's edge) world chunks draw, m. Haze hides them well before this; the
+ * gates only skip drawing what cannot be seen, so they are set long to avoid pop-in.
+ */
+const FAR_BUILDINGS = 4000;
+const FAR_STANDS = 3200;
+const FAR_BRIDGES = 3000;
+const FAR_BOARDS = 1200;
+const FAR_DECALS = 900;
 
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
 const WOOD_DENSITY = 1 / 42;
@@ -161,39 +183,129 @@ function hexLinear(hex: string): [number, number, number] {
  * invented-brand hoardings, braking/DRS boards, bridges, historic banking and surface decals.
  * Circuit-agnostic: everything here comes from the dressing file, track and design data.
  */
+interface WorldChunk {
+  mesh: Mesh;
+  centre: Vector3;
+  radius: number;
+  maxDistance: number;
+  castShadow: boolean;
+  shadowMaxDistance: number;
+}
+
+const defaultYield = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
 export class CircuitWorld {
   readonly group = new Group();
-  readonly heightAt: (x: number, z: number) => number;
+  heightAt: (x: number, z: number) => number = () => 0;
   readonly stands: StandFrame[] = [];
   readonly counts: Record<string, number> = {};
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: Material[] = [];
   private readonly textures: Texture[] = [];
-  private readonly cover: CoverMap;
+  /** Unset until the ground step of the build has run. */
+  private cover: CoverMap | null = null;
   private readonly trees: TreeMaterials[] = [];
+  /** Per-tree swap between near trees and cards (eye updated every frame). */
+  private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
   private readonly crowdTime = { value: 0 };
   private readonly lap: LapIndex;
+  private readonly worldChunks: WorldChunk[] = [];
   private pitComplex: PitComplexData | null = null;
   private startGantry: StartGantry | null = null;
 
   /** Milliseconds per build step (start-up budget). */
   readonly buildTimes: Record<string, number> = {};
 
-  constructor(o: CircuitWorldOptions) {
+  constructor(o: CircuitWorldOptions, deferBuild = false) {
+    this.group.name = 'world';
+    this.lap = new LapIndex(o.track);
+    if (!deferBuild) {
+      this.buildSync(o);
+    }
+  }
+
+  /** Build the circuit world cooperatively across event-loop slices so the UI stays responsive. */
+  static async buildAsync(
+    o: CircuitWorldOptions,
+    yieldSlice: () => Promise<void> = defaultYield,
+  ): Promise<CircuitWorld> {
+    const world = new CircuitWorld(o, true);
     const { track, dressing, quality } = o;
     const wq = quality.world;
-    this.group.name = 'world';
+    let sliceStart = performance.now();
+    let maxSlice = 0;
+    const maybeYield = async (): Promise<void> => {
+      const elapsed = performance.now() - sliceStart;
+      if (elapsed > maxSlice) maxSlice = elapsed;
+      if (elapsed >= 12) {
+        await yieldSlice();
+        sliceStart = performance.now();
+      }
+    };
+    const timed = async (name: string, fn: () => void): Promise<void> => {
+      const t0 = performance.now();
+      fn();
+      world.buildTimes[name] = Math.round(performance.now() - t0);
+      await maybeYield();
+    };
+
+    try {
+      const lapBox = bounds(
+        Array.from({ length: track.lap.count * 2 }, (_, i) =>
+          i % 2 === 0 ? (track.lap.x[i >> 1] as number) : (track.lap.z[i >> 1] as number),
+        ),
+      );
+      let terrain: ReturnType<typeof buildTerrain> | null = null;
+      await timed('terrain', () => {
+        const grid = decodeTerrain(dressing.terrain);
+        terrain = buildTerrain(
+          track,
+          grid,
+          world.lap,
+          o.drivable,
+          wq.terrain === 'high'
+            ? TERRAIN_HIGH
+            : wq.terrain === 'lite'
+              ? TERRAIN_LITE
+              : TERRAIN_MOBILE,
+        );
+        world.heightAt = terrain.heightAt;
+      });
+      await timed('cover', () => {
+        world.buildGround(o, terrain!, lapBox);
+      });
+      if (!wq.structures) {
+        await timed('trees', () => world.placeTrees(o, lapBox));
+      } else {
+        await timed('pit', () => world.placePitComplex(o));
+        await timed('trees', () => world.placeTrees(o, lapBox));
+        await timed('buildings', () => world.placeBuildings(o));
+        await timed('stands', () => world.placeStands(o));
+        await timed('furniture', () => world.placeFurnitureAndDecals(o));
+      }
+    } catch (error) {
+      // Release what the steps so far made; the caller gets the error.
+      world.dispose();
+      throw error;
+    }
+    const finalSlice = performance.now() - sliceStart;
+    if (finalSlice > maxSlice) maxSlice = finalSlice;
+    world.buildTimes.maxSlice = Math.round(maxSlice);
+    return world;
+  }
+
+  private buildSync(o: CircuitWorldOptions): void {
+    const { track, dressing, quality } = o;
+    const wq = quality.world;
     let mark = performance.now();
     const step = (name: string): void => {
       const now = performance.now();
       this.buildTimes[name] = Math.round(now - mark);
       mark = now;
     };
-    this.lap = new LapIndex(track);
     const grid = decodeTerrain(dressing.terrain);
     step('index');
 
-    // Ground.
     const terrain = buildTerrain(
       track,
       grid,
@@ -208,6 +320,50 @@ export class CircuitWorld {
         i % 2 === 0 ? (track.lap.x[i >> 1] as number) : (track.lap.z[i >> 1] as number),
       ),
     );
+    this.buildGround(o, terrain, lapBox);
+    step('ground');
+    if (!wq.structures) {
+      this.placeTrees(o, lapBox);
+      step('trees');
+      return;
+    }
+    // Build pit complex before generic buildings so its footprint excludes mapped pit slabs.
+    this.placePitComplex(o);
+    step('pit');
+    this.placeTrees(o, lapBox);
+    step('trees');
+    this.placeBuildings(o);
+    step('buildings');
+    this.placeStands(o);
+    step('stands');
+    this.placeFurnitureAndDecals(o);
+    step('furniture');
+  }
+
+  private addWorldChunk(
+    mesh: Mesh,
+    centre: readonly [number, number, number],
+    radius: number,
+    maxDistance: number,
+    shadowMaxDistance: number,
+  ): void {
+    this.worldChunks.push({
+      mesh,
+      centre: new Vector3(centre[0], centre[1], centre[2]),
+      radius,
+      maxDistance,
+      castShadow: mesh.castShadow,
+      shadowMaxDistance,
+    });
+  }
+
+  private buildGround(
+    o: CircuitWorldOptions,
+    terrain: ReturnType<typeof buildTerrain>,
+    lapBox: [number, number, number, number],
+  ): void {
+    const { dressing, quality } = o;
+    const wq = quality.world;
     const r = dressing.radius + 50;
     this.cover = buildCoverMap(
       dressing,
@@ -215,7 +371,6 @@ export class CircuitWorld {
       wq.coverResolution,
     );
     this.textures.push(this.cover.texture);
-    step('cover');
     const macro = macroNoise();
     this.textures.push(macro);
     const ground = surfaceMaterial(
@@ -254,35 +409,28 @@ export class CircuitWorld {
       { aoMapIntensity: 1 },
     );
     this.materials.push(ground);
-    const groundMesh = new Mesh(terrain.geometry, ground);
-    groundMesh.name = 'world:ground';
-    groundMesh.receiveShadow = true;
-    groundMesh.matrixAutoUpdate = false;
-    this.geometries.push(terrain.geometry);
-    this.group.add(groundMesh);
-
-    step('ground');
-    if (!wq.structures) {
-      this.placeTrees(o, lapBox);
-      step('trees');
-      return;
-    }
-    // Build pit complex before generic buildings so its footprint excludes mapped pit slabs.
-    this.placePitComplex(o);
-    step('pit');
-    this.placeTrees(o, lapBox);
-    step('trees');
-    this.placeBuildings(o);
-    step('buildings');
-    this.placeStands(o);
-    step('stands');
-    this.placeFurnitureAndDecals(o);
-    step('furniture');
+    terrain.chunks.forEach((cg, ci) => {
+      const groundMesh = new Mesh(cg, ground);
+      groundMesh.name = ci === 0 ? 'world:ground' : `world:ground-${ci}`;
+      groundMesh.receiveShadow = true;
+      groundMesh.matrixAutoUpdate = false;
+      this.geometries.push(cg);
+      this.group.add(groundMesh);
+    });
   }
 
   /** Set the 5 start-gantry lights (bits 0..4 red pods, bit 5 green). */
   setStartLights(mask: number): void {
     this.startGantry?.setLights(mask);
+  }
+
+  /**
+   * Distance within which trees are real geometry, m; 0 shows the cards everywhere. Read back
+   * when called without an argument (the tree-swap check compares the two).
+   */
+  treeSwapDistance(distance?: number): number {
+    if (distance !== undefined) this.treeSwap.distance.value = Math.max(0, distance);
+    return this.treeSwap.distance.value;
   }
 
   /** Pit building, team garage boards, pit-wall canopies and pit crew. */
@@ -296,45 +444,44 @@ export class CircuitWorld {
     const pit = buildPitBuilding(track, this.lap, teams.length);
     this.pitComplex = pit;
     const mat = pitFacadeMaterial(teams.map((t) => t.primary));
-    this.geometries.push(pit.geometry);
     this.materials.push(mat);
 
-    const mesh = new Mesh(pit.geometry, mat);
-    mesh.name = 'world:pit-building';
-    mesh.castShadow = quality.sceneryShadows;
-    mesh.receiveShadow = true;
-    mesh.matrixAutoUpdate = false;
-    this.group.add(mesh);
+    pit.chunks.forEach((ch, ci) => {
+      this.geometries.push(ch.geometry);
+      const mesh = new Mesh(ch.geometry, mat);
+      mesh.name = ci === 0 ? 'world:pit-building' : `world:pit-building-${ci}`;
+      mesh.castShadow = quality.sceneryShadows;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.group.add(mesh);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
+    });
 
-    // Garage team fascia boards (one per bay, facing the pit lane).
-    const boardMats = teams.map((team) => {
-      const tex = garageBoardTexture(team);
-      this.textures.push(tex);
-      const bm = boardMaterial(tex, { anisotropy: quality.anisotropy, roughness: 0.45 });
-      bm.name = `garage-board-${team.code}`;
+    // Garage team fascia boards consolidated into one atlas texture and one draw call.
+    if (pit.bays.length > 0) {
+      const atlas = garageBoardAtlas(teams, quality.anisotropy);
+      this.textures.push(atlas);
+      const bm = boardMaterial(atlas, { anisotropy: quality.anisotropy, roughness: 0.45 });
+      bm.name = 'garage-boards';
       this.materials.push(bm);
-      return bm;
-    });
-    const boardGeo = new PlaneGeometry(5.6, 0.98);
-    // Rotate plane so its front (+Z) faces +X to match the prop pivot convention (+X front).
-    boardGeo.rotateY(Math.PI / 2);
-    this.geometries.push(boardGeo);
-    boardMats.forEach((bm, ti) => {
-      props.define({
-        id: `garage-board-${ti}`,
-        castShadow: false,
-        receiveShadow: true,
-        lods: [{ geometry: boardGeo, material: bm, maxDistance: 650 }],
-      });
-    });
-    for (const bay of pit.bays) {
-      props.place(`garage-board-${bay.teamIndex}`, {
-        x: bay.x,
-        y: bay.y,
-        z: bay.z,
-        yaw: bay.yaw,
-        s: bay.s,
-      });
+      const boardGeo = buildGarageBoardsGeometry(pit.bays, teams.length);
+      this.geometries.push(boardGeo);
+      const boardMesh = new Mesh(boardGeo, bm);
+      boardMesh.name = 'world:garage-boards';
+      boardMesh.castShadow = false;
+      boardMesh.receiveShadow = true;
+      boardMesh.matrixAutoUpdate = false;
+      this.group.add(boardMesh);
+      const bs = boardGeo.boundingSphere;
+      if (bs) {
+        this.addWorldChunk(
+          boardMesh,
+          [bs.center.x, bs.center.y, bs.center.z],
+          bs.radius,
+          FAR_BOARDS,
+          0,
+        );
+      }
     }
     this.counts.garageBays = pit.bays.length;
 
@@ -351,6 +498,7 @@ export class CircuitWorld {
     props.define({
       id: 'pit-wall-canopy',
       castShadow: quality.sceneryShadows,
+      shadowMaxDistance: 180,
       receiveShadow: true,
       lods: [{ geometry: canopyGeo, material: canopyMat, maxDistance: far }],
     });
@@ -433,6 +581,8 @@ export class CircuitWorld {
     const { dressing, quality, props } = o;
     const wq = quality.world;
     if (wq.treeDensity <= 0) return;
+    const cover = this.cover;
+    if (!cover) throw new Error('trees are placed after the ground');
     const atlas = treeAtlas(wq.treeTile, quality.anisotropy);
     this.textures.push(atlas);
     const coverage = quality.msaa > 0;
@@ -444,14 +594,54 @@ export class CircuitWorld {
     const near = treeCards(3);
     const far = treeCards(2);
     this.geometries.push(near, far);
+    // Near trees: real geometry within `treeCloud` of the eye, on small chunks so only the few
+    // around the camera draw; the cards fade out over the same distance per tree.
+    const cloud = wq.treeCloud > 0;
+    const swap: TreeSwap | null = cloud ? this.treeSwap : null;
+    this.treeSwap.distance.value = wq.treeCloud;
+    const clouds = cloud
+      ? {
+          broad: treeCloudGeometry(BROADLEAF_CLOUD, 17),
+          column: treeCloudGeometry(COLUMNAR_CLOUD, 29),
+        }
+      : null;
+    if (clouds) this.geometries.push(clouds.broad, clouds.column);
     for (const k of kinds) {
-      const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage });
+      const mats = treeMaterials(atlas, k.tiles, k.id, { wind: wq.wind, coverage, swap });
       this.trees.push(mats);
       this.materials.push(mats.material, mats.depth);
+      if (clouds) {
+        const cm = treeCloudMaterials(
+          atlas,
+          k.id,
+          { wind: wq.wind, coverage },
+          mats.time,
+          this.treeSwap,
+        );
+        this.materials.push(cm.material, cm.depth);
+        props.define({
+          id: `${k.id}-near`,
+          gridCell: 120,
+          // The cards cast every tree's shadow (see treeMaterials).
+          castShadow: false,
+          shadowMaxDistance: 170,
+          receiveShadow: true,
+          lods: [
+            {
+              geometry: k.id === 'tree-row' ? clouds.column : clouds.broad,
+              material: cm.material,
+              depthMaterial: cm.depth,
+              // Near-edge distance of the chunk: the swap distance plus the dither band.
+              maxDistance: wq.treeCloud + 15,
+            },
+          ],
+        });
+      }
       props.define({
         id: k.id,
         gridCell: 320,
         castShadow: quality.sceneryShadows,
+        shadowMaxDistance: 170,
         receiveShadow: true,
         lods: [
           {
@@ -478,14 +668,14 @@ export class CircuitWorld {
       size: number,
       checkCover = true,
     ): boolean => {
-      if (checkCover && !this.cover.treeAllowed(x, z)) return false;
+      if (checkCover && !cover.treeAllowed(x, z)) return false;
       this.lap.nearest(x, z, hit);
       if (hit.dist < this.lap.barrierAt(hit.index, hit.d) + TREE_CLEARANCE) return false;
       const n = serial++;
       const h1 = hash01(n, 11);
       const h2 = hash01(n, 12);
       const h3 = hash01(n, 13);
-      props.place(kind, {
+      const placement: PropPlacement = {
         x,
         y: this.heightAt(x, z) - 0.25,
         z,
@@ -493,7 +683,9 @@ export class CircuitWorld {
         yaw: hash01(n, 14) * Math.PI * 2,
         scale: size * (0.72 + 0.56 * h1),
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
-      });
+      };
+      props.place(kind, placement);
+      if (cloud) props.place(`${kind}-near`, placement);
       return true;
     };
     const step = Math.sqrt(1 / (WOOD_DENSITY * wq.treeDensity));
@@ -567,32 +759,39 @@ export class CircuitWorld {
 
   private placeBuildings(o: CircuitWorldOptions): void {
     const pitFoot = this.pitComplex?.footprint ?? [];
-    const { geometry, count } = buildBuildings(o.dressing.mapped.building, this.heightAt, (f) => {
-      // Buildings on the circuit itself (mapped over the pit lane or under bridges) stay out.
-      const [x0, z0, x1, z1] = bounds(f.p);
-      const cx = (x0 + x1) / 2;
-      const cz = (z0 + z1) / 2;
-      const hit = this.lap.nearest(cx, cz);
-      if (hit.dist < 12) return true;
-      // Exclude mapped OSM slabs overlapping the dedicated pit complex (e.g. Palazzina Box).
-      if (pitFoot.length >= 6) {
-        if (inRing(pitFoot, cx, cz)) return true;
-        for (let i = 0; i + 1 < f.p.length; i += 2) {
-          if (inRing(pitFoot, f.p[i] as number, f.p[i + 1] as number)) return true;
+    const { chunks, count } = buildBuildingChunks(
+      o.dressing.mapped.building,
+      this.heightAt,
+      (f) => {
+        // Buildings on the circuit itself (mapped over the pit lane or under bridges) stay out.
+        const [x0, z0, x1, z1] = bounds(f.p);
+        const cx = (x0 + x1) / 2;
+        const cz = (z0 + z1) / 2;
+        const hit = this.lap.nearest(cx, cz);
+        if (hit.dist < 12) return true;
+        // Exclude mapped OSM slabs overlapping the dedicated pit complex (e.g. Palazzina Box).
+        if (pitFoot.length >= 6) {
+          if (inRing(pitFoot, cx, cz)) return true;
+          for (let i = 0; i + 1 < f.p.length; i += 2) {
+            if (inRing(pitFoot, f.p[i] as number, f.p[i + 1] as number)) return true;
+          }
         }
-      }
-      return false;
-    });
+        return false;
+      },
+    );
     this.counts.buildings = count;
     const mat = facadeMaterial();
-    this.geometries.push(geometry);
     this.materials.push(mat);
-    const mesh = new Mesh(geometry, mat);
-    mesh.name = 'world:buildings';
-    mesh.castShadow = o.quality.sceneryShadows;
-    mesh.receiveShadow = true;
-    mesh.matrixAutoUpdate = false;
-    this.group.add(mesh);
+    chunks.forEach((ch, ci) => {
+      this.geometries.push(ch.geometry);
+      const mesh = new Mesh(ch.geometry, mat);
+      mesh.name = ci === 0 ? 'world:buildings' : `world:buildings-${ci}`;
+      mesh.castShadow = o.quality.sceneryShadows;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.group.add(mesh);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_BUILDINGS, 220);
+    });
   }
 
   private placeStands(o: CircuitWorldOptions): void {
@@ -602,16 +801,19 @@ export class CircuitWorld {
     });
     this.counts.stands = this.stands.length;
     if (this.stands.length === 0) return;
-    const geometry = buildStands(this.stands);
+    const standChunks = buildStandChunks(this.stands);
     const standMat = grandstandMaterial();
-    this.geometries.push(geometry);
     this.materials.push(standMat);
-    const mesh = new Mesh(geometry, standMat);
-    mesh.name = 'world:stands';
-    mesh.castShadow = o.quality.sceneryShadows;
-    mesh.receiveShadow = true;
-    mesh.matrixAutoUpdate = false;
-    this.group.add(mesh);
+    standChunks.forEach((ch, ci) => {
+      this.geometries.push(ch.geometry);
+      const mesh = new Mesh(ch.geometry, standMat);
+      mesh.name = ci === 0 ? 'world:stands' : `world:stands-${ci}`;
+      mesh.castShadow = o.quality.sceneryShadows;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.group.add(mesh);
+      this.addWorldChunk(mesh, ch.centre, ch.radius, FAR_STANDS, 240);
+    });
 
     // Crowd: fuller near the start line and the first chicane, thinner at the back of big stands.
     const wq = o.quality.world;
@@ -677,11 +879,28 @@ export class CircuitWorld {
     this.materials.push(...gantry.materials);
     this.group.add(gantry.group);
 
-    // Over-track bridges from OSM + authored config.
+    // Over-track bridges from OSM + authored config (chunked per bridge).
     const bridges = buildTrackBridges(track, dressing, this.lap, brandTex);
     this.geometries.push(...bridges.geometries);
     this.materials.push(...bridges.materials);
-    if (bridges.count > 0) this.group.add(bridges.group);
+    if (bridges.count > 0) {
+      this.group.add(bridges.group);
+      for (const child of bridges.group.children) {
+        const m = child as Mesh;
+        if (!m.isMesh) continue;
+        m.castShadow = m.castShadow && quality.sceneryShadows;
+        const bs = m.geometry.boundingSphere;
+        if (bs) {
+          this.addWorldChunk(
+            m,
+            [bs.center.x, bs.center.y, bs.center.z],
+            bs.radius,
+            FAR_BRIDGES,
+            240,
+          );
+        }
+      }
+    }
     this.counts.bridges = bridges.count;
 
     // Historic banked oval concrete where mapped (e.g., Monza's Sopraelevata).
@@ -689,7 +908,18 @@ export class CircuitWorld {
     if (banking.mesh && banking.geometry && banking.material) {
       this.geometries.push(banking.geometry);
       this.materials.push(banking.material);
+      banking.mesh.castShadow = quality.sceneryShadows;
       this.group.add(banking.mesh);
+      const bs = banking.geometry.boundingSphere;
+      if (bs) {
+        this.addWorldChunk(
+          banking.mesh,
+          [bs.center.x, bs.center.y, bs.center.z],
+          bs.radius,
+          FAR_STANDS,
+          220,
+        );
+      }
     }
 
     // Modular instanced furniture (hoardings, catch fencing, braking/DRS boards, marshals, Tecpro, screens, towers).
@@ -719,19 +949,36 @@ export class CircuitWorld {
     this.materials.push(...decals.materials);
     this.textures.push(...decals.textures);
     this.group.add(decals.group);
+    for (const child of decals.group.children) {
+      const m = child as Mesh;
+      if (!m.isMesh) continue;
+      m.matrixAutoUpdate = false;
+      const bs = m.geometry.boundingSphere;
+      if (bs) {
+        this.addWorldChunk(m, [bs.center.x, bs.center.y, bs.center.z], bs.radius, FAR_DECALS, 0);
+      }
+    }
   }
 
-  /** Per frame: wind and the crowd's idle motion. */
-  update(time: number): void {
+  /** Per frame: wind, crowd motion, and chunk distance / shadow-cascade gating. */
+  update(time: number, eye?: Vector3): void {
     for (const t of this.trees) t.time.value = time;
+    if (eye) this.treeSwap.eye.value.copy(eye);
     this.crowdTime.value = time;
+    if (!eye) return;
+    for (const c of this.worldChunks) {
+      const dist = c.centre.distanceTo(eye) - c.radius;
+      const vis = dist < c.maxDistance;
+      c.mesh.visible = vis;
+      c.mesh.castShadow = vis && c.castShadow && dist < c.shadowMaxDistance;
+    }
   }
 
   dispose(): void {
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials) m.dispose();
     for (const t of this.textures) t.dispose();
-    this.cover.dispose();
+    this.cover?.dispose();
     this.group.removeFromParent();
   }
 }

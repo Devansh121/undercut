@@ -20,7 +20,8 @@ describe('validation: published braking events (doc 2.4)', () => {
   for (const e of BRAKING_EVENTS) {
     describe(e.label, () => {
       const { values } = measureBrakingEvent(e);
-      for (const what of ['distance', 'time', 'peak']) {
+      const what3 = ['distance', 'time', 'peak'];
+      for (const what of e.power === undefined ? what3 : [...what3, 'power']) {
         const id = `${e.id}-${what}`;
         it(targetName(id), () => expectTarget(id, values[id]!));
       }

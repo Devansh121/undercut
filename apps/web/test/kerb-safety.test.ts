@@ -57,9 +57,11 @@ const CASES: readonly (readonly [s: number, d: number, steer: number, tc: 0 | 2,
 
 /**
  * Cases that pass: fixed by the inelastic strike rule, or by it together with the contact patch
- * merged from master (#17). Every other case is still open: the run-off ground inside the first
- * chicane folds a 3 % centreline grade into ramps of up to 37 % (s 652-661, d about 11 m), and
- * the car takes off from them. Open cases run as expected failures, so each one turns this suite
+ * merged from master (#17). Every other case is still open. Traced in M4 (docs/track-data.md 5.6): the
+ * three teleport(540, 8) cases and the run along the turn 2 run-off are thrown by the chicane's
+ * 13 cm sausage kerbs (turn 1 inside, s 600–638, and turn 2), struck at speed, not by the
+ * folded run-off ground beside them (which is real, up to 41 % at s 645–671, d 9–14, and pinned
+ * in packages/track/test/runoff-grade.test.ts). Open cases run as expected failures, so each one turns this suite
  * red the moment it starts passing and must then move into this list.
  */
 const FIXED = new Set([

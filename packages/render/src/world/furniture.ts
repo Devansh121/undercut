@@ -15,7 +15,7 @@ import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
 import type { DressingFile, MappedFeature } from './dressing';
-import type { StandFrame } from './grandstands';
+import { STAND, rowHeight, type StandFrame } from './grandstands';
 import type { LapIndex } from './lap-index';
 import type { PitComplexData } from './pit-building';
 
@@ -727,8 +727,12 @@ export function buildTrackBridges(
 
   if (bridgeS.length === 0) return { group, geometries, materials, count: 0 };
 
-  const sb = new PropBuilder();
-  const bb = new PropBuilder();
+  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
+  sm.name = 'track-bridge-struct';
+  const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
+  bm.name = 'track-bridge-banner';
+  materials.push(sm, bm);
+
   const steel = [0.3, 0.32, 0.34];
   const concrete = [0.25, 0.25, 0.245];
   const dark = [0.075, 0.08, 0.09];
@@ -736,6 +740,8 @@ export function buildTrackBridges(
   const t = createVec3();
 
   bridgeS.forEach((s, bi) => {
+    const sb = new PropBuilder();
+    const bb = new PropBuilder();
     const idxS = Math.min(track.lap.count - 1, Math.round(s / track.lap.step));
     const leftBar = Math.abs(track.barrier[0][idxS] ?? 11) + 2.2;
     const rightBar = Math.abs(track.barrier[1][idxS] ?? 11) + 2.2;
@@ -826,23 +832,21 @@ export function buildTrackBridges(
       [1, 1, 1],
       uvRect,
     );
+
+    const sg = sb.build(true);
+    const bg = bb.build(false);
+    geometries.push(sg, bg);
+    const sMesh = new Mesh(sg, sm);
+    sMesh.name = `world:bridge-struct-${bi}`;
+    sMesh.castShadow = true;
+    sMesh.receiveShadow = true;
+    sMesh.matrixAutoUpdate = false;
+    const bMesh = new Mesh(bg, bm);
+    bMesh.name = `world:bridge-banner-${bi}`;
+    bMesh.receiveShadow = true;
+    bMesh.matrixAutoUpdate = false;
+    group.add(sMesh, bMesh);
   });
-
-  const sg = sb.build(true);
-  const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
-  sm.name = 'track-bridge-struct';
-  const bg = bb.build(false);
-  const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
-  bm.name = 'track-bridge-banner';
-  geometries.push(sg, bg);
-  materials.push(sm, bm);
-
-  const sMesh = new Mesh(sg, sm);
-  sMesh.castShadow = true;
-  sMesh.receiveShadow = true;
-  const bMesh = new Mesh(bg, bm);
-  bMesh.receiveShadow = true;
-  group.add(sMesh, bMesh);
 
   return { group, geometries, materials, count: bridgeS.length };
 }
@@ -852,6 +856,17 @@ export function buildTrackBridges(
  * raceways near the circuit): extruded weathered concrete slab with banked outer lip so the old
  * high-speed banking reads clearly where it crosses or parallels the view.
  */
+/**
+ * Lap chunk length of the small props that line the barriers, m: short, so only the chunks beside
+ * the eye draw at the top level (a 200 m chunk would put hundreds of fence modules there).
+ */
+const SMALL_PROP_CHUNK = 50;
+
+/** Absorber block shell (linear RGB, a weathered blue) and its two alternating band colours. */
+const ABSORBER_SHELL: [number, number, number] = [0.035, 0.075, 0.2];
+const ABSORBER_BAND_A: [number, number, number] = [0.55, 0.05, 0.035];
+const ABSORBER_BAND_B: [number, number, number] = [0.72, 0.72, 0.7];
+
 /** No old-oval concrete nearer the circuit's centreline than this, m (except where it crosses). */
 const BANKING_CLEARANCE = 32;
 
@@ -1010,6 +1025,8 @@ export function placeTracksideFurniture(options: {
 
   const farDist = mobile ? 450 : 950;
   const distScale = mobile ? 0.55 : 1;
+  // Mobile loads no top-level kit models, so short chunks would only add draw calls there.
+  const smallChunk = mobile ? undefined : SMALL_PROP_CHUNK;
 
   const kitHoardMat = brandHoardingMaterial(brandAtlasTex, true);
   materials.push(kitHoardMat);
@@ -1022,7 +1039,9 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'hoarding-front',
+      chunkLength: smallChunk,
       castShadow: castShadows,
+      shadowMaxDistance: 160,
       receiveShadow: true,
       lods: kitHoarding,
     });
@@ -1032,12 +1051,14 @@ export function placeTracksideFurniture(options: {
     geometries.push(hoardFrontGeo, hoardFrameGeo);
     props.define({
       id: 'hoarding-front',
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: hoardFrontGeo, material: hoardMat, maxDistance: farDist }],
     });
     props.define({
       id: 'hoarding-frame',
+      chunkLength: smallChunk,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: hoardFrameGeo, material: steelMat, maxDistance: farDist * 0.65 }],
@@ -1049,23 +1070,29 @@ export function placeTracksideFurniture(options: {
   geometries.push(vergeFrontGeo, vergeFrameGeo);
   props.define({
     id: 'verge-board-front',
+    chunkLength: SMALL_PROP_CHUNK,
     castShadow: false,
     receiveShadow: true,
     lods: [{ geometry: vergeFrontGeo, material: hoardMat, maxDistance: farDist * 0.9 }],
   });
   props.define({
     id: 'verge-board-frame',
+    chunkLength: SMALL_PROP_CHUNK,
     castShadow: castShadows,
+    shadowMaxDistance: 140,
     receiveShadow: true,
     lods: [{ geometry: vergeFrameGeo, material: steelMat, maxDistance: farDist * 0.55 }],
   });
 
-  const kitFence = propKit?.lodsFor('catch-fence', { maxDistanceScale: distScale });
+  const kitFence = propKit?.lodsFor('catch-fence', {
+    maxDistanceScale: distScale,
+  });
   const hasKitFence = Boolean(kitFence);
   if (kitFence) {
     kitPropsUsed++;
     props.define({
       id: 'catch-fence-post',
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: kitFence,
@@ -1076,24 +1103,29 @@ export function placeTracksideFurniture(options: {
     geometries.push(fencePostGeo, fenceMeshGeo);
     props.define({
       id: 'catch-fence-post',
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: fencePostGeo, material: steelMat, maxDistance: mobile ? 300 : 650 }],
     });
     props.define({
       id: 'catch-fence-mesh',
+      chunkLength: smallChunk,
       castShadow: false,
       receiveShadow: false,
       lods: [{ geometry: fenceMeshGeo, material: fenceMeshMat, maxDistance: mobile ? 220 : 480 }],
     });
   }
 
-  const kitMarshal = propKit?.lodsFor('marshal-post', { maxDistanceScale: distScale });
+  const kitMarshal = propKit?.lodsFor('marshal-post', {
+    maxDistanceScale: distScale,
+  });
   if (kitMarshal) {
     kitPropsUsed++;
     props.define({
       id: 'marshal-post',
       castShadow: castShadows,
+      shadowMaxDistance: 160,
       receiveShadow: true,
       lods: kitMarshal,
     });
@@ -1108,12 +1140,19 @@ export function placeTracksideFurniture(options: {
     });
   }
 
-  const kitAbsorber = propKit?.lodsFor('absorber-block', { maxDistanceScale: distScale });
+  // Energy-absorbing blocks wear coloured shells (the kit's rubber slot is black), with a
+  // painted band that alternates red and white along a run (instance colour).
+  const kitAbsorber = propKit?.lodsFor('absorber-block', {
+    maxDistanceScale: distScale,
+    slotColors: { rubber: ABSORBER_SHELL },
+  });
   if (kitAbsorber) {
     kitPropsUsed++;
     props.define({
       id: 'tecpro-block',
+      chunkLength: smallChunk,
       castShadow: castShadows,
+      shadowMaxDistance: 120,
       receiveShadow: true,
       lods: kitAbsorber,
     });
@@ -1122,6 +1161,7 @@ export function placeTracksideFurniture(options: {
     geometries.push(tecproGeo);
     props.define({
       id: 'tecpro-block',
+      chunkLength: smallChunk,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: tecproGeo, material: steelMat, maxDistance: farDist * 0.8 }],
@@ -1137,6 +1177,7 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'big-screen-frame',
       castShadow: castShadows,
+      shadowMaxDistance: 220,
       receiveShadow: true,
       lods: kitScreen,
     });
@@ -1186,12 +1227,15 @@ export function placeTracksideFurniture(options: {
     });
   }
 
-  const kitCamera = propKit?.lodsFor('camera-tower', { maxDistanceScale: distScale });
+  const kitCamera = propKit?.lodsFor('camera-tower', {
+    maxDistanceScale: distScale,
+  });
   if (kitCamera) {
     kitPropsUsed++;
     props.define({
       id: 'camera-tower',
       castShadow: castShadows,
+      shadowMaxDistance: 220,
       receiveShadow: true,
       lods: kitCamera,
     });
@@ -1211,8 +1255,9 @@ export function placeTracksideFurniture(options: {
   props.define({
     id: 'truss-tower',
     castShadow: castShadows,
+    shadowMaxDistance: 220,
     receiveShadow: true,
-    lods: [{ geometry: trussTowerGeo, material: steelMat, maxDistance: farDist * 1.5 }],
+    lods: [{ geometry: trussTowerGeo, material: steelMat, maxDistance: farDist * 1.3 }],
   });
 
   // Register braking & DRS board slots (0:150, 1:100, 2:50, 4:DRS, 5:DRS det).
@@ -1251,6 +1296,7 @@ export function placeTracksideFurniture(options: {
         props.define({
           id: `${id}-face`,
           castShadow: castShadows,
+          shadowMaxDistance: 140,
           receiveShadow: true,
           lods,
         });
@@ -1464,6 +1510,21 @@ export function placeTracksideFurniture(options: {
       const z = st.oz + st.az * u - st.bz * 0.16;
       placeHoarding(x, st.base + 0.3, z, yawFront, st.s);
     }
+    // Bigger stands carry a row of brand boards on their back wall, facing out over the park.
+    if (st.rows >= 8) {
+      const back = 0.3 + st.rows * STAND.rowDepth + 0.9;
+      const y = st.base + rowHeight(st.rows) * 0.62 + 1.35;
+      const yawBack = Math.atan2(-st.bz, st.bx);
+      for (let u = 4; u < st.length - 4; u += hoardPitch * 1.5) {
+        placeHoarding(
+          st.ox + st.ax * u + st.bx * back,
+          y,
+          st.oz + st.az * u + st.bz * back,
+          yawBack,
+          st.s,
+        );
+      }
+    }
   }
   counts.hoardings = hoardings;
 
@@ -1615,7 +1676,14 @@ export function placeTracksideFurniture(options: {
     for (let s = c.start - 12; s <= c.end + 16; s += 1.65) {
       const b = atBarrier(s, outSide, -0.45);
       if (foldsAcrossTrack(b, 1.4, 0.22)) continue;
-      props.place('tecpro-block', { x: b.x, y: b.y, z: b.z, yaw: b.yawInward, s: b.s });
+      props.place('tecpro-block', {
+        x: b.x,
+        y: b.y,
+        z: b.z,
+        yaw: b.yawInward,
+        s: b.s,
+        colour: tecpro % 2 === 0 ? ABSORBER_BAND_A : ABSORBER_BAND_B,
+      });
       tecpro++;
     }
   }

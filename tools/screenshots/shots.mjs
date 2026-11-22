@@ -12,6 +12,9 @@
 //   npm run shots -- monza --lifecycle                 also five High sessions on one page: no GL
 //                                                      object or program may leak (GPU twin of
 //                                                      tests/browser/lifecycle.nightly.spec.ts)
+//   npm run shots -- monza --tree-swap-check          also near trees against the cards they replace:
+//                                                      mean luma with and without them, day and
+//                                                      night, within 10 %
 //   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
 //                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
@@ -764,6 +767,116 @@ async function lifecycle(browser, report) {
  * compares the central sky band (where High's lens vignette is zero) between the HDR pipeline and
  * the direct fallback (half-float colour targets hidden) on a frozen grid start.
  */
+/**
+ * Near trees against the cards they replace (High, by day and under floodlights at night): the
+ * same frozen poses drawn with the near trees on (the preset's swap distance) and off (0, cards
+ * only), mean luma over the pixels that change. The two must be within TREE_SWAP_TOLERANCE, or
+ * a band of lighter or darker trees travels with the camera.
+ */
+const TREE_SWAP_TOLERANCE = 0.1;
+async function treeSwapCheck(browser, report) {
+  const problems = [];
+  const cases = [];
+  for (const [label, tod] of [
+    ['day', ''],
+    ['night', '&tod=night-floodlit'],
+  ]) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    page.on('pageerror', (e) => problems.push(e.message));
+    await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high${tod}`);
+    await page.waitForFunction(() => Boolean(globalThis.__undercut));
+    await page.evaluate(() => globalThis.__undercut.start());
+    await page.waitForFunction(
+      () => globalThis.document.documentElement.dataset.ready !== undefined,
+      null,
+      { timeout: 120_000 },
+    );
+    const poses = {
+      // Chase camera through the Lesmo woods, and a high view over the park.
+      lesmo: () => {
+        const u = globalThis.__undercut;
+        u.camera('chase-near');
+        u.teleport(1640, 0, 250);
+        u.setTimeScale(0);
+      },
+      park: () => {
+        const u = globalThis.__undercut;
+        u.camera('tv');
+        const e = u.trackPoint(2150, 70, 32);
+        const a = u.trackPoint(2650, -40, 2);
+        u.tvCamera(e.x, e.y, e.z, 42, a);
+      },
+    };
+    const swap = await page.evaluate(() => globalThis.__undercut.treeSwap());
+    for (const [name, set] of Object.entries(poses)) {
+      await page.evaluate(set);
+      const shots = [];
+      for (const d of [swap, 0]) {
+        await page.evaluate((v) => {
+          globalThis.__undercut.treeSwap(v);
+          globalThis.__undercut.resetFrameTimes();
+        }, d);
+        await page.waitForFunction(() => (globalThis.__undercut.frameTimes().length ?? 0) >= 20);
+        const png = await page
+          .locator('#view')
+          .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+        fs.writeFileSync(path.join(outDir, `tree-swap-${label}-${name}-${d}.png`), png);
+        shots.push(png.toString('base64'));
+      }
+      await page.evaluate((v) => globalThis.__undercut.treeSwap(v), swap);
+      const m = await page.evaluate(async ([a, b]) => {
+        const read = async (b64) => {
+          const img = new globalThis.Image();
+          img.src = `data:image/png;base64,${b64}`;
+          await img.decode();
+          const canvas = new globalThis.OffscreenCanvas(img.width, img.height);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          return ctx.getImageData(0, 0, img.width, img.height).data;
+        };
+        const pa = await read(a);
+        const pb = await read(b);
+        let sa = 0;
+        let sb = 0;
+        let n = 0;
+        for (let i = 0; i < pa.length; i += 4) {
+          const la = 0.2126 * pa[i] + 0.7152 * pa[i + 1] + 0.0722 * pa[i + 2];
+          const lb = 0.2126 * pb[i] + 0.7152 * pb[i + 1] + 0.0722 * pb[i + 2];
+          if (Math.abs(la - lb) < 6) continue;
+          sa += la;
+          sb += lb;
+          n++;
+        }
+        return { near: n ? sa / n : 0, cards: n ? sb / n : 0, changed: n / (pa.length / 4) };
+      }, shots);
+      const ratio = m.cards > 0 ? m.near / m.cards : 1;
+      cases.push({
+        tod: label,
+        pose: name,
+        swap,
+        nearLuma: +m.near.toFixed(1),
+        cardLuma: +m.cards.toFixed(1),
+        ratio: +ratio.toFixed(3),
+        changedPct: +(m.changed * 100).toFixed(1),
+      });
+    }
+    await page.evaluate(() => globalThis.__undercut.quit());
+    await context.close();
+  }
+  const ok =
+    problems.length === 0 &&
+    cases.length === 4 &&
+    cases.every((c) => c.swap > 0 && Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE);
+  report.treeSwapCheck = { ok, tolerance: TREE_SWAP_TOLERANCE, cases, problems };
+  for (const c of cases)
+    console.log(
+      `  tree-swap ${c.tod} ${c.pose}: near ${c.nearLuma} vs cards ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
+    );
+  console.log(`  tree-swap-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
+  if (!ok) report.errors.push(`Tree swap check failed: ${JSON.stringify(report.treeSwapCheck)}`);
+}
+
 async function skyCheck(browser, report) {
   const hideFloatTargets = () => {
     const hidden = new Set(['EXT_color_buffer_float', 'EXT_color_buffer_half_float']);
@@ -896,6 +1009,7 @@ try {
     if (flag('moving')) await moving(browser, report);
     if (flag('lifecycle')) await lifecycle(browser, report);
     if (flag('sky-check')) await skyCheck(browser, report);
+    if (flag('tree-swap-check')) await treeSwapCheck(browser, report);
   } finally {
     await browser.close();
   }

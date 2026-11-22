@@ -1,0 +1,54 @@
+{
+  "sha": "c2e1d48",
+  "circuit": "monza",
+  "shots": [],
+  "perf": [],
+  "lap": null,
+  "moving": null,
+  "errors": [
+    "Tree swap check failed: {\"ok\":false,\"tolerance\":0.1,\"cases\":[{\"tod\":\"day\",\"pose\":\"lesmo\",\"swap\":95,\"nearLuma\":65.5,\"cardLuma\":47.6,\"ratio\":1.375,\"changedPct\":26.9},{\"tod\":\"day\",\"pose\":\"park\",\"swap\":95,\"nearLuma\":69.4,\"cardLuma\":66.7,\"ratio\":1.041,\"changedPct\":11.5},{\"tod\":\"night\",\"pose\":\"lesmo\",\"swap\":95,\"nearLuma\":28.9,\"cardLuma\":17.9,\"ratio\":1.615,\"changedPct\":19.1},{\"tod\":\"night\",\"pose\":\"park\",\"swap\":95,\"nearLuma\":24.1,\"cardLuma\":14.9,\"ratio\":1.618,\"changedPct\":4.9}],\"problems\":[]}"
+  ],
+  "treeSwapCheck": {
+    "ok": false,
+    "tolerance": 0.1,
+    "cases": [
+      {
+        "tod": "day",
+        "pose": "lesmo",
+        "swap": 95,
+        "nearLuma": 65.5,
+        "cardLuma": 47.6,
+        "ratio": 1.375,
+        "changedPct": 26.9
+      },
+      {
+        "tod": "day",
+        "pose": "park",
+        "swap": 95,
+        "nearLuma": 69.4,
+        "cardLuma": 66.7,
+        "ratio": 1.041,
+        "changedPct": 11.5
+      },
+      {
+        "tod": "night",
+        "pose": "lesmo",
+        "swap": 95,
+        "nearLuma": 28.9,
+        "cardLuma": 17.9,
+        "ratio": 1.615,
+        "changedPct": 19.1
+      },
+      {
+        "tod": "night",
+        "pose": "park",
+        "swap": 95,
+        "nearLuma": 24.1,
+        "cardLuma": 14.9,
+        "ratio": 1.618,
+        "changedPct": 4.9
+      }
+    ],
+    "problems": []
+  }
+}
