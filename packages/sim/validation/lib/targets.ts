@@ -105,6 +105,12 @@ export interface BrakingEvent {
   distance: number;
   time: number;
   peak: number;
+  /**
+   * Published braking power of the stop, kW (doc 1.5), where the source gives one. The sources
+   * do not say where in the stop it falls, so it is a validation check of the model's stop, not
+   * a ceiling on the friction force (docs/physics-validation.md section 7.9).
+   */
+  power?: number;
   source: string;
 }
 
@@ -118,6 +124,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 129,
     time: 2.75,
     peak: 4.7,
+    power: 2715,
     source: '[21][47]',
   },
   {
@@ -151,6 +158,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 93,
     time: 1.48,
     peak: 4.7,
+    power: 2584,
     source: '[22]',
   },
   {
@@ -173,6 +181,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 96,
     time: 1.9,
     peak: 4.9,
+    power: 2542,
     source: '[23][29]',
   },
   {
@@ -184,6 +193,7 @@ export const BRAKING_EVENTS: readonly BrakingEvent[] = [
     distance: 94,
     time: 2.19,
     peak: 4.6,
+    power: 2239,
     source: '[51]',
   },
 ];
@@ -294,6 +304,17 @@ for (const e of BRAKING_EVENTS) {
       `doc 2.4 ${e.source}`,
     ),
   );
+  if (e.power !== undefined)
+    list.push(
+      target(
+        `${e.id}-power`,
+        `${e.label}: peak friction brake power`,
+        'kW',
+        rel(e.power, 0.1),
+        `${e.power} ± 10 %`,
+        `doc 1.5 ${e.source}`,
+      ),
+    );
 }
 list.push(
   target(
@@ -372,6 +393,13 @@ const DOWNFORCE_PEAK =
 const MONZA_2023 =
   'The 2023 figure (5.2 g) stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner ' +
   'and speed; the model gives about 4.7–4.8 g for all three.';
+const BRAKE_POWER =
+  'The model makes 58–72 % more peak friction brake power in the published stops than Brembo ' +
+  'quotes. The quoted power does not say where in the stop it falls; a capacity matched to it ' +
+  'near v1 cannot lock a wheel at full pedal from 330 km/h in high trim and moves passing ' +
+  "braking checks, so the brakes keep master's capacity (owner decision, " +
+  'docs/physics-validation.md section 7.9). Not separated: when the power is reached, pad ' +
+  'friction through the stop (no pad temperature), or a stronger brake system than estimated.';
 const POUHON =
   'Flat constant-speed sweep in Spa air; the 5.7 g figure is a single secondary source for a ' +
   'downhill double-apex corner, with no trace, filter or duration.';
@@ -389,6 +417,10 @@ export const KNOWN_GAPS: Readonly<Record<string, KnownGap>> = Object.freeze({
   'singapore-t14-2024-time': { measured: 1.808, reason: BRAKING_TIME },
   'singapore-t14-2024-peak': { measured: 5.065, reason: DOWNFORCE_PEAK },
   'lateral-pouhon': { measured: 4.594, reason: POUHON },
+  'monza-t1-2025-power': { measured: 4401.5, reason: BRAKE_POWER },
+  'spa-t5-2025-power': { measured: 4296.5, reason: BRAKE_POWER },
+  'singapore-t7-2025-power': { measured: 4026.1, reason: BRAKE_POWER },
+  'singapore-t14-2024-power': { measured: 3846.5, reason: BRAKE_POWER },
 });
 
 export type Verdict = 'pass' | 'gap' | 'fail';
