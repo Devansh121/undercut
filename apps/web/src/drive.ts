@@ -787,6 +787,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   skipResults.hidden = true;
   skipResults.style.pointerEvents = 'auto';
   let skippingToResults = false;
+  // The race readout is text that changes a few times a second at most: rebuilt at 4 Hz (and at
+  // once when the result comes in), not every frame.
+  const STATUS_PERIOD = 0.25;
+  let statusClock = STATUS_PERIOD;
+  let statusHadResult = false;
   skipResults.addEventListener('click', () => {
     skippingToResults = true;
     loop.timeScale = MAX_TIME_SCALE;
@@ -843,6 +848,54 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     stopped: false,
     message: null,
   };
+
+  function raceStatusText(): string {
+    const c = session.race.control;
+    const standings = c.standings();
+    const row = standings.find((r) => r.car === 0);
+    const totalLaps = o.quickRace?.laps ?? 5;
+    const lap = Math.max(1, Math.min(session.timer.lap, totalLaps));
+    const gapText =
+      row && row.position > 1
+        ? row.lapsDown > 0
+          ? ` · +${row.lapsDown}L`
+          : row.gap !== null
+            ? ` · +${row.gap.toFixed(1)}s`
+            : ''
+        : '';
+    return session.result
+      ? 'Race result\n' +
+          session.result.entries
+            .map((e) => {
+              const g =
+                e.gap === null
+                  ? ''
+                  : 'laps' in e.gap
+                    ? `  +${e.gap.laps}L`
+                    : `  +${e.gap.time.toFixed(3)}s`;
+              return `${e.position}  ${e.code}  ${e.status}${g}`;
+            })
+            .join('\n')
+      : session.playerFinished
+        ? `Chequered flag · P${row?.position ?? 20} · provisional\n` +
+          standings
+            .map((r) => {
+              const code = session.race.entrants[r.car]?.code ?? '';
+              const state =
+                r.status === 'running'
+                  ? `racing, lap ${Math.min(r.lap, totalLaps)}`
+                  : r.status === 'finished'
+                    ? 'finished'
+                    : r.status;
+              return `${r.position}  ${code}  ${state}`;
+            })
+            .join('\n')
+        : c.phase === 'grid'
+          ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
+          : c.phase === 'lights'
+            ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
+            : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+  }
 
   const frame = (): void => {
     const now = performance.now();
@@ -921,56 +974,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         dot.z = p.z;
       });
       view.setRaceCars(fleetPoses, fleetDrs);
-      const c = session.race.control;
-      const row = c.standings().find((r) => r.car === 0);
-      const totalLaps = o.quickRace?.laps ?? 5;
-      const lap = Math.max(1, Math.min(session.timer.lap, totalLaps));
-      const gapText =
-        row && row.position > 1
-          ? row.lapsDown > 0
-            ? ` · +${row.lapsDown}L`
-            : row.gap !== null
-              ? ` · +${row.gap.toFixed(1)}s`
-              : ''
-          : '';
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
       }
-      raceStatus.textContent = session.result
-        ? 'Race result\n' +
-          session.result.entries
-            .map((e) => {
-              const g =
-                e.gap === null
-                  ? ''
-                  : 'laps' in e.gap
-                    ? `  +${e.gap.laps}L`
-                    : `  +${e.gap.time.toFixed(3)}s`;
-              return `${e.position}  ${e.code}  ${e.status}${g}`;
-            })
-            .join('\n')
-        : session.playerFinished
-          ? `Chequered flag · P${row?.position ?? 20} · provisional\n` +
-            c
-              .standings()
-              .map((r) => {
-                const code = session.race.entrants[r.car]?.code ?? '';
-                const state =
-                  r.status === 'running'
-                    ? `racing, lap ${Math.min(r.lap, totalLaps)}`
-                    : r.status === 'finished'
-                      ? 'finished'
-                      : r.status;
-                return `${r.position}  ${code}  ${state}`;
-              })
-              .join('\n')
-          : c.phase === 'grid'
-            ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
-            : c.phase === 'lights'
-              ? Array.from({ length: 5 }, (_, i) => (i < c.lightsCount ? '●' : '○')).join('  ')
-              : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
+      statusClock += dt;
+      if (statusClock >= STATUS_PERIOD || (session.result !== null) !== statusHadResult) {
+        statusClock = 0;
+        statusHadResult = session.result !== null;
+        const text = raceStatusText();
+        if (raceStatus.textContent !== text) raceStatus.textContent = text;
+      }
     }
     view.setDrivingLine(session.assists.racingLine ?? 'off');
     view.render({
