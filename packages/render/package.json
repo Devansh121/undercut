@@ -6,7 +6,8 @@
   "license": "MIT",
   "description": "Rendering of sim state with three.js: renderer, sky, track, cars and cameras.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./data/*.json": "./data/*.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
