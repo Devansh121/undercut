@@ -862,6 +862,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const audioState = defaultCarState();
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
+  /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
+  const drawLog: number[] = [];
+  let drawnSeen = -1;
   let last: number | null = null;
   let clock = 0;
   let handle = 0;
@@ -1002,6 +1005,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       revLights,
       speedUnit: speedUnit(),
     });
+    const drawnNow = view.drawnCount;
+    if (drawnNow !== drawnSeen) {
+      // A new view (another preset) starts its count again; its first interval is not a frame.
+      if (drawnSeen >= 0 && drawnNow > drawnSeen) {
+        drawLog.push(view.lastDrawIntervalMs);
+        if (drawLog.length > FRAME_LOG) drawLog.shift();
+      }
+      drawnSeen = drawnNow;
+    }
 
     // HUD.
     if (hudVisible) {
@@ -1199,10 +1211,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const measured = quality;
     window.setTimeout(() => {
       if (quitting) return;
-      const startAt = frameLog.length;
+      drawLog.length = 0;
+      const startAt = 0;
       window.setTimeout(() => {
         if (quitting) return;
-        const times = frameLog.slice(startAt).sort((a, b) => a - b);
+        // Drawn frames, not animation frames: with the GPU behind, rAF holds 60 Hz while the
+        // pacer skips draws, and only the drawn interval shows how slow the preset is.
+        const times = drawLog.slice(startAt).sort((a, b) => a - b);
         if (times.length < 30) return;
         const median = times[Math.floor(times.length / 2)] as number;
         const gpu = view.stats().gpuMs;

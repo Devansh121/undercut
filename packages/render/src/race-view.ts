@@ -246,6 +246,8 @@ export class RaceView {
   /** Frame time since the last drawn frame, ms: dynamic resolution's sample when draws skip. */
   private sinceDrawMs = 0;
   private drawnFrames = 0;
+  /** Real time between the last two drawn frames, ms (a skipped draw makes it longer). */
+  private drawIntervalMs = 0;
   private contextLost = false;
   private readonly fleetLiveries: readonly CarLivery[];
   private readonly track: Track;
@@ -565,6 +567,16 @@ export class RaceView {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Frames drawn so far (an animation frame may skip its draw). Per frame: no allocation. */
+  get drawnCount(): number {
+    return this.drawnFrames;
+  }
+
+  /** Real time between the last two drawn frames, ms: what the player saw, not rAF. */
+  get lastDrawIntervalMs(): number {
+    return this.drawIntervalMs;
+  }
+
   get cameraName(): CameraName {
     return this.rig.current;
   }
@@ -778,6 +790,7 @@ export class RaceView {
         : frame.frameMs === undefined
           ? null
           : this.sinceDrawMs;
+      this.drawIntervalMs = this.sinceDrawMs;
       this.sinceDrawMs = 0;
       if (sample !== null && this.dynamic.update(sample, this.gpu.available)) this.resize(true);
     }
