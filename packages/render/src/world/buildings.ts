@@ -68,6 +68,7 @@ export function buildBuildings(
   const nor: number[] = [];
   const col: number[] = [];
   const uv: number[] = [];
+  const seed: number[] = [];
   const idx: number[] = [];
   let count = 0;
   for (const [n, f] of features.entries()) {
@@ -109,6 +110,9 @@ export function buildBuildings(
         col.push(wall[0] * shadeK, wall[1] * shadeK, wall[2] * shadeK);
       }
       uv.push(along, 0, along + len, 0, along + len, top - base, along, top - base);
+      const sd = hash01(n, 6);
+      const wallH = top - base;
+      seed.push(sd, wallH, sd, wallH, sd, wallH, sd, wallH);
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
       along += len;
     }
@@ -123,6 +127,7 @@ export function buildBuildings(
       nor.push(0, 1, 0);
       col.push(roof[0], roof[1], roof[2]);
       uv.push(-1, -1);
+      seed.push(0, 0);
     }
     for (const t of tris) {
       const a = t[0] as number;
@@ -145,6 +150,8 @@ export function buildBuildings(
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
   g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3));
   g.setAttribute('facade', new BufferAttribute(new Float32Array(uv), 2));
+  // Per building: its seed (window grid, plinth, shutters) and the wall's height (cornice).
+  g.setAttribute('facadeSeed', new BufferAttribute(new Float32Array(seed), 2));
   g.setIndex(idx.length > 65535 ? new BufferAttribute(new Uint32Array(idx), 1) : idx);
   g.computeBoundingSphere();
   return { geometry: g, count };
@@ -155,20 +162,69 @@ export function buildBuildings(
  * and frames lighter, a plinth darker; the glass is smooth and reflects the sky. Roofs keep the
  * vertex colour, rougher.
  */
-export function facadeMaterial(night = false): MeshStandardMaterial {
+/**
+ * GLSL for the window grid when each building has its own (`variety`): bay width, floor height,
+ * window size, a stone plinth, string courses at the floors, shutter colours and shopfronts on
+ * the ground floor, all from the building's seed. Sets `cell`, `f`, `floorIdx`, `bay`, `win`
+ * and the shutter colour.
+ */
+const VARIED_GRID = `
+          float sd = vFacadeSeed.x;
+          float wallTop = vFacadeSeed.y;
+          float h1 = fract(sd * 7.13 + 0.17);
+          float h2 = fract(sd * 13.71 + 0.53);
+          float h3 = fract(sd * 29.37 + 0.31);
+          float h4 = fract(sd * 41.93 + 0.79);
+          float h5 = fract(sd * 57.11 + 0.07);
+          float bayW = mix(2.7, 4.3, h1);
+          float floorH = mix(2.9, 3.7, h2);
+          vec2 cell = vec2(vFacade.x / bayW, (vFacade.y - 0.6) / floorH);
+          vec2 f = fract(cell);
+          float floorIdx = floor(cell.y);
+          float bay = floor(cell.x);
+          float ww = mix(0.17, 0.27, h3);
+          float win = step(0.5 - ww, f.x) * step(f.x, 0.5 + ww)
+            * step(mix(0.2, 0.34, h4), f.y) * step(f.y, mix(0.72, 0.86, h3)) * step(0.0, floorIdx);
+          // Shopfronts: wide glazing on the ground floor of some buildings.
+          float shop = step(0.62, h5) * (1.0 - step(1.0, floorIdx)) * step(0.0, floorIdx);
+          win = mix(win, step(0.06, f.x) * step(f.x, 0.94) * step(0.04, f.y) * step(f.y, 0.8), shop);
+          // Shutters: green, grey or wood, by building.
+          vec3 shutterTint = h5 < 0.33 ? vec3(0.42, 0.55, 0.42) : h5 < 0.66 ? vec3(0.6, 0.62, 0.64) : vec3(0.62, 0.48, 0.36);
+          vec3 shutterCol = diffuseColor.rgb * shutterTint;
+          // Frames and a stone sill round each window, rain streaks under it, a cornice band.
+          float frame = step(0.5 - ww - 0.035, f.x) * step(f.x, 0.5 + ww + 0.035)
+            * step(mix(0.2, 0.34, h4) - 0.05, f.y) * step(f.y, mix(0.72, 0.86, h3) + 0.03)
+            * step(0.0, floorIdx) * (1.0 - shop);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.18 + 0.03, frame * 0.8);
+          float streak = step(0.5 - ww * 0.6, f.x) * step(f.x, 0.5 + ww * 0.6)
+            * (1.0 - smoothstep(0.0, mix(0.2, 0.34, h4) - 0.05, f.y)) * step(0.0, floorIdx);
+          diffuseColor.rgb *= 1.0 - 0.07 * streak;
+          float cornice = step(wallTop - mix(0.45, 0.9, h2), vFacade.y);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * mix(0.72, 1.15, h3), cornice);
+          // String course at every floor on some buildings; a stone plinth on others.
+          diffuseColor.rgb *= 1.0 - 0.12 * step(0.5, h1) * (1.0 - step(0.05, f.y)) * step(0.0, floorIdx);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.66, 0.64, 0.6), step(0.35, h4) * (1.0 - step(0.95, vFacade.y)));`;
+
+export function facadeMaterial(night = false, variety = false): MeshStandardMaterial {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 });
   m.name = night ? 'facade-night' : 'facade';
   m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec2 facade;\nvarying vec2 vFacade;',
+        '#include <common>\nattribute vec2 facade;\nvarying vec2 vFacade;' +
+          (variety ? '\nattribute vec2 facadeSeed;\nvarying vec2 vFacadeSeed;' : ''),
       )
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFacade = facade;');
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvFacade = facade;' +
+          (variety ? '\nvFacadeSeed = facadeSeed;' : ''),
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nvarying vec2 vFacade;\nfloat facadeGlass;\nfloat facadeLit;',
+        '#include <common>\nvarying vec2 vFacade;\nfloat facadeGlass;\nfloat facadeLit;' +
+          (variety ? '\nvarying vec2 vFacadeSeed;' : ''),
       )
       .replace(
         '#include <color_fragment>',
@@ -176,12 +232,17 @@ export function facadeMaterial(night = false): MeshStandardMaterial {
         facadeGlass = 0.0;
         facadeLit = 0.0;
         if (vFacade.x >= 0.0) {
-          vec2 cell = vec2(vFacade.x / 3.4, (vFacade.y - 0.6) / 3.2);
+          ${
+            variety
+              ? VARIED_GRID
+              : `vec2 cell = vec2(vFacade.x / 3.4, (vFacade.y - 0.6) / 3.2);
           vec2 f = fract(cell);
           float floorIdx = floor(cell.y);
           float bay = floor(cell.x);
-          float rnd = fract(sin(bay * 12.9898 + floorIdx * 78.233) * 43758.5453);
           float win = step(0.3, f.x) * step(f.x, 0.72) * step(0.28, f.y) * step(f.y, 0.82) * step(0.0, floorIdx);
+          vec3 shutterCol = diffuseColor.rgb * vec3(0.55, 0.6, 0.5);`
+          }
+          float rnd = fract(sin(bay * 12.9898 + floorIdx * 78.233) * 43758.5453);
           // Where the window grid is finer than a pixel, show its average instead of nothing:
           // about a fifth of the facade is dark glass and frames.
           float aaw = fwidth(cell.x) * 2.0;
@@ -189,7 +250,7 @@ export function facadeMaterial(night = false): MeshStandardMaterial {
           // Some shutters closed.
           float shut = step(0.72, rnd);
           vec3 glass = vec3(0.035, 0.04, 0.045);
-          vec3 shutter = diffuseColor.rgb * vec3(0.55, 0.6, 0.5);
+          vec3 shutter = shutterCol;
           diffuseColor.rgb = mix(diffuseColor.rgb, mix(glass, shutter, shut), win);
           facadeGlass = win * (1.0 - shut);
           // At night about half the windows are lit, warm; whole floors of some bays dark.
@@ -209,7 +270,7 @@ export function facadeMaterial(night = false): MeshStandardMaterial {
         '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.8, 0.52) * 1.6 * facadeLit;',
       );
   };
-  m.customProgramCacheKey = () => (night ? 'facade-v1-night' : 'facade-v1');
+  m.customProgramCacheKey = () => `facade-v1${night ? '-night' : ''}${variety ? '-varied' : ''}`;
   return m;
 }
 

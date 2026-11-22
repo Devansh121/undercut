@@ -1035,7 +1035,7 @@ export class CircuitWorld {
       this.theme.buildings,
     );
     this.counts.buildings = count;
-    const mat = facadeMaterial(o.night ?? false);
+    const mat = facadeMaterial(o.night ?? false, this.theme.buildings.variety ?? false);
     this.materials.push(mat);
     chunks.forEach((ch, ci) => {
       this.geometries.push(ch.geometry);

@@ -2,10 +2,11 @@ import type { Species } from './tree-atlas';
 
 /**
  * What makes one circuit's surroundings look like its region, beyond what its dressing file maps:
- * the tree species, the building colours, which kit models stand in for the pit building, the
- * stands and the street furniture, and whether the circuit runs between street walls under
- * floodlights. `CircuitWorld` reads the theme for the track's id and stays circuit-agnostic;
- * a circuit without an entry gets the default (Monza's) look.
+ * the tree species, the building colours and facades, which kit models stand in for the pit
+ * building, whether it is a street circuit (`street`: walls, debris fencing, floodlight masts,
+ * temporary stands and backdrops from the kit) and whether its mapped water is drawn (`water`).
+ * `CircuitWorld` reads the theme for the track's id and stays circuit-agnostic; a circuit
+ * without an entry gets the default (Monza's) look.
  */
 
 /** Atlas tiles (tree-atlas.ts SPECIES order) for each kind of tree. */
@@ -37,6 +38,11 @@ export interface ConiferWoods {
 export interface BuildingPalette {
   /** Wall colours (sRGB hex), one per building by hash. */
   walls: readonly string[];
+  /**
+   * Each building its own window grid, plinth, string courses, shutters and shopfronts
+   * (buildings.ts); otherwise one regular grid for all.
+   */
+  variety?: boolean;
   /** Flat roof colours (sRGB hex). */
   roofs: readonly string[];
 }
@@ -97,6 +103,7 @@ const LOMBARDY: BuildingPalette = {
  * weathered tile ones on barns).
  */
 const ARDENNES: BuildingPalette = {
+  variety: true,
   walls: ['#cfccc3', '#bdb8ad', '#a39d92', '#8d8780', '#d6d2c8', '#9b9184', '#b5ab9b', '#77726c'],
   roofs: ['#3d4045', '#45484d', '#36393e', '#4e5156', '#5a5650', '#6e4a3a'],
 };
@@ -118,6 +125,7 @@ export const DEFAULT_THEME: WorldTheme = {
 
 /** Marina Bay: white and pale grey render, warm stone, tinted glass; pale roofs and plant decks. */
 const MARINA: BuildingPalette = {
+  variety: true,
   walls: ['#d9d8d2', '#c8ccce', '#b9c2c6', '#e2ddd2', '#a9b4b9', '#cfc6b6', '#8f9ca3', '#bdb7aa'],
   roofs: ['#8d9092', '#a3a5a6', '#6f7476', '#b3b0aa', '#7c8184', '#5f6366'],
 };
