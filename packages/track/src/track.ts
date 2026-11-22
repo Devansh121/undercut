@@ -13,6 +13,7 @@ import {
 import {
   FOLD_STRETCH,
   FoldGround,
+  foldShare,
   NodeKind,
   type Box,
   type FoldSample,
@@ -61,6 +62,12 @@ function smoothOpen(values: ArrayLike<number>, sigmaSamples: number): Float64Arr
 
 /** Lateral fall of the ground beyond the track edge (drainage), metres per metre. */
 export const VERGE_FALL = 0.02;
+/**
+ * The folded run-off's fill (`FoldGround`) leaves the kerb and this much beyond it as it is
+ * (estimate: the strip a kerb's installation is laid in), and grows in over FOLD_RAMP, m.
+ */
+export const FOLD_KERB_MARGIN = 0;
+export const FOLD_RAMP = 1;
 
 export const LEFT = 0;
 export const RIGHT = 1;
@@ -741,7 +748,16 @@ export class Track {
     const z = lap.z[i0]! + (lap.z[j]! - lap.z[i0]!) * f + d * nz;
     const fs = this.fold!.sample(x, z, this.foldSample);
     if (fs.weight <= 0) return;
-    const w = fs.weight;
+    // The kerb and a margin beyond it keep the original ground (a kerb is laid along the track
+    // edge and follows it); the fill grows in beyond that over FOLD_RAMP.
+    const side: SideIndex = sign > 0 ? LEFT : RIGHT;
+    const kp = this.kerb[side][out.sample]!;
+    const from = (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN;
+    const tr = Math.min(1, Math.max(0, (u - from) / FOLD_RAMP));
+    if (tr <= 0) return;
+    const ramp = tr * tr * (3 - 2 * tr);
+    const dRamp = tr < 1 ? (6 * tr * (1 - tr)) / FOLD_RAMP : 0; // per metre of u
+    const w = fs.weight * ramp;
     const base = edge - VERGE_FALL * u;
     const diff = fs.height - base;
     // World gradient of the unfolded base: along s a metre of s is a world step of m.
@@ -757,8 +773,10 @@ export class Track {
     const kz = (kerbSlopeS / m) * tz + sign * kerbSlopeU * nz;
     out.height += w * diff;
     out.world = true;
-    out.gx = (1 - w) * bx + w * fs.gx + fs.wx * diff + kx;
-    out.gz = (1 - w) * bz + w * fs.gz + fs.wz * diff + kz;
+    const wx = fs.wx * ramp + fs.weight * dRamp * sign * nx;
+    const wz = fs.wz * ramp + fs.weight * dRamp * sign * nz;
+    out.gx = (1 - w) * bx + w * fs.gx + wx * diff + kx;
+    out.gz = (1 - w) * bz + w * fs.gz + wz * diff + kz;
   }
 
   /**
@@ -825,6 +843,7 @@ export class Track {
       // Every node carries the unfolded base (behind the barrier too: a blend near it reads it).
       if (a <= hw) {
         c.kind = NodeKind.Fixed;
+        c.weight = 0;
         c.height = yc + q.d * tb;
         return;
       }
@@ -832,7 +851,13 @@ export class Track {
       if (g.kind === SurfaceKind.OutOfBounds) c.kind = NodeKind.Outside;
       // The zone is the whole run-off inside a bend that folds before its barrier, from the
       // track edge out: its heights are then joined across the full width of the bend.
-      else c.kind = folding[side][g.sample] ? NodeKind.Zone : NodeKind.Fixed;
+      else {
+        const kp = this.kerb[side][g.sample]!;
+        const kerb = (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN;
+        c.kind = folding[side][g.sample] && a - hw > kerb ? NodeKind.Zone : NodeKind.Fixed;
+        const sign = side === LEFT ? 1 : -1;
+        c.weight = foldShare(1 - lap.curvature[g.sample]! * sign * this.barrier[side][g.sample]!);
+      }
     });
   }
 

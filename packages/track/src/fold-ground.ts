@@ -21,6 +21,18 @@
 export const FOLD_CELL = 0.5;
 /** A point is in a fold zone where the frame's stretch m = 1 − κd falls below this (estimate). */
 export const FOLD_STRETCH = 0.6;
+/** The fill is used in full where the stretch at the barrier is at or below this (estimate). */
+export const FOLD_FULL = 0.3;
+
+/**
+ * Share of the fill for a bend whose stretch at the barrier is mBarrier: none at FOLD_STRETCH
+ * (where a bend just starts to fold), all of it from FOLD_FULL, so the fill fades out towards the
+ * ends of a folding stretch of lap instead of meeting the unfolded ground at a seam.
+ */
+export function foldShare(mBarrier: number): number {
+  const t = Math.min(1, Math.max(0, (FOLD_STRETCH - mBarrier) / (FOLD_STRETCH - FOLD_FULL)));
+  return t * t * (3 - 2 * t);
+}
 
 /** What a grid node is: beyond the barrier, fixed at the unfolded ground, or solved for. */
 export const NodeKind = { Outside: 0, Fixed: 1, Zone: 2 } as const;
@@ -30,6 +42,8 @@ export interface NodeClass {
   kind: NodeKind;
   /** The unfolded base height at the node (no kerb profile). */
   height: number;
+  /** For a zone node, how much of the fill to use there, 0–1 (`foldShare`). */
+  weight: number;
 }
 
 export interface FoldSample {
@@ -88,12 +102,14 @@ export class FoldGround {
     const n = ix.length;
     this.heights = new Float64Array(n);
     this.kinds = new Uint8Array(n);
-    const c: NodeClass = { kind: NodeKind.Outside, height: 0 };
+    const c: NodeClass = { kind: NodeKind.Outside, height: 0, weight: 0 };
+    const share = new Float64Array(n);
     let zone = 0;
     for (let j = 0; j < n; j++) {
       classify(ix[j]! * FOLD_CELL, iz[j]! * FOLD_CELL, c);
       this.kinds[j] = c.kind;
       this.heights[j] = c.height;
+      share[j] = c.weight;
       if (c.kind === NodeKind.Zone) zone++;
     }
     // A zone node at the edge of a box has neighbours nobody classified: fix it instead, so the
@@ -236,7 +252,7 @@ export class FoldGround {
     // reads it: give the first rings of nodes behind it the values a free edge implies (the mean
     // of their neighbours inside) and their weight, so the solved ground reaches the barrier.
     this.weights = new Float64Array(n);
-    for (let j = 0; j < n; j++) this.weights[j] = this.kinds[j] === NodeKind.Zone ? 1 : 0;
+    for (let j = 0; j < n; j++) this.weights[j] = this.kinds[j] === NodeKind.Zone ? share[j]! : 0;
     const filled = new Uint8Array(n);
     for (let j = 0; j < n; j++) if (this.kinds[j] !== NodeKind.Outside) filled[j] = 1;
     for (let ring = 0; ring < GHOST_RINGS; ring++) {
