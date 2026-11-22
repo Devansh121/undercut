@@ -259,7 +259,7 @@ const REV_COLOURS = ['#38d07a', '#e5484d', '#4f7dff'] as const;
 
 /** The steering wheel's screen: a canvas redrawn when its values change, shown as emissive. */
 export class Dashboard {
-  shown: { gear: string; speed: string; revs: number } | null = null;
+  shown: { gear: string; speed: string; revs: number; unit: string } | null = null;
   readonly texture: CanvasTexture;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D | null;
@@ -292,13 +292,13 @@ export class Dashboard {
     m.needsUpdate = true;
   }
 
-  draw(gear: number, speedKmh: number, revLights: number): void {
+  draw(gear: number, speed: number, revLights: number, unit = 'KM/H'): void {
     const g = gear < 0 ? 'R' : gear === 0 ? 'N' : String(gear);
-    const v = String(Math.max(0, Math.round(speedKmh)));
+    const v = String(Math.max(0, Math.round(speed)));
     const revs = Math.max(0, Math.min(16, Math.round(revLights)));
     const s = this.shown;
-    if (s && s.gear === g && s.speed === v && s.revs === revs) return;
-    this.shown = { gear: g, speed: v, revs };
+    if (s && s.gear === g && s.speed === v && s.revs === revs && s.unit === unit) return;
+    this.shown = { gear: g, speed: v, revs, unit };
     const c = this.ctx;
     if (!c) return;
     const W = this.canvas.width;
@@ -325,7 +325,7 @@ export class Dashboard {
     c.fillText(v, 14, 132);
     c.fillStyle = '#7d7c78';
     c.font = '600 18px Archivo, sans-serif';
-    c.fillText('KM/H', 14, 152);
+    c.fillText(unit, 14, 152);
     this.texture.needsUpdate = true;
   }
 

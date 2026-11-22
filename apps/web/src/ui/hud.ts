@@ -1,3 +1,4 @@
+import { speedUnit } from './player-settings';
 import type { DeltaClass } from '../game/timing';
 import { formatDelta, formatGear, formatLapTime, formatSpeedKmh } from '../game/format';
 import type { MinimapPlan } from '../game/minimap';
@@ -339,7 +340,7 @@ export class Hud {
     const spd = el('div', 'hud-spd');
     const spdB = txt('speed', el('b', 'num'));
     spdB.dataset.testid = 'speed';
-    spd.append(spdB, el('span', 'label', S.hud.kmh));
+    spd.append(spdB, txt('speedUnit', el('span', 'label', S.hud.kmh)));
     sg.append(rpm, gear, spd);
     const ers = el('div', 'hud-ers');
     const ersLeft = el('div');
@@ -398,7 +399,12 @@ export class Hud {
     setClass(this.t.best?.node as HTMLElement, 'is-empty', h.best === null);
     setClass(this.lastEl, 'is-empty', h.last === null);
     t.lapTime?.set(h.running ? formatLapTime(h.lapTime) : formatLapTime(0));
-    t.speed?.set(formatSpeedKmh(h.speed));
+    t.speed?.set(
+      speedUnit() === 'mph'
+        ? String(Math.max(0, Math.round(Math.abs(h.speed) / 0.44704)))
+        : formatSpeedKmh(h.speed),
+    );
+    t.speedUnit?.set(speedUnit() === 'mph' ? S.pause.mph : S.hud.kmh);
     t.gear?.set(formatGear(h.gear));
     t.rpm?.set(String(Math.round(h.rpm / 10) * 10).replace(/\B(?=(\d{3})+$)/, ' '));
     t.last?.set(formatLapTime(h.last));
