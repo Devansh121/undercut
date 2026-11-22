@@ -3,6 +3,7 @@ import {
   Group,
   Mesh,
   MeshDepthMaterial,
+  MeshPhysicalMaterial,
   Vector3,
   type BufferGeometry,
   type Material,
@@ -14,7 +15,7 @@ import type { PropKitAssets } from '../props/catalog';
 import { boardMaterial, type PropPlacement, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
-import { buildBuildingChunks, facadeMaterial } from './buildings';
+import { buildBuildingChunks, buildingHeight, facadeMaterial } from './buildings';
 import { buildCoverMap, type CoverMap } from './cover';
 import { crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
 import {
@@ -28,6 +29,7 @@ import {
 import {
   buildHistoricBanking,
   buildStartGantry,
+  brandHoardingMaterial,
   buildTrackBridges,
   placeTracksideFurniture,
   type StartGantry,
@@ -53,7 +55,17 @@ import {
   type PitComplexData,
 } from './pit-building';
 import { buildSurfaceDecals } from './surface-decals';
-import { buildTerrain, TERRAIN_HIGH, TERRAIN_LITE, TERRAIN_MOBILE } from './terrain';
+import type { LocalLight } from '../lighting/light-pool';
+import { pickBackdrops, placeStreetCircuit, windowMaterial } from './street';
+import {
+  buildTerrain,
+  TERRAIN_HIGH,
+  TERRAIN_LITE,
+  TERRAIN_MOBILE,
+  waterBodies,
+  waterGeometry,
+  type WaterBody,
+} from './terrain';
 import { coniferShare, worldTheme, type WorldTheme } from './theme';
 import { treeAtlas } from './tree-atlas';
 import {
@@ -118,6 +130,8 @@ export interface CircuitWorldOptions {
    * +Y up, +X front); kinds it lacks keep the stand-in.
    */
   propKit?: PropKitAssets | null;
+  /** Lamps and windows lit (a floodlit night). */
+  night?: boolean;
 }
 
 /**
@@ -228,6 +242,11 @@ export class CircuitWorld {
   private startGantry: StartGantry | null = null;
   /** The circuit's regional look (theme.ts), from the track's id. */
   readonly theme: WorldTheme;
+  /** The circuit's own floodlights (lamp banks it placed), for the pooled lights at night. */
+  readonly localLights: LocalLight[] = [];
+  private crowdKinds = 0;
+  /** Mapped water drawn as a surface (theme `water`), with the ground kept under it. */
+  private water: WaterBody[] = [];
 
   /** Milliseconds per build step (start-up budget). */
   readonly buildTimes: Record<string, number> = {};
@@ -275,6 +294,7 @@ export class CircuitWorld {
       let terrain: ReturnType<typeof buildTerrain> | null = null;
       await timed('terrain', () => {
         const grid = decodeTerrain(dressing.terrain);
+        world.water = world.theme.water ? waterBodies(dressing.mapped.water, grid) : [];
         terrain = buildTerrain(
           track,
           grid,
@@ -285,11 +305,13 @@ export class CircuitWorld {
             : wq.terrain === 'lite'
               ? TERRAIN_LITE
               : TERRAIN_MOBILE,
+          world.water,
         );
         world.heightAt = terrain.heightAt;
       });
       await timed('cover', () => {
         world.buildGround(o, terrain!, lapBox);
+        world.placeWater();
       });
       if (!wq.structures) {
         await timed('trees', () => world.placeTrees(o, lapBox));
@@ -324,12 +346,14 @@ export class CircuitWorld {
     const grid = decodeTerrain(dressing.terrain);
     step('index');
 
+    this.water = this.theme.water ? waterBodies(dressing.mapped.water, grid) : [];
     const terrain = buildTerrain(
       track,
       grid,
       this.lap,
       o.drivable,
       wq.terrain === 'high' ? TERRAIN_HIGH : wq.terrain === 'lite' ? TERRAIN_LITE : TERRAIN_MOBILE,
+      this.water,
     );
     this.heightAt = terrain.heightAt;
     step('terrain');
@@ -339,6 +363,7 @@ export class CircuitWorld {
       ),
     );
     this.buildGround(o, terrain, lapBox);
+    this.placeWater();
     step('ground');
     if (!wq.structures) {
       this.placeTrees(o, lapBox);
@@ -451,6 +476,42 @@ export class CircuitWorld {
       this.geometries.push(cg);
       this.group.add(groundMesh);
     });
+  }
+
+  /** Flat water surfaces at each body's level: dark, smooth, reflecting the sky and the lamps. */
+  private placeWater(): void {
+    if (this.water.length === 0) return;
+    // Harbour water: dark green-grey, a broken sheen rather than a mirror of the sky (weaker
+    // specular than glass, so the overcast sky at a grazing angle does not turn it white).
+    const mat = new MeshPhysicalMaterial({
+      color: new Color('#0b1b1f'),
+      roughness: 0.2,
+      metalness: 0,
+      specularIntensity: 0.35,
+      envMapIntensity: 0.6,
+    });
+    mat.name = 'water';
+    this.materials.push(mat);
+    this.water.forEach((b, wi) => {
+      const g = waterGeometry(b);
+      if (!g) return;
+      this.geometries.push(g);
+      const mesh = new Mesh(g, mat);
+      mesh.name = `world:water-${wi}`;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.group.add(mesh);
+      const bs = g.boundingSphere;
+      if (bs)
+        this.addWorldChunk(
+          mesh,
+          [bs.center.x, bs.center.y, bs.center.z],
+          bs.radius,
+          FAR_BUILDINGS,
+          0,
+        );
+    });
+    this.counts.water = this.water.length;
   }
 
   /** Set the 5 start-gantry lights (bits 0..4 red pods, bit 5 green). */
@@ -905,10 +966,56 @@ export class CircuitWorld {
 
   private placeBuildings(o: CircuitWorldOptions): void {
     const pitFoot = this.pitComplex?.footprint ?? [];
+    // A street circuit's smaller buildings by the track are the kit's marina backdrops.
+    const street = this.theme.street;
+    const kit = o.propKit;
+    const backdrops =
+      street && kit
+        ? pickBackdrops(
+            o.dressing.mapped.building,
+            this.lap,
+            this.heightAt,
+            street,
+            kit,
+            buildingHeight,
+          )
+        : [];
+    const asBackdrop = new Set(backdrops.map((b) => b.feature));
+    if (kit && backdrops.length > 0) {
+      const windows = windowMaterial(o.night ?? false);
+      this.materials.push(windows);
+      for (const id of new Set(backdrops.map((b) => b.kitId))) {
+        const lods = kit.lodsFor(id, {
+          materialOverrides: { 'window-emissive-mask': windows },
+          // Seen across the city: as far as the mapped buildings.
+          maxDistanceScale: 3.4,
+          distanceCaps: [80, 300, FAR_BUILDINGS],
+        });
+        if (!lods) continue;
+        o.props.define({
+          id: `backdrop-${id}`,
+          castShadow: o.quality.sceneryShadows,
+          shadowMaxDistance: 220,
+          receiveShadow: true,
+          lods,
+        });
+      }
+      for (const b of backdrops)
+        o.props.place(`backdrop-${b.kitId}`, {
+          x: b.x,
+          y: b.y,
+          z: b.z,
+          yaw: b.yaw,
+          scale: b.scale,
+          s: b.s,
+        });
+      this.counts.backdrops = backdrops.length;
+    }
     const { chunks, count } = buildBuildingChunks(
       o.dressing.mapped.building,
       this.heightAt,
       (f) => {
+        if (asBackdrop.has(f.id)) return true;
         // Buildings on the circuit itself (mapped over the pit lane or under bridges) stay out.
         const [x0, z0, x1, z1] = bounds(f.p);
         const cx = (x0 + x1) / 2;
@@ -928,7 +1035,7 @@ export class CircuitWorld {
       this.theme.buildings,
     );
     this.counts.buildings = count;
-    const mat = facadeMaterial();
+    const mat = facadeMaterial(o.night ?? false);
     this.materials.push(mat);
     chunks.forEach((ch, ci) => {
       this.geometries.push(ch.geometry);
@@ -972,20 +1079,35 @@ export class CircuitWorld {
       const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
       return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
     });
-    const mats = crowdMaterial(this.crowdTime);
-    this.materials.push(mats);
+    const spectator = this.spectators(o);
+    for (const seat of seats) spectator(seat);
+    this.counts.crowd = seats.length;
+  }
+
+  /**
+   * Place one spectator on a seat (the crowd kinds are defined on first use): variant, clothes,
+   * a little turn and size from the seat's number `k`.
+   */
+  private spectators(
+    o: CircuitWorldOptions,
+  ): (seat: { x: number; y: number; z: number; yaw: number; s: number; k: number }) => void {
     const variants = 3;
-    for (let v = 0; v < variants; v++) {
-      const g = spectatorGeometry(v);
-      this.geometries.push(g);
-      o.props.define({
-        id: `crowd-${v}`,
-        castShadow: false,
-        receiveShadow: true,
-        lods: [{ geometry: g, material: mats, maxDistance: 650 }],
-      });
+    if (this.crowdKinds === 0) {
+      const mats = crowdMaterial(this.crowdTime);
+      this.materials.push(mats);
+      for (let v = 0; v < variants; v++) {
+        const g = spectatorGeometry(v);
+        this.geometries.push(g);
+        o.props.define({
+          id: `crowd-${v}`,
+          castShadow: false,
+          receiveShadow: true,
+          lods: [{ geometry: g, material: mats, maxDistance: 650 }],
+        });
+      }
+      this.crowdKinds = variants;
     }
-    for (const seat of seats) {
+    return (seat) => {
       const c = CLOTHING[Math.floor(hash01(seat.k, 3) * CLOTHING.length)] as [
         number,
         number,
@@ -1000,8 +1122,7 @@ export class CircuitWorld {
         scale: 0.94 + hash01(seat.k, 5) * 0.12,
         colour: c,
       });
-    }
-    this.counts.crowd = seats.length;
+    };
   }
 
   /** Start gantry, bridges, historic banking, trackside furniture and place-dependent surface decals. */
@@ -1088,8 +1209,37 @@ export class CircuitWorld {
       geometries: this.geometries,
       materials: this.materials,
       textures: this.textures,
+      street: this.theme.street !== null,
     });
     Object.assign(this.counts, furnCounts);
+
+    // A street circuit's walls, debris fencing, floodlight masts and temporary stands (street.ts).
+    const street = this.theme.street;
+    if (street && o.propKit) {
+      const boards = brandHoardingMaterial(brandTex, true);
+      this.materials.push(boards);
+      const res = placeStreetCircuit({
+        track,
+        lap: this.lap,
+        props,
+        kit: o.propKit,
+        street,
+        obstacles: [...dressing.mapped.building, ...dressing.mapped.water],
+        heightAt: this.heightAt,
+        night: o.night ?? false,
+        mobile,
+        castShadows: quality.sceneryShadows,
+        boardMaterial: boards,
+        materials: this.materials,
+        spectator: this.spectators(o),
+        crowd: quality.world.crowd,
+      });
+      Object.assign(this.counts, {
+        ...res.counts,
+        crowd: (this.counts.crowd ?? 0) + (res.counts.crowd ?? 0),
+      });
+      this.localLights.push(...res.lights);
+    }
 
     // Surface decals (start/finish chequer, grid numbers, pit-lane lines, painted run-off chevrons).
     const decals = buildSurfaceDecals(track, quality.anisotropy);

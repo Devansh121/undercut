@@ -155,9 +155,9 @@ export function buildBuildings(
  * and frames lighter, a plinth darker; the glass is smooth and reflects the sky. Roofs keep the
  * vertex colour, rougher.
  */
-export function facadeMaterial(): MeshStandardMaterial {
+export function facadeMaterial(night = false): MeshStandardMaterial {
   const m = new MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 });
-  m.name = 'facade';
+  m.name = night ? 'facade-night' : 'facade';
   m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -166,11 +166,15 @@ export function facadeMaterial(): MeshStandardMaterial {
       )
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFacade = facade;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vFacade;\nfloat facadeGlass;')
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec2 vFacade;\nfloat facadeGlass;\nfloat facadeLit;',
+      )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
         facadeGlass = 0.0;
+        facadeLit = 0.0;
         if (vFacade.x >= 0.0) {
           vec2 cell = vec2(vFacade.x / 3.4, (vFacade.y - 0.6) / 3.2);
           vec2 f = fract(cell);
@@ -188,6 +192,9 @@ export function facadeMaterial(): MeshStandardMaterial {
           vec3 shutter = diffuseColor.rgb * vec3(0.55, 0.6, 0.5);
           diffuseColor.rgb = mix(diffuseColor.rgb, mix(glass, shutter, shut), win);
           facadeGlass = win * (1.0 - shut);
+          // At night about half the windows are lit, warm; whole floors of some bays dark.
+          float rnd2 = fract(sin(bay * 39.346 + floorIdx * 11.135) * 24634.6345);
+          facadeLit = win * (1.0 - shut) * step(0.48, rnd2);
           // Plinth and dirt toward the ground.
           diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.3, 1.0, vFacade.y));
         }`,
@@ -196,8 +203,13 @@ export function facadeMaterial(): MeshStandardMaterial {
         '#include <roughnessmap_fragment>',
         '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.08, facadeGlass);',
       );
+    if (night)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.8, 0.52) * 1.6 * facadeLit;',
+      );
   };
-  m.customProgramCacheKey = () => 'facade-v1';
+  m.customProgramCacheKey = () => (night ? 'facade-v1-night' : 'facade-v1');
   return m;
 }
 
