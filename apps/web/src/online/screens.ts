@@ -31,7 +31,7 @@ export class RoomScreens {
     );
     const content = el('div', 'online-screen__content');
     const button = (text: string, action: () => void, disabled = false): HTMLButtonElement => {
-      const b = el('button', 'button', text);
+      const b = el('button', 'btn btn--secondary', text);
       b.type = 'button';
       b.disabled = disabled;
       b.id = 'online-' + text.toLowerCase().replaceAll(' ', '-');

@@ -161,8 +161,8 @@
   --touch-min: 44px;
 }
 
-/* Phone landscape: same tokens, tighter steps */
-@media (max-height: 500px) and (orientation: landscape) {
+/* Phones (landscape, or a narrow portrait screen): same tokens, tighter steps */
+@media (max-height: 500px) and (orientation: landscape), (max-width: 600px) and (orientation: portrait) {
   :root {
     --grid-cols: 8;
     --grid-gutter: 12px;
