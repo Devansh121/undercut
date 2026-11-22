@@ -267,7 +267,9 @@ export class PauseMenu {
     refreshGlyphs(this.root);
     this.root.hidden = false;
     // Open at the top, with Resume and the driving actions in view, wherever it was scrolled.
-    for (const node of this.root.querySelectorAll<HTMLElement>('.pause__card, .pause__actions'))
+    for (const node of this.root.querySelectorAll<HTMLElement>(
+      '.pause__card, .pause__body, .pause__actions, .pause__settings',
+    ))
       node.scrollTop = 0;
     this.root.scrollTop = 0;
     this.focusIndex = 0;

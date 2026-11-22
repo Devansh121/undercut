@@ -167,7 +167,8 @@ async function answer(key,request,keep){
   const cache=await caches.open(NAME);
   const hit=await cache.match(key,{ignoreSearch:true});
   if(hit) return hit;
-  const response=await fetch(request);
+  // Revalidate: an unhashed asset may sit in the HTTP cache from the previous build.
+  const response=await fetch(request,keep?{cache:'no-cache'}:undefined);
   if(keep&&response.status===200&&response.type==='basic'&&!response.redirected)
     await cache.put(key,response.clone()).catch(()=>{});
   return response;
