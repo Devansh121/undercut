@@ -1002,7 +1002,10 @@ export class RaceDriver implements Driver {
       const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
       // Behind a car standing still, stop with room to steer out and round it.
       // (Round one, also behind the crawling car ahead in the gap: no nose-to-tail queue on it.)
-      const room = gap - (vl < 1 || (this.passBypass && vl < 3) ? STILL_GAP : STANDSTILL_GAP);
+      // (From walking pace down, before the car ahead is quite still: a queue stopping in front
+      // of a stopped car, where the gap needed jumps as the car ahead stops.)
+      const stopping = vl < 1 || (vl < 3 && !view.launching);
+      const room = gap - (stopping ? STILL_GAP : STANDSTILL_GAP);
       const vKin =
         room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl - 1;
       let aSafe = SPEED_GAIN * (vSafe - v);
@@ -1057,8 +1060,16 @@ export class RaceDriver implements Driver {
     // to steer out, braking from as far off as it is seen (in a chicane it may be in the path
     // only where the line swings across, too late for the car-ahead law).
     if (ob !== null && !this.passBypass) {
-      const toStop = Math.max(0, this.ahead(s0, ob.s) - CAR_LENGTH - STILL_GAP);
+      const obDs = this.ahead(s0, ob.s);
+      const toStop = Math.max(0, obDs - CAR_LENGTH - STILL_GAP);
       limit = Math.min(limit, SPEED_GAIN * (Math.sqrt(2 * STOP_DECEL * toStop) - v));
+      // No passing into a queue stopping for it: the car being passed is followed again (in a
+      // move it was out of this car's path, and it stops short of the stopped car).
+      if (this.passId >= 0 && passCar !== null && passDs < obDs) {
+        this.passId = -1;
+        this.passCommitted = false;
+        this.cooldown = 3;
+      }
     }
     if (this.passId < 0) this.reverseTime = 0;
     // Committed to a move, the exit is where it is made: the full drive the driver asks for.
@@ -1338,6 +1349,10 @@ export class RaceDriver implements Driver {
       if (c.speed >= 1) continue;
       const ds = this.ahead(s0, c.s);
       if (ds <= 0 || ds > reach || ds >= bestDs) continue;
+      // A car stopped in a queue behind another is waited behind, not gone round: only the
+      // head of a stopped queue is an obstacle (cars weaving between the cars of a queue at
+      // walking pace touch them).
+      if (this.queuedBehind(view, c)) continue;
       // In the way where this car is now, or where its path (the line, at its offset) runs
       // when it gets there: the line sweeps across the track into a corner.
       const reachHalf = IN_PATH + c.halfWidth;
@@ -1347,6 +1362,17 @@ export class RaceDriver implements Driver {
       bestDs = ds;
     }
     return best;
+  }
+
+  /** Car `c` stands still within 30 m behind another car standing still. */
+  private queuedBehind(view: TrafficView, c: TrafficCar): boolean {
+    for (let k = 0; k < view.count; k++) {
+      const o = view.cars[k]!;
+      if (o.id === c.id || o.speed >= 1) continue;
+      const ds = this.ahead(c.s, o.s);
+      if (ds > 0 && ds < 30) return true;
+    }
+    return false;
   }
 
   /** A car standing still on the road within `range` m ahead, anywhere across it. */
