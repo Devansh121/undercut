@@ -970,7 +970,8 @@ button {
 
 /* ================= Phone landscape ================= */
 
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
   /* Touch targets: 44 px or more in both directions on a phone. */
   .btn {
     height: 44px;

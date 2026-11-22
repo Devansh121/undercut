@@ -56,7 +56,7 @@ test('installable shell survives a redirecting host, updates on reload, and driv
     const manifest = (await page.evaluate(async () =>
       (await fetch('./manifest.webmanifest')).json(),
     )) as { display: string; orientation: string; icons: { sizes: string; purpose: string }[] };
-    expect(manifest.display).toBe('standalone');
+    expect(manifest.display).toBe('fullscreen');
     expect(manifest.orientation).toBe('landscape');
     expect(manifest.icons.map((i) => `${i.sizes} ${i.purpose}`)).toEqual([
       '192x192 any',

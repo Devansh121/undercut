@@ -46,7 +46,12 @@ export class LaunchScreen implements Screen {
     this.press.dataset.nav = '';
     this.press.dataset.navDefault = '';
     this.press.dataset.action = 'press-start';
-    this.press.append(glyph('menuAccept'), el('span', 'launch__press-text', S.launch.press));
+    // A phone has no keys to press: say tap.
+    const touch = window.matchMedia?.('(hover: none) and (pointer: coarse)').matches ?? false;
+    this.press.append(
+      glyph('menuAccept'),
+      el('span', 'launch__press-text', touch ? S.launch.pressTouch : S.launch.press),
+    );
     this.press.addEventListener('click', () => this.open());
     const build = el('span', 'label launch__build');
     build.append(`${S.launch.build} `, el('code', 'num', buildHash));

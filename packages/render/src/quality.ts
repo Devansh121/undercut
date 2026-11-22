@@ -63,7 +63,15 @@ export interface Quality {
   /** Radial blur at the frame edge at speed. */
   readonly speedBlur: boolean;
   /** Frame-time target for dynamic resolution (0: off) and the lowest render scale. */
-  readonly dynamicResolution: { readonly targetMs: number; readonly min: number };
+  /**
+   * `max` above 1 lets dynamic resolution go past `pixelRatioCap` on a screen with more pixels
+   * (a DPR 3 phone) when the frame has room; never past the screen's own pixel ratio.
+   */
+  readonly dynamicResolution: {
+    readonly targetMs: number;
+    readonly min: number;
+    readonly max?: number;
+  };
   /** The dressing around the circuit (docs/render.md, World). */
   readonly world: Readonly<WorldQuality>;
 }

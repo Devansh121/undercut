@@ -449,6 +449,9 @@ export class Hud {
       this.lastMark = markShift;
     }
     setData(this.drsEl, 'state', h.drs);
+    // The phone's DRS touch button shows the same state (styles.css), so the cluster can drop
+    // its own DRS box there: one DRS control on screen.
+    setData(document.documentElement, 'drs', h.drs);
 
     setClass(this.invalidEl, 'is-on', h.running && !h.valid);
     if (h.running && !h.valid) this.invalidReason.set(h.invalidReason ?? S.hud.trackLimits);

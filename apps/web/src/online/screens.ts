@@ -21,8 +21,18 @@ export class RoomScreens {
     this.code = code ?? '';
   }
   show(): void {
+    // The screen is rebuilt on every change: keep the focused field's caret and selection too, or
+    // typing over a selected name just as it redraws appends to it ("DriverHost").
     const active = document.activeElement as HTMLInputElement | null;
     const focus = active?.id;
+    const selection =
+      active instanceof HTMLInputElement && active.selectionStart !== null
+        ? {
+            start: active.selectionStart,
+            end: active.selectionEnd ?? active.selectionStart,
+            direction: active.selectionDirection ?? 'none',
+          }
+        : null;
     const s = this.session.state;
     const title = el(
       'h1',
@@ -31,7 +41,7 @@ export class RoomScreens {
     );
     const content = el('div', 'online-screen__content');
     const button = (text: string, action: () => void, disabled = false): HTMLButtonElement => {
-      const b = el('button', 'button', text);
+      const b = el('button', 'btn btn--secondary', text);
       b.type = 'button';
       b.disabled = disabled;
       b.id = 'online-' + text.toLowerCase().replaceAll(' ', '-');
@@ -204,7 +214,10 @@ export class RoomScreens {
     const status = el('p', '', s.busy ? 'Connecting to the room' : connection[s.status]);
     status.setAttribute('role', 'status');
     this.root.replaceChildren(title, status, content, el('p', 'online-notice', this.notice));
-    if (focus) document.getElementById(focus)?.focus();
+    const next = focus ? document.getElementById(focus) : null;
+    next?.focus();
+    if (selection && next instanceof HTMLInputElement && next.selectionStart !== null)
+      next.setSelectionRange(selection.start, selection.end, selection.direction);
   }
   say(message: string): void {
     this.notice = message;

@@ -16,6 +16,11 @@ const roomsPort = Number(process.env.TEST_ROOMS_PORT ?? 4787);
  * `browser` job that runs desktop and phone; a plain `playwright test` runs all three.
  */
 const LIFECYCLE = /\/(lifecycle|context-loss)\.spec\.ts$/;
+/**
+ * The phone layout sweep also runs on WebKit, the engine of every iPhone browser. DOM only (no
+ * WebGL), so it is quick; CI runs it in the `build` job beside the lifecycle project.
+ */
+const PHONE_FIT = /\/phone-fit\.spec\.ts$/;
 
 const launchOptions = {
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
@@ -59,6 +64,13 @@ export default defineConfig({
         isMobile: true,
         hasTouch: true,
         launchOptions,
+      },
+    },
+    {
+      name: 'webkit-phone',
+      testMatch: PHONE_FIT,
+      use: {
+        ...devices['iPhone 13'],
       },
     },
     {

@@ -1658,6 +1658,10 @@ body {
   inset: 0;
   overflow: auto;
   padding: clamp(16px, 4vw, 56px);
+  padding-top: max(clamp(16px, 4vw, 56px), env(safe-area-inset-top, 0px));
+  padding-right: max(clamp(16px, 4vw, 56px), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(16px, 4vw, 56px), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(16px, 4vw, 56px), env(safe-area-inset-left, 0px));
   background: var(--bg, #101215);
   color: var(--text, #edf0f2);
 }
@@ -1680,6 +1684,11 @@ body {
 .online-screen a {
   color: #b7d3e8;
   overflow-wrap: anywhere;
+  /* A 44 px tap target around a one-line link. */
+  display: inline-block;
+  min-height: 44px;
+  padding: 12px 0;
+  box-sizing: border-box;
 }
 .online-field {
   display: flex;
@@ -1692,6 +1701,10 @@ body {
   border: 1px solid #626c74;
   padding: 10px;
   font: inherit;
+  /* 16 px or more: iPhone Safari zooms the page into any smaller field on focus. */
+  font-size: 16px;
+  min-height: 44px;
+  box-sizing: border-box;
   width: 180px;
 }
 .online-assist {
@@ -1920,4 +1933,167 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
   .pause__controls {
     display: none;
   }
+}
+
+@media (max-width: 600px) {
+  .online-screen__content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ================= Compact phone HUD ================= */
+/* A landscape phone keeps the top third for the road: a narrow tower (lap, then position, name
+   and gap; the flag only when it is not green), the lap time without its header, a smaller map,
+   and the pause button where the camera button was (the camera is in the pause menu). The
+   cluster is one slim strip, and with touch controls the DRS button is the only DRS control:
+   it shows the state the cluster's DRS box showed. Steering and pedal zones are unchanged. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-tower {
+    width: 132px;
+  }
+  .hud-tower__status[data-flag='green'] {
+    display: none;
+  }
+  .hud-timing {
+    width: 204px;
+  }
+  .hud-timing .panel-head {
+    display: none;
+  }
+  .hud-map {
+    width: 96px;
+    padding: 4px;
+  }
+  .hud-control {
+    top: calc(var(--safe-t) + 76px);
+    max-width: calc(100vw - 2 * (var(--safe-r) + 168px));
+  }
+  .results {
+    top: calc(var(--safe-t) + 76px);
+  }
+
+  .hud-drive {
+    width: 208px;
+    padding: 4px var(--sp-2) 6px;
+  }
+  .hud-revs {
+    margin-bottom: 2px;
+  }
+  .hud-revs i {
+    height: 3px;
+  }
+  .hud-gear {
+    font-size: var(--fs-32);
+    line-height: 1;
+  }
+  .hud-spd b {
+    font-size: var(--fs-20);
+  }
+  .hud-rpm b {
+    font-size: var(--fs-12);
+  }
+  .hud-speedgear .label {
+    margin-top: 0;
+  }
+  /* ERS as one line: a thin meter with the deploy mode beside it (no label, no percentage). */
+  .hud-ers {
+    margin-top: 4px;
+    padding-top: 0;
+    box-shadow: none;
+  }
+  .hud-ers > div:first-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 6px;
+  }
+  .hud-ers__row {
+    order: 2;
+    margin-bottom: 0;
+  }
+  .hud-ers__row > .label,
+  .hud-ers__row > b {
+    display: none;
+  }
+  .hud-ers .hud-ers__mode {
+    font-size: var(--fs-10);
+    line-height: 1;
+  }
+  .hud-ers__meter {
+    height: 4px;
+  }
+  html:has(.ut-touch) .hud-drs {
+    display: none;
+  }
+
+  .ut-touch .ut-touch__btn--camera {
+    display: none;
+  }
+  .ut-touch .ut-touch__btn--pause {
+    top: var(--ut-t);
+    right: calc(var(--ut-r) + 104px);
+  }
+}
+
+/* A small phone (or Safari's bars in the way): the cluster takes the strip between the gear
+   buttons (256 px in from the left safe edge) and DRS and overtake (228 px in from the right),
+   with gear and speed only. */
+@media (max-height: 500px) and (max-width: 760px) and (orientation: landscape) {
+  html:has(.ut-touch) .hud-cluster {
+    left: calc(var(--safe-l) + 264px);
+    right: calc(var(--safe-r) + 236px);
+    justify-content: center;
+    transform: none;
+  }
+  html:has(.ut-touch) .hud-drive {
+    width: 100%;
+    max-width: 208px;
+  }
+  html:has(.ut-touch) .hud-rpm {
+    visibility: hidden;
+  }
+}
+
+/* The DRS touch button carries the DRS state: dim when closed, outlined when it may open,
+   filled when open. */
+html[data-drs='off'] .ut-touch .ut-touch__btn--drs {
+  border-color: var(--c-line-strong);
+  color: var(--c-text-3);
+}
+html[data-drs='open'] .ut-touch .ut-touch__btn--drs {
+  background: var(--c-drs);
+  border-color: var(--c-drs);
+  color: var(--c-text-inverse);
+}
+
+/* iPhone: how to get full screen (a home-screen launch). Launch screen only, top centre. */
+.home-hint {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: max(var(--safe), env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: max-content;
+  max-width: calc(100vw - 2 * max(var(--safe), env(safe-area-inset-left, 0px)));
+  box-sizing: border-box;
+  padding: 4px 4px 4px 14px;
+  background: var(--c-ink-1);
+  border-left: 3px solid var(--c-accent);
+  box-shadow: var(--e-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  line-height: 1.35;
+  color: var(--c-text-1);
+}
+.home-hint .ibtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+html:not([data-screen='launch']) .home-hint {
+  display: none;
 }

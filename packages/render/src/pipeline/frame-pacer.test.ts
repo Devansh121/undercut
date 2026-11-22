@@ -101,4 +101,70 @@ describe('FramePacer', () => {
     expect(gpu.released).toEqual([0, 1]);
     expect(pacer.inFlight).toBe(0);
   });
+
+  it('keeps the view moving when a fence never signals, then stops pacing for the session', () => {
+    const gpu = new FakeGpu(); // nothing ever completes
+    const pacer = new FramePacer(gpu);
+    const drawsBy = (ms: number, t0: number): number => {
+      let drawn = 0;
+      for (let t = t0; t < ms; t += 16.7) {
+        if (pacer.ready(16.7)) {
+          pacer.submitted();
+          drawn++;
+        }
+      }
+      return drawn;
+    };
+    // Two frames in flight, then one draw anyway after 10 s of waiting.
+    expect(drawsBy(9900, 0)).toBe(2);
+    expect(drawsBy(10_100, 9900)).toBe(1);
+    expect(pacer.forcedDraws).toBe(1);
+    expect(pacer.disabled).toBe(false);
+    // Nothing signalled for a minute: fences are not working here; pacing stops.
+    expect(drawsBy(59_900, 10_100)).toBe(0);
+    drawsBy(60_100, 59_900);
+    expect(pacer.disabled).toBe(true);
+    expect(gpu.released.length).toBe(3);
+    expect(pacer.inFlight).toBe(0);
+    for (let i = 0; i < 10; i++) {
+      expect(pacer.ready(16.7)).toBe(true);
+      pacer.submitted();
+    }
+    expect(pacer.inFlight).toBe(0);
+  });
+
+  it('a slow GPU that keeps signalling is never forced or switched off', () => {
+    const gpu = new FakeGpu();
+    const pacer = new FramePacer(gpu);
+    // One GPU frame completes every 6 s (a CPU-starved machine with software WebGL).
+    let sinceDone = 0;
+    for (let t = 0; t < 300_000; t += 16.7) {
+      if (pacer.ready(16.7)) pacer.submitted();
+      sinceDone += 16.7;
+      if (sinceDone >= 6000 && gpu.done < gpu.next - 1) {
+        gpu.done++;
+        sinceDone = 0;
+      }
+    }
+    expect(pacer.forcedDraws).toBe(0);
+    expect(pacer.disabled).toBe(false);
+    expect(pacer.inFlight).toBeLessThanOrEqual(2);
+  });
+
+  it('at one animation frame a second, the pacer still forces a draw at 10 s and gives up at 60 s', () => {
+    // Fences that never complete; render timing gets the real 1000 ms per frame.
+    const stuck: Fences<number> = { insert: () => 1, signaled: () => false, release: () => {} };
+    const pacer = new FramePacer(stuck);
+    let forcedAt = 0;
+    let disabledAt = 0;
+    for (let t = 1; t <= 120; t++) {
+      if (pacer.ready(1000)) pacer.submitted();
+      if (!forcedAt && pacer.forcedDraws > 0) forcedAt = t;
+      if (!disabledAt && pacer.disabled) disabledAt = t;
+    }
+    expect(forcedAt).toBeGreaterThanOrEqual(10);
+    expect(forcedAt).toBeLessThanOrEqual(13);
+    expect(disabledAt).toBeGreaterThanOrEqual(60);
+    expect(disabledAt).toBeLessThanOrEqual(63);
+  });
 });
