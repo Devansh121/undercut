@@ -42,6 +42,7 @@ import {
   type StandFrame,
 } from './grandstands';
 import { footprintOnTrack } from './corridor';
+import { streetGround } from './lamps';
 import { LapIndex } from './lap-index';
 import {
   buildGarageBoardsGeometry,
@@ -1227,7 +1228,8 @@ export class CircuitWorld {
         kit: o.propKit,
         street,
         obstacles: [...dressing.mapped.building, ...dressing.mapped.water],
-        heightAt: this.heightAt,
+        // On the ground the lamp map is baked on: the track's own by the track.
+        heightAt: streetGround(track, this.lap, this.heightAt),
         night: o.night ?? false,
         mobile,
         castShadows: quality.sceneryShadows,

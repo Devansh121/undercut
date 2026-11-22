@@ -52,8 +52,10 @@ export interface LampMap {
     uLampReach: { value: number[] };
     uLampColour: { value: Color };
   };
-  /** Baked irradiance and ground height at (x, z), filtered as the GPU does (tests). */
+  /** Baked irradiance and ground height at (x, z), bilinear between the grid points (tests). */
   sample(x: number, z: number): { e: number; ground: number };
+  /** The same from the texture's half-float texels, as the GPU reads it. */
+  sampleStored(x: number, z: number): { e: number; ground: number };
   /** Take the pool's lights as they now stand (each frame, after the pool's update). */
   update(pooled: readonly PooledLamp[]): void;
   dispose(): void;
@@ -94,7 +96,7 @@ export function lampLightAt(
   y: number,
   z: number,
 ): number {
-  const { e, ground } = map.sample(x, z);
+  const { e, ground } = map.sampleStored(x, z);
   let pool = 0;
   let share = 0;
   for (const l of pooled) {
@@ -154,6 +156,12 @@ export function bakeLampMap(
     half[2 * k + 1] = DataUtils.toHalfFloat(ground[k] as number);
   }
   const texture = new DataTexture(half, w, h, RGFormat, HalfFloatType);
+  const storedE = new Float32Array(w * h);
+  const storedG = new Float32Array(w * h);
+  for (let k = 0; k < w * h; k++) {
+    storedE[k] = DataUtils.fromHalfFloat(half[2 * k] as number);
+    storedG[k] = DataUtils.fromHalfFloat(half[2 * k + 1] as number);
+  }
   texture.minFilter = LinearFilter;
   texture.magFilter = LinearFilter;
   texture.generateMipmaps = false;
@@ -191,6 +199,11 @@ export function bakeLampMap(
       if (x < x0 || z < z0 || x > x0 + (w - 1) * cell || z > z0 + (h - 1) * cell)
         return { e: 0, ground: bilinear(ground, x, z) };
       return { e: bilinear(e, x, z), ground: bilinear(ground, x, z) };
+    },
+    sampleStored(x, z) {
+      if (x < x0 || z < z0 || x > x0 + (w - 1) * cell || z > z0 + (h - 1) * cell)
+        return { e: 0, ground: bilinear(storedG, x, z) };
+      return { e: bilinear(storedE, x, z), ground: bilinear(storedG, x, z) };
     },
     update(pooled) {
       for (let k = 0; k < LAMP_POOL_SLOTS; k++) {

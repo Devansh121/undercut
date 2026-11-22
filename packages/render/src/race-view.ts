@@ -30,14 +30,8 @@ import { unregisteredLitMaterials } from './lighting/registration';
 import type { LocalLight } from './lighting/light-pool';
 import { nextLift } from './framing';
 import { MONZA_AFTERNOON, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
-import {
-  LAMP_POOL_SLOTS,
-  addLampLight,
-  bakeLampMap,
-  type LampMap,
-  type PooledLamp,
-} from './lighting/lamp-map';
-import { receivingHeight } from './world/corridor';
+import { LAMP_POOL_SLOTS, addLampLight, type LampMap, type PooledLamp } from './lighting/lamp-map';
+import { bakeCircuitLamps } from './world/lamps';
 import { disposeSet, pbrSet, type PbrSet } from './materials/surface';
 import { DynamicResolution } from './pipeline/dynamic-resolution';
 import { FramePacer, webglFences } from './pipeline/frame-pacer';
@@ -76,9 +70,6 @@ import { CircuitWorld } from './world/world';
  * pipeline's own targets, so a session can change preset without a new context.
  */
 
-/** The baked lamp map: its cell (m) and how far it reaches past the lap's box (m). */
-const LAMP_MAP_CELL = 2;
-const LAMP_MAP_MARGIN = 120;
 export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer {
   const renderer = new WebGLRenderer({
     canvas,
@@ -545,25 +536,7 @@ export class RaceView {
     this.scene.add(this.props.group);
     // At night the banks beyond the pooled lights' reach light the scenery from a baked map.
     if (this.world && lamps.length > 0 && this.environment.pool) {
-      const lap = this.track.lap;
-      let x0 = Infinity;
-      let z0 = Infinity;
-      let x1 = -Infinity;
-      let z1 = -Infinity;
-      for (let i = 0; i < lap.count; i++) {
-        x0 = Math.min(x0, lap.x[i] as number);
-        x1 = Math.max(x1, lap.x[i] as number);
-        z0 = Math.min(z0, lap.z[i] as number);
-        z1 = Math.max(z1, lap.z[i] as number);
-      }
-      const m = LAMP_MAP_MARGIN;
-      // On the surface that receives the light: the road where the track is, the terrain beyond.
-      this.lampMap = bakeLampMap(
-        lamps,
-        [x0 - m, z0 - m, x1 + m, z1 + m],
-        LAMP_MAP_CELL,
-        receivingHeight(this.track, this.world.lap, this.world.heightAt),
-      );
+      this.lampMap = bakeCircuitLamps(this.track, this.world.lap, this.world.heightAt, lamps);
       addLampLight([this.trackView.group, this.world.group, this.props.group], this.lampMap);
     }
     this.environment.register(this.scene);
