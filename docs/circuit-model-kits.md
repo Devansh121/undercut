@@ -19,9 +19,9 @@ Twelve original scripted props, each with High / Mobile / Far LODs. All sizes be
 
 New kit: 1,287,292 bytes across all LODs. Complete catalogue: 3,709,812 bytes, below the existing 4,000,000 byte cap.
 
-The production build reports 8.89 MiB for the existing High first race and 3.71 MiB on Mobile. `kit-budget.json` reserves every new LOD plus both circuits’ skies at both tiers on top of that baseline: High 10.23 MiB, Mobile 5.06 MiB, against 25 MB. This is a conservative model-asset allowance, not measured integrated Spa/Singapore traffic. Terrain, placement, light layout and circuit request telemetry remain with dressing.
+The production build reports 8.89 MiB for the existing High first race and 3.72 MiB on Mobile. `kit-budget.json` reserves every new LOD plus both circuits’ skies at both tiers on top of that baseline: High 10.23 MiB, Mobile 5.06 MiB, against 25 MB. This is a conservative model-asset allowance, not measured integrated Spa/Singapore traffic. Terrain, placement, light layout and circuit request telemetry remain with dressing.
 
-Monza loads none of these props, but it does pay for their catalogue entries: `props.catalog.json` is bundled into the client, and the twelve new entries add metadata only. Against the review's build with master's catalogue, the first race measures +1,142 bytes on both High (9,317,826 → 9,318,968) and Mobile (3,893,020 → 3,894,162), with identical prop inventories and prop bytes; the two forest entries account for 204 of them. If Monza ever has to add zero bytes, split the catalogue per circuit; at this size it is not worth a second fetch.
+Monza loads none of these props, but it does pay for their catalogue entries: `props.catalog.json` is bundled into the client, and the twelve new entries add metadata only. With master's ten kit entries already shipped (#40: +938 bytes of first-race transfer against the earlier catalogue), the two forest entries add 204 bytes on both High and Mobile, with identical prop inventories and prop bytes. If Monza ever has to add zero bytes, split the catalogue per circuit; at this size it is not worth a second fetch.
 
 ## Evidence and reproduction
 

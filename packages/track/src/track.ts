@@ -10,6 +10,17 @@ import {
   type Side,
   type TrackData,
 } from './data';
+import {
+  FOLD_CELL,
+  FOLD_STRETCH,
+  FoldGround,
+  foldShare,
+  NodeKind,
+  type Box,
+  type FoldSample,
+  type NodeClass,
+  type OriginalGround,
+} from './fold-ground';
 import { TrackPath, createPathPoint, createVec3, type PathPoint, type Vec3 } from './path';
 
 /**
@@ -53,6 +64,53 @@ function smoothOpen(values: ArrayLike<number>, sigmaSamples: number): Float64Arr
 
 /** Lateral fall of the ground beyond the track edge (drainage), metres per metre. */
 export const VERGE_FALL = 0.02;
+/**
+ * The folded run-off's fill (`FoldGround`) leaves the kerb and this much beyond it as it is
+ * (estimate: the strip a kerb's installation is laid in), and grows in over FOLD_RAMP, m. At
+ * 0.5 m the disciplined keyboard driver brushes the fill's edge inside the first chicane's second
+ * turn and its recorded drivability gap widens (docs/track-data.md 5.8).
+ */
+export const FOLD_KERB_MARGIN = 1;
+export const FOLD_RAMP = 1;
+/**
+ * How far along the lap the track's grade and bank count as "nearby" for the slope the fill may
+ * always reach (the run-off contract's distance, docs/track-data.md 5.6), m.
+ */
+export const FOLD_NEAR = 50;
+/** The run-off contract's allowance on top of grade, bank and drainage fall (5.6), as a slope. */
+export const FOLD_SLOPE_ALLOWANCE = 0.05;
+/**
+ * The fill stays this far under the contract's bound, as a slope: the build checks the final
+ * slope at points a quarter of a cell (12.5 cm) apart, and the original ground's slope changes
+ * between them (it is piecewise along the lap).
+ */
+export const FOLD_SLOPE_RESERVE = 0.01;
+/** A grid cell's diagonal: how far a query can be from the nodes it reads, m. */
+const FOLD_CELL_DIAGONAL = FOLD_CELL * Math.SQRT2;
+/**
+ * A fold is filled only where the track's edge itself is compressed by the bend (its stretch below
+ * this; estimate): a pocket the bend wraps around, not a wide run-off inside a gentle bend.
+ */
+export const FOLD_EDGE_STRETCH = 0.8;
+
+/**
+ * World gradient of a cross-section from `ground` before any fill: along the lap a metre of s is
+ * a world step of m = 1 − κd; across it, d grows along the left normal (tz, −tx).
+ */
+function originalGradient(g: Ground, out: { gx: number; gz: number }): void {
+  const m = Math.max(1 - g.curvature * g.d, 0.05);
+  const along = g.slopeS / m;
+  out.gx = along * g.tx + g.slopeD * g.tz;
+  out.gz = along * g.tz - g.slopeD * g.tx;
+}
+
+export interface TrackOptions {
+  /**
+   * Fill the run-off where the track's frame folds (`FoldGround`; default true). Off, the ground
+   * is the original one everywhere: the reference the fill is checked against.
+   */
+  fillFolds?: boolean;
+}
 
 export const LEFT = 0;
 export const RIGHT = 1;
@@ -121,6 +179,13 @@ export interface Ground {
   tz: number;
   curvature: number;
   d: number;
+  /**
+   * Where the frame folds (`FoldGround`) the slope is carried as a world gradient instead
+   * (gx, gz, m/m): the frame's stretch there can be near or below zero.
+   */
+  world: boolean;
+  gx: number;
+  gz: number;
 }
 
 export function createGround(): Ground {
@@ -135,6 +200,9 @@ export function createGround(): Ground {
     tz: 0,
     curvature: 0,
     d: 0,
+    world: false,
+    gx: 0,
+    gz: 0,
   };
 }
 
@@ -278,11 +346,11 @@ export class Track {
 
   private readonly tmp = createVec3();
 
-  static fromJSON(raw: unknown): Track {
-    return new Track(validateTrackData(raw));
+  static fromJSON(raw: unknown, options: TrackOptions = {}): Track {
+    return new Track(validateTrackData(raw), options);
   }
 
-  constructor(data: TrackData) {
+  constructor(data: TrackData, options: TrackOptions = {}) {
     this.data = data;
     this.id = data.id;
     this.name = data.name;
@@ -386,6 +454,9 @@ export class Track {
       for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
     }
     this.pitHeight = smoothOpen(under, PIT_GROUND_SIGMA / pp.step);
+    // The pit lane is its own surface, built from the original ground under it (above); the fill
+    // of the folded run-off comes after it, and the pit lane's blend band joins the two.
+    this.fold = options.fillFolds === false ? null : this.buildFoldGround();
     this.pit = new PitLane(data.pit, (x, z) => this.groundHeightAt(x, z));
 
     this.trackLimits = [new Float64Array(2 * n), new Float64Array(2 * n)];
@@ -589,6 +660,17 @@ export class Track {
   }
 
   private readonly groundScratch = createGround();
+  /** The solved base where the frame folds (`FoldGround`); null while it is being built. */
+  private fold: FoldGround | null = null;
+  private readonly foldSample: FoldSample = {
+    weight: 0,
+    wx: 0,
+    wz: 0,
+    height: 0,
+    gx: 0,
+    gz: 0,
+    active: false,
+  };
 
   /**
    * The ground cross-section at (s, d) on the lap: height, slopes and surface kind from the
@@ -626,6 +708,7 @@ export class Track {
     out.d = d;
     out.sample = i;
     out.highKerb = false;
+    out.world = false;
     if (a <= hw) {
       out.height = yc + d * tb;
       out.slopeD = tb;
@@ -678,7 +761,150 @@ export class Track {
     out.slopeD = sign * slope;
     out.slopeS = grade + sign * hw * dtb + kerbSlopeS;
     out.kind = kind;
+    if (this.fold) this.foldBase(lap, i0, j, f, d, out);
     return out;
+  }
+
+  /**
+   * Where the frame folds, blend the solved height (`FoldGround`) into the original ground by its
+   * weight, and carry the slope as a world gradient.
+   */
+  private foldBase(lap: TrackPath, i0: number, j: number, f: number, d: number, out: Ground): void {
+    const nx = lap.nx[i0]! + (lap.nx[j]! - lap.nx[i0]!) * f;
+    const nz = lap.nz[i0]! + (lap.nz[j]! - lap.nz[i0]!) * f;
+    const x = lap.x[i0]! + (lap.x[j]! - lap.x[i0]!) * f + d * nx;
+    const z = lap.z[i0]! + (lap.z[j]! - lap.z[i0]!) * f + d * nz;
+    const fs = this.fold!.sample(x, z, this.foldSample);
+    if (!fs.active) return;
+    originalGradient(out, this.gradient);
+    const w = fs.weight;
+    const diff = fs.height - out.height;
+    out.height += w * diff;
+    out.world = true;
+    out.gx = (1 - w) * this.gradient.gx + w * fs.gx + diff * fs.wx;
+    out.gz = (1 - w) * this.gradient.gz + w * fs.gz + diff * fs.wz;
+  }
+
+  private readonly gradient = { gx: 0, gz: 0 };
+
+  /**
+   * Does the run-off beside lap sample i fold: the frame folds before the barrier, and the
+   * track's own edge (beyond its kerb) is compressed, so the run-off is a pocket the bend
+   * wraps around rather than a wide run-off inside a gentle bend (where the fold lies far out).
+   */
+  private foldsHere(side: SideIndex, i: number): boolean {
+    const sign = side === LEFT ? 1 : -1;
+    const k = this.lap.curvature[i]! * sign;
+    const kp = this.kerb[side][i]!;
+    const edge = this.halfWidth[side][i]! + (kp >= 0 ? this.kerbProfiles[kp]!.width : 0);
+    return 1 - k * this.barrier[side][i]! < FOLD_STRETCH && 1 - k * edge < FOLD_EDGE_STRETCH;
+  }
+
+  /**
+   * Build the solved base for every place the frame folds inside the barriers: wherever the
+   * stretch at the barrier on the inside of a bend falls below FOLD_STRETCH, the box around that
+   * stretch of lap out to its barrier, padded.
+   */
+  private buildFoldGround(): FoldGround | null {
+    const lap = this.lap;
+    const n = lap.count;
+    const PAD = 4;
+    const boxes: Box[] = [];
+    for (const side of [LEFT, RIGHT] as const) {
+      const sign = side === LEFT ? 1 : -1;
+      const folds = (i: number): boolean => this.foldsHere(side, i);
+      let start = -1;
+      for (let i = 0; i < n; i++)
+        if (folds(i) && !folds((i + n - 1) % n)) start = start < 0 ? i : start;
+      if (start < 0 && folds(0)) start = 0;
+      if (start < 0) continue;
+      for (let m = 0; m < n; m++) {
+        const i = (start + m) % n;
+        if (!folds(i) || folds((i + n - 1) % n)) continue;
+        // A run of folding samples from i: its box, out to the barrier, padded.
+        let x0 = Infinity;
+        let z0 = Infinity;
+        let x1 = -Infinity;
+        let z1 = -Infinity;
+        for (let k = 0; k < n && folds((i + k) % n); k++) {
+          const q = (i + k) % n;
+          for (const a of [0, this.barrier[side][q]!]) {
+            const px = lap.x[q]! + sign * a * lap.nx[q]!;
+            const pz = lap.z[q]! + sign * a * lap.nz[q]!;
+            x0 = Math.min(x0, px);
+            z0 = Math.min(z0, pz);
+            x1 = Math.max(x1, px);
+            z1 = Math.max(z1, pz);
+          }
+        }
+        boxes.push({ x0: x0 - PAD, z0: z0 - PAD, x1: x1 + PAD, z1: z1 + PAD });
+      }
+    }
+    if (boxes.length === 0) return null;
+    const folding = [new Uint8Array(n), new Uint8Array(n)] as const;
+    for (const side of [LEFT, RIGHT] as const) {
+      for (let i = 0; i < n; i++) folding[side][i] = this.foldsHere(side, i) ? 1 : 0;
+    }
+    // The steepest grade plus bank within FOLD_NEAR of each sample.
+    const near = new Float64Array(n);
+    const window = Math.ceil(FOLD_NEAR / lap.step);
+    for (let i = 0; i < n; i++) {
+      let most = 0;
+      for (let k = -window; k <= window; k++) {
+        const j = (i + k + n) % n;
+        most = Math.max(most, Math.abs(lap.grade[j]!) + Math.abs(this.tanBank[j]!));
+      }
+      near[i] = most;
+    }
+    const q = createPathPoint();
+    const hint = { index: -1 };
+    const g = createGround();
+    const classify = (x: number, z: number, c: NodeClass): void => {
+      this.project(x, z, hint, q);
+      this.ground(q.s, q.d, g);
+      const side: SideIndex = q.d >= 0 ? LEFT : RIGHT;
+      const a = Math.abs(q.d);
+      const hw = this.halfWidthAt(q.s, side);
+      const yc = this.lap.interpolate(this.lap.y, q.s);
+      const tb = this.lap.interpolate(this.tanBank, q.s);
+      c.ramp = 0;
+      // Every node carries the unfolded base (behind the barrier too: a blend near it reads it).
+      if (a <= hw) {
+        c.kind = NodeKind.Fixed;
+        c.weight = 0;
+        c.height = yc + q.d * tb;
+        return;
+      }
+      c.height = yc + (side === LEFT ? 1 : -1) * hw * tb - VERGE_FALL * (a - hw);
+      if (g.kind === SurfaceKind.OutOfBounds) c.kind = NodeKind.Outside;
+      // The zone is the whole run-off inside a bend that folds before its barrier, from the
+      // track edge out: its heights are then joined across the full width of the bend.
+      else {
+        // The kerb and FOLD_KERB_MARGIN beyond it keep the original ground exactly: a zone node
+        // is at least a cell's diagonal further out, so no cell the strip lies in has one.
+        const kp = this.kerb[side][g.sample]!;
+        const from =
+          (kp >= 0 ? this.kerbProfiles[kp]!.width : 0) + FOLD_KERB_MARGIN + FOLD_CELL_DIAGONAL;
+        c.kind = folding[side][g.sample] && a - hw > from ? NodeKind.Zone : NodeKind.Fixed;
+        const sign = side === LEFT ? 1 : -1;
+        c.weight = foldShare(1 - lap.curvature[g.sample]! * sign * this.barrier[side][g.sample]!);
+        const tr = Math.min(1, Math.max(0, (a - hw - from) / FOLD_RAMP));
+        c.ramp = tr * tr * (3 - 2 * tr);
+      }
+    };
+    // The unfilled ground at a world point, as a query reads it (the fill is not built yet), and
+    // the slope the fill may always reach there: the run-off contract's bound, the track's grade
+    // and bank nearby plus the drainage fall plus its allowance.
+    const original = (x: number, z: number, o: OriginalGround): boolean => {
+      this.project(x, z, hint, q);
+      this.ground(q.s, q.d, g);
+      if (g.kind === SurfaceKind.OutOfBounds) return false;
+      o.height = g.height;
+      originalGradient(g, o);
+      o.floor = near[g.sample]! + VERGE_FALL + FOLD_SLOPE_ALLOWANCE - FOLD_SLOPE_RESERVE;
+      return true;
+    };
+    return new FoldGround(boxes, classify, original);
   }
 
   /**
@@ -687,6 +913,13 @@ export class Track {
    * the tangent across it.
    */
   groundNormal(g: Ground, out: Vec3): Vec3 {
+    if (g.world) {
+      const len = Math.sqrt(g.gx * g.gx + 1 + g.gz * g.gz);
+      out.x = -g.gx / len;
+      out.y = 1 / len;
+      out.z = -g.gz / len;
+      return out;
+    }
     let m = 1 - g.curvature * g.d;
     if (m < 0.05) m = 0.05;
     const nx = g.tz;

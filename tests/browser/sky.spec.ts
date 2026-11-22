@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { viewPixels } from './helpers';
+import { viewPixels, waitForDraws } from './helpers';
 
 /**
  * The sky on the direct render path (no float targets) must come out tone-mapped and sRGB-encoded
@@ -24,9 +24,8 @@ test('the sky is exposed and tone-mapped the same on the direct path as on the H
     await page.evaluate((p) => {
       const u = window.__undercut;
       u?.skyProbe(p);
-      u?.resetFrameTimes();
     }, path);
-    await page.waitForFunction(() => (window.__undercut?.frameTimes().length ?? 0) >= 2);
+    await waitForDraws(page);
     const { meanLuma } = await viewPixels(page, { from: 0, to: 0.15 });
     return meanLuma;
   };

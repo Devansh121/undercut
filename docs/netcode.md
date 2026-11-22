@@ -422,7 +422,9 @@ log. The service clock is the real one, so the race runs in real time: 3 laps (a
 in CI, 12 laps (about 4 minutes) nightly. It runs alone, after the other runtime tests:
 centimetre-level error needs the service not to be starved of CPU by other races on a
 four-core CI runner. Its report includes the longest stall of the test process and of
-relayed frames, so starvation shows up as such rather than as a netcode error.
+relayed frames, so starvation shows up as such rather than as a netcode error. The service keeps its
+state on memory (`/dev/shm`): on disk, each storage fsync stalls the room's snapshot relay, and
+a slow CI disk failed the error bounds that way.
 
 The simulator treats snapshots as an unreliable stream (delayed independently, so jitter
 reorders them; dropped; duplicated) and control messages as TCP does (in order, once;
