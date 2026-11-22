@@ -622,7 +622,8 @@ export class CircuitWorld {
         props.define({
           id: `${k.id}-near`,
           gridCell: 120,
-          castShadow: quality.sceneryShadows,
+          // The cards cast every tree's shadow (see treeMaterials).
+          castShadow: false,
           shadowMaxDistance: 170,
           receiveShadow: true,
           lods: [

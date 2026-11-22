@@ -47,6 +47,11 @@ export interface PropKind {
    * spread over the land around the circuit (woods), where lap chunks would be long and thin.
    */
   gridCell?: number;
+  /**
+   * Lap chunk length for this kind, m (default the registry's): short chunks for small props
+   * along the barriers, so only those really near the eye switch to their top level.
+   */
+  chunkLength?: number;
 }
 
 /** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
@@ -159,7 +164,7 @@ export class PropRegistry {
       const chunks: Chunk[] = [];
       const buckets = kind.gridCell
         ? bucketByGrid(list, kind.gridCell)
-        : bucketBySector(list, this.lapLength, this.chunkLength);
+        : bucketBySector(list, this.lapLength, kind.chunkLength ?? this.chunkLength);
       for (const indices of buckets.values()) {
         const centre = new Vector3();
         for (const i of indices) {

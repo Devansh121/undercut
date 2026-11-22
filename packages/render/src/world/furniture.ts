@@ -856,6 +856,12 @@ export function buildTrackBridges(
  * raceways near the circuit): extruded weathered concrete slab with banked outer lip so the old
  * high-speed banking reads clearly where it crosses or parallels the view.
  */
+/**
+ * Lap chunk length of the small props that line the barriers, m: short, so only the chunks beside
+ * the eye draw at the top level (a 200 m chunk would put hundreds of fence modules there).
+ */
+const SMALL_PROP_CHUNK = 50;
+
 /** Absorber block shell (linear RGB, a weathered blue) and its two alternating band colours. */
 const ABSORBER_SHELL: [number, number, number] = [0.035, 0.075, 0.2];
 const ABSORBER_BAND_A: [number, number, number] = [0.55, 0.05, 0.035];
@@ -1031,6 +1037,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'hoarding-front',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: castShadows,
       shadowMaxDistance: 160,
       receiveShadow: true,
@@ -1042,12 +1049,14 @@ export function placeTracksideFurniture(options: {
     geometries.push(hoardFrontGeo, hoardFrameGeo);
     props.define({
       id: 'hoarding-front',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: hoardFrontGeo, material: hoardMat, maxDistance: farDist }],
     });
     props.define({
       id: 'hoarding-frame',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: hoardFrameGeo, material: steelMat, maxDistance: farDist * 0.65 }],
@@ -1059,12 +1068,14 @@ export function placeTracksideFurniture(options: {
   geometries.push(vergeFrontGeo, vergeFrameGeo);
   props.define({
     id: 'verge-board-front',
+    chunkLength: SMALL_PROP_CHUNK,
     castShadow: false,
     receiveShadow: true,
     lods: [{ geometry: vergeFrontGeo, material: hoardMat, maxDistance: farDist * 0.9 }],
   });
   props.define({
     id: 'verge-board-frame',
+    chunkLength: SMALL_PROP_CHUNK,
     castShadow: castShadows,
     shadowMaxDistance: 140,
     receiveShadow: true,
@@ -1079,6 +1090,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'catch-fence-post',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: false,
       receiveShadow: true,
       lods: kitFence,
@@ -1089,12 +1101,14 @@ export function placeTracksideFurniture(options: {
     geometries.push(fencePostGeo, fenceMeshGeo);
     props.define({
       id: 'catch-fence-post',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: false,
       receiveShadow: true,
       lods: [{ geometry: fencePostGeo, material: steelMat, maxDistance: mobile ? 300 : 650 }],
     });
     props.define({
       id: 'catch-fence-mesh',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: false,
       receiveShadow: false,
       lods: [{ geometry: fenceMeshGeo, material: fenceMeshMat, maxDistance: mobile ? 220 : 480 }],
@@ -1134,6 +1148,7 @@ export function placeTracksideFurniture(options: {
     kitPropsUsed++;
     props.define({
       id: 'tecpro-block',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: castShadows,
       shadowMaxDistance: 120,
       receiveShadow: true,
@@ -1144,6 +1159,7 @@ export function placeTracksideFurniture(options: {
     geometries.push(tecproGeo);
     props.define({
       id: 'tecpro-block',
+      chunkLength: SMALL_PROP_CHUNK,
       castShadow: castShadows,
       receiveShadow: true,
       lods: [{ geometry: tecproGeo, material: steelMat, maxDistance: farDist * 0.8 }],

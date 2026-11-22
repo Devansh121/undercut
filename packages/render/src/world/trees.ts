@@ -191,6 +191,11 @@ export function treeMaterials(
       .replace('#include <uv_vertex>', tileChunk(tiles));
     if (options.wind)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WIND);
+  };
+  // The colour pass hands the near trees over within the swap distance; the shadow pass keeps
+  // the cards everywhere (the near trees cast no shadow), so each tree casts one shadow.
+  const colourHook = (shader: WebGLProgramParametersWithUniforms): void => {
+    hook(shader);
     if (swap) addSwap(shader, swap, false);
   };
   const material = new MeshStandardMaterial({
@@ -203,7 +208,7 @@ export function treeMaterials(
     envMapIntensity: 0.8,
   });
   material.name = `tree-${key}`;
-  material.onBeforeCompile = hook;
+  material.onBeforeCompile = colourHook;
   material.customProgramCacheKey = () => `tree-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
@@ -212,7 +217,7 @@ export function treeMaterials(
     side: DoubleSide,
   });
   depth.onBeforeCompile = hook;
-  depth.customProgramCacheKey = () => `tree-depth-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}`;
+  depth.customProgramCacheKey = () => `tree-depth-${key}-${options.wind ? 1 : 0}`;
   return { material, depth, time };
 }
 
@@ -236,15 +241,15 @@ export const BROADLEAF_CLOUD: CloudShape = {
   crownY: 0.6,
   rx: 0.36,
   ry: 0.32,
-  cards: 70,
-  card: 0.2,
+  cards: 48,
+  card: 0.24,
 };
 export const COLUMNAR_CLOUD: CloudShape = {
   crownY: 0.58,
   rx: 0.14,
   ry: 0.4,
-  cards: 56,
-  card: 0.13,
+  cards: 40,
+  card: 0.155,
 };
 
 /** Atlas uv of a point (tu, tv) in tile `t`, tv = 0 at the tile's bottom (see treeAtlas). */
