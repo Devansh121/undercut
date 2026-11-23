@@ -916,7 +916,7 @@ manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both assert
   human, and no race AI with human-like sensing, does that.
 - It plans with the measured envelope of this exact car, so the line and speeds fit the car
   better than any human's would.
-- No wind, no traffic, no tyre temperature or wear model yet.
+- No wind, no traffic, and new soft tyres in their window: the tyre temperature and wear model (section 7.10) is off for the reference laps.
 
 **What handicaps it**
 
@@ -1091,3 +1091,50 @@ minimum speeds of this era; technical journalism gives only qualitative statemen
 timing-derived telemetry exists (the OpenF1 API), but it is licensed CC BY-NC-SA 4.0, which does
 not fit this repository. It was looked at only privately, to see where the laps lose time; no
 parameter, target or figure here comes from it.
+
+### 7.10 Tyre compounds, temperature and wear; fuel (M4)
+
+`packages/sim/src/tyre-condition.ts`. Each tyre has a tread temperature and a wear state, and the
+grip they leave multiplies the surface grip at that wheel. The model is opt-in per car: a car
+with no compound fitted steps exactly as before. The physics suite and the reference laps run
+that way, and their outputs are byte-identical to before the model existed (all 72 manoeuvre
+artefacts and the three circuits' reference-lap traces and summaries compared file by file).
+The reference compound is the soft, new and inside its working range (section 2.1: "new
+softest compound"), so it has a grip factor of exactly 1.
+
+| Item | Model | Source / reasoning |
+|---|---|---|
+| Working ranges | soft 80–110 °C, medium 85–115 °C, hard 100–130 °C | Section 4.2 [38]: C5, C4 and C3 shifted 5 °C lower. That is Monza's and Singapore's 2025 nomination; Spa's hard was C1 (110–140 °C), not modelled separately. |
+| Grip between compounds | medium 0.991, hard 0.982 of the soft | **Estimate**. At Monza that is 0.28 s and 0.55 s a lap. |
+| Grip out of the window | −0.3 % per K below, −0.2 % per K above (section 4.2: −1 % per 5 °C), at least 0.75 | **Estimate** below the window. |
+| Grip lost to wear | 20 % at a worn-through tread, linear | **Estimate**. |
+| Wear | proportional to the sliding energy into the tread, × 1.5 per 10 K above the window (section 4.2) | Rates calibrated to section 4.2's lap-time bands at Monza: soft 0.10, medium 0.065, hard 0.04 s a lap. |
+| Heating | 20 % of the sliding power, plus carcass flex at the rolling-resistance power (0.015 · Fz · v) | **Estimate**. |
+| Cooling | (15 + 0.955 · v) W/K to the air (25 °C); tread heat capacity 3.6 kJ/K | **Estimate**: a time constant of about 40 s at race pace. |
+| Off the blankets | 70 °C | Section 1.2 [17] |
+
+Measured on the reference driver's laps at Monza (`packages/ai/validation/tyres.test.ts`), three
+timed laps after the out-lap:
+
+| Compound | Mean tread over a lap | Grip lost to wear a lap | As lap time |
+|---|---|---|---|
+| Soft (from the blankets) | 104–105 °C (window 80–110) | 0.33 % | 0.10 s |
+| Medium (from the blankets) | 105 °C (85–115) | 0.21 % | 0.065 s |
+| Hard (from 100 °C) | 105–106 °C (100–130) | 0.13 % | 0.04 s |
+
+The four treads spread widely around that mean: at Monza front right 82 °C, rear left 124 °C on
+the soft. That is the lap's clockwise loading and the rear's traction sliding. A lap costs 0.31 s
+per 1 % of grip there (Spa 0.44 s, Singapore 0.46 s). That is measured quasi-steady: the racing
+line re-planned on the envelope scaled down by 1 %. The reference driver drives one fixed plan,
+so its own laps barely show grip: 0.07 s for 1 %. From the blankets the hard is 30 K under its
+window, with 9 % less grip on the out-lap. The reference driver, on a plan for new softs, spins
+on it. Warming tyres up is the race AI's job and arrives with its strategy (M4 Race Weekend).
+
+Fuel already burns at the regulated flow (section 1.3) and its mass, centre of gravity and yaw
+inertia enter the step (`computeMass`). Section 4.3's check, 10 kg more costing 0.25–0.40 s at
+Monza, is measured the same quasi-steady way: the envelope re-measured at 20 kg and the line
+re-planned. It costs **0.216 s**, a recorded gap (`monza-fuel-10kg`, pinned by
+`packages/ai/validation/fuel-effect.test.ts`); Spa 0.296 s, Singapore 0.315 s. Monza is the
+circuit least sensitive to mass. The band is an estimate from the widely quoted 0.3 s per
+10 kg.
+

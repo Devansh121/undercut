@@ -25,6 +25,17 @@ export const LAP_TARGETS: Readonly<Record<string, Target>> = Object.freeze({
     source: 'doc 2.2 [11]',
     role: 'validation',
   },
+  'monza-fuel-10kg': {
+    id: 'monza-fuel-10kg',
+    label:
+      'Monza lap time with 10 kg more fuel, quasi-steady (envelope and speed profile re-measured)',
+    unit: 's',
+    low: 0.25,
+    high: 0.4,
+    stated: '0.25–0.40',
+    source: 'doc 4.3 (estimate: the widely quoted 0.3 s per 10 kg)',
+    role: 'validation',
+  },
   'spa-lap-m4': {
     id: 'spa-lap-m4',
     label: 'Spa reference lap, medium trim, qualifying fuel (M4 band, ±3 %)',
@@ -166,6 +177,14 @@ export const LAP_GAPS: Readonly<Record<string, LapGap>> = Object.freeze({
       'First reference lap on the Spa line (medium trim): 8.5 % over the 2025 pole. The gap is ' +
       'mostly in sector 2, the downforce sector (+14 % on the session best), as at Monza the ' +
       "car is slower than the era's cars in fast corners. docs/physics-validation.md section 7.8.",
+  },
+  'monza-fuel-10kg': {
+    measured: 0.216,
+    reason:
+      'Re-measuring the envelope at 20 kg instead of 10 kg and re-planning the racing line costs ' +
+      '0.216 s at Monza, under the 0.25–0.40 s doc 4.3 asks for (Spa 0.296 s, Singapore 0.315 s). ' +
+      'Monza is the circuit least sensitive to mass; the doc band is an estimate from the quoted ' +
+      '0.3 s per 10 kg (section 7.10).',
   },
   'spa-s1': {
     measured: 31.75,
