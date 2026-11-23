@@ -35,7 +35,15 @@ export interface StreetOptions {
   /** Owned by the world (released with it). */
   materials: Material[];
   /** Places one spectator (the world's crowd kinds); `k` picks variant and clothes. */
-  spectator: (p: { x: number; y: number; z: number; yaw: number; s: number; k: number }) => void;
+  spectator: (p: {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    s: number;
+    k: number;
+    near?: boolean;
+  }) => void;
   /** Fraction of seats taken. */
   crowd: number;
 }
@@ -354,6 +362,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
               yaw: b.yaw,
               s,
               k,
+              near: Number(r.name.replace('crowd-row-', '')) < 4,
             });
             spectators++;
           }

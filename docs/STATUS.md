@@ -95,6 +95,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- M2 kit placement: retain the collision barrier meshes and cover their faces with catalogue sleeves; structures retain their existing mapped footprints. Permanent stands use catalogue seat markers, with near crowd geometry in the front four rows and cheap figures beyond 48 m. Singapore keeps its scaffold stands. Daytime water changes remain deferred until structure and performance verification is complete.
+
 - M2 dressing: a mapped building is left out when any part of its footprint reaches into the drivable corridor (inside the barriers, or within a metre beyond them) or the centreline runs through it, at every circuit; before, only buildings whose centre was within 12 m of the centreline were. Two Singapore buildings were mapped across the road (s 1234 and 1366: roads the race closes) and 17 small buildings stood inside Spa's run-off (marshal huts P1 to P19B and unnamed ones), which the world's own marshal posts replace; Monza loses none. `corridor.test.ts` checks every kept footprint against every centreline sample and every barrier by brute force.
 - M2 dressing: a prefetch (the budget's request-log check) releases only what it made; the decoded images belong to the page's download cache and stay for the next session.
 

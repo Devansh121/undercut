@@ -2,6 +2,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  CircleGeometry,
   DoubleSide,
   Group,
   Mesh,
@@ -507,7 +508,13 @@ export function startLightMask(count: number | null): number {
   return (1 << Math.min(5, Math.floor(count))) - 1;
 }
 
-export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot = 0): StartGantry {
+export function buildStartGantry(
+  track: Track,
+  brandAtlasTex: Texture,
+  brandSlot = 0,
+  kit?: PropKitAssets | null,
+  props?: PropRegistry,
+): StartGantry {
   const group = new Group();
   group.name = 'world:start-gantry';
   const geometries: BufferGeometry[] = [];
@@ -527,6 +534,51 @@ export function buildStartGantry(track: Track, brandAtlasTex: Texture, brandSlot
 
   group.position.set(p.x, groundY, p.z);
   group.rotation.y = yaw;
+
+  const banner = brandHoardingMaterial(brandAtlasTex, false);
+  const kitLods = kit?.lodsFor('start-gantry', {
+    materialOverrides: { 'board-face': banner },
+    slotColors: { 'lamp-red': [0.015, 0.004, 0.003] },
+    maxDistanceScale: 2.7,
+  });
+  if (kitLods && props) {
+    materials.push(banner);
+    const wide = span / 18;
+    kitLods.forEach((l) => l.geometry.scale(1, 1, wide));
+    props.define({ id: 'start-gantry', lods: kitLods, shadowMaxDistance: 240 });
+    props.place('start-gantry', { x: p.x, y: groundY, z: p.z, yaw: yaw + Math.PI, s: 0 });
+    group.rotation.y = yaw + Math.PI;
+    const lamps: MeshStandardMaterial[] = [];
+    for (const a of kit?.entries.get('start-gantry')?.attachments ?? []) {
+      if (!a.name.startsWith('start-light-')) continue;
+      const g = new CircleGeometry(0.19, 12);
+      g.rotateY(Math.PI / 2);
+      const m = new MeshStandardMaterial({
+        color: 0x180604,
+        emissive: 0xff1808,
+        emissiveIntensity: 0,
+        roughness: 0.2,
+      });
+      const mesh = new Mesh(g, m);
+      mesh.position.set(a.position[0] + 0.012, a.position[1], a.position[2] * wide);
+      group.add(mesh);
+      geometries.push(g);
+      materials.push(m);
+      lamps.push(m);
+    }
+    return {
+      group,
+      geometries,
+      materials,
+      setLights(mask) {
+        lamps.forEach((m, i) => {
+          m.emissive.setHex(mask & 32 ? 0x10e048 : 0xff1808);
+          m.emissiveIntensity = mask & 32 ? 8 : mask & (1 << i) ? 9 : 0;
+        });
+      },
+    };
+  }
+  banner.dispose();
 
   const clearH = 6.7;
   const topH = 9.2;
@@ -690,6 +742,8 @@ export function buildTrackBridges(
   dressing: DressingFile,
   lap: LapIndex,
   brandAtlasTex: Texture,
+  kit?: PropKitAssets | null,
+  props?: PropRegistry,
 ): { group: Group; geometries: BufferGeometry[]; materials: Material[]; count: number } {
   const group = new Group();
   group.name = 'world:bridges';
@@ -756,6 +810,17 @@ export function buildTrackBridges(
     const rx = -fz;
     const rz = fx;
     const gy = track.groundHeightAt(p.x, p.z);
+    const kitLods = kit?.lodsFor('pedestrian-bridge', {
+      materialOverrides: { 'board-face': bm },
+      maxDistanceScale: 2.5,
+    });
+    if (kitLods && props) {
+      kitLods.forEach((l) => l.geometry.scale(1, 1, span / 20));
+      const id = `bridge-kit-${bi}`;
+      props.define({ id, lods: kitLods, shadowMaxDistance: 240 });
+      props.place(id, { x: p.x, y: gy, z: p.z, yaw: Math.atan2(-fz, fx), s });
+      return;
+    }
     const clearH = 6.3;
     const topH = 9.2;
     const halfSpan = span / 2;

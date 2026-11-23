@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   MeshStandardMaterial,
   type WebGLProgramParametersWithUniforms,
+  type Vector3,
 } from 'three';
 
 /** Clothing colours of the crowd (linear): realistic race-day palette with muted neutrals and team-shirt accents. */
@@ -164,4 +165,38 @@ export function crowdMaterial(time: { value: number }): MeshStandardMaterial {
   };
   m.customProgramCacheKey = () => 'crowd-v1';
   return m;
+}
+
+/** Complementary per-person handover; a small screen-door band avoids a visible crowd ring. */
+export function crowdSwapMaterial(
+  material: MeshStandardMaterial,
+  eye: { value: Vector3 },
+  near: boolean,
+): void {
+  const hook = material.onBeforeCompile.bind(material);
+  const key = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    hook(shader, renderer);
+    shader.uniforms.uCrowdEye = eye;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 uCrowdEye; varying float vCrowdFar;',
+      )
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+        vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
+        vCrowdFar = smoothstep(38.0, 48.0, distance(crowdOrigin, uCrowdEye));`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vCrowdFar;')
+      .replace(
+        '#include <alphatest_fragment>',
+        `#include <alphatest_fragment>
+        float crowdNoise = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+        if (${near ? 'crowdNoise < vCrowdFar' : 'crowdNoise >= vCrowdFar'}) discard;`,
+      );
+  };
+  material.customProgramCacheKey = () => `${key}-swap-${near}`;
 }

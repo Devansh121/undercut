@@ -11,13 +11,13 @@ import {
 } from 'three';
 import type { MeshData, Track } from '@undercut/track';
 import { macroNoise, surfaceMaterial, type PbrSet } from '../materials/surface';
-import type { PropKitAssets } from '../props/catalog';
+import { createPropKitMaterial, type PropKitAssets } from '../props/catalog';
 import { boardMaterial, type PropPlacement, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
 import { buildBuildingChunks, buildingHeight, facadeMaterial } from './buildings';
 import { buildCoverMap, type CoverMap } from './cover';
-import { crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
+import { crowdSwapMaterial, crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
 import {
   bounds,
   decodeTerrain,
@@ -43,6 +43,7 @@ import {
 } from './grandstands';
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
+import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
   buildGarageBoardsGeometry,
@@ -237,6 +238,7 @@ export class CircuitWorld {
   private readonly trees: TreeMaterials[] = [];
   /** Per-tree swap between near trees and cards (eye updated every frame). */
   private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
+  private readonly crowdEye = { value: new Vector3() };
   private readonly crowdTime = { value: 0 };
   /** Nearest lap sample to a world point (shared with the view's lamp map). */
   readonly lap: LapIndex;
@@ -541,8 +543,8 @@ export class CircuitWorld {
 
     const built = buildPitBuilding(track, this.lap, teams.length);
     const garageLods =
-      this.theme.pit === 'kit-garages' && built.bays.length > 0
-        ? (o.propKit?.lodsFor('hill-pit-garage', {
+      built.bays.length > 0
+        ? (o.propKit?.lodsFor(this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage', {
             // Its own board panel stays dark behind the team boards placed on it.
             slotColors: { 'board-face': [0.018, 0.019, 0.021] },
             maxDistanceScale: 2.6,
@@ -555,7 +557,9 @@ export class CircuitWorld {
       // stretched along the row to the bay pitch, its front wall on the garage line, and the
       // team boards move onto the panel the module carries for them.
       for (const ch of built.chunks) ch.geometry.dispose();
-      const entry = o.propKit?.entries.get('hill-pit-garage');
+      const entry = o.propKit?.entries.get(
+        this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage',
+      );
       const board = entry?.attachments?.find((a) => a.name === 'team-board');
       const k = PIT_BUILDING.bay / (entry?.moduleLength || 6);
       const wallX = (board?.position[0] ?? 4.98) * k;
@@ -643,19 +647,26 @@ export class CircuitWorld {
       castShadow: quality.sceneryShadows,
       shadowMaxDistance: 180,
       receiveShadow: true,
-      lods: [{ geometry: canopyGeo, material: canopyMat, maxDistance: far }],
+      lods: o.propKit?.lodsFor('pit-wall') ?? [
+        { geometry: canopyGeo, material: canopyMat, maxDistance: far },
+      ],
     });
     props.define({
       id: 'pit-crew-engineer',
       castShadow: false,
       receiveShadow: true,
-      lods: [{ geometry: engGeo, material: crewMat, maxDistance: far * 0.7 }],
+      lods: o.propKit?.lodsFor('crew-engineer-seated')?.map((l) => {
+        l.geometry.translate(0, -0.5, 0);
+        return l;
+      }) ?? [{ geometry: engGeo, material: crewMat, maxDistance: far * 0.7 }],
     });
     props.define({
       id: 'pit-crew-mechanic',
       castShadow: false,
       receiveShadow: true,
-      lods: [{ geometry: mechGeo, material: crewMat, maxDistance: far * 0.7 }],
+      lods: o.propKit?.lodsFor('crew-mechanic-standing') ?? [
+        { geometry: mechGeo, material: crewMat, maxDistance: far * 0.7 },
+      ],
     });
 
     let crewCount = 0;
@@ -1059,7 +1070,63 @@ export class CircuitWorld {
     });
     this.counts.stands = this.stands.length;
     if (this.stands.length === 0) return;
-    const standChunks = buildStandChunks(this.stands);
+    const fallback: StandFrame[] = [];
+    const spectator = this.spectators(o);
+    let kitCrowd = 0;
+    for (const [i, fr] of this.stands.entries()) {
+      const kitId = fr.roof ? 'grandstand-roof' : 'grandstand';
+      const entry = o.propKit?.entries.get(kitId);
+      const lods = o.propKit?.lodsFor(kitId, { maxDistanceScale: 2.7 });
+      if (!entry || !lods) {
+        fallback.push(fr);
+        continue;
+      }
+      const n = Math.max(1, Math.round(fr.length / 10));
+      const pitch = fr.length / n;
+      const sx = fr.depth / 9.47;
+      const sy = Math.max(0.7, fr.rows / 10);
+      const sz = pitch / 10;
+      for (const l of lods) l.geometry.scale(sx, sy, sz);
+      const id = `stand-kit-${i}`;
+      o.props.define({
+        id,
+        lods,
+        chunkLength: 40,
+        castShadow: o.quality.sceneryShadows,
+        shadowMaxDistance: 240,
+      });
+      const yaw = Math.atan2(fr.bz, -fr.bx);
+      for (let m = 0; m < n; m++) {
+        const x = fr.ox + fr.ax * ((m + 0.5) * pitch) + fr.bx * (4.76 * sx);
+        const z = fr.oz + fr.az * ((m + 0.5) * pitch) + fr.bz * (4.76 * sx);
+        o.props.place(id, { x, y: fr.base, z, yaw, s: fr.s, colour: fr.seat });
+        for (const [row, a] of (entry.attachments ?? [])
+          .filter((a) => a.name.startsWith('crowd-row-'))
+          .entries()) {
+          for (let j = 0; j < (a.count ?? 0); j++) {
+            const k = i * 100000 + m * 1000 + row * 30 + j;
+            if (hash01(k, 77) > o.quality.world.crowd * 0.85) continue;
+            const lx = a.position[0] * sx;
+            const lz = (a.position[2] + j * (a.spacing ?? 0.55)) * sz;
+            spectator({
+              x: x - fr.bx * lx + fr.ax * lz,
+              y: fr.base + a.position[1] * sy,
+              z: z - fr.bz * lx + fr.az * lz,
+              yaw,
+              s: fr.s,
+              k,
+              near: row < 4,
+            });
+            kitCrowd++;
+          }
+        }
+      }
+    }
+    this.counts.kitStandModules = this.stands.reduce(
+      (sum, fr) => sum + Math.max(1, Math.round(fr.length / 10)),
+      0,
+    );
+    const standChunks = buildStandChunks(fallback);
     const standMat = grandstandMaterial();
     this.materials.push(standMat);
     standChunks.forEach((ch, ci) => {
@@ -1077,14 +1144,13 @@ export class CircuitWorld {
     const wq = o.quality.world;
     if (wq.crowd <= 0) return;
     const L = o.track.length;
-    const seats = crowdSeats(this.stands, (fr, row) => {
+    const seats = crowdSeats(fallback, (fr, row) => {
       const ds = Math.min(Math.abs(fr.s), Math.abs(L - fr.s));
       const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
       return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
     });
-    const spectator = this.spectators(o);
     for (const seat of seats) spectator(seat);
-    this.counts.crowd = seats.length;
+    this.counts.crowd = seats.length + kitCrowd;
   }
 
   /**
@@ -1093,7 +1159,15 @@ export class CircuitWorld {
    */
   private spectators(
     o: CircuitWorldOptions,
-  ): (seat: { x: number; y: number; z: number; yaw: number; s: number; k: number }) => void {
+  ): (seat: {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    s: number;
+    k: number;
+    near?: boolean;
+  }) => void {
     const variants = 3;
     if (this.crowdKinds === 0) {
       const mats = crowdMaterial(this.crowdTime);
@@ -1101,11 +1175,37 @@ export class CircuitWorld {
       for (let v = 0; v < variants; v++) {
         const g = spectatorGeometry(v);
         this.geometries.push(g);
+        const farMat = crowdMaterial(this.crowdTime);
+        crowdSwapMaterial(farMat, this.crowdEye, false);
+        this.materials.push(farMat);
+        o.props.define({
+          id: `crowd-far-${v}`,
+          castShadow: false,
+          gridCell: 16,
+          lods: [{ geometry: g, material: farMat, maxDistance: 650 }],
+        });
         o.props.define({
           id: `crowd-${v}`,
           castShadow: false,
           receiveShadow: true,
           lods: [{ geometry: g, material: mats, maxDistance: 650 }],
+        });
+      }
+      const nearMat = createPropKitMaterial({ swayTime: this.crowdTime });
+      crowdSwapMaterial(nearMat, this.crowdEye, true);
+      this.materials.push(nearMat);
+      for (let v = 0; v < variants; v++) {
+        const lods = o.propKit?.lodsFor(`crowd-seated-${v}`, {
+          baseMaterial: nearMat,
+          slotColors: { clothing: [1, 1, 1] },
+        });
+        if (!lods) continue;
+        for (const l of lods) l.geometry.translate(0, -0.5, 0);
+        o.props.define({
+          id: `crowd-near-${v}`,
+          castShadow: false,
+          gridCell: 16,
+          lods: lods.map((l) => ({ ...l, maxDistance: Math.min(l.maxDistance, 65) })),
         });
       }
       this.crowdKinds = variants;
@@ -1116,7 +1216,7 @@ export class CircuitWorld {
         number,
         number,
       ];
-      o.props.place(`crowd-${seat.k % variants}`, {
+      const placement = {
         x: seat.x,
         y: seat.y,
         z: seat.z,
@@ -1124,7 +1224,13 @@ export class CircuitWorld {
         yaw: seat.yaw + (hash01(seat.k, 4) - 0.5) * 0.5,
         scale: 0.94 + hash01(seat.k, 5) * 0.12,
         colour: c,
-      });
+      };
+      const v = seat.k % variants;
+      const near = seat.near !== false && o.propKit?.has(`crowd-seated-${v}`);
+      if (near) {
+        o.props.place(`crowd-near-${v}`, placement);
+        o.props.place(`crowd-far-${v}`, placement);
+      } else o.props.place(`crowd-${v}`, placement);
     };
   }
 
@@ -1145,14 +1251,14 @@ export class CircuitWorld {
     this.textures.push(brandTex, signTex, fenceTex);
 
     // Start gantry at s = 0 with 5 individually addressable start lights.
-    const gantry = buildStartGantry(track, brandTex, 0);
+    const gantry = buildStartGantry(track, brandTex, 0, o.propKit, props);
     this.startGantry = gantry;
     this.geometries.push(...gantry.geometries);
     this.materials.push(...gantry.materials);
     this.group.add(gantry.group);
 
     // Over-track bridges from OSM + authored config (chunked per bridge).
-    const bridges = buildTrackBridges(track, dressing, this.lap, brandTex);
+    const bridges = buildTrackBridges(track, dressing, this.lap, brandTex, o.propKit, props);
     this.geometries.push(...bridges.geometries);
     this.materials.push(...bridges.materials);
     if (bridges.count > 0) {
@@ -1174,6 +1280,15 @@ export class CircuitWorld {
       }
     }
     this.counts.bridges = bridges.count;
+
+    if (o.propKit)
+      this.counts.kitBarriers = placeKitBarriers(
+        track,
+        this.lap,
+        o.propKit,
+        props,
+        this.theme.street !== null,
+      );
 
     // Historic banked oval concrete where mapped (e.g., Monza's Sopraelevata).
     const banking = buildHistoricBanking(dressing.mapped.raceway, this.heightAt, this.lap);
@@ -1267,6 +1382,7 @@ export class CircuitWorld {
     for (const t of this.trees) t.time.value = time;
     if (eye) this.treeSwap.eye.value.copy(eye);
     this.crowdTime.value = time;
+    if (eye) this.crowdEye.value.copy(eye);
     if (!eye) return;
     for (const c of this.worldChunks) {
       const dist = c.centre.distanceTo(eye) - c.radius;
