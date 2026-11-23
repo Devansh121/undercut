@@ -142,8 +142,17 @@ export class CarState {
   readonly forceX = new Float64Array(4);
   readonly forceY = new Float64Array(4);
   readonly travel = new Float64Array(4);
-  /** Per-wheel grip multiplier for later tyre temperature, wear and damage. */
+  /** Per-wheel grip multiplier: tyre compound, temperature and wear (`tyre-condition.ts`), later damage. */
   readonly gripScale = new Float64Array([1, 1, 1, 1]);
+  /**
+   * Tyre condition (`tyre-condition.ts`): the compound fitted, as an index into `COMPOUNDS`
+   * (−1: none, the model off and `gripScale` left alone), each tread's temperature, K, and wear
+   * (0 new, 1 the tread gone), and the air temperature the tyres cool towards, K.
+   */
+  tyreCompound = -1;
+  tyreAmbient = 0;
+  readonly tyreTemp = new Float64Array(4);
+  readonly tyreWear = new Float64Array(4);
   /**
    * Diagnostics from the last substep, never part of a snapshot (they are outputs, recomputed
    * every substep): the carcass damping share of each tyre's vertical load, N, and the total
@@ -230,6 +239,8 @@ const SCALAR_KEYS = [
   'breakableImpactSpeed',
   'wallImpactSpeed',
   'wallContact',
+  'tyreCompound',
+  'tyreAmbient',
 ] as const satisfies readonly (keyof CarState)[];
 
 const ARRAY_KEYS = [
@@ -251,6 +262,8 @@ const ARRAY_KEYS = [
   'forceY',
   'travel',
   'gripScale',
+  'tyreTemp',
+  'tyreWear',
 ] as const satisfies readonly (keyof CarState)[];
 
 /** Length of a car snapshot in numbers. */

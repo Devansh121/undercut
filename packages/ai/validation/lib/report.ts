@@ -12,6 +12,8 @@ export interface ReferenceLapOptions {
   fuel?: number;
   recordEvery?: number;
   clock?: () => number;
+  /** Prepare the car after it is built (fit tyres, for instance). */
+  prepare?: LapRunOptions['prepare'];
 }
 
 export interface ReferenceLapRun {
@@ -33,6 +35,7 @@ export function referenceLap(setup: CircuitSetup, o: ReferenceLapOptions = {}): 
     track,
     plan,
     ...(o.onSample ? { onSample: o.onSample } : {}),
+    ...(o.prepare ? { prepare: o.prepare } : {}),
     trim: setup.trim,
     airDensity: setup.airDensity,
     fuel: o.fuel ?? setup.fuel,

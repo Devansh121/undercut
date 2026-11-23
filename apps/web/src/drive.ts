@@ -6,6 +6,7 @@
  */
 import { Track } from '@undercut/track';
 import {
+  COMPOUNDS,
   ErsMode,
   SurfaceKind,
   computeMass,
@@ -89,7 +90,7 @@ import {
   type QuickRaceOptions,
   type SessionEvent,
 } from './game/session';
-import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
+import { Hud, type HudIdentity, type HudMessage, type HudState, type HudTyres } from './ui/hud';
 import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu, type PauseCommand } from './ui/pause';
@@ -996,6 +997,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let lookBack = false;
   let lastHudDevice: DeviceKind = input.activeDevice;
   setGlyphContext(lastHudDevice, input.profile.bindings);
+  // The player's tyres and fuel for the HUD, refreshed in place each frame (a race only).
+  const hudTyres: HudTyres = {
+    compound: 'medium',
+    temp: new Float64Array(4),
+    wear: new Float64Array(4),
+    low: 0,
+    high: 0,
+  };
   const hudState: HudState = {
     circuit: track.name,
     lengthKm: (track.length / 1000).toFixed(3),
@@ -1373,6 +1382,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           }
         }
       }
+      if (session.quickRace && t.tyreCompound >= 0) {
+        const c = COMPOUNDS[t.tyreCompound]!;
+        hudTyres.compound = c.id;
+        hudTyres.low = c.windowLow;
+        hudTyres.high = c.windowHigh;
+        (hudTyres.temp as Float64Array).set(t.tyreTemp);
+        (hudTyres.wear as Float64Array).set(t.tyreWear);
+        h.tyres = hudTyres;
+      } else h.tyres = null;
+      h.fuel = session.quickRace ? t.fuelMass : null;
       h.message = message;
       if (others) h.others = others;
       else if (session.quickRace) h.others = fleetDots;

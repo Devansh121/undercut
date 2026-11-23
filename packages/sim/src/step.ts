@@ -18,6 +18,7 @@ import {
 } from './model';
 import type { AeroParams, EngineParams } from './params';
 import { ErsMode, computeMass, gearRatio, type CarState, type MassState } from './state';
+import { updateTyres } from './tyre-condition';
 import { createTyreForce, tyreForce } from './tyre';
 
 /**
@@ -105,6 +106,8 @@ export function stepCar(
     substep(state, input, surface, h, n, env);
     if (surface.breakables) breakableContact(state, surface.breakables);
   }
+  // Tyre temperature and wear from this step, the grip for the next (no compound: nothing).
+  if (state.tyreCompound >= 0) updateTyres(state, dt);
 }
 
 /**

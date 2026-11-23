@@ -917,7 +917,7 @@ manoeuvres (lateral at 200 km/h within 2 %, top speed within 1 km/h; both assert
   human, and no race AI with human-like sensing, does that.
 - It plans with the measured envelope of this exact car, so the line and speeds fit the car
   better than any human's would.
-- No wind, no traffic, no tyre temperature or wear model yet.
+- No wind, no traffic, and new soft tyres in their window: the tyre temperature and wear model (section 7.11) is off for the reference laps.
 
 **What handicaps it**
 
@@ -1224,3 +1224,67 @@ and it is blocked by checks that pass: the folded run-off at Monza's first chica
 and the Spa T5 braking peak and trap for medium. The next step is the one 7.9 names: the folded
 run-off's elevation (docs/track-data.md 5.6–5.8) so that the kerb cases stop depending on the
 exact path, then the seamless upshift (0.29–0.40 s) and the low-trim downforce [57] together.
+
+### 7.11 Tyre compounds, temperature and wear; fuel (M4)
+
+`packages/sim/src/tyre-condition.ts`. Each tyre has a tread temperature and a wear state, and the
+grip they leave multiplies the surface grip at that wheel. The model is opt-in per car: a car
+with no compound fitted steps exactly as before. The physics suite and the reference laps run
+that way, and their outputs are byte-identical to before the model existed (all 72 manoeuvre
+artefacts and the three circuits' reference-lap traces and summaries compared file by file).
+The reference compound is the soft, new and inside its working range (section 2.1: "new
+softest compound"), so it has a grip factor of exactly 1.
+
+| Item | Model | Source / reasoning |
+|---|---|---|
+| Working ranges | soft 80–110 °C, medium 85–115 °C, hard 100–130 °C | Section 4.2 [38]: C5, C4 and C3 shifted 5 °C lower. That is Monza's and Singapore's 2025 nomination; Spa's hard was C1 (110–140 °C), not modelled separately. |
+| Grip between compounds | medium 0.991, hard 0.982 of the soft | **Estimate**. At Monza that is 0.28 s and 0.55 s a lap. |
+| Grip out of the window | −0.2 % per K either side (section 4.2: −1 % per 5 °C above), at least 0.75 | **Estimate** below the window: section 4.2 gives the slope above only. |
+| Grip lost to wear | 20 % at a worn-through tread, linear | **Estimate**. |
+| Wear | proportional to the sliding energy into the tread, × 1.5 per 10 K above the window (section 4.2) | Rates checked against section 4.2's unchanged lap-time bands at Monza: soft 0.082–0.087, medium 0.056–0.059, hard 0.035 s a lap. |
+| Heating | 20 % of the sliding power, plus carcass flex at the rolling-resistance power (0.015 · Fz · v) | **Estimate**. |
+| Cooling | (15 + 0.955 · v) W/K to the air (25 °C); tread heat capacity 3.6 kJ/K | **Estimate**: a time constant of about 40 s at race pace. |
+| Off the blankets | 70 °C | Section 1.2 [17] |
+
+Measured on the reference driver's laps at Monza (`packages/ai/validation/tyres.test.ts`), three
+timed laps after the out-lap:
+
+| Compound | Mean tread over a lap | Grip lost to wear a lap | As lap time |
+|---|---|---|---|
+| Soft (from the blankets) | 101.0–102.7 °C (window 80–110) | 0.266–0.284 % | 0.082–0.087 s |
+| Medium (from the blankets) | 100.8–102.8 °C (85–115) | 0.183–0.193 % | 0.056–0.059 s |
+| Hard (from the blankets, timed laps 2–3) | 101.8–101.9 °C (100–130) | 0.113–0.115 % | 0.035 s |
+
+All sets start from the 70 °C blankets. The hard's first timed lap still includes warm-up
+(mean 99.8 °C, below its 100 °C window); laps 2–3 measure steady-state wear and window occupancy,
+with the same targets and bands. All three compounds complete all three laps without spinning.
+The rates have not changed. Evidence: `~/.cache/undercut/scratch/m4-tyres-fuel/rev-measure.jsonl`.
+
+The four treads spread widely around that mean: on lap 2 at Monza, soft front right 82.1 °C,
+rear left 123.0 °C; medium front right 82.2 °C, rear left 123.0 °C; hard front right 82.0 °C,
+rear left 121.4 °C. The hard's fronts remain under its window: mean occupancy does not mean
+every tread is warm. This roughly 40 K spread is an estimate of clockwise loading and rear
+traction sliding, not measured tyre data. The driver uses the weaker axle's mean grip, an
+estimate that avoids letting the unloaded front right alone set the whole car's target.
+
+A lap costs 0.31 s per 1 % of grip there (Spa 0.44 s, Singapore 0.46 s), measured quasi-steady:
+the racing line re-planned on the envelope scaled down by 1 %. The driver now re-plans its
+speed profile in 0.5 % grip buckets, rounded down, preserving the plan's deployment mask and
+scaling lateral, braking and traction capacity only; engine force and drag stay unchanged.
+On mediums the three Monza timed laps are 85.498 / 85.677 / 86.049 s, with lap maxima
+349.23 / 349.21 / 342.44 km/h (the last lap runs out of deployment). Part-throttle ticks over
+300 km/h with no brake total 1,063, against 1,131 without tyres; the uniform square-root scaling
+reviewed previously produced 10,070 and 342.9–345.6 km/h traps.
+
+Race starting sets for every car, including the player, are initialized 5 K inside their
+compound's window to represent formation-lap warm-up (**estimate**, the formation lap itself
+is not simulated). This prevents the original blankets-only grid condition cooling further
+before turn one. Practice, qualifying and pit sets still start off the blankets.
+
+Fuel already burns at the regulated flow (section 1.3) and its mass, centre of gravity and yaw
+inertia enter the step (`computeMass`). Section 4.3's check, 10 kg more costing 0.25–0.40 s at
+Monza, is measured the same quasi-steady way: the envelope re-measured at 20 kg and the line
+re-planned. It costs **0.216 s**, a recorded gap (`monza-fuel-10kg`, pinned by
+`packages/ai/validation/fuel-effect.test.ts`); Spa 0.296 s, Singapore 0.315 s. Monza is the
+circuit least sensitive to mass. The band is an estimate from the widely quoted 0.3 s per
+10 kg.
