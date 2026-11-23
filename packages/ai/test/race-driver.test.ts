@@ -430,6 +430,24 @@ describe('race driver: closing on a queue', () => {
 });
 
 describe('race driver: stopped cars on the road', () => {
+  it('keeps the obstruction caution ceiling when following a moving leader', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+    const ahead = { id: 1, s: 210, d: lineD(dr, 210), speed: 40 };
+    tick(dr, me, [ahead]);
+    expect(dr.last.accelLimit).toBeGreaterThan(0);
+    tick(dr, me, [ahead, { id: 2, s: 250, d: 5, speed: 0 }]);
+    expect(dr.last.leader).toBe(1);
+    expect(dr.last.accelLimit).toBeLessThan(-10);
+  });
+
+  it('stays at queue speed until clear of a stopped car in a sweeping chicane', () => {
+    const dr = driver();
+    const me = { id: 0, s: 670, d: lineD(dr, 670), speed: 20 };
+    tick(dr, me, [{ id: 1, s: 650, d: lineD(dr, 650), speed: 0 }]);
+    expect(dr.last.accelLimit).toBeLessThan(-10);
+  });
+
   for (const side of [-1, 1]) {
     it(`ignores a stopped car beyond the ${side > 0 ? 'left' : 'right'} road edge`, () => {
       const dr = driver();

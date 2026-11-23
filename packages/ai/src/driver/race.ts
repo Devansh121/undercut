@@ -117,6 +117,8 @@ const SLOW_STOP_BRAKE = 0.6;
 const STOP_DECEL = 6;
 /** Line slope across the road, m/m, past which there is no going round a stopped car there. */
 const SWEEP_MAX = 0.3;
+/** Road lane settling distance around a stopped car where the racing line sweeps, m. */
+const QUEUE_SWEEP_CLEARANCE = 60;
 /**
  * Two cars level with no room for both each give way to the other at speed (each drops back
  * until it is settled who goes first). Below this speed, m/s, a car no longer follows a car level
@@ -1076,10 +1078,10 @@ export class RaceDriver implements Driver {
       LATERAL_SLOPE * Math.max(v, this.passBypass ? BYPASS_SLOPE_FROM : LATERAL_SLOPE_FROM),
     );
     if (view.launching && this.passId < 0) this.o = myO;
-    else if (queueStop && sweep > 0 && v < SLOW_STEER_BELOW) {
-      // At walking pace the lane moves on the road, toward the target lane at no more than the
-      // car's own lateral rate. (The offset moving at the rate plus the line's sweep, a target
-      // lane lying the way the line swept was crossed to at twice the sweep: at Raidillon,
+    else if (queueStop && sweep > 0) {
+      // Throughout the queue the lane moves on the road, toward the target lane at no more
+      // than the car's own lateral rate. (Adding the rate to the line's sweep crossed a target
+      // lying the way the line swept at twice the sweep: at Raidillon,
       // behind a stopped car, cars on full lock swung a radian across and ran off the road.)
       const ldNext = this.at(line.d, s0 + v * dt);
       this.o = this.approach(ldHere + this.o, ldNext + target, dt, rate) - ldNext;
@@ -1102,9 +1104,13 @@ export class RaceDriver implements Driver {
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
     let limit = Number.POSITIVE_INFINITY;
     // A car standing in the road ahead: arrive no faster than slows to a crawl beside it
-    // (`CAUTION_DECEL`), in whatever lane.
+    // (`CAUTION_DECEL`), in whatever lane. Where the line sweeps, reach the crawl before the
+    // sweep starts: a car braking and changing lane on the climb has little yaw margin.
     if (queueStop) {
-      const toIt = Math.max(0, standing - CAR_LENGTH);
+      const toIt = Math.max(
+        0,
+        standing - CAR_LENGTH - (this.lineSweeps(s0 + standing) ? QUEUE_SWEEP_CLEARANCE : 0),
+      );
       const vCaution = Math.sqrt(BYPASS_SPEED * BYPASS_SPEED + 2 * CAUTION_DECEL * toIt);
       limit = Math.min(limit, SPEED_GAIN * (vCaution - v));
     }
@@ -1158,7 +1164,7 @@ export class RaceDriver implements Driver {
       ) {
         aLim = Math.max(aLim, SPEED_GAIN * (Math.min(5, Math.max(1.5, gap)) - v));
       }
-      limit = aLim;
+      limit = Math.min(limit, aLim);
     }
     // Off the line the cars ahead all pull away at once: the queue counts only once a car is
     // close ahead in this lane (before that the gaps are the grid's, and they open).
@@ -1526,7 +1532,10 @@ export class RaceDriver implements Driver {
     return false;
   }
 
-  /** Distance ahead to the nearest car standing still within `range`, m, or −1. */
+  /**
+   * Distance to a car standing on the road within `range`, m, or −1. In a sweeping chicane,
+   * keep the queue rules at zero distance until the car clears the settling region beyond it.
+   */
   private nearestStanding(view: TrafficView, s0: number, range: number): number {
     let best = -1;
     for (let k = 0; k < view.count; k++) {
@@ -1536,11 +1545,11 @@ export class RaceDriver implements Driver {
         c.speed < 1 &&
         c.d - c.halfWidth <= this.at(this.plan.track.halfWidth[0], c.s) &&
         c.d + c.halfWidth >= -this.at(this.plan.track.halfWidth[1], c.s) &&
-        ds > 0 &&
+        (ds > 0 || (ds > -QUEUE_SWEEP_CLEARANCE && this.lineSweeps(c.s))) &&
         ds < range &&
-        (best < 0 || ds < best)
+        (best < 0 || Math.max(0, ds) < best)
       )
-        best = ds;
+        best = Math.max(0, ds);
     }
     return best;
   }

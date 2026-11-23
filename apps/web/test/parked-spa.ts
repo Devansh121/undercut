@@ -5,6 +5,9 @@ import { Track } from '@undercut/track';
 import spaTrack from '@undercut/track/data/spa.json';
 import spaLine from '../../../packages/ai/data/spa-medium.line.json';
 import spaEnvelope from '../../../packages/ai/data/spa-medium.envelope.json';
+import singaporeTrack from '@undercut/track/data/singapore.json';
+import singaporeLine from '../../../packages/ai/data/singapore-high.line.json';
+import singaporeEnvelope from '../../../packages/ai/data/singapore-high.envelope.json';
 import { DriveSession } from '../src/game/session';
 
 // Shared by parked-player-spa-*.test.ts (a test file each, so they run side by side).
@@ -16,25 +19,6 @@ import { DriveSession } from '../src/game/session';
 // cars arrive at it no faster than slows them to a crawl beside it, and at walking pace there
 // the lane moves on the road and the steering turns the car back toward it.
 
-const track = Track.fromJSON(spaTrack);
-const raceArtefacts = { line: spaLine, envelope: spaEnvelope };
-const offsets = racingLineOffsets(decodeRacingLine(spaLine));
-const L = track.length;
-
-function ahead(a: number, b: number): number {
-  let x = (b - a) % L;
-  if (x > L / 2) x -= L;
-  else if (x <= -L / 2) x += L;
-  return x;
-}
-
-function lineAt(s: number): number {
-  const u = track.wrap(s) / track.lap.step;
-  const n = offsets.length;
-  const i = Math.floor(u) % n;
-  return offsets[i]! + (offsets[(i + 1) % n]! - offsets[i]!) * (u - Math.floor(u));
-}
-
 export interface Parked {
   /** Fastest closing speed at any contact between two cars once the player stopped, m/s. */
   peakContact: number;
@@ -44,7 +28,25 @@ export interface Parked {
   finished: number;
 }
 
-export function parkAt(spot: number, seed: number): Parked {
+export function parkAt(spot: number, seed: number, circuit: 'spa' | 'singapore' = 'spa'): Parked {
+  const track = circuit === 'spa' ? Track.fromJSON(spaTrack) : Track.fromJSON(singaporeTrack);
+  const raceArtefacts =
+    circuit === 'spa'
+      ? { line: spaLine, envelope: spaEnvelope }
+      : { line: singaporeLine, envelope: singaporeEnvelope };
+  const offsets = racingLineOffsets(decodeRacingLine(raceArtefacts.line));
+  const L = track.length;
+  const ahead = (a: number, b: number): number => {
+    let x = (b - a) % L;
+    if (x > L / 2) x -= L;
+    else if (x <= -L / 2) x += L;
+    return x;
+  };
+  const lineAt = (s: number): number => {
+    const u = track.wrap(s) / track.lap.step;
+    const i = Math.floor(u) % offsets.length;
+    return offsets[i]! + (offsets[(i + 1) % offsets.length]! - offsets[i]!) * (u - Math.floor(u));
+  };
   const s = new DriveSession({
     track,
     seed,
