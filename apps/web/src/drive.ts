@@ -71,7 +71,7 @@ import { defaultCarState } from '@undercut/audio';
 import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
-import { Haptics } from './game/haptics';
+import { Haptics, padCanRumble, phoneCanVibrate } from './game/haptics';
 import { carStopped } from './game/stopped';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
@@ -737,6 +737,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           hapticsOn = Number(v) === 1;
           o.haptics?.set(hapticsOn);
         },
+        // A phone shows it (greyed where the browser has no vibration, as on an iPhone), and so
+        // does a pad that can rumble; a keyboard-only desktop has nothing for it to act on.
+        visible: () => o.touch || padCanRumble(),
+        disabled: () => !((o.touch && phoneCanVibrate()) || padCanRumble()),
+        hint: S.pause.hapticsUnavailable,
       },
       {
         id: 'camera',

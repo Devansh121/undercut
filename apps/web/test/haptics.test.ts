@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   Haptics,
+  padCanRumble,
+  phoneCanVibrate,
   KERB_MIN_SPEED,
   IMPACT_MIN_SPEED,
   type HapticsFrame,
@@ -189,5 +191,32 @@ describe('haptics', () => {
     );
     expect(() => run(haptics, 0.5, { kerb: 1, wallImpact: 10 })).not.toThrow();
     expect(() => haptics.stop()).not.toThrow();
+  });
+});
+
+describe('haptics capability', () => {
+  const nav = (n: Record<string, unknown>) => n as unknown as Navigator;
+  it('sees a phone motor only where the Vibration API exists', () => {
+    expect(phoneCanVibrate(nav({ vibrate: () => true }))).toBe(true);
+    // iOS Safari: no navigator.vibrate.
+    expect(phoneCanVibrate(nav({}))).toBe(false);
+    expect(phoneCanVibrate(undefined)).toBe(false);
+  });
+
+  it('sees a pad that can rumble, not one without an actuator or an empty slot', () => {
+    const pads = (list: unknown[]) => nav({ getGamepads: () => list });
+    expect(padCanRumble(pads([null, { vibrationActuator: {} }]))).toBe(true);
+    expect(padCanRumble(pads([null, {}]))).toBe(false);
+    expect(padCanRumble(pads([]))).toBe(false);
+    expect(padCanRumble(nav({}))).toBe(false);
+    expect(
+      padCanRumble(
+        nav({
+          getGamepads: () => {
+            throw new Error('blocked by policy');
+          },
+        }),
+      ),
+    ).toBe(false);
   });
 });

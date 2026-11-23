@@ -297,6 +297,7 @@ export const S = {
     units: 'Speed units',
     haptics: 'Vibration',
     hapticsHelp: 'Kerbs and contacts through gamepad rumble, or the phone motor where it has one',
+    hapticsUnavailable: 'Not available on this device',
     mph: 'mph',
     autoGraphics: 'Auto',
     resetDefaults: 'Reset settings',

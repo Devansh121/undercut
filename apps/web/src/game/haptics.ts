@@ -12,6 +12,23 @@ export interface HapticsPort {
   vibrate(ms: number): void;
 }
 
+/** The browser can drive a phone's vibration motor (the Vibration API; Android, not iOS Safari). */
+export function phoneCanVibrate(nav: Navigator | undefined = globalThis.navigator): boolean {
+  return typeof nav?.vibrate === 'function';
+}
+
+/** A connected gamepad can rumble (the Gamepad haptics API). */
+export function padCanRumble(nav: Navigator | undefined = globalThis.navigator): boolean {
+  try {
+    const pads = nav?.getGamepads?.() ?? [];
+    return [...pads].some(
+      (p) => p !== null && (p as Gamepad & { vibrationActuator?: unknown }).vibrationActuator,
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** One rendered frame of what the player's car felt. */
 export interface HapticsFrame {
   /** Real frame time, s. */
