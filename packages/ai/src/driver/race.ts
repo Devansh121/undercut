@@ -107,6 +107,9 @@ const QUEUE_REACH = 30;
 const INTEGRATE_FROM = 2;
 /** Heading toward its lane a car asks for at walking pace, at most, rad. */
 const SLOW_HEADING = 0.5;
+/** Below this speed, m/s, a car pulling away keeps this share of the throttle. */
+const PULL_AWAY_BELOW = 8;
+const PULL_AWAY_THROTTLE = 0.3;
 /** Below this speed, m/s, a car stopping for traffic keeps this share of the brake pedal. */
 const SLOW_STOP_BELOW = 12;
 const SLOW_STOP_BRAKE = 0.6;
@@ -133,6 +136,13 @@ const LATERAL_RATE = 1.5;
  * steers no more sharply than that, or its steering saturates and carries it past the line.
  */
 const LATERAL_SLOPE = 0.2;
+/**
+ * Counted from no slower than this, m/s: standing still the lane may still move (to go round a
+ * car stalled on the grid ahead), and the heading limit keeps the steering in hand once moving.
+ */
+const LATERAL_SLOPE_FROM = 3;
+/** Going round a stopped car, from no slower than this, m/s (off the grid behind a stalled car). */
+const BYPASS_SLOPE_FROM = 10;
 /** Gap control: standstill gap, m, speed gain, 1/s, and the deceleration assumed for safety, m/s². */
 const STANDSTILL_GAP = 2;
 /** Gap kept to a car standing still in the road, m: room to steer out and round it. */
@@ -164,6 +174,12 @@ const CORNER_CURVATURE = 1 / 150;
 const LAUNCHED = 25;
 /** Room to the edge a car turning round keeps before it changes direction, m. */
 const TURN_ROOM = 3.5;
+/** A car within this far of where it stood is standing still, m. */
+const STILL_RADIUS = 1.5;
+/** Off the road, a recovering car turns this far toward it from the lap's direction, rad. */
+const ROAD_AIM = 0.4;
+/** Past the track edge by more than this, m, a car is off the road (in no queue). */
+const ROAD_EDGE_SLACK = 1;
 /** Recovery: each direction (forward, back) is held at least this long once its gear is in, s. */
 const DIR_HOLD = 1;
 
@@ -232,6 +248,9 @@ export class RaceDriver implements Driver {
   private recovering = false;
   private rejoinTime = 0;
   private stillTime = 0;
+  /** Where the car stood when it last moved off, for `stillTime` (NaN: nowhere yet). */
+  private stillS = Number.NaN;
+  private stillD = Number.NaN;
   private backTime = 0;
   /** Recovery: time in the present direction, s; back up straight; direction changes made. */
   private dirHeld = 0;
@@ -317,6 +336,8 @@ export class RaceDriver implements Driver {
     this.recovering = false;
     this.rejoinTime = 0;
     this.stillTime = 0;
+    this.stillS = Number.NaN;
+    this.stillD = Number.NaN;
     this.backTime = 0;
     this.dirHeld = 0;
     this.backStraight = false;
@@ -353,6 +374,9 @@ export class RaceDriver implements Driver {
     out.recovering = this.recovering;
     out.rejoinTime = this.rejoinTime;
     out.stillTime = this.stillTime;
+    // (NaN, none yet, is null in JSON and comes back as none.)
+    out.stillS = this.stillS;
+    out.stillD = this.stillD;
     out.backTime = this.backTime;
     out.dirHeld = this.dirHeld;
     out.backStraight = this.backStraight;
@@ -407,6 +431,8 @@ export class RaceDriver implements Driver {
     this.recovering = m.recovering === true;
     this.rejoinTime = num('rejoinTime');
     this.stillTime = num('stillTime');
+    this.stillS = typeof m.stillS === 'number' ? m.stillS : Number.NaN;
+    this.stillD = typeof m.stillD === 'number' ? m.stillD : Number.NaN;
     this.backTime = num('backTime');
     this.dirHeld = num('dirHeld');
     this.backStraight = m.backStraight === true;
@@ -442,6 +468,7 @@ export class RaceDriver implements Driver {
       inner.offsetSlope = 0;
       inner.accelLimit = Number.POSITIVE_INFINITY;
       inner.brakeFloor = 0;
+      inner.throttleFloor = 0;
       inner.maxCorrection = BASE_CORRECTION;
       inner.headingLimit = Number.POSITIVE_INFINITY;
       inner.integrateFrom = 0;
@@ -599,6 +626,19 @@ export class RaceDriver implements Driver {
     const lineHeading =
       line.heading[Math.round(plan.track.wrap(s0) / plan.track.lap.step) % line.count]!;
     const dRate = v * Math.sin(wrapAngle(tel.yaw - (lineHeading - Math.atan(lineSlope))));
+    // Going round a stopped car: its lane on the road, and how far ahead the stopped car is. The
+    // cars already in that lane are followed in single file, not drawn alongside (alongside, the
+    // car behind is squeezed off the lane into the stopped car).
+    let bypassLane = Number.NaN;
+    let bypassReach = 0;
+    if (this.passBypass && this.passId >= 0) {
+      for (let k = 0; k < view.count; k++) {
+        const c = view.cars[k]!;
+        if (c.id !== this.passId) continue;
+        bypassLane = c.d + this.passSide * (BYPASS_SIDE_BY_SIDE + c.halfWidth - BODY_HALF_WIDTH);
+        bypassReach = this.ahead(s0, c.s) + CAR_LENGTH;
+      }
+    }
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       // Relative position as it was SEE_DELAY ago (both cars move; the gap changes by the
@@ -634,9 +674,14 @@ export class RaceDriver implements Driver {
           : // Round a stopped car: out of its lane where the car is, not where it means to be
             // (short of that it stops for it, with room to steer out).
             this.passBypass && lateral >= inPathAt - 0.5);
+      const inLane =
+        c.id !== this.passId &&
+        ds > 0 &&
+        ds < bypassReach &&
+        Math.abs(c.d - bypassLane) < CAR_WIDTH + wide + PASS_CLEARANCE;
       const inPath = passing
         ? lateral < CAR_WIDTH + wide + PASS_CLEARANCE
-        : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns;
+        : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns || inLane;
       // Ahead and in the way (or overlapping it already): follow it.
       const closing = Math.max(0, v - c.speed);
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
@@ -997,7 +1042,10 @@ export class RaceDriver implements Driver {
             this.o,
             target,
             dt,
-            Math.min(LATERAL_RATE, LATERAL_SLOPE * Math.max(v, 1)) + sweep,
+            Math.min(
+              LATERAL_RATE,
+              LATERAL_SLOPE * Math.max(v, this.passBypass ? BYPASS_SLOPE_FROM : LATERAL_SLOPE_FROM),
+            ) + sweep,
           );
     // The held offset is from the line, and the line sweeps across the track into a corner
     // faster than the offset comes back: keep line + offset on the track here and now (not
@@ -1114,6 +1162,11 @@ export class RaceDriver implements Driver {
     this.inner.accelLimit = limit;
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
+    // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays
+    // on (see `throttleFloor`).
+    // Not on the grid: the launch's wheelspin control is the reference driver's own.
+    this.inner.throttleFloor =
+      !view.launching && limit > 0 && v < PULL_AWAY_BELOW ? PULL_AWAY_THROTTLE : 0;
     // Pulling away from a queue off the line, at walking pace: steer back as tight as the car
     // turns there, not on the high-speed limit (it ran wide of the line, off the road).
     this.inner.maxCorrection =
@@ -1567,6 +1620,13 @@ export class RaceDriver implements Driver {
     }
   }
 
+  /** Not standing still (or not counting): the clock starts again from here. */
+  private markStill(view: TrafficView): void {
+    this.stillTime = 0;
+    this.stillS = view.self.s;
+    this.stillD = view.self.d;
+  }
+
   // ---- Recovery after a spin or a crash ----
 
   /**
@@ -1583,9 +1643,22 @@ export class RaceDriver implements Driver {
     const v = tel.speed;
     // In a queue: behind the car ahead, or behind any car standing still close ahead (into a
     // chicane the car ahead in the queue may sit across the road from this car's line).
+    // (Off the road a car is in no queue: the cars passing on the track are not its leaders.)
+    const dHere = view.self.d;
+    const offRoad =
+      Math.abs(dHere) > track.halfWidthAt(track.wrap(s0), dHere >= 0 ? 0 : 1) + ROAD_EDGE_SLACK;
     const queued =
-      (this.last.leader >= 0 && this.last.gap < 15) || this.standingAhead(view, s0, 30);
-    this.stillTime = view.active && Math.abs(v) < 0.7 && !queued ? this.stillTime + dt : 0;
+      !offRoad &&
+      ((this.last.leader >= 0 && this.last.gap < 15) || this.standingAhead(view, s0, 30));
+    // Standing still: under 0.7 m/s, or rocking within a metre and a half of where it stood (a
+    // car against a barrier, now and then over that pace, is still going nowhere).
+    const here = view.self;
+    const away = Number.isFinite(this.stillS)
+      ? Math.hypot(this.ahead(this.stillS, here.s), here.d - this.stillD)
+      : Number.POSITIVE_INFINITY;
+    const still = Math.abs(v) < 0.7 || (away <= STILL_RADIUS && Math.abs(v) < 1.5);
+    if (!view.active || queued || !still) this.markStill(view);
+    else this.stillTime += dt;
     if (!this.recovering && view.active) {
       if (Math.abs(err) > 1.4 && Math.abs(v) < 12) this.recovering = true;
       else if (this.stillTime > 3) {
@@ -1613,7 +1686,11 @@ export class RaceDriver implements Driver {
     if (!this.recovering) return;
     out.drs = false;
     out.overtake = false;
-    const turn = Math.abs(err) < 0.35 ? 0 : err > 0 ? -1 : 1;
+    // Off the road, the way back is across toward it, not straight along the lap: a car wedged
+    // beside the pit wall's end backed up straight and drove into it again until retired.
+    const toRoad = offRoad ? (dHere > 0 ? -1 : 1) : 0;
+    const aimErr = wrapAngle(err - toRoad * ROAD_AIM);
+    const turn = Math.abs(aimErr) < 0.35 ? 0 : aimErr > 0 ? -1 : 1;
     // On the racing surface, wait for the cars coming; off it (run-off, at a barrier) there is
     // no need.
     const d = view.self.d;
@@ -1621,7 +1698,7 @@ export class RaceDriver implements Driver {
       d < track.halfWidthAt(track.wrap(s0), 0) && -d < track.halfWidthAt(track.wrap(s0), 1);
     if (onTrack && this.trackBusy(view, s0, 150) && Math.abs(err) > 0.8) {
       // Wait for the gap: stopped, out of the way. Waiting is not being stuck.
-      this.stillTime = 0;
+      this.markStill(view);
       out.steer = 0;
       out.throttle = 0;
       out.brake = 1;
@@ -1645,13 +1722,13 @@ export class RaceDriver implements Driver {
     if (this.backTime > 0) {
       this.backTime -= dt;
       const settled = tel.gear < 0 && this.dirHeld > DIR_HOLD;
-      const pointed = Math.abs(err) < 0.5 && !this.backStraight;
+      const pointed = Math.abs(aimErr) < 0.5 && !this.backStraight;
       if (settled && (behind < TURN_ROOM || pointed || this.stillTime > 1.5)) {
         this.backTime = 0;
       }
       if (this.backTime <= 0) {
         this.backTime = 0;
-        this.stillTime = 0;
+        this.markStill(view);
         this.dirHeld = 0;
         this.flips++;
       }
@@ -1661,9 +1738,9 @@ export class RaceDriver implements Driver {
       (ahead < TURN_ROOM || this.stillTime > 1.5)
     ) {
       this.backTime = 4;
-      this.stillTime = 0;
+      this.markStill(view);
       this.dirHeld = 0;
-      this.backStraight = Math.abs(err) < 0.5 || this.flips >= 2;
+      this.backStraight = !offRoad && (Math.abs(err) < 0.5 || this.flips >= 2);
       this.flips++;
     }
     // Gears: first to go forward, reverse to back, stepping down through the box from wherever
@@ -1671,7 +1748,7 @@ export class RaceDriver implements Driver {
     const shiftable = !tel.shifting && Math.abs(v) < 3;
     if (this.backTime > 0) {
       if (onTrack && this.trackBusy(view, s0, CAR_LENGTH + 15)) {
-        this.stillTime = 0;
+        this.markStill(view);
         out.steer = 0;
         out.throttle = 0;
         out.brake = 1;
