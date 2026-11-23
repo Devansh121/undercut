@@ -5,7 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { dcOffset, maxStep, samplePeak, truePeak } from '../src/analysis/index';
 import { DEFAULT_LIMITER, softClip } from '../src/dsp/limiter';
 import { SoftLimiter } from '../src/dsp/limiter';
-import { AudioCore, CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../src/index';
+import {
+  AudioCore,
+  CAR_STATE_LENGTH,
+  packCarState,
+  packScene,
+  rpmToRadPerSecond,
+  type AudioCarState,
+} from '../src/index';
 import { engineState, FS, render, type Clip } from './helpers';
 
 /** Everything at once, every gain at its maximum. */
@@ -28,8 +35,33 @@ function everything(t: number): AudioCarState {
 describe('limiter', () => {
   it('holds true peak under 0 dBFS with everything at maximum', () => {
     const core = new AudioCore({ sampleRate: FS });
-    for (const id of ['master', 'engine', 'effects', 'ui'] as const) core.setGain(id, 2);
-    const clip = render(core, 3, everything);
+    for (const id of ['master', 'engine', 'effects', 'ui', 'ambience'] as const) {
+      core.setGain(id, 2);
+    }
+    // The scene at its loudest too: nineteen cars at 2–29 m at the limiter, the city bed, the
+    // crowd at its maximum with the lights-out cheer, and a menu cue every 0.2 s.
+    let cue = 0;
+    const clip = render(core, 3, (t) => {
+      core.setScene({
+        cars: Array.from({ length: 19 }, (_, i) => ({
+          x: (i % 2 ? 1 : -1) * (2 + 1.5 * i),
+          z: i % 3 ? 2 : -2,
+          vx: -40,
+          vz: 0,
+          engineSpeed: rpmToRadPerSecond(12_500),
+          throttle: 1,
+        })),
+        ambience: 'city-night',
+        crowdLeft: 2,
+        crowdRight: 2,
+        lights: t < 0.5 ? Math.floor(t * 10) : 6,
+      });
+      if (t >= cue) {
+        core.cue('accept');
+        cue += 0.2;
+      }
+      return everything(t);
+    });
     expect(core.limiter.minGain, 'the limiter engaged').toBeLessThan(0.9);
     for (const ch of [clip.left, clip.right]) {
       expect(samplePeak(ch)).toBeLessThan(1);
@@ -294,8 +326,25 @@ describe('cost', () => {
     // State arrives packed, as the worklet receives it from the main thread.
     const packed = packCarState(everything(0), new Float64Array(CAR_STATE_LENGTH));
     const out = [new Float32Array(128), new Float32Array(128)];
+    // The scene arrives packed too: nineteen cars in range (six voiced, the rest summed), the
+    // city bed and a crowd, lamps and cues coming and going.
+    const scene = packScene({
+      cars: Array.from({ length: 19 }, (_, i) => ({
+        x: 3 + i * 9,
+        z: i % 2 ? -4 : 4,
+        vx: -25,
+        vz: 1,
+        engineSpeed: rpmToRadPerSecond(8000 + i * 150),
+        throttle: (i % 4) / 3,
+      })),
+      ambience: 'city-night',
+      crowdLeft: 1,
+      crowdRight: 0.5,
+      lights: 0,
+    });
     // The same input pattern as the measured loop: state every third block, a gear change
-    // every 300 blocks, the limiter cutting, every layer on.
+    // every 300 blocks, the limiter cutting, every layer on; the scene every sixth block with
+    // the cars moving, a lamp every 400 blocks and a menu cue every 250.
     const run = (blocks: number) => {
       for (let i = 0; i < blocks; i++) {
         if (i % 3 === 0) {
@@ -303,11 +352,20 @@ describe('cost', () => {
           packed[6] = i % 600 < 300 ? 1 : -1; // shift direction
           core.setCarState(packed);
         }
+        if (i % 6 === 0) {
+          // Each car's x sits at HEADER (6) + c * PER_CAR (6) in the packed scene.
+          for (let c = 0; c < 19; c++) scene[6 + c * 6] = 3 + c * 9 - (i % 1200) * 0.05;
+          scene[4] = Math.floor(i / 400) % 7;
+          core.setScene(scene);
+        }
+        if (i % 250 === 0) core.cue(i % 500 === 0 ? 'accept' : 'focus');
         core.process(out, 128);
       }
     };
     // Warm up so every path is optimised and every lazily created buffer exists.
     run(6000);
+    // The measured loop must actually voice the six nearest cars, not just the field.
+    expect(core.scene.audibleCount).toBe(6);
     // Collect the garbage of earlier tests, then settle again: a full collection can throw
     // away optimised code that referred to objects it freed, and until a function is
     // re-optimised the interpreter boxes numbers. Nothing in steady play forces collections

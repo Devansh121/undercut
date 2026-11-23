@@ -25,3 +25,30 @@ export {
   type AudioCarState,
 } from './state';
 export type { BusId, GainId, Voice } from './voice';
+
+export {
+  SceneSound,
+  packScene,
+  AUDIBLE_CARS,
+  CULL_DISTANCE,
+  FIELD_DISTANCE,
+  OTHER_CAR_CAPACITY,
+  SCENE_LENGTH,
+  type AudioScene,
+  type OtherCarSound,
+} from './scene';
+export {
+  OpponentVoice,
+  trainTables,
+  airCorner,
+  distanceGain,
+  dopplerRatio,
+  DOPPLER_MAX,
+  DOPPLER_MIN,
+  MAX_ITD,
+  OPPONENT_LEVEL,
+  PAN_WIDTH,
+  REFERENCE_DISTANCE,
+} from './opponent-voice';
+export { Ambience, AMBIENCE_KINDS, AMBIENCE_PROFILES, type AmbienceKind } from './ambience';
+export { Cues, AUDIO_CUES, CUE_SET, type AudioCue, type CueNote } from './cues';

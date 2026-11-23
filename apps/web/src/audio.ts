@@ -1,8 +1,33 @@
-import type { AudioView, AudioCarState } from '@undercut/audio';
+import type { AudioCue, AudioScene, AudioView, AudioCarState } from '@undercut/audio';
 import { createAudioEngine, type AudioEngine } from '@undercut/audio/web';
 import type { StoragePort } from '@undercut/input';
 import type { CarAudioSink } from './game/audio-seam';
 import { AudioSettingsStore, type AudioSettingKey } from './game/audio-settings';
+
+/** What counts as a menu control for the menu sounds. */
+const CONTROL = 'button, [role="button"], input, select, [data-nav]';
+/** Controls that go back: the kit's Back buttons carry `data-action="back"` (or `…-back`). */
+const BACK = '[data-action="back"], [data-action$="-back"]';
+
+/** The menu control an event happened on, or null. */
+function control(target: EventTarget | null): Element | null {
+  return typeof Element === 'function' && target instanceof Element
+    ? target.closest(CONTROL)
+    : null;
+}
+
+/** The cue for a focus or click on a menu control: none for a disabled one or no control. */
+export function menuCue(
+  type: 'focusin' | 'click',
+  target: Pick<Element, 'matches'> | null,
+): AudioCue | null {
+  if (!target || target.matches(':disabled, [aria-disabled="true"]')) return null;
+  if (type === 'focusin') return 'focus';
+  return target.matches(BACK) ? 'back' : 'accept';
+}
+
+/** How long the context keeps running after a menu sound before it is suspended again, ms. */
+const MENU_LINGER = 800;
 
 /**
  * The page's engine audio: one engine for the page's lifetime, created on the first user
@@ -14,13 +39,38 @@ export class PageAudio {
   private gestured = false;
   private active = false;
   private fallback: string | null = null;
+  private pointerAt = -Infinity;
+  /** `?debug=1&audioProfile=1`: the worklet measures its own processing time. */
+  private readonly profiling: boolean;
+  private profileReport: Readonly<Record<string, unknown>> | null = null;
+  private menuTimer: ReturnType<typeof setTimeout> | null = null;
   readonly settings: AudioSettingsStore;
 
   constructor(storage: StoragePort, win: Window = window) {
     this.settings = new AudioSettingsStore(storage);
+    const query = new URLSearchParams(win.location.search);
+    this.profiling = query.get('debug') === '1' && query.get('audioProfile') === '1';
     void this.settings.load().then(() => this.applyVolumes());
     // The first key, click or touch anywhere counts as the gesture that unlocks audio.
     const onGesture = (): void => this.gesture();
+    // Menu sounds: a tick when a control takes focus (not when a pointer press focuses it), and
+    // accept or back when one is pressed.
+    win.addEventListener('pointerdown', () => (this.pointerAt = win.performance.now()), {
+      capture: true,
+      passive: true,
+    });
+    win.addEventListener('focusin', (event) => {
+      if (win.performance.now() - this.pointerAt < 250) return;
+      const cue = menuCue('focusin', control(event.target));
+      if (cue) this.uiCue(cue);
+    });
+    win.addEventListener('click', (event) => {
+      const cue = menuCue('click', control(event.target));
+      if (cue) {
+        this.gesture();
+        this.uiCue(cue);
+      }
+    });
     for (const type of ['pointerdown', 'keydown', 'touchstart'] as const) {
       win.addEventListener(type, onGesture, { capture: true, passive: true });
     }
@@ -39,6 +89,11 @@ export class PageAudio {
     return this.fallback;
   }
 
+  /** The worklet's latest processing-time report (`?debug=1&audioProfile=1` only), or null. */
+  get profile(): Readonly<Record<string, unknown>> | null {
+    return this.profileReport;
+  }
+
   /** Engine status, or 'none' before the engine exists. */
   get status(): string {
     return this.engine?.status ?? 'none';
@@ -53,9 +108,14 @@ export class PageAudio {
   /** A session is driving (true) or paused or gone (false). */
   setActive(active: boolean): void {
     this.active = active;
+    if (this.menuTimer !== null) clearTimeout(this.menuTimer);
+    this.menuTimer = null;
     if (active) {
       if (this.gestured) this.play();
     } else {
+      // Close the car and circuit buses while fading out, so a later menu cue starts from them
+      // closed (the core also snaps gains on the way back in).
+      this.applyVolumes();
       void this.engine?.suspend();
     }
   }
@@ -65,10 +125,35 @@ export class PageAudio {
     state: Readonly<AudioCarState>,
     _paused: boolean,
     view?: AudioView,
+    scene?: AudioScene,
   ) => {
+    if (_paused) return;
+    if (scene) this.engine?.setScene(scene);
     if (view) this.engine?.setView(view);
     this.engine?.setCarState(state as AudioCarState);
   };
+
+  /**
+   * Play a menu cue, once the engine exists (the first session start creates it). A menu press
+   * never creates the engine itself: that would start an AudioContext and fetch the worklet in
+   * the same click as whatever the press does, such as reloading into a new build (the offline
+   * worker's handover then stalled the reload in CI). Outside a driving session the context runs
+   * just long enough for the cue, with only the UI bus open.
+   */
+  uiCue(cue: AudioCue): void {
+    const engine = this.engine;
+    if (!this.gestured || !engine) return;
+    if (!this.active) {
+      this.applyVolumes(); // the car and circuit buses at 0 outside a session
+      void engine.resume();
+      if (this.menuTimer !== null) clearTimeout(this.menuTimer);
+      this.menuTimer = setTimeout(() => {
+        this.menuTimer = null;
+        if (!this.active) void this.engine?.suspend();
+      }, MENU_LINGER);
+    }
+    engine.cue(cue);
+  }
 
   get volumes(): Readonly<Record<AudioSettingKey, number>> {
     return this.settings.current;
@@ -76,7 +161,7 @@ export class PageAudio {
 
   setVolume(key: AudioSettingKey, value: number): void {
     void this.settings.set(key, value).then(() => this.applyVolumes());
-    this.engine?.setVolume(key, this.settings.current[key]);
+    this.applyVolumes();
   }
 
   private play(): void {
@@ -87,6 +172,7 @@ export class PageAudio {
       onFallback: (reason) => {
         this.fallback = reason;
       },
+      ...(this.profiling ? { onProfile: (report) => (this.profileReport = report) } : {}),
     });
     this.applyVolumes();
     void this.engine.resume();
@@ -96,9 +182,11 @@ export class PageAudio {
     const v = this.settings.current;
     if (!this.engine) return;
     this.engine.setVolume('master', v.master);
-    this.engine.setVolume('engine', v.engine);
-    this.engine.setVolume('effects', v.effects);
     this.engine.setVolume('ui', v.ui);
-    this.engine.setVolume('ambience', v.ambience);
+    // In the menus the car and circuit stay silent; their levels apply once a session drives.
+    const vehicle = this.active ? 1 : 0;
+    this.engine.setVolume('engine', v.engine * vehicle);
+    this.engine.setVolume('effects', v.effects * vehicle);
+    this.engine.setVolume('ambience', v.ambience * vehicle);
   }
 }
