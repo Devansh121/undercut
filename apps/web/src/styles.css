@@ -1187,6 +1187,9 @@ body {
   inset: 0;
   z-index: 20;
   display: grid;
+  /* A definite track, so the card's max-height: 100% holds inside the safe area and the card
+     scrolls rather than running under the home bar (an upright phone). */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   background: rgba(11, 12, 14, 0.72);
@@ -1275,6 +1278,10 @@ body {
   min-height: 48px;
   padding: 4px 0;
   box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.pause__setting[hidden] {
+  display: none;
 }
 
 .pause__hint {
@@ -1983,7 +1990,8 @@ html:has(.update-bar) .pause {
   display: grid;
   align-content: center;
   text-align: center;
-  padding: 24px;
+  padding: max(24px, var(--safe-t)) max(24px, var(--safe-r)) max(24px, var(--safe-b))
+    max(24px, var(--safe-l));
   background: var(--c-ink-0);
   color: var(--c-text-1);
 }
@@ -2000,7 +2008,7 @@ html:has(.update-bar) .pause {
 @media (orientation: portrait) {
   .rotate-prompt {
     bottom: auto;
-    padding: 12px;
+    padding: max(12px, var(--inset-t)) var(--safe-r) 12px var(--safe-l);
     border-bottom: 1px solid var(--c-line-strong);
   }
   .rotate-prompt h2 {
@@ -2011,8 +2019,9 @@ html:has(.update-bar) .pause {
     font-size: 12px;
     margin: 0;
   }
+  /* Below the rotate prompt, which grows by the top inset. */
   [data-portrait] .pause {
-    padding-top: 100px;
+    padding-top: calc(100px + var(--inset-t));
   }
 }
 @media (max-height: 500px) {
@@ -2203,14 +2212,16 @@ html[data-drs='open'] .ut-touch .ut-touch__btn--drs {
 .home-hint {
   position: fixed;
   z-index: 60;
-  left: 50%;
+  /* Centred between the safe edges, so a one-sided inset (notch left or right) moves it over. */
+  left: var(--safe-l);
+  right: var(--safe-r);
   top: var(--safe-t);
-  transform: translateX(-50%);
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   width: max-content;
-  max-width: calc(100vw - var(--safe-l) - var(--safe-r));
+  max-width: calc(100% - var(--safe-l) - var(--safe-r));
   box-sizing: border-box;
   padding: 4px 4px 4px 14px;
   background: var(--c-ink-1);

@@ -16,6 +16,21 @@ import { watchProblems } from './helpers';
 
 /** A landscape iPhone 15's safe-area insets, CSS px: the bars down both sides, the home bar. */
 const INSETS = { l: 59, r: 59, t: 0, b: 21 };
+/** The same phone upright: the status bar and Dynamic Island on top, the home bar below. */
+const PORTRAIT_INSETS = { l: 0, r: 0, t: 59, b: 34 };
+
+/**
+ * Inset shapes the menus must clear. iPhones report symmetric side insets, but phones with an
+ * off-centre camera do not, so one-sided bars are checked too. Upright matters as much as on its
+ * side: a home-screen launch ignores the manifest's orientation, and the black-translucent status
+ * bar puts the page under the Dynamic Island.
+ */
+const SHAPES = [
+  { name: 'side bars', upright: false, insets: INSETS },
+  { name: 'notch left', upright: false, insets: { l: 59, r: 0, t: 0, b: 21 } },
+  { name: 'notch right', upright: false, insets: { l: 0, r: 59, t: 0, b: 21 } },
+  { name: 'upright', upright: true, insets: PORTRAIT_INSETS },
+];
 
 const webkit = (name: string): boolean => name === 'webkit-phone';
 
@@ -52,18 +67,21 @@ function underBars(page: Page, selector: string, i: typeof INSETS): Promise<stri
           (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
         );
         if (!isControl && !hasText) continue;
-        // Scrolled out of its box: it scrolls into view inside the safe area.
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0) continue;
-        let clipped = false;
+        // What shows is the part its scroll boxes leave visible: a row scrolled out, or cut by
+        // the bottom edge of a scrolling card, scrolls into view inside the safe area.
+        const box = el.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) continue;
+        let [top, bottom] = [box.top, box.bottom];
         for (let p = el.parentElement; p; p = p.parentElement) {
           const o = getComputedStyle(p).overflowY;
           if (o === 'auto' || o === 'scroll' || o === 'hidden') {
-            const b = p.getBoundingClientRect();
-            if (r.bottom <= b.top || r.top >= b.bottom) clipped = true;
+            const c = p.getBoundingClientRect();
+            top = Math.max(top, c.top);
+            bottom = Math.min(bottom, c.bottom);
           }
         }
-        if (clipped) continue;
+        if (bottom - top < 0.5) continue;
+        const r = { left: box.left, right: box.right, top, bottom };
         const bad =
           r.left < i.l - 0.5 ||
           r.right > w - i.r + 0.5 ||
@@ -143,34 +161,38 @@ test('home-screen launch: full-bleed viewport, icon, and a launch image for ever
   expect(manifest.orientation).toBe('landscape');
 });
 
-test('menus keep their text and controls clear of the landscape side bars', async ({
-  page,
-}, info) => {
-  test.skip(!/^(webkit|pixel)-phone$/.test(info.project.name), 'device projects only');
-  const problems = watchProblems(page);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  const vp = page.viewportSize()!;
-  await page.setViewportSize({
-    width: Math.max(vp.width, vp.height),
-    height: Math.min(vp.width, vp.height),
+for (const shape of SHAPES) {
+  test(`menus keep their text and controls clear of the bars (${shape.name})`, async ({
+    page,
+  }, info) => {
+    test.skip(!/^(webkit|pixel)-phone$/.test(info.project.name), 'device projects only');
+    const problems = watchProblems(page);
+    const i = shape.insets;
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const vp = page.viewportSize()!;
+    const [long, short] = [Math.max(vp.width, vp.height), Math.min(vp.width, vp.height)];
+    await page.setViewportSize(
+      shape.upright ? { width: short, height: long } : { width: long, height: short },
+    );
+    await page.goto('/');
+    await setInsets(page, i);
+    await expect(page.locator('[data-action=press-start]')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    expect(await underBars(page, 'body *', i), 'launch').toEqual([]);
+    await page.locator('[data-action=press-start]').tap();
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
+    expect(await underBars(page, 'body *', i), 'hub').toEqual([]);
+    await page.locator('[data-action=mode-quickRace]').tap();
+    expect(await underBars(page, 'body *', i), 'quick race').toEqual([]);
+    const edit = page.locator('[data-action=edit-settings]');
+    if (await edit.isVisible()) {
+      await edit.tap();
+      await expect(page.getByTestId('settings-dialog')).toBeVisible();
+      expect(await underBars(page, 'body *', i), 'session settings').toEqual([]);
+    }
+    expect(problems).toEqual([]);
   });
-  await page.goto('/');
-  await setInsets(page, INSETS);
-  await expect(page.locator('[data-action=press-start]')).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
-  expect(await underBars(page, 'body *', INSETS), 'launch').toEqual([]);
-  await page.locator('[data-action=press-start]').tap();
-  await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
-  expect(await underBars(page, 'body *', INSETS), 'hub').toEqual([]);
-  await page.locator('[data-action=mode-quickRace]').tap();
-  const edit = page.locator('[data-action=edit-settings]');
-  if (await edit.isVisible()) {
-    await edit.tap();
-    await expect(page.getByTestId('settings-dialog')).toBeVisible();
-    expect(await underBars(page, 'body *', INSETS), 'session settings').toEqual([]);
-  }
-  expect(problems).toEqual([]);
-});
+}
 
 test('no double-tap zoom, selection, callout or tap flash on the interface', async ({
   page,
@@ -287,6 +309,27 @@ test.describe('on an Android phone, driving', () => {
     await setInsets(page, { l: 0, r: 0, t: 0, b: 0 });
   });
 
+  test('upright, the rotate prompt and the pause card keep clear of the top and bottom bars', async () => {
+    // Turned upright mid-session: the session pauses and asks for landscape, settings usable.
+    await page.setViewportSize({ width: 412, height: 915 });
+    await setInsets(page, PORTRAIT_INSETS);
+    await expect(page.getByTestId('pause-menu')).toBeVisible();
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+    // The rotate prompt and the pause card (the HUD under them is laid out for landscape and is
+    // not driven upright).
+    expect(
+      await underBars(
+        page,
+        '[data-testid=rotate-prompt] *, [data-testid=pause-menu] *',
+        PORTRAIT_INSETS,
+      ),
+    ).toEqual([]);
+    await page.setViewportSize({ width: 915, height: 412 });
+    await setInsets(page, { l: 0, r: 0, t: 0, b: 0 });
+    await page.evaluate(() => window.__undercut!.resume());
+    await expect(page.getByTestId('pause-menu')).toBeHidden();
+  });
+
   test('kerbs and button presses vibrate, and the Vibration setting turns it off', async () => {
     const vibrations = (): Promise<unknown[]> =>
       page.evaluate(() =>
@@ -336,6 +379,16 @@ test.describe('on an Android phone, driving', () => {
     // Back on.
     await page.evaluate(() => window.__undercut!.pause());
     await row.locator('[data-value="1"]').tap();
+    await page.evaluate(() => window.__undercut!.resume());
+
+    // A browser with no vibration (iPhone Safari) and no pad: the row says so and cannot be set.
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'vibrate', { configurable: true, value: undefined }),
+    );
+    await page.evaluate(() => window.__undercut!.pause());
+    await expect(row).toBeVisible();
+    await expect(row.locator('[data-value="1"]')).toBeDisabled();
+    await expect(row.locator('.pause__hint')).toHaveText('Not available on this device');
     await page.evaluate(() => window.__undercut!.resume());
     expect(problems).toEqual([]);
   });
