@@ -11,6 +11,7 @@ import {
   parsePadControl,
   type ActionId,
   type BindingMap,
+  type ControlId,
   type DeviceKind,
 } from '@undercut/input';
 import { icon, type IconKey } from './icons';
@@ -63,6 +64,11 @@ export function glyphFace(action: ActionId, dev: DeviceKind, map: BindingMap): G
     const label = controlLabel(control);
     return { text: KEY_SHORT[label] ?? label, shape: 'key' };
   }
+  return padFace(control);
+}
+
+/** What to draw for one pad control: its button shape, or a stick for an axis. */
+export function padFace(control: ControlId): GlyphFace {
   const pad = parsePadControl(control);
   if (pad?.kind === 'button') {
     const p = PAD[pad.index];
@@ -82,7 +88,10 @@ const ARROWS: Record<string, IconKey> = {
 function paint(el: HTMLElement): void {
   const action = el.dataset.glyph as ActionId | undefined;
   if (!action) return;
-  const face = glyphFace(action, device, bindings);
+  draw(el, glyphFace(action, device, bindings));
+}
+
+function draw(el: HTMLElement, face: GlyphFace): void {
   const key = `${face.shape}:${face.text}`;
   if (el.dataset.face === key) return;
   el.dataset.face = key;
@@ -102,6 +111,15 @@ export function glyph(action: ActionId, className = ''): HTMLElement {
   el.dataset.glyph = action;
   el.setAttribute('aria-hidden', 'true');
   paint(el);
+  return el;
+}
+
+/** A glyph that always shows `face`, whatever the device in use (the controls list). */
+export function faceGlyph(face: GlyphFace, className = ''): HTMLElement {
+  const el = document.createElement('kbd');
+  el.className = className ? `glyph ${className}` : 'glyph';
+  el.setAttribute('aria-hidden', 'true');
+  draw(el, face);
   return el;
 }
 

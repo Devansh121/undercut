@@ -822,7 +822,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
-    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
+    {
+      bindings: () => input.profile.bindings,
+      device: () => input.activeDevice,
+      padConnected: () => input.gamepad.connected,
+      touchCapable: () => o.touch,
+    },
     commands,
   );
   o.host.replaceChildren(hud.root, results.root, pause.root, intro.root);
@@ -1191,6 +1196,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // The controls list follows the device before that device's first press is read.
+      pause.controls?.sync();
       // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
       const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
