@@ -156,6 +156,29 @@ describe('power unit', () => {
     expect(tooFast.gear).toBe(6);
   });
 
+  it('takes a seamless upshift when the upshift time is 0: the next gear at once, no torque cut', () => {
+    // A seamless shift: an up-shift "with a torque loss time of zero" (docs/physics-validation.md
+    // 7.10, source 59).
+    const params = createCarParams('low', { gearbox: { upshiftTime: 0 } });
+    const car = createCarState(params, { speed: 40, gear: 3 });
+    run(car, input({ throttle: 1 }), 0.2);
+    const before = car.driveTorque;
+    expect(before).toBeGreaterThan(0);
+    stepCar(car, input({ gearShift: 1, throttle: 1 }), FLAT_SURFACE, DT, env);
+    expect(car.gear).toBe(4);
+    expect(car.shiftTimer).toBe(0);
+    const carrier = (car.wheelSpeed[2]! + car.wheelSpeed[3]!) / 2;
+    expect(radToRpm(car.engineSpeed)).toBeCloseTo(
+      radToRpm(params.gearbox.ratios[3]! * carrier),
+      -2,
+    );
+    // Drive torque through the shift: never cut, as a timed shift's is.
+    for (let i = 0; i < 10; i++) {
+      stepCar(car, input({ throttle: 1 }), FLAT_SURFACE, DT, env);
+      expect(car.driveTorque).toBeGreaterThan(0.5 * before);
+    }
+  });
+
   it('selects reverse only near standstill, through neutral', () => {
     const car = createCarState(REFERENCE_CAR, { gear: 0 });
     stepCar(car, input({ gearShift: -1 }), FLAT_SURFACE, DT, env);

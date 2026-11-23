@@ -113,6 +113,27 @@ async function loadAiLib() {
   return module;
 }
 
+// Where each reference lap's time goes (docs/physics-validation.md 7.10).
+async function budget(options) {
+  const ai = await loadAiLib();
+  const setups = { monza: ai.MONZA, spa: ai.SPA, singapore: ai.SINGAPORE };
+  const ids = (options.circuit ?? 'monza,spa,singapore').split(',');
+  const pouhon = ai.pouhonMeasuredG();
+  const out = {};
+  for (const id of ids) {
+    const setup = setups[id];
+    if (!setup)
+      throw new Error(`no racing line for ${id}; one of ${Object.keys(setups).join(', ')}`);
+    const b = ai.lapBudget(setup, pouhon);
+    out[id] = ai.budgetReport(b);
+    console.log(`\n${ai.formatBudget(b)}`);
+  }
+  fs.mkdirSync(outDir, { recursive: true });
+  const file = path.join(outDir, 'budget.json');
+  fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
+  console.log(`\nwrote ${path.relative(root, file)}`);
+}
+
 // The reference driver on the committed racing line: flying lap(s) in the doc 2.1 conditions.
 async function lap(options) {
   const ai = await loadAiLib();
@@ -331,6 +352,10 @@ if (name === 'lap') {
   await lap(options);
   process.exit(0);
 }
+if (name === 'budget') {
+  await budget(options);
+  process.exit(0);
+}
 if (name === 'race' || name === 'weekend') {
   await race(options, name === 'weekend');
   process.exit(0);
@@ -355,6 +380,9 @@ if (name === 'list' || options.help) {
   );
   console.log(
     `  ${'calibrate'.padEnd(15)} every target, the Monza lap and corner speeds for a candidate car (--set file.json, --line rebuild)`,
+  );
+  console.log(
+    `  ${'budget'.padEnd(15)} where each reference lap's time goes: driver, planning margin, car; term sensitivities (--circuit)`,
   );
 } else if (name === 'bench') {
   await bench(lib, options);
