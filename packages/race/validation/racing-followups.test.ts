@@ -13,7 +13,7 @@ describe('recorded lane-change and moving-pack starts', () => {
     ['singapore', 119],
   ] as const;
   for (const [circuit, seed] of recorded) {
-    const test = followupGap(circuit, seed) ? it.fails : it;
+    const test = followupGap(circuit, seed, true) ? it.fails : it;
     test(`${circuit} seed ${seed}: no hard contact or spin, every car classified`, () => {
       const run = runFollowupRace(circuit, seed);
       expectQuickRace(run, 1);
