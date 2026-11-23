@@ -12,7 +12,7 @@ import {
   type Texture,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
-import { MeshSurface, createVec3, type Track } from '@undercut/track';
+import { barrierSigns, createVec3, tracksideObjects, type Track } from '@undercut/track';
 import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
@@ -1532,11 +1532,6 @@ export function placeTracksideFurniture(options: {
     if (!hasKitHoarding) props.place('hoarding-frame', { x, y, z, yaw, s });
     hoardings++;
   };
-  const placeVergeBoard = (x: number, y: number, z: number, yaw: number, s: number): void => {
-    props.place('verge-board-front', { x, y, z, yaw, s });
-    props.place('verge-board-frame', { x, y, z, yaw, s });
-    hoardings++;
-  };
 
   // Main straight (both sides, skipping pit entry/exit openings) + braking zones & corner outsides.
   const hoardingRuns: { s0: number; s1: number; side: 0 | 1; step?: number }[] = [
@@ -1579,24 +1574,14 @@ export function placeTracksideFurniture(options: {
       placeHoarding(b.x, b.y, b.z, b.yawInward, b.s);
     }
   }
-  // Neat rhythmic rows of angled advertising boards along wide straight/outer grass verges (skipping
-  // inner sweeping curves so trackside cameras don't look across a row of dark backs).
-  const vergeStep = mobile ? 20 : 10.0;
-  for (let s = 20; s < L - 20; s += vergeStep) {
-    for (const side of [0, 1] as const) {
-      if (nearPitGap(s, side)) continue;
-      const idxS = Math.min(track.lap.count - 1, Math.round(s / track.lap.step));
-      const outerSurf = track.outer[side][idxS] as number;
-      if (outerSurf !== MeshSurface.Grass) continue;
-      const barD = Math.abs(track.barrier[side][idxS] as number);
-      const halfW = Math.abs(track.halfWidth[side][idxS] as number);
-      if (barD - halfW < 6.8) continue;
-      // Place cleanly on the grass verge ~2.7 m outside the track edge (leaving >= 4.1 m to barrier).
-      const extra = halfW + 2.7 - barD;
-      const b = atBarrier(s, side, extra);
-      if (foldsAcrossTrack(b, 2.2, 0.1)) continue;
-      placeVergeBoard(b.x, b.y, b.z, b.yawInward, b.s);
-    }
+  // Shared contact placements: all qualities retain the same lightweight objects and ids.
+  const lightObjects = tracksideObjects(track);
+  for (const o of lightObjects) {
+    if (o.kind !== 'verge-board') continue;
+    const placement = { x: o.x, y: o.y, z: o.z, yaw: o.yaw, s: o.s, breakable: o };
+    props.place('verge-board-front', placement);
+    props.place('verge-board-frame', placement);
+    hoardings++;
   }
   // Grandstand front-wall brand banners (mounted cleanly along the concrete front wall of each stand).
   for (const st of stands) {
@@ -1704,41 +1689,22 @@ export function placeTracksideFurniture(options: {
   }
   counts.catchFences = fences;
 
-  // 4. Braking boards (150, 100, 50 m) before every braking corner + DRS boards.
+  // 4. Lightweight signs use the same ground footprints as the vehicle model.
   let boards = 0;
-  const placeSign = (id: string, x: number, y: number, z: number, yaw: number, s: number): void => {
-    props.place(`${id}-face`, { x, y, z, yaw, s });
-    // A catalogue board is one model (face and posts); the stand-in is two kinds.
-    if (!kitSigns.has(id)) props.place(`${id}-post`, { x, y, z, yaw, s });
+  for (const o of lightObjects) {
+    if (o.kind === 'verge-board') continue;
+    const placement = { x: o.x, y: o.y, z: o.z, yaw: o.yaw, s: o.s, breakable: o };
+    props.place(`${o.kind}-face`, placement);
+    if (!kitSigns.has(o.kind)) props.place(`${o.kind}-post`, placement);
     boards++;
-  };
-  // Identify primary braking zones (first corner of each chicane or distinct corner separated > 200 m).
-  let lastBrakeS = -999;
-  for (const c of track.corners) {
-    // Skip long flat-out sweeps and second apex of a chicane.
-    if (c.end - c.start > 450) continue;
-    if (c.start - lastBrakeS < 220) continue;
-    lastBrakeS = c.start;
-    const outSide: 0 | 1 = c.direction === 'right' ? 0 : 1;
-    for (const [dist, id] of [
-      [150, 'board-150'],
-      [100, 'board-100'],
-      [50, 'board-50'],
-    ] as const) {
-      const b = atBarrier(c.start - dist, outSide, 0.9);
-      // Angle slightly toward the centreline so drivers read it cleanly approaching at 300 km/h.
-      const cant = outSide === 0 ? -0.22 : 0.22;
-      placeSign(id, b.x, b.y, b.z, b.yawOncoming + cant, b.s);
-    }
   }
-  // DRS detection & activation boards on both sides of the circuit.
-  for (const zone of track.drsZones) {
-    for (const side of [0, 1] as const) {
-      const act = atBarrier(zone.activation, side, 0.95);
-      placeSign('board-drs', act.x, act.y, act.z, act.yawOncoming, act.s);
-      const det = atBarrier(zone.detection, side, 0.95);
-      placeSign('board-drs-det', det.x, det.y, det.z, det.yawOncoming, det.s);
-    }
+  // Signs with no room in front of the barrier stand on it, as solid as the barrier.
+  for (const sign of barrierSigns(track)) {
+    const b = atBarrier(sign.s, sign.side, sign.extra);
+    const placement = { x: b.x, y: b.y, z: b.z, yaw: b.yawOncoming + sign.cant, s: b.s };
+    props.place(`${sign.kind}-face`, placement);
+    if (!kitSigns.has(sign.kind)) props.place(`${sign.kind}-post`, placement);
+    boards++;
   }
   counts.signBoards = boards;
 

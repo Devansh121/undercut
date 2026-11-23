@@ -583,4 +583,6 @@ function copyPose(a: CarPose, b: CarPose): void {
   b.steerAngle = a.steerAngle;
   b.wheelY.set(a.wheelY);
   b.wheelAngle.set(a.wheelAngle);
+  if (a.brokenObjects) (b.brokenObjects ??= new Uint32Array(64)).set(a.brokenObjects);
+  if (a.breakableHits) (b.breakableHits ??= new Float64Array(16)).set(a.breakableHits);
 }

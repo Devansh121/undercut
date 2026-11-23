@@ -101,6 +101,8 @@ export class OnlineRace implements DriveExtension {
   private loadedSent = false;
   private readonly gate = new StartGate();
   private resets = 0;
+  /** Which word of the broken-object set the next snapshot carries (0 to 63). */
+  private brokenCursor = 0;
   private lastRaceMs = 0;
   private goUntil = 0;
   private position: number | null = null;
@@ -334,13 +336,23 @@ export class OnlineRace implements DriveExtension {
           lap: this.counter.laps,
           s: this.counter.lineS(session.s),
           resets: this.resets,
+          brokenCursor: this.brokenCursor,
         }),
       ]);
-      if (sent) this.report.snapshotsSent++;
+      if (sent) {
+        this.report.snapshotsSent++;
+        this.brokenCursor = (this.brokenCursor + 1) % 64;
+      }
     }
 
     // The other cars.
     const views = now === null ? [] : this.smoother.update(c.remoteCars.sample(now), f.dt);
+    // Objects the other clients have seen broken (on joining, after a reconnect, or more than
+    // four at once): consumed here, so this car takes no impulse from them and draws them down.
+    const flags = session.car.state.brokenObjects;
+    const remoteSet = c.remoteCars.brokenSet;
+    for (let w = 0; w < flags.length && w < remoteSet.length; w++)
+      flags[w] = flags[w]! | remoteSet[w]!;
     const drawn: { livery: CarLivery; pose: CarPose; opacity: number }[] = [];
     const others: { x: number; z: number; colour: string; opacity: number }[] = [];
     const remote: OnlineRaceReport['remote'] = [];
@@ -351,6 +363,15 @@ export class OnlineRace implements DriveExtension {
         this.poses.set(v.seat, pose);
       }
       poseFromView(v, this.wheelDrop, f.dt, pose);
+      // A remote hit consumes the lightweight object here too; its debris has no contact.
+      const hits = v.breakableHits;
+      if (hits)
+        for (let k = 0; k < hits.length; k += 4) {
+          const id = hits[k]!;
+          if (id < 0 || id >= 2048) continue;
+          const flags = session.car.state.brokenObjects;
+          flags[id >>> 5] = flags[id >>> 5]! | (1 << (id & 31));
+        }
       const l = seatLivery(v.seat);
       drawn.push({
         livery: {

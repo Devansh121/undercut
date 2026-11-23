@@ -54,6 +54,16 @@ const ABS_GAIN = 150;
 const ABS_RECOVER = 5;
 /** Immediate cut per unit of excess slip, on top of the integrator. */
 const DIRECT_CUT = 3;
+/**
+ * Below this forward speed, m/s, slip is no measure of wheelspin: a stopped tyre keeps the
+ * deflection it stopped with, which reads as a large slip angle. Unless a driven wheel's tread
+ * really runs faster than the car (by TC_SPIN_SPEED, m/s), traction control there leaves at
+ * least the launch throttle, so a car stopped against a barrier or in the run-off can move off.
+ * A launch with real wheelspin is cut as before.
+ */
+const TC_LAUNCH_SPEED = 2;
+const TC_LAUNCH_THROTTLE = 0.3;
+const TC_SPIN_SPEED = 1;
 /** Automatic gearbox: shift up at this rpm; shift down when the lower gear lands below it. */
 const UPSHIFT_RPM = 11800;
 /**
@@ -191,6 +201,8 @@ export function applyAssists(
   // (unless the driver asked for less), or it would brake the wheels it is saving.
   if (out.throttle < throttle)
     out.throttle = Math.max(out.throttle, Math.min(throttle, neutralThrottle(car)));
+  if (out.throttle < throttle && Math.abs(car.vx) < TC_LAUNCH_SPEED && !driveWheelsSpin(car))
+    out.throttle = Math.max(out.throttle, Math.min(throttle, TC_LAUNCH_THROTTLE));
 
   // ABS: hold every braked wheel's combined slip under the level's limit (lower at the rear).
   const absLimit = ABS_LIMIT[clampLevel(settings.abs)];
@@ -381,6 +393,15 @@ export function speedSensitiveSteer(
 }
 
 /** Slip of wheel `i` relative to the slip at peak force, both directions combined. */
+/** Whether a driven wheel's tread runs faster than the car over the ground, in its gear's sense. */
+function driveWheelsSpin(car: CarState): boolean {
+  const r = car.model.params.tyre.rollingRadius;
+  const drive = car.gear < 0 ? -1 : 1;
+  for (let i = 2; i < 4; i++)
+    if ((car.wheelSpeed[i]! * r - car.vx) * drive > TC_SPIN_SPEED) return true;
+  return false;
+}
+
 function combinedSlip(car: CarState, curve: TyreCurve, i: number): number {
   const sx = car.slipRatio[i]! / curve.peakSlipRatio;
   const sy = car.slipTan[i]! / curve.peakSlipTan;

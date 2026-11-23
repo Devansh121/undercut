@@ -264,6 +264,25 @@ function circle(t: number, seat = 1, tick?: number): CarSnapshot {
 }
 
 describe('RemoteCarBuffer', () => {
+  it("gathers the senders' broken sets from every record, even ones it drops", () => {
+    const b = new RemoteCarBuffer();
+    for (let i = 0; i < 64; i++) {
+      const snap = {
+        ...circle((i * 1000) / 30),
+        brokenIndex: i,
+        brokenWord: i === 63 ? 0x80000000 : 1 << (i % 32),
+      };
+      b.push(snap, (i * 1000) / 30 + 50);
+      // A duplicate still carries its word.
+      if (i === 5) b.push({ ...snap, brokenWord: 4 }, (i * 1000) / 30 + 60);
+    }
+    expect(b.brokenSet[0]).toBe(1);
+    expect(b.brokenSet[5]).toBe((1 << 5) | 4);
+    expect(b.brokenSet[63]).toBe(0x80000000);
+    b.clear();
+    expect(b.brokenSet.every((w) => w === 0)).toBe(true);
+  });
+
   it('interpolates between snapshots with a small error on a curve', () => {
     const b = new RemoteCarBuffer();
     for (let i = 0; i <= 30; i++) b.push(circle((i * 1000) / 30), (i * 1000) / 30 + 50);

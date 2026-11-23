@@ -1,6 +1,6 @@
 /**
  * Binary car snapshots. Control messages are JSON; car state goes ~30 times a second
- * per car, so it has a fixed-size little-endian record of 56 bytes.
+ * per car, so it has a fixed-size little-endian record of 94 bytes.
  *
  * Quantisation (worst-case round-trip error in brackets):
  *
@@ -20,6 +20,8 @@
  *   wheelSpin[4]     i16     0.05 rad/s           +-1638 rad/s           0.025 rad/s
  *   lap              u16     laps completed       0..65535               exact
  *   s                u32     mm along centreline  0..4294 km             0.5 mm
+ *   hits[4]          i16/u16/i16/i16  id, age ms, vx/vz cm/s (8 B each)
+ *   broken set       u16 + u32  word index 0..63, its 32 bits    exact
  *
  * Angles are rounded to the nearest step and wrapped in 16-bit space, so values next to
  * +pi and -pi stay within half a step of the truth measured round the circle. Values
@@ -35,11 +37,13 @@
  *   down (server to client): u8 kind=2, u8 count, u32 server receive time (ms after
  *                            epoch), count x record
  *
- * At 30 Hz with 20 cars a client receives 19 cars a tick: about 1.1 kB, or 34 kB/s.
+ * At 30 Hz with 20 cars a client receives 19 cars a tick: about 1.8 kB, or 54 kB/s.
  */
 import { MAX_CARS } from './settings';
 
-export const CAR_RECORD_BYTES = 56;
+export const CAR_RECORD_BYTES = 94;
+/** Words in the broken-object set (2048 lightweight objects); one rides in each record. */
+export const BROKEN_SET_WORDS = 64;
 export const UP_HEADER_BYTES = 2;
 export const DOWN_HEADER_BYTES = 6;
 export const FRAME_UP = 1;
@@ -61,6 +65,15 @@ export const CAR_FLAG = {
 const FLAG_MASK = 0x3f;
 
 export interface CarSnapshot {
+  /** Four recent cosmetic impacts: id, age (s), world vx/vz (m/s), repeated. */
+  breakableHits?: number[];
+  /**
+   * One word of the sender's set of broken lightweight objects, `brokenIndex` (0 to 63) and its
+   * 32 bits as an unsigned number. Senders step the index every record, so a receiver that
+   * joins late or misses hit events has the whole set within 64 records.
+   */
+  brokenIndex?: number;
+  brokenWord?: number;
   seat: number;
   /** CAR_FLAG bits (0 to 63). */
   flags: number;
@@ -150,10 +163,35 @@ function writeCar(view: DataView, o: number, c: CarSnapshot, epoch: number): voi
   }
   view.setUint16(o + 50, clampInt(c.lap, 0, 65535), true);
   view.setUint32(o + 52, clampInt(c.s * 1000, 0, 0xffffffff), true);
+  for (let i = 0; i < 4; i++) {
+    const h = c.breakableHits;
+    const k = i * 4,
+      offset = o + 56 + i * 8;
+    const id = h?.[k] ?? -1;
+    view.setInt16(offset, clampInt(id, -1, 2047), true);
+    view.setUint16(offset + 2, clampInt((h?.[k + 1] ?? 0) * 1000, 0, 65535), true);
+    view.setInt16(offset + 4, clampInt((h?.[k + 2] ?? 0) * 100, -32768, 32767), true);
+    view.setInt16(offset + 6, clampInt((h?.[k + 3] ?? 0) * 100, -32768, 32767), true);
+  }
+  view.setUint16(o + 88, clampInt(c.brokenIndex ?? 0, 0, BROKEN_SET_WORDS - 1), true);
+  view.setUint32(o + 90, (c.brokenWord ?? 0) >>> 0, true);
 }
 
 function readCar(view: DataView, o: number, epoch: number): CarSnapshot {
+  const hits: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const offset = o + 56 + i * 8;
+    hits.push(
+      view.getInt16(offset, true),
+      view.getUint16(offset + 2, true) / 1000,
+      view.getInt16(offset + 4, true) / 100,
+      view.getInt16(offset + 6, true) / 100,
+    );
+  }
   return {
+    ...(hits.some((id, i) => i % 4 === 0 && id >= 0) ? { breakableHits: hits } : {}),
+    brokenIndex: view.getUint16(o + 88, true),
+    brokenWord: view.getUint32(o + 90, true),
     seat: view.getUint8(o),
     flags: view.getUint8(o + 1) & FLAG_MASK,
     resets: view.getUint8(o + 1) >> 6,
@@ -209,6 +247,9 @@ function viewOf(data: Uint8Array | ArrayBuffer): DataView {
 /** Check one record's enumerated fields; the rest are any bit pattern. */
 function recordProblem(car: CarSnapshot): string | null {
   if (car.seat >= MAX_CARS) return 'seat out of range';
+  if (car.breakableHits?.some((v, i) => i % 4 === 0 && (v < -1 || v > 2047)))
+    return 'object id out of range';
+  if ((car.brokenIndex ?? 0) >= BROKEN_SET_WORDS) return 'broken-set word out of range';
   if (car.gear < -1 || car.gear > 8) return 'gear out of range';
   return null;
 }

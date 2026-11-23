@@ -1,4 +1,9 @@
-import { createSurfaceHint, type SurfaceHint, type SurfaceSampler } from './contracts';
+import {
+  BROKEN_OBJECT_WORDS,
+  createSurfaceHint,
+  type SurfaceHint,
+  type SurfaceSampler,
+} from './contracts';
 import { PATCH_HINTS, createPatchSample, samplePatch } from './contact';
 import { STANDARD_GRAVITY } from './environment';
 import { createCarModel, type CarModel } from './model';
@@ -113,6 +118,16 @@ export class CarState {
   wallImpactSpeed = 0;
   wallContact = 0;
 
+  /** Consumed dressing ids and the four latest canonical hits, included in snapshots. */
+  contactTime = 0;
+  breakableHitCount = 0;
+  readonly hitObject = new Float64Array(4).fill(-1);
+  readonly hitTime = new Float64Array(4);
+  readonly hitVx = new Float64Array(4);
+  readonly hitVz = new Float64Array(4);
+  readonly brokenObjects = new Uint32Array(BROKEN_OBJECT_WORDS);
+  breakableImpactSpeed = 0;
+
   // Per wheel, in FL, FR, RL, RR order.
   readonly wheelSpeed = new Float64Array(4);
   readonly wheelAngle = new Float64Array(4);
@@ -219,13 +234,20 @@ const SCALAR_KEYS = [
   'externalTorque',
   'groundSteps',
   'contactLifts',
+  'contactTime',
+  'breakableHitCount',
+  'breakableImpactSpeed',
   'wallImpactSpeed',
   'wallContact',
   'tyreCompound',
   'tyreAmbient',
 ] as const satisfies readonly (keyof CarState)[];
 
-const WHEEL_KEYS = [
+const ARRAY_KEYS = [
+  'hitObject',
+  'hitTime',
+  'hitVx',
+  'hitVz',
   'wheelSpeed',
   'wheelAngle',
   'wheelY',
@@ -245,7 +267,7 @@ const WHEEL_KEYS = [
 ] as const satisfies readonly (keyof CarState)[];
 
 /** Length of a car snapshot in numbers. */
-export const CAR_SNAPSHOT_LENGTH = SCALAR_KEYS.length + WHEEL_KEYS.length * 4;
+export const CAR_SNAPSHOT_LENGTH = SCALAR_KEYS.length + ARRAY_KEYS.length * 4 + BROKEN_OBJECT_WORDS;
 
 /** Copy every number of the state into `out` (allocated if absent). Plain numbers only. */
 export function snapshotCar(state: CarState, out?: Float64Array): Float64Array {
@@ -253,10 +275,11 @@ export function snapshotCar(state: CarState, out?: Float64Array): Float64Array {
   if (buf.length < CAR_SNAPSHOT_LENGTH) throw new RangeError('snapshot buffer too short');
   let k = 0;
   for (const key of SCALAR_KEYS) buf[k++] = state[key];
-  for (const key of WHEEL_KEYS) {
+  for (const key of ARRAY_KEYS) {
     const arr = state[key];
     for (let i = 0; i < 4; i++) buf[k++] = arr[i] as number;
   }
+  for (const word of state.brokenObjects) buf[k++] = word;
   return buf;
 }
 
@@ -266,10 +289,11 @@ export function restoreCar(state: CarState, snapshot: ArrayLike<number>): void {
   let k = 0;
   const target = state as unknown as Record<string, number>;
   for (const key of SCALAR_KEYS) target[key] = snapshot[k++] as number;
-  for (const key of WHEEL_KEYS) {
+  for (const key of ARRAY_KEYS) {
     const arr = state[key];
     for (let i = 0; i < 4; i++) arr[i] = snapshot[k++] as number;
   }
+  for (let i = 0; i < BROKEN_OBJECT_WORDS; i++) state.brokenObjects[i] = snapshot[k++]!;
   for (const hint of state.hints) hint.index = -1;
   for (const hint of state.wallHints) hint.index = -1;
   for (const hint of state.patchHints) hint.index = -1;

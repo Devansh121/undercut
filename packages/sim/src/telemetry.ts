@@ -1,3 +1,4 @@
+import { BROKEN_OBJECT_WORDS } from './contracts';
 import type { CarState } from './state';
 
 const RAD_TO_RPM = 60 / (2 * Math.PI);
@@ -76,6 +77,8 @@ export interface CarTelemetry {
   carContactSpeed: number;
   /** Largest speed into a barrier at a contact on the last step, m/s; 0 when nothing hit. */
   wallImpact: number;
+  /** Equivalent impact speed for a lightweight panel, m/s. */
+  breakableImpact: number;
   /** A body corner is touching a barrier. */
   wallContact: boolean;
 }
@@ -125,6 +128,7 @@ export function createCarTelemetry(): CarTelemetry {
     carContactImpulse: 0,
     carContactSpeed: 0,
     wallImpact: 0,
+    breakableImpact: 0,
     wallContact: false,
   };
 }
@@ -181,12 +185,16 @@ export function readCarTelemetry(
   out.carContactImpulse = state.carContactImpulse;
   out.carContactSpeed = state.carContactSpeed;
   out.wallImpact = state.wallImpactSpeed;
+  out.breakableImpact = state.breakableImpactSpeed;
   out.wallContact = state.wallContact !== 0;
   return out;
 }
 
 /** What a renderer needs to draw a car between two sim steps. */
 export interface CarPose {
+  /** Four recent board hits: id, age (s), world vx/vz (m/s), repeated. */
+  breakableHits?: Float64Array;
+  brokenObjects?: Uint32Array;
   x: number;
   y: number;
   z: number;
@@ -201,6 +209,8 @@ export interface CarPose {
 
 export function createCarPose(): CarPose {
   return {
+    brokenObjects: new Uint32Array(BROKEN_OBJECT_WORDS),
+    breakableHits: new Float64Array([-1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0]),
     x: 0,
     y: 0,
     z: 0,
@@ -215,6 +225,17 @@ export function createCarPose(): CarPose {
 
 /** Copy the drawable pose of a state. */
 export function readCarPose(state: CarState, out: CarPose): CarPose {
+  (out.brokenObjects ??= new Uint32Array(BROKEN_OBJECT_WORDS)).set(state.brokenObjects);
+  const hits = (out.breakableHits ??= new Float64Array(16));
+  for (let i = 0; i < 4; i++) {
+    hits[i * 4] = state.hitObject[i]!;
+    hits[i * 4 + 1] = Math.max(
+      0,
+      Math.round((state.contactTime - state.hitTime[i]!) * 1000) / 1000,
+    );
+    hits[i * 4 + 2] = state.hitVx[i]!;
+    hits[i * 4 + 3] = state.hitVz[i]!;
+  }
   out.x = state.x;
   out.y = state.y;
   out.z = state.z;
@@ -234,6 +255,9 @@ export function readCarPose(state: CarState, out: CarPose): CarPose {
  * alpha). Angles take the short way round.
  */
 export function interpolateCarPose(a: CarPose, b: CarPose, alpha: number, out: CarPose): CarPose {
+  if (b.brokenObjects)
+    (out.brokenObjects ??= new Uint32Array(BROKEN_OBJECT_WORDS)).set(b.brokenObjects);
+  if (b.breakableHits) (out.breakableHits ??= new Float64Array(16)).set(b.breakableHits);
   const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
   out.x = a.x + (b.x - a.x) * t;
   out.y = a.y + (b.y - a.y) * t;
