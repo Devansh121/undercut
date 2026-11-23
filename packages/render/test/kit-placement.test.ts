@@ -10,7 +10,7 @@ import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
 import { placeKitBarriers } from '../src/world/kit-barriers';
 import { LapIndex } from '../src/world/lap-index';
-import { DataTexture, type Mesh } from 'three';
+import { DataTexture } from 'three';
 
 function fakeKit(): PropKitAssets {
   const entries = new Map((catalog.props as unknown as PropCatalogEntry[]).map((p) => [p.id, p]));
@@ -26,7 +26,10 @@ function fakeKit(): PropKitAssets {
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AmbientLight,
   BoxGeometry,
+  Mesh,
+  PointLight,
   type InstancedMesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -56,8 +59,17 @@ describe('loading prop levels', () => {
       count: m.count,
       cull: m.frustumCulled,
     }));
+    const scene = new Scene();
+    const terrain = new Mesh(geometry, material);
+    const lamp = new Mesh(geometry, material);
+    const light = new PointLight();
+    lamp.add(light);
+    scene.add(terrain, lamp, new AmbientLight(), props.group);
     const render = vi.fn(() => {
       expect(meshes.every((m) => m.visible && !m.frustumCulled && m.count === 1)).toBe(true);
+      // Only the props draw; the scene's lights (and a mesh carrying one) stay.
+      expect(terrain.visible).toBe(false);
+      expect(lamp.visible && light.visible).toBe(true);
       if (fail) throw new Error('lost context');
     });
     const renderer = {
@@ -67,18 +79,14 @@ describe('loading prop levels', () => {
       render,
     };
     const draw = () =>
-      warmPropLevels(
-        renderer as unknown as WebGLRenderer,
-        new Scene(),
-        new PerspectiveCamera(),
-        props,
-      );
+      warmPropLevels(renderer as unknown as WebGLRenderer, scene, new PerspectiveCamera(), props);
     if (fail) expect(draw).toThrow('lost context');
     else draw();
     expect(render).toHaveBeenCalledOnce();
     expect(
       meshes.map((m) => ({ visible: m.visible, count: m.count, cull: m.frustumCulled })),
     ).toEqual(before);
+    expect(terrain.visible).toBe(true);
     expect(renderer.shadowMap.autoUpdate).toBe(true);
     expect(renderer.setRenderTarget).toHaveBeenLastCalledWith(null);
     props.dispose();
