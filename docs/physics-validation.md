@@ -1099,17 +1099,57 @@ parameter, target or figure here comes from it.
 the driven lap, the speed profile the driver plans at its skill (98 / 95 / 98 % of the measured
 lateral, braking and traction limits) and the full-envelope profile (every measured limit used).
 Driven − plan is the driver's cost, plan − full the planning margin, full − published the car,
-the line and the track as modelled. Each is split by sector and by the full profile's phase:
-braking, corners (held at the corner limit), traction exits (full throttle held below what the
-engine gives on that grade by the tyres) and straights (full throttle at what the engine gives).
-Sensitivities re-plan the full envelope with one term changed. Asserted for internal consistency
-by `packages/ai/validation/budget.test.ts`; master 3c60c07.
+the line and the track as modelled. Each is split by sector and by the constraint that binds the
+full profile on each segment, read from the profile's own limits at the segment's entry speed
+(within 3 %):
 
-| Circuit | Published | Driven | Gap | Driver | Planning margin | Full envelope − published |
-|---|---|---|---|---|---|---|
-| Monza (low) | 78.792 | 84.872 | +6.080 | 0.820 | 0.694 | 4.566 |
-| Spa (medium) | 100.562 | 109.072 | +8.510 | 1.347 | 0.969 | 6.194 |
-| Singapore (high) | 89.158 | 91.817 | +2.659 | 0.488 | 1.032 | 1.139 |
+- corner limit: the lateral demand uses the lateral grip;
+- braking limit: decelerating at what the tyres, drag and grade give;
+- grip-limited exit: accelerating at what the tyres give while they also corner (grip shared
+  along the combined limit), less than the straight-line run would give;
+- full-throttle run: accelerating at the car's measured straight-line full-throttle
+  acceleration on that grade (the envelope's drive table: power, drag, DRS, the MGU-K, the gear
+  shifts and, at low speed, wheelspin held at the tyre's peak);
+- transition: none of these binds (the step from one limit to the next, where the profile's
+  passes meet below every limit).
+
+Sensitivities re-plan the full envelope with one term changed. `packages/ai/validation/budget.test.ts`
+checks, at all three circuits, that the budget accounts for every second, that its sectors are
+the lap report's, and that its phases name what the physics says binds (every accelerating
+segment above 300 km/h is the full-throttle run, the hardest deceleration is the braking limit,
+no hard-cornering exit below 150 km/h is the straight-line run); master 3c60c07.
+
+**The published baseline.** The sectors are the pole lap's own at Monza, and the session's best
+sectors at Spa and Singapore, which were set on different laps (2.2). Session bests add up to an
+ideal lap faster than the pole lap, so at Spa and Singapore the sector gaps add up to the gap to
+that ideal lap, and the gap to the pole lap is that less the pole lap's difference from it:
+
+| Circuit | Pole lap | Published sectors | Their sum | Pole − sum | Driven | Gap to the sum | Gap to the pole |
+|---|---|---|---|---|---|---|---|
+| Monza (low) | 78.792 | pole lap | 78.792 | 0 | 84.872 | +6.080 | +6.080 |
+| Spa (medium) | 100.562 | session bests | 100.150 | 0.412 | 109.072 | +8.922 | +8.510 |
+| Singapore (high) | 89.158 | session bests | 88.964 | 0.194 | 91.817 | +2.853 | +2.659 |
+
+| Circuit | Gap to the pole | Driver | Planning margin | Full envelope − pole lap |
+|---|---|---|---|---|
+| Monza (low) | +6.080 | 0.820 | 0.694 | 4.566 |
+| Spa (medium) | +8.510 | 1.347 | 0.969 | 6.194 (6.606 against the session bests' sum) |
+| Singapore (high) | +2.659 | 0.488 | 1.032 | 1.139 (1.333 against the session bests' sum) |
+
+Sector figures below are against the published sectors of the first table (session bests at Spa
+and Singapore).
+
+| Binding constraint (full envelope), s | Monza: full / driver / margin | Spa | Singapore |
+|---|---|---|---|
+| Corner limit | 3.547 / +0.028 / +0.050 | 7.109 / −0.018 / +0.100 | 5.681 / −0.124 / +0.080 |
+| Braking limit | 12.913 / −0.187 / +0.278 | 18.046 / −0.278 / +0.369 | 18.236 / −0.115 / +0.399 |
+| Grip-limited exit | 10.734 / +0.212 / +0.145 | 12.670 / +0.306 / +0.171 | 16.040 / −0.060 / +0.223 |
+| Full-throttle run | 54.911 / +0.725 / +0.203 | 65.033 / +1.218 / +0.280 | 45.893 / +0.790 / +0.267 |
+| Transition | 1.253 / +0.042 / +0.017 | 3.899 / +0.119 / +0.049 | 4.445 / −0.004 / +0.063 |
+
+Fast flat-out curves (Biassono, Blanchimont) are full-throttle runs: the engine, not the tyres,
+binds there. The driver's cost shows up mostly on the full-throttle runs because a slow exit is
+paid for down the following straight.
 
 | Term, full envelope (s per lap) | Monza | Spa | Singapore |
 |---|---|---|---|
@@ -1139,16 +1179,16 @@ trap (7.9).
 | Circuit | Loss | s | Model terms (source or estimate) |
 |---|---|---|---|
 | Monza | Fast corners, S2 and S3 (Lesmo, Ascari, Parabolica) | ≈3.5 | Low-trim downforce (ClA 3.6, estimate, 7.3) and the tyre's lateral μ at load (fitted, 7.4): S2 and S3 need ×1.21 lateral, inside the ×1.17–1.32 the practice speeds at Lesmo 2 and Ascari imply on this line (3.4–4.1 g against 2.9–3.1, 7.6) |
-| Monza | Driver, straights | 0.69 | Two parts. The 30 ms upshift torque cut (doc 1.3, estimate), which the plan does not model: with a seamless upshift the driven lap gains 0.289 s and the plan 0.046 s. And exit speed carried down the straights: T2 left at 64.6 km/h against a planned 72 (0.41 s to Roggia), the Parabolica left with the inside rear at 0–1.6 kN, 8° of sideslip and the slide recovery cutting the throttle (311 km/h at the control line against 316 planned) |
-| Monza | Planning margin | 0.69 | 0.29 of it braking (95 %) |
+| Monza | Driver, full-throttle runs | 0.73 | Two parts. The 30 ms upshift torque cut (doc 1.3, estimate), which the plan does not model: with a seamless upshift the driven lap gains 0.289 s and the plan 0.046 s. And exit speed carried down the straights: T2 left at 64.6 km/h against a planned 72 (0.41 s to Roggia), the Parabolica left with the inside rear at 0–1.6 kN, 8° of sideslip and the slide recovery cutting the throttle (311 km/h at the control line against 316 planned) |
+| Monza | Planning margin | 0.69 | 0.28 of it at the braking limit (planned at 95 %) |
 | Monza | S1 beyond grip | ≈0.34 | With Pouhon-scaled grip S1 is still 0.34 s over: the chicane (T1 run in at 77 km/h against a planned 70, 7.6); the trap (349.0 against 348 ± 6) puts drag and power in band |
-| Spa | Fast corners, S2 (Pouhon to Stavelot) | 4.92 | Medium-trim downforce (ClA 4.6, estimate): S2 needs ×1.236 lateral, and the published Pouhon figure gives ×1.241 (S2 42.44 s against the session best 42.53) |
+| Spa | Fast corners, S2 (Pouhon to Stavelot), against the session-best S2 | 4.92 | Medium-trim downforce (ClA 4.6, estimate): S2 needs ×1.236 lateral, and the published Pouhon figure gives ×1.241 (S2 42.44 s against the session best 42.53) |
 | Spa | S1 beyond grip | ≈0.82 | La Source to Kemmel: with Pouhon-scaled grip S1 is still 0.82 s over. Trap 312.9 km/h against 315 ± 6 (pass, 2.1 low); timing line 218.5 against 234.9 published, the Bus Stop exit; drag −5 % is worth 0.19 s in S1, propulsion alone would need ×1.49 |
-| Spa | Driver | 1.35 | Straights 1.21: the upshift cut (seamless: driven −0.305 s, plan −0.033 s) and exits carried (Stavelot to Blanchimont 0.40 s, Eau Rouge and Raidillon 0.38, Pouhon 0.16, Bruxelles 0.15) |
+| Spa | Driver | 1.35 | Full-throttle runs 1.22: the upshift cut (seamless: driven −0.305 s, plan −0.033 s) and exits carried (Stavelot to Blanchimont 0.40 s, Eau Rouge and Raidillon 0.38, Pouhon 0.16, Bruxelles 0.15) |
 | Spa | Planning margin | 0.97 | 0.60 of it in S2 |
-| Singapore | Planning margin | 1.03 | Braking 0.41, traction 0.25, straights 0.24 |
-| Singapore | Car, S3 most | 1.14 | S3 needs ×1.07 lateral or ×1.27 propulsion; trap 301.7 km/h against 304 ± 6 (pass, 2.3 low) |
-| Singapore | Driver | 0.49 | Straights 0.77 (the upshift cut: seamless driven −0.402 s, plan −0.052 s), gained back in corners and braking |
+| Singapore | Planning margin | 1.03 | Braking limit 0.40, full-throttle runs 0.27, grip-limited exits 0.22, corner limit 0.08 |
+| Singapore | Car, S3 most (against the session bests; 1.14 against the pole lap) | 1.33 | S3 needs ×1.07 lateral or ×1.27 propulsion; trap 301.7 km/h against 304 ± 6 (pass, 2.3 low) |
+| Singapore | Driver | 0.49 | Full-throttle runs 0.79 (the upshift cut: seamless driven −0.402 s, plan −0.052 s), gained back in corners and braking |
 
 **Terms found at their limit.** The MGU-K deploys its 120 kW ([1] Art. 5.3.3) wherever the car
 is power-limited; the store supplies what the MGU-H's direct feed (60 kW, estimate, doc 1.3) does
@@ -1158,13 +1198,14 @@ points from the FIA maps (docs/track-data.md 5.4–5.5). Braking is not a loss: 
 stops shorter than published at Spa and Singapore (77 and 83 m against 93 and 96 m, 7.1).
 
 **Fixes measured against every passing check** (the laps of the three reference circuits; ten
-laps on soak fuel where the plan changes):
+laps where the plan changes, starting from 30.9 / 38.6 / 32.0 kg, an estimate of 1.9 / 2.6 /
+2.0 kg a lap; the nightly soak starts Spa from 39.7 kg, 2.7 kg a lap):
 
 | Candidate | Monza / Spa / Singapore lap | Passing check it moves | Kept |
 |---|---|---|---|
 | Seamless upshift, no torque cut (Honda R&D 2009 [59]: an up-shift "with a torque loss time of zero"; almost every team had one a season later) | −0.289 / −0.305 / −0.402 s | Game kerb case teleport(540, 8, 300 km/h) steer 0, TC 0 needs the safety reset (folded first chicane) | No; the car keeps 30 ms. The sim takes `upshiftTime: 0` as a seamless shift (`stepCar`, tested), so the change is one parameter once the kerb cases allow it |
-| Plan at 99 % lateral (traction 100 %) | −0.208 / −0.177 / −0.342 s | Spa ten-lap soak on soak fuel: four wheels off, 374 tyre samples on grass | No: the margin covers the heavier car the plan does not see |
-| Plan at 99 % lateral (traction 98 %) | −0.179 / −0.157 / −0.282 s | The same Spa soak (372 samples) | No |
+| Plan at 99 % lateral (traction 100 %) | −0.208 / −0.177 / −0.342 s | Spa ten laps from 38.6 kg: four wheels off, 374 tyre samples on grass (458 from the nightly soak's 39.7 kg) | No: the margin covers the heavier car the plan does not see |
+| Plan at 99 % lateral (traction 98 %) | −0.179 / −0.157 / −0.282 s | The same Spa run (372 samples; 434 from 39.7 kg) | No |
 | Plan at 97–99 % braking | −0.13 to −0.16 / +0.44 to +0.58 / −0.15 to −0.29 s | Spa: four wheels off on a single lap | No |
 | Plan at 100 % traction | −0.025 / −0.005 / −0.062 s | None in the soak | No: worth at most 0.06 s, and the skill is part of every line's fingerprint, so all three lines and every check that reads them would move for it |
 | Controller gains (slide limit, slide and spin gains, spin recovery, lock gain and recovery, understeer lift, speed preview and gain), one at a time | −0.19 to +0.37 s, mixed sign by circuit | — | No: no robust gain; the controller sits at its own optimum |
