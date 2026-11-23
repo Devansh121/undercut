@@ -8,7 +8,6 @@ import { Track } from '@undercut/track';
 import {
   COMPOUNDS,
   ErsMode,
-  SurfaceKind,
   computeMass,
   createCarPose,
   interpolateCarPose,
@@ -72,6 +71,7 @@ import { defaultCarState } from '@undercut/audio';
 import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
+import { carStopped } from './game/stopped';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
@@ -1381,11 +1381,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       } else {
         h.wrongWay = false;
       }
-      h.stopped =
-        playing &&
-        session.world.time > 2 &&
-        t.speed < 1.5 &&
-        session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      h.stopped = carStopped({
+        playing,
+        time: session.world.time,
+        speed: t.speed,
+        surface: session.surfaceUnderCar(),
+      });
       if (session.quickRace) {
         // A race has no out lap, no lap invalidation (track limits are strikes, shown as
         // notices) and no time-trial record or ghost.
