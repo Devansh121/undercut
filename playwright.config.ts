@@ -92,7 +92,7 @@ export default defineConfig({
       name: 'pixel-phone',
       testMatch: [PHONE_DEVICE, PHONE_SOAK],
       use: {
-        ...devices['Pixel 8'],
+        ...devices['Pixel 8 landscape'],
         launchOptions,
       },
     },

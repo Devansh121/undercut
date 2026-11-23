@@ -71,7 +71,10 @@ test('sustained Mobile Quick Race on a phone: frame-time drift, heap growth, aud
       audio: sample.audio,
       audioStatus: sample.audioStatus,
       lap: (sample.state as { lap?: number }).lap,
+      phase: (sample.state as { phase?: string }).phase,
     };
+    // A paused session (an upright phone pauses) would measure nothing.
+    expect(row.phase, `minute ${m}`).toBe('running');
     minutes.push(row);
     console.log(JSON.stringify({ ...row, renderer: undefined, audio: undefined }));
   }
@@ -117,7 +120,16 @@ test('sustained Mobile Quick Race on a phone: frame-time drift, heap growth, aud
   // a shared machine; a leak or a pile-up shows as far more.
   expect(result.drift.heapMB.late).toBeLessThan(result.drift.heapMB.early * 1.15 + 4);
   expect(result.drift.meanMs.late).toBeLessThan(result.drift.meanMs.early * 1.25);
-  const r0 = minutes[1]!.renderer as Record<string, number>;
+  // GPU objects are compared from the first minute the car is on its second lap: the first lap
+  // uploads each stretch of the circuit's dressing as the car first comes near it (at Monza on
+  // this machine, 199 geometries at minute one to 263 by the lap's end), which is loading, not a
+  // pile-up. After that every stretch has been seen, so any growth is a leak.
+  const lapped = minutes.findIndex((r) => Number(r.lap) >= 2);
+  expect(lapped, 'the run must last more than one lap to judge GPU objects').toBeGreaterThanOrEqual(
+    0,
+  );
+  expect(lapped, 'and leave minutes after it').toBeLessThan(minutes.length - 1);
+  const r0 = minutes[lapped]!.renderer as Record<string, number>;
   const r1 = minutes.at(-1)!.renderer as Record<string, number>;
   for (const key of ['geometries', 'textures', 'programs'])
     if (key in r0) expect(r1[key], key).toBeLessThanOrEqual(r0[key]! + 8);
