@@ -119,6 +119,18 @@ interface Chunk {
   meshes: InstancedMesh[];
 }
 
+/**
+ * A car's body footprint for keeping debris out of it, m: from the centre to the nose and the
+ * tail and to each side (`bodyCorners` in the sim, generous for every trim), and the height
+ * under which a board can meet it.
+ */
+const CAR_NOSE = 3.4;
+const CAR_TAIL = 2.6;
+const CAR_HALF_WIDTH = 1;
+const DEBRIS_CLEAR_HEIGHT = 0.9;
+/** Room kept between a board's origin and a car's body, m. */
+const DEBRIS_CLEARANCE = 0.4;
+
 const m = new Matrix4();
 const q = new Quaternion();
 const qPitch = new Quaternion();
@@ -174,6 +186,10 @@ export class PropRegistry {
   private readonly debrisPose = createDebrisPose();
   /** Per object, the local bounds of all its meshes (x and y, m): what rests on the ground. */
   private readonly debrisBounds = new Map<number, readonly [number, number, number, number]>();
+  /** Cars seen this frame (x, z, yaw, repeated), for keeping low debris out of their bodies. */
+  private readonly cars: number[] = [];
+  /** Per moving board, how far it has been pushed out of cars so far (x, z), m. */
+  private readonly debrisPush = new Map<number, [number, number]>();
 
   /**
    * The shadow pass's depth material for props without their own: owned here and released with
@@ -298,6 +314,7 @@ export class PropRegistry {
 
   /** Local, AI and remote cars carry the same canonical hit events; never infer hits from frames. */
   observeCar(pose: CarPose, time: number): void {
+    this.cars.push(pose.x, pose.z, pose.yaw);
     const hits = pose.breakableHits;
     if (!hits) return;
     for (let k = 0; k < hits.length; k += 4) {
@@ -332,6 +349,47 @@ export class PropRegistry {
       this.writeDebris(id, hit, time);
       if (time - hit.time >= 6) this.debris.delete(id);
     }
+    this.cars.length = 0;
+  }
+
+  /**
+   * A board still low enough to meet a car's body is kept out of it: one ahead of a car's centre
+   * rides on its nose (a slow car pushes it along), any other leaves by the nearer side or the
+   * tail. The push accumulates per board, so it never springs back once the car has gone.
+   */
+  private pushOutOfCars(
+    id: number,
+    x: number,
+    z: number,
+    lift: number,
+    push: [number, number],
+  ): void {
+    if (lift >= DEBRIS_CLEAR_HEIGHT) return;
+    const cars = this.cars;
+    for (let k = 0; k < cars.length; k += 3) {
+      const c = Math.cos(cars[k + 2]!),
+        sn = Math.sin(cars[k + 2]!);
+      const dx = x + push[0] - cars[k]!,
+        dz = z + push[1] - cars[k + 1]!;
+      // Car frame: forward (cos yaw, −sin yaw), left (−sin yaw, −cos yaw).
+      const fwd = dx * c - dz * sn;
+      const left = -dx * sn - dz * c;
+      const r = DEBRIS_CLEARANCE;
+      if (fwd <= -CAR_TAIL - r || fwd >= CAR_NOSE + r || Math.abs(left) >= CAR_HALF_WIDTH + r)
+        continue;
+      let along = 0,
+        across = 0;
+      if (fwd >= 0) along = CAR_NOSE + r - fwd;
+      else {
+        const side = CAR_HALF_WIDTH + r - Math.abs(left);
+        const tail = fwd + CAR_TAIL + r;
+        if (side < tail) across = Math.sign(left || 1) * side;
+        else along = -tail;
+      }
+      push[0] += along * c - across * sn;
+      push[1] += -along * sn - across * c;
+    }
+    if (push[0] !== 0 || push[1] !== 0) this.debrisPush.set(id, push);
   }
 
   /**
@@ -343,6 +401,10 @@ export class PropRegistry {
     const refs = this.breakableInstances.get(id);
     if (!o || !refs) return;
     const pose = debrisPose(hit ?? settledHit(o), time, this.debrisPose);
+    const push = this.debrisPush.get(id) ?? [0, 0];
+    if (hit && time - hit.time < 6) this.pushOutOfCars(id, pose.x, pose.z, pose.lift, push);
+    pose.x += push[0];
+    pose.z += push[1];
     const [minX, maxX, minY, maxY] = this.boundsOf(id, refs);
     // Rolled about its width (local z), a local point (x, y) rises to x·sin + y·cos.
     const sr = Math.sin(pose.roll),
