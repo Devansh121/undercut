@@ -890,6 +890,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     document.documentElement.dataset.touch = '';
     overlay = mountTouchOverlay(document.body, input, { haptics: () => hapticsOn });
   }
+  // iOS Safari zooms on a pinch whatever the viewport says; two thumbs on the controls must not.
+  const noPinch = (event: Event): void => event.preventDefault();
+  document.addEventListener('gesturestart', noPinch, { passive: false });
 
   // Messages: one at a time, each for a short real-time span.
   let message: HudMessage | null = null;
@@ -1620,6 +1623,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     haptics.stop();
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
+    document.removeEventListener('gesturestart', noPinch);
     o.canvas.removeEventListener('webglcontextlost', onContextLost);
     o.canvas.removeEventListener('webglcontextrestored', onContextRestored);
     clusterObserver.disconnect();

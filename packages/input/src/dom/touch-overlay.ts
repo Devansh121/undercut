@@ -12,10 +12,10 @@ const STYLE_ID = 'ut-touch-style';
 
 const CSS = `
 .ut-touch {
-  --ut-l: max(var(--safe, 12px), env(safe-area-inset-left, 0px));
-  --ut-r: max(var(--safe, 12px), env(safe-area-inset-right, 0px));
-  --ut-t: max(var(--safe, 12px), env(safe-area-inset-top, 0px));
-  --ut-b: max(var(--safe, 12px), env(safe-area-inset-bottom, 0px));
+  --ut-l: max(var(--safe, 12px), var(--inset-l, env(safe-area-inset-left, 0px)));
+  --ut-r: max(var(--safe, 12px), var(--inset-r, env(safe-area-inset-right, 0px)));
+  --ut-t: max(var(--safe, 12px), var(--inset-t, env(safe-area-inset-top, 0px)));
+  --ut-b: max(var(--safe, 12px), var(--inset-b, env(safe-area-inset-bottom, 0px)));
   --ut-hit: max(var(--touch-min, 48px), 48px);
   position: fixed; inset: 0; pointer-events: none; touch-action: none;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;

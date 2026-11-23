@@ -154,8 +154,7 @@
   align-items: center;
   gap: var(--sp-4);
   min-height: 72px;
-  padding: var(--sp-3) var(--safe-r) max(var(--sp-3), env(safe-area-inset-bottom, 0px))
-    var(--safe-l);
+  padding: var(--sp-3) var(--safe-r) max(var(--sp-3), var(--inset-b)) var(--safe-l);
   box-shadow: inset 0 1px 0 var(--c-line);
   background: rgba(11, 12, 14, 0.6);
 }
@@ -241,8 +240,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  padding: var(--sp-5) var(--safe-r) max(var(--sp-5), env(safe-area-inset-bottom, 0px))
-    var(--safe-l);
+  padding: var(--sp-5) var(--safe-r) max(var(--sp-5), var(--inset-b)) var(--safe-l);
   box-shadow: inset 0 1px 0 var(--c-line);
 }
 
@@ -1011,7 +1009,7 @@
   .actionbar {
     min-height: 48px;
     padding-top: 6px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(6px, var(--inset-b));
   }
   .actionbar .btn {
     height: 44px;
@@ -1040,7 +1038,7 @@
   }
   .launch__bar {
     padding-top: var(--sp-3);
-    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(var(--sp-3), var(--inset-b));
   }
   /* A thumb-sized hit area for the credit link; the text stays small and quiet. */
   .launch__credit {
