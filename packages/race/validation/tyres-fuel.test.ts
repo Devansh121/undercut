@@ -21,16 +21,21 @@ function askIn(s: RaceSession): void {
 }
 
 describe('a race with tyres and a start fuel load', () => {
-  it('fits the starting compound off the blankets, and nothing without the option', () => {
+  it('fits the race starting set after formation warm-up, and nothing without the option', () => {
     const plain = aiSession(spec, { cars: 2, seed: 1 });
     expect(plain.worldCar(0).state.tyreCompound).toBe(-1);
     const s = aiSession(spec, { cars: 2, seed: 1, tyres: true, compound: 'soft' });
     for (let i = 0; i < 2; i++) {
       const st = s.worldCar(i).state;
       expect(st.tyreCompound).toBe(compoundIndex('soft'));
-      expect(Array.from(st.tyreTemp)).toEqual([K + 70, K + 70, K + 70, K + 70]);
+      expect(Array.from(st.tyreTemp)).toEqual([K + 85, K + 85, K + 85, K + 85]);
     }
     expect(s.control.cars[0]!.compound).toBe('soft');
+    const practice = aiSession(
+      { kind: 'practice', duration: 60 },
+      { cars: 1, seed: 1, tyres: true, compound: 'hard' },
+    );
+    expect(Array.from(practice.worldCar(0).state.tyreTemp)).toEqual(Array(4).fill(K + 70));
   });
 
   it('a stop fits a fresh set of the new compound; the start load burns down', () => {
@@ -98,7 +103,7 @@ describe('a race with tyres and a start fuel load', () => {
 });
 
 describe('Quick Race at Monza with tyres and a start load', () => {
-  // As the game runs it: twenty cars on mediums off the blankets, the start load for five laps
+  // As the game runs it: twenty cars on mediums after formation warm-up, the start load for five laps
   // and a lap in hand, the racing drivers easing off to the grip their tyres have; here each
   // also stops once for hards around half distance (the nightly soak runs it without stops).
   it('seed 17: clean start, no spins, no stuck cars, every car classified on two compounds', () => {

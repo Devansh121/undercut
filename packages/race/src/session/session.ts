@@ -9,6 +9,8 @@ import {
   createWorld,
   readCarPose,
   readCarTelemetry,
+  COMPOUNDS,
+  compoundIndex,
   fitTyres,
   restoreCar,
   snapshotCar,
@@ -32,6 +34,17 @@ import { buildResult, type EntrantInfo, type SessionResult } from '../results';
 import type { RaceRules } from '../rules';
 import type { TimingBests } from '../timing/lap-timer';
 import type { CarController, ControlContext, ControllerState } from './controllers';
+
+/**
+ * Estimated grid condition after an unmodelled formation lap: every starting set (human and
+ * AI) is 5 K inside its window. Blankets alone cool further on the run to Monza turn one
+ * (seed 5: 16/20 clean); the grid warm-up represents work before the start, not extra grip.
+ * Pit sets and practice/qualifying still start at the 70 °C blanket limit [17].
+ */
+const FORMATION_WARMTH = 5;
+function formationTemperature(compound: CompoundId): number {
+  return COMPOUNDS[compoundIndex(compound)]!.windowLow + FORMATION_WARMTH;
+}
 
 /** Sim step: 240 Hz (ADR 0007). */
 export const RACE_STEP = 1 / 240;
@@ -238,7 +251,15 @@ export class RaceSession {
             : {}),
       });
       if (car.ersMode !== undefined) setErsMode(wc.state, car.ersMode);
-      if (this.tyres) fitTyres(wc.state, this.control.cars[i]!.compound as CompoundId);
+      if (this.tyres) {
+        const compound = this.control.cars[i]!.compound as CompoundId;
+        // A race starts after the formation lap: the starting set warmed off its blankets.
+        fitTyres(
+          wc.state,
+          compound,
+          o.session.kind === 'race' ? { temperature: formationTemperature(compound) } : {},
+        );
+      }
     });
     this.facts = o.cars.map(() => createFacts());
     this.telemetry = o.cars.map(() => createCarTelemetry());

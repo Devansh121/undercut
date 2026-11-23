@@ -7,6 +7,8 @@ import {
   TYRE_THERMAL,
   compoundIndex,
   createCarState,
+  createCarTelemetry,
+  readCarTelemetry,
   createEnvironment,
   fitTyres,
   restoreCar,
@@ -139,5 +141,14 @@ describe('temperature and wear on the move', () => {
     expect(c.tyreCompound).toBe(compoundIndex('medium'));
     run(c, CIRCLE, 3);
     expect(Array.from(snapshotCar(c))).toEqual(Array.from(snapshotCar(a)));
+  });
+});
+
+describe('the grip the car reports', () => {
+  it('is the weaker axle, the mean of its two tyres; exactly 1 with no tyres fitted', () => {
+    const car = createCarState(REFERENCE_CAR);
+    expect(readCarTelemetry(car, createCarTelemetry()).tyreGrip).toBe(1);
+    car.gripScale.set([0.9, 1, 0.97, 0.99]);
+    expect(readCarTelemetry(car, createCarTelemetry()).tyreGrip).toBeCloseTo(0.95, 12);
   });
 });

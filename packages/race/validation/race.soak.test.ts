@@ -28,7 +28,7 @@ describe('Quick Race on more seeds, with pit stops', () => {
 });
 
 describe('Quick Race at Monza with tyres and a start load, no stops, more seeds', () => {
-  for (const seed of [1, 29, 211]) {
+  for (const seed of [1, 5, 29, 211]) {
     it(`seed ${seed}`, () => {
       const run = runRace({
         cars: 20,
