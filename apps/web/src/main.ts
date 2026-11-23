@@ -141,16 +141,17 @@ function showMenus(screen: 'launch' | 'hub'): void {
 }
 
 /** The choice on the main menu now (the debug API starts with it). */
-function currentChoice(): SessionChoice {
+function currentChoice(circuit?: string): SessionChoice {
   const p = prefs.get();
-  const summary = CIRCUITS.find((c) => c.id === p.circuit);
+  const id = circuit ?? p.circuit;
+  const summary = CIRCUITS.find((c) => c.id === id);
   return {
     mode: 'timeTrial',
-    circuit: p.circuit,
+    circuit: id,
     team: p.team,
     driver: p.driver,
     // The circuit's own sky as the hub would pick it (Spa is overcast), not the default one.
-    timeOfDay: summary ? timeOfDayOf(p, summary) : (p.timeOfDay[p.circuit] ?? ''),
+    timeOfDay: summary ? timeOfDayOf(p, summary) : (p.timeOfDay[id] ?? ''),
     assists: p.assists[input.activeDevice] ?? {},
   };
 }
@@ -292,7 +293,7 @@ if (debugEnabled()) {
     (o) =>
       o?.quickRace
         ? start(
-            { ...currentChoice(), mode: 'quickRace', circuit: 'monza' },
+            { ...currentChoice(o.circuit ?? 'monza'), mode: 'quickRace' },
             undefined,
             undefined,
             o.quickRace,

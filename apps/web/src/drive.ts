@@ -1,5 +1,5 @@
 /**
- * The drive screen: a time-trial session at Monza in the browser. Loaded on demand from the
+ * The drive screen: a time trial or a Quick Race at any circuit in the browser. Loaded on demand from the
  * launch screen so the first paint does not wait for three.js and the track. Wires the pure
  * session and loop (game/) to the renderer (@undercut/render), the HUD and menus (ui/), the
  * input layer, storage and the audio seam.
@@ -86,6 +86,7 @@ import {
   DriveSession,
   TIME_TRIAL_FUEL,
   type QuickRaceOptions,
+  type RaceArtefacts,
   type SessionEvent,
 } from './game/session';
 import { Hud, type HudIdentity, type HudMessage, type HudState } from './ui/hud';
@@ -333,30 +334,43 @@ const AI_ENVELOPES = import.meta.glob<unknown>('../../../packages/ai/data/*.enve
 });
 
 /**
- * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, and the
- * driving line for braking help. The guide's advised speeds come from the envelope of the car
- * the line was built for, so it is used only when that is the player's trim (low downforce).
+ * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, the
+ * driving line for braking help, and for a race the line and envelope the AI field drives on.
+ * The guide's advised speeds come from the envelope of the car the line was built for, so it is
+ * used only when that is the player's car: a race runs every car in the line's trim, time trial
+ * the low-drag car.
  */
 async function racingLine(
   track: Track,
-): Promise<{ offsets: Float64Array; guide: EnvelopeArtefact | null } | null> {
+  race: boolean,
+): Promise<{
+  offsets: Float64Array;
+  guide: EnvelopeArtefact | null;
+  artefacts: RaceArtefacts | null;
+} | null> {
   const prefix = `../../../packages/ai/data/${track.id}-`;
   const key = Object.keys(AI_LINES).find((k) => k.startsWith(prefix));
   const load = key ? AI_LINES[key] : undefined;
   if (!key || !load) return null;
-  const raw = (await load()) as { count: number; offsetTenthMm: number[] };
+  const raw = (await load()) as { count: number; trim: string; offsetTenthMm: number[] };
   if (raw.count !== track.lap.count) return null;
   const offsets = Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
-  const envelope = key.endsWith('-low.line.json')
-    ? AI_ENVELOPES[key.replace('.line.json', '.envelope.json')]
-    : undefined;
-  return { offsets, guide: envelope ? ((await envelope()) as EnvelopeArtefact) : null };
+  const loadEnvelope = AI_ENVELOPES[key.replace('.line.json', '.envelope.json')];
+  const playerTrim = race ? raw.trim : 'low';
+  const envelope = loadEnvelope && (race || raw.trim === playerTrim) ? await loadEnvelope() : null;
+  return {
+    offsets,
+    guide: envelope && raw.trim === playerTrim ? (envelope as EnvelopeArtefact) : null,
+    artefacts: race && envelope ? { line: raw, envelope } : null,
+  };
 }
 
 export interface DriveHandle {
   readonly session: DriveSession;
   readonly loop: GameLoop;
   readonly view: RaceView;
+  /** The time of day the session is lit for (`TIMES_OF_DAY` id). */
+  readonly timeOfDay: string;
   /** The render preset in use, and a switch to another (rebuilds the view, keeps the session). */
   readonly quality: QualityName;
   /** Views built for this session (the first, quality switches, context restores). */
@@ -403,7 +417,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const ai = await racingLine(track);
+  const ai = await racingLine(track, o.quickRace !== undefined);
   const line = ai?.offsets ?? null;
   const drivingLine =
     ai && ai.guide
@@ -417,6 +431,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     record,
     today: o.today,
     ...(o.quickRace ? { quickRace: o.quickRace } : {}),
+    ...(ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
@@ -739,7 +754,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         label: S.setup.braking,
         description: S.setup.help.braking,
         choices: levels,
-        // Braking help follows the driving line, which exists at Monza only for now.
+        // Braking help follows the driving line, which exists where the player's car has one.
         disabled: () => drivingLine === null,
         hint: S.setup.brakingNoLine,
         get: () => session.assists.braking,
@@ -1577,6 +1592,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     get view() {
       return view;
     },
+    timeOfDay: tod.id,
     get quality() {
       return quality;
     },

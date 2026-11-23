@@ -1,7 +1,7 @@
 import { createAiField, type SessionResult, type AiController } from '@undercut/race';
 import { decodeEnvelope, decodeRacingLine, racingLineOffsets } from '@undercut/ai';
-import raceLine from '../../../../packages/ai/data/monza-low.line.json';
-import raceEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
+import monzaLine from '../../../../packages/ai/data/monza-low.line.json';
+import monzaEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
 import {
   InputController,
   RaceSession,
@@ -24,6 +24,7 @@ import {
   createSurfaceHint,
   createSurfaceSample,
   invariantLimits,
+  type AeroTrim,
   readCarTelemetry,
   type AssistState,
   type CarParams,
@@ -93,9 +94,34 @@ export interface QuickRaceOptions {
   fieldStartDelay?: number;
 }
 
+/**
+ * The circuit's racing line and measured envelope as the build ships them (raw JSON): what the
+ * AI field drives on in a Quick Race, in the trim the line was built for.
+ */
+export interface RaceArtefacts {
+  line: unknown;
+  envelope: unknown;
+}
+
+/** Aero trims the cars can run. */
+const TRIMS: readonly AeroTrim[] = ['low', 'medium', 'high'];
+
+/**
+ * The artefacts a Quick Race on `track` races on: the ones given, else Monza's (bundled, so tests
+ * and tools that build a session at Monza need not load them). Any other circuit must be given
+ * its own: a line from another circuit would put the field on the wrong road.
+ */
+function raceArtefactsFor(track: Track, given: RaceArtefacts | undefined): RaceArtefacts {
+  if (given) return given;
+  if (track.id === 'monza') return { line: monzaLine, envelope: monzaEnvelope };
+  throw new Error(`a Quick Race at ${track.id} needs its racing line and envelope`);
+}
+
 export interface DriveSessionOptions {
   track: Track;
   quickRace?: QuickRaceOptions;
+  /** Quick Race: the circuit's racing line and envelope (default: Monza's, at Monza only). */
+  raceArtefacts?: RaceArtefacts;
   seed: number;
   params?: CarParams;
   /** All-time best for this circuit, from storage. */
@@ -108,6 +134,13 @@ export interface DriveSessionOptions {
   device?: DeviceKind;
   /** Advised speeds round the circuit (the driving line), for the braking help. */
   guide?: SpeedGuide;
+}
+
+/** The trim a racing line names, checked. */
+export function raceTrim(name: string): AeroTrim {
+  const trim = TRIMS.find((t) => t === name);
+  if (!trim) throw new Error(`unknown aero trim ${name}`);
+  return trim;
 }
 
 /**
@@ -129,6 +162,8 @@ export class DriveSession {
   readonly raceEvents: RaceEvent[] = [];
   result: SessionResult | null = null;
   readonly track: Track;
+  /** The cars' aero trim: the race line's in a Quick Race, low drag in time trial. */
+  readonly trim: AeroTrim;
   readonly race: RaceSession;
   readonly world: World;
   readonly car: WorldCar;
@@ -175,7 +210,17 @@ export class DriveSession {
     this.quickRace = options.quickRace !== undefined;
     this.track = options.track;
     this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
-    this.params = options.params ?? createCarParams('low');
+    const artefacts = this.quickRace
+      ? raceArtefactsFor(options.track, options.raceArtefacts)
+      : null;
+    const line = artefacts ? decodeRacingLine(artefacts.line) : null;
+    if (line && line.count !== options.track.lap.count) {
+      throw new Error(`the racing line for ${line.circuit} does not fit ${options.track.id}`);
+    }
+    // A race: every car in the trim the field's line and envelope were measured for (Monza low,
+    // Spa medium, Singapore high). Time trial: the low-drag car, as its records were set in.
+    this.trim = line ? raceTrim(line.trim) : 'low';
+    this.params = options.params ?? createCarParams(this.trim);
     this.today = options.today ?? '';
     this.initialDevice = options.device ?? 'keyboard';
     this.deviceValue = this.initialDevice;
@@ -191,33 +236,33 @@ export class DriveSession {
     };
     const record = options.record ?? null;
     const limits = options.limits;
-    const line = this.quickRace ? decodeRacingLine(raceLine) : null;
     this.lineOffsets = line ? racingLineOffsets(line) : null;
     const gridSlot = this.quickRace
       ? Math.max(0, Math.min(19, Math.round(options.quickRace?.gridPosition ?? 10) - 1))
       : 0;
-    const field = line
-      ? createAiField({
-          track: this.track,
-          params: this.params,
-          line,
-          // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
-          gridNoise: options.quickRace?.gridNoise ?? 0.5,
-          envelope: decodeEnvelope(raceEnvelope),
-          count: 20,
-          seed: options.seed,
-          ...(options.quickRace?.skillSpread !== undefined
-            ? { spread: options.quickRace.skillSpread }
-            : {}),
-          ...(options.quickRace?.fieldStartDelay !== undefined
-            ? {
-                startDelay: options.quickRace.fieldStartDelay,
-                noDelay: gridSlot,
-                jumpStartChance: 0,
-              }
-            : {}),
-        })
-      : [];
+    const field =
+      line && artefacts
+        ? createAiField({
+            track: this.track,
+            params: this.params,
+            line,
+            // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
+            gridNoise: options.quickRace?.gridNoise ?? 0.5,
+            envelope: decodeEnvelope(artefacts.envelope),
+            count: 20,
+            seed: options.seed,
+            ...(options.quickRace?.skillSpread !== undefined
+              ? { spread: options.quickRace.skillSpread }
+              : {}),
+            ...(options.quickRace?.fieldStartDelay !== undefined
+              ? {
+                  startDelay: options.quickRace.fieldStartDelay,
+                  noDelay: gridSlot,
+                  jumpStartChance: 0,
+                }
+              : {}),
+          })
+        : [];
     this.playerPilot = field[gridSlot] ?? null;
     const aiField = this.quickRace
       ? [...field.slice(0, gridSlot), ...field.slice(gridSlot + 1)]
