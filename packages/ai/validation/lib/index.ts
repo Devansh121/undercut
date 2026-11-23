@@ -5,3 +5,4 @@ export * from './lap';
 export * from './report';
 export * from './targets';
 export * from './bench';
+export * from './budget';
