@@ -139,8 +139,10 @@ in an overlapping lane that would close the gap within 2 s at its closing speed.
 it again, as traffic, as soon as it moves faster than 2 m/s, so the cars behind plan round it
 before it turns solid. The race screen draws a blocking ghost at half strength and tells the
 player when their own car is one. Only cars racing and under way
-count (not in the pit lane, not held by the pit crew, and not cars that have yet to move off the
-grid). The state is carried in `RaceSession.snapshot` (`blockers`).
+count (not in the pit lane, not held by the pit crew). Under way is having been at speed, or
+still racing a second after the lights went out: a car stalled on the grid counts, and becomes a
+ghost after 1.5 s of held-up traffic rather than 6 s, since the cars behind it have not got away
+at all. The state is carried in `RaceSession.snapshot` (`blockers`).
 
 ## Snapshots and cost
 
