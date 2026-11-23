@@ -1494,3 +1494,10 @@
     padding: 1px 4px;
   }
 }
+
+/* The device tabs are touch targets on a phone. */
+@media (pointer: coarse) {
+  .controls__tabs .tab {
+    min-height: 44px;
+  }
+}
