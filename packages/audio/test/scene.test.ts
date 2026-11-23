@@ -10,8 +10,16 @@ import {
   type AudioScene,
   type OtherCarSound,
 } from '../src';
-import { bandPower, findPeak, magnitudeSpectrum, rmsDbfs, spectralCentroid } from '../src/analysis';
-import { FS, identical } from './helpers';
+import {
+  bandPower,
+  findPeak,
+  magnitudeSpectrum,
+  maxStep,
+  rmsDbfs,
+  samplePeak,
+  spectralCentroid,
+} from '../src/analysis';
+import { engineState, FS, identical } from './helpers';
 
 const RPM = 9000;
 /** Firing frequency of a four-stroke V6: rpm / 60 × 3. */
@@ -248,8 +256,9 @@ describe('circuit ambience', () => {
   });
 
   it('puts the crowd on the side of the stands and scales with it', () => {
-    const left = bed('none', { crowdLeft: 1 });
-    expect(rmsDbfs(left.left) - rmsDbfs(left.right)).toBeGreaterThan(30);
+    const left = bed('none', { crowdLeft: 1, crowdRight: 0.25 });
+    const side = rmsDbfs(left.left.subarray(2 * FS)) - rmsDbfs(left.right.subarray(2 * FS));
+    expect(Math.abs(side - 12.04)).toBeLessThan(0.5);
     const quarter = bed('none', { crowdLeft: 0.25 });
     const drop = rmsDbfs(left.left.subarray(2 * FS)) - rmsDbfs(quarter.left.subarray(2 * FS));
     expect(Math.abs(drop - 12.04)).toBeLessThan(0.5);
@@ -321,5 +330,133 @@ describe('cues', () => {
     for (let i = 1100; i < 1300; i++)
       step = Math.max(step, Math.abs(out[0]![i]! - out[0]![i - 1]!));
     expect(step).toBeLessThan(0.02);
+  });
+});
+
+/** Largest sample-to-sample step of either channel over [from, to) seconds. */
+const stepIn = (clip: Clip, from: number, to: number) =>
+  Math.max(
+    maxStep(clip.left, Math.round(from * FS) + 1, Math.round(to * FS)),
+    maxStep(clip.right, Math.round(from * FS) + 1, Math.round(to * FS)),
+  );
+
+describe('no steps, no swells (review of PR 51)', () => {
+  it('hears two cars at their own rpm, each on its own side', () => {
+    const clip = still(
+      scene([
+        car(10, -8, { engineSpeed: (9000 * Math.PI) / 30 }),
+        car(10, 8, { engineSpeed: (11000 * Math.PI) / 30 }),
+      ]),
+    );
+    const l = spectrum(clip.left);
+    const r = spectrum(clip.right);
+    const a = findPeak(l, FS, 400, 500);
+    const b = findPeak(r, FS, 500, 600);
+    expect(Math.abs(a.frequency - 450)).toBeLessThan(0.5);
+    expect(Math.abs(b.frequency - 550)).toBeLessThan(0.5);
+    expect(a.magnitude).toBeGreaterThan(2 * findPeak(r, FS, 400, 500).magnitude);
+    expect(b.magnitude).toBeGreaterThan(2 * findPeak(l, FS, 500, 600).magnitude);
+  });
+
+  it('fades a receding car smoothly through the cull and field distances, to silence', () => {
+    // 40 m/s away from 200 m to 720 m: voice, crossfade into the far field, field fade-out.
+    const clip = render(13, (t) => scene([car(200 + 40 * t, 3, { vx: 40 })]));
+    let last = Infinity;
+    for (let s = 0.25; s + 0.25 <= 12.5; s += 0.25) {
+      const level = rmsDbfs(clip.left.subarray(s * FS, (s + 0.25) * FS));
+      if (last > -120) expect(level, `at ${(200 + 40 * s).toFixed(0)} m`).toBeLessThan(last + 0.5);
+      last = level;
+    }
+    expect(samplePeak(clip.left.subarray(12.5 * FS))).toBeLessThan(1e-6);
+  });
+
+  it('gives the far field each car once at full throttle (the voice applies throttle)', () => {
+    const sound = new SceneSound(FS);
+    sound.set(scene([car(400, 0, { throttle: 0 })]));
+    const closed = sound.fieldLevel;
+    sound.set(scene([car(400, 0, { throttle: 1 })]));
+    expect(sound.fieldLevel).toBe(closed);
+  });
+
+  it('makes no step when a car enters the pool and another leaves', () => {
+    const six = Array.from({ length: 6 }, (_, i) => car(20 + 10 * i, i % 2 ? 3 : -3));
+    const clip = render(1.2, (t) => scene(t < 0.5 ? six : [...six, car(8, 2)]));
+    const steady = Math.max(stepIn(clip, 0.2, 0.5), stepIn(clip, 0.9, 1.2));
+    expect(stepIn(clip, 0.5, 0.65)).toBeLessThanOrEqual(1.2 * steady);
+  });
+
+  it('makes no step when the sixth and seventh cars swap places every frame', () => {
+    const five = Array.from({ length: 5 }, (_, i) => car(15 + 8 * i, i % 2 ? 3 : -3));
+    let flip = false;
+    const swap = render(1.5, () => {
+      flip = !flip;
+      return scene([
+        ...five,
+        car(flip ? 70 : 72, 4),
+        car(flip ? 72 : 70, -4, { engineSpeed: (9500 * Math.PI) / 30 }),
+      ]);
+    });
+    const fixed = render(1.5, () =>
+      scene([...five, car(70, 4), car(72, -4, { engineSpeed: (9500 * Math.PI) / 30 })]),
+    );
+    expect(stepIn(swap, 0.3, 1.5)).toBeLessThanOrEqual(1.2 * stepIn(fixed, 0.3, 1.5));
+  });
+
+  it('makes no step when the bed and the crowd change in one update', () => {
+    const clip = render(4, (t) =>
+      scene(
+        [],
+        t < 1.5 ? { ambience: 'forest' } : { ambience: 'city-night', crowdLeft: 2, crowdRight: 2 },
+      ),
+    );
+    const steady = Math.max(stepIn(clip, 0.8, 1.5), stepIn(clip, 3.2, 4));
+    expect(stepIn(clip, 1.5, 1.65)).toBeLessThanOrEqual(1.2 * steady);
+  });
+
+  it('does not let the frozen race mix through when a menu cue follows a pause', () => {
+    const drive = (core: AudioCore) => {
+      core.setCarState(engineState(11_000, 1, { boost: 1, ersPower: 120_000, speed: 70 }));
+      core.setScene(
+        scene(
+          Array.from({ length: 8 }, (_, i) => car(6 + 6 * i, i % 2 ? 3 : -3)),
+          {
+            ambience: 'park',
+            crowdLeft: 2,
+            crowdRight: 1.4,
+          },
+        ),
+      );
+    };
+    const block = (core: AudioCore, seconds: number) => {
+      const out = [new Float32Array(seconds * FS), new Float32Array(seconds * FS)];
+      for (let i = 0; i < out[0]!.length; i += 128) {
+        core.process(
+          out.map((c) => c.subarray(i, i + 128)),
+          Math.min(128, out[0]!.length - i),
+        );
+      }
+      return out;
+    };
+    // Driving, then a pause (tap to pause: the car buses still open), frozen.
+    const core = new AudioCore({ sampleRate: FS });
+    drive(core);
+    block(core, 1);
+    core.setPaused(true);
+    block(core, 0.2);
+    expect(core.silent).toBe(true);
+    // The page closes the car and circuit buses, unpauses and plays the cue, in that order.
+    for (const id of ['engine', 'effects', 'ambience'] as const) core.setGain(id, 0);
+    core.setPaused(false);
+    core.cue('focus');
+    const after = block(core, 0.15);
+    // The cue alone, from a core whose car buses were closed all along.
+    const alone = new AudioCore({ sampleRate: FS });
+    for (const id of ['engine', 'effects', 'ambience'] as const) alone.setGain(id, 0);
+    drive(alone);
+    block(alone, 1);
+    alone.cue('focus');
+    const cue = block(alone, 0.15);
+    const peak = (c: Float32Array[]) => Math.max(samplePeak(c[0]!), samplePeak(c[1]!));
+    expect(peak(after)).toBeLessThanOrEqual(peak(cue) * 1.001);
   });
 });

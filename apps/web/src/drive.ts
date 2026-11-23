@@ -68,7 +68,7 @@ const propCatalog: unknown = Object.values(
 // The AI's racing line and measured vehicle envelope are loaded per circuit below, for the
 // rubbered line, the driving-line assist, and the driving line's advised speeds (braking help).
 import { defaultCarState } from '@undercut/audio';
-import { RaceAudioScene } from './game/audio-scene';
+import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
@@ -1397,7 +1397,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       audioState,
       !playing || document.visibilityState === 'hidden',
       camera === 'cockpit' || camera === 'tcam' ? camera : camera === 'tv' ? 'trackside' : 'chase',
-      audioScene.update(session, view.world?.stands),
+      audioScene.update(session, view.world?.stands, voicesFor(quality)),
     );
 
     ext?.ready?.();

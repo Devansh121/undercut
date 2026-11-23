@@ -1,4 +1,9 @@
-import type { AmbienceKind, AudioScene, OtherCarSound } from '@undercut/audio';
+import {
+  AUDIBLE_CARS,
+  type AmbienceKind,
+  type AudioScene,
+  type OtherCarSound,
+} from '@undercut/audio';
 import type { DriveSession } from './session';
 
 /**
@@ -30,6 +35,16 @@ const FULL_STAND = 60 * 20;
 const NEAR_FIELD = 20;
 /** How far the crowd's side follows the stand's bearing (1 would be hard left or right). */
 const CROWD_WIDTH = 0.8;
+
+/**
+ * Opponent voices of their own per graphics preset; the rest go to the far field. Mobile and
+ * Lite keep three until the worklet's cost is measured on a phone: in a muted Mobile Quick Race
+ * on this laptop it took 4.35 % of one core with six, and a phone core may be 4–6 times slower
+ * against a 10 % budget.
+ */
+export function voicesFor(quality: string): number {
+  return quality === 'mobile' || quality === 'lite' ? 3 : 6;
+}
 
 /** The circuit's location bed by track id. */
 export function ambienceFor(trackId: string): AmbienceKind {
@@ -75,8 +90,13 @@ export function crowdAt(
     left += (level * Math.cos(angle)) ** 2;
     right += (level * Math.sin(angle)) ** 2;
   }
-  out.left = Math.min(2, Math.sqrt(2 * left));
-  out.right = Math.min(2, Math.sqrt(2 * right));
+  out.left = softCrowd(Math.sqrt(2 * left));
+  out.right = softCrowd(Math.sqrt(2 * right));
+}
+
+/** Above 1 (a full stand at 20 m) the crowd grows ever more slowly towards 2: 2 − 1/x. */
+function softCrowd(x: number): number {
+  return x <= 1 ? x : 2 - 1 / x;
 }
 
 /** Reused per-frame scene, with stable race-index slots for up to nineteen opponents. */
@@ -99,7 +119,12 @@ export class RaceAudioScene {
     lights: -1,
   };
 
-  update(session: DriveSession, stands: readonly CrowdStand[] = []): AudioScene {
+  update(
+    session: DriveSession,
+    stands: readonly CrowdStand[] = [],
+    voices = AUDIBLE_CARS,
+  ): AudioScene {
+    this.state.voices = voices;
     const p = session.car.state;
     const c = Math.cos(p.yaw);
     const s = Math.sin(p.yaw);

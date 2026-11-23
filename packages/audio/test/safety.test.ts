@@ -35,8 +35,33 @@ function everything(t: number): AudioCarState {
 describe('limiter', () => {
   it('holds true peak under 0 dBFS with everything at maximum', () => {
     const core = new AudioCore({ sampleRate: FS });
-    for (const id of ['master', 'engine', 'effects', 'ui'] as const) core.setGain(id, 2);
-    const clip = render(core, 3, everything);
+    for (const id of ['master', 'engine', 'effects', 'ui', 'ambience'] as const) {
+      core.setGain(id, 2);
+    }
+    // The scene at its loudest too: nineteen cars at 2–29 m at the limiter, the city bed, the
+    // crowd at its maximum with the lights-out cheer, and a menu cue every 0.2 s.
+    let cue = 0;
+    const clip = render(core, 3, (t) => {
+      core.setScene({
+        cars: Array.from({ length: 19 }, (_, i) => ({
+          x: (i % 2 ? 1 : -1) * (2 + 1.5 * i),
+          z: i % 3 ? 2 : -2,
+          vx: -40,
+          vz: 0,
+          engineSpeed: rpmToRadPerSecond(12_500),
+          throttle: 1,
+        })),
+        ambience: 'city-night',
+        crowdLeft: 2,
+        crowdRight: 2,
+        lights: t < 0.5 ? Math.floor(t * 10) : 6,
+      });
+      if (t >= cue) {
+        core.cue('accept');
+        cue += 0.2;
+      }
+      return everything(t);
+    });
     expect(core.limiter.minGain, 'the limiter engaged').toBeLessThan(0.9);
     for (const ch of [clip.left, clip.right]) {
       expect(samplePeak(ch)).toBeLessThan(1);

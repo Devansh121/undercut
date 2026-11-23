@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { menuCue } from '../src/audio';
-import { ambienceFor, crowdAt, RaceAudioScene, type CrowdStand } from '../src/game/audio-scene';
+import {
+  ambienceFor,
+  crowdAt,
+  RaceAudioScene,
+  voicesFor,
+  type CrowdStand,
+} from '../src/game/audio-scene';
 import type { DriveSession } from '../src/game/session';
 
 /** A full stand (60 m, 20 rows) whose front runs east along z = `z`, centred on x = 0. */
@@ -19,10 +25,10 @@ describe('crowd from the grandstands', () => {
     const out = { left: 0, right: 0 };
     crowdAt({ x: 0, z: 0, yaw: 0 }, [stand(-20)], out);
     expect(out.left).toBeGreaterThan(4 * out.right);
-    expect(Math.hypot(out.left, out.right)).toBeCloseTo(Math.SQRT2, 6); // level 1 at 20 m
-    // Turned to face north, the same stand is straight ahead.
+    // Turned to face north, the same stand is straight ahead: level 1 in each ear at 20 m.
     crowdAt({ x: 0, z: 0, yaw: Math.PI / 2 }, [stand(-20)], out);
-    expect(out.left).toBeCloseTo(out.right, 6);
+    expect(out.left).toBeCloseTo(1, 6);
+    expect(out.right).toBeCloseTo(1, 6);
   });
 
   it('halves with doubled distance, scales with rows, and adds stands by power', () => {
@@ -35,6 +41,22 @@ describe('crowd from the grandstands', () => {
     expect(at([stand(-40, 10)]) / at([stand(-40)])).toBeCloseTo(0.5, 6);
     expect(at([stand(-40), stand(40)]) / at([stand(-40)])).toBeCloseTo(Math.SQRT2, 6);
     expect(at([])).toBe(0);
+  });
+
+  it('grows ever more slowly above a full stand at 20 m, never past 2', () => {
+    const ahead = (stands: CrowdStand[]) => {
+      const out = { left: 0, right: 0 };
+      crowdAt({ x: 0, z: 0, yaw: Math.PI / 2 }, stands, out);
+      return out.left;
+    };
+    expect(ahead([stand(-20), stand(-20)])).toBeCloseTo(2 - 1 / Math.SQRT2, 6);
+    expect(ahead(Array.from({ length: 50 }, () => stand(-20)))).toBeLessThan(2);
+  });
+
+  it('keeps three voices on the Mobile and Lite presets and six elsewhere', () => {
+    expect(voicesFor('mobile')).toBe(3);
+    expect(voicesFor('lite')).toBe(3);
+    expect(voicesFor('high')).toBe(6);
   });
 
   it('names the bed for each circuit', () => {

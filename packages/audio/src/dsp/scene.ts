@@ -33,18 +33,29 @@ export interface AudioScene {
   crowdRight: number;
   /** −1 outside the start procedure, 0–5 red lamps lit, 6 lights out. */
   lights: number;
+  /**
+   * How many cars may have a voice of their own, 0–`AUDIBLE_CARS` (default `AUDIBLE_CARS`);
+   * the rest go to the far field. The game lowers it on the Mobile preset to save CPU.
+   */
+  voices?: number;
 }
 
 export type { AudioCue, AmbienceKind };
 export const OTHER_CAR_CAPACITY = 19;
-/** Voices rendered individually: the nearest cars within `CULL_DISTANCE`. */
+/** Most voices rendered individually: the nearest cars within `CULL_DISTANCE`. */
 export const AUDIBLE_CARS = 6;
-/** Beyond this, a car has no voice of its own; its level fades out over the last 80 m. */
+/**
+ * Beyond this, a car has no voice of its own. Over the last `CROSSFADE` metres its voice fades
+ * and the far field takes its power over (constant power), so its level falls smoothly.
+ */
 export const CULL_DISTANCE = 300;
-/** Cars without a voice but nearer than this are summed into one distant-field voice. */
+export const CROSSFADE = 80;
+/** Cars without a voice but nearer than this are summed into one far-field voice; their share
+ * fades out over the last `FIELD_FADE` metres. */
 export const FIELD_DISTANCE = 600;
+export const FIELD_FADE = 100;
 
-const HEADER = 5;
+const HEADER = 6;
 const PER_CAR = 6;
 /** Length of a packed scene. */
 export const SCENE_LENGTH = HEADER + OTHER_CAR_CAPACITY * PER_CAR;
@@ -60,6 +71,7 @@ export function packScene(
   out[2] = scene.crowdLeft;
   out[3] = scene.crowdRight;
   out[4] = scene.lights;
+  out[5] = scene.voices ?? AUDIBLE_CARS;
   for (let i = 0; i < count; i++) {
     const c = scene.cars[i] as OtherCarSound;
     const o = HEADER + i * PER_CAR;
@@ -91,6 +103,7 @@ const FALLBACK = new Float64Array(SCENE_LENGTH);
   field(2, 0, 2, 0);
   field(3, 0, 2, 0);
   field(4, -1, 6, -1);
+  field(5, 0, AUDIBLE_CARS, AUDIBLE_CARS);
   for (let i = 0; i < OTHER_CAR_CAPACITY; i++) {
     const o = HEADER + i * PER_CAR;
     field(o, -1e5, 1e5, NaN);
@@ -174,7 +187,8 @@ export class SceneSound {
     }
     // The nearest `AUDIBLE_CARS` within the cull distance get a voice.
     this.picked.fill(0);
-    for (let n = 0; n < AUDIBLE_CARS; n++) {
+    const voices = (p[5] as number) | 0;
+    for (let n = 0; n < voices; n++) {
       let best = -1;
       let bestDistance = CULL_DISTANCE;
       for (let i = 0; i < count; i++) {
@@ -206,13 +220,21 @@ export class SceneSound {
       const z = p[o + 1] as number;
       const engine = p[o + 4] as number;
       const throttle = p[o + 5] as number;
+      // The car's level at full throttle; the voices apply throttle themselves.
+      const g = (level0 * reference) / Math.max(reference, d);
+      // Power the far field carries for this car: all of it for a car without a voice (fading
+      // out towards the field distance), the share its voice gives up while crossfading.
+      let w: number;
       if (this.picked[i]) {
-        const fade = Math.min(1, Math.max(0, (CULL_DISTANCE - d) / 80));
-        v.targetGain = ((level0 * reference) / Math.max(reference, d)) * fade;
+        const fade = Math.min(1, Math.max(0, (CULL_DISTANCE - d) / CROSSFADE));
+        v.targetGain = g * fade;
         v.aim(p, o);
-      } else if (d < FIELD_DISTANCE) {
-        const g = ((level0 * reference) / Math.max(reference, d)) * (0.4 + 0.6 * throttle);
-        const w = g * g;
+        w = g * g * (1 - fade * fade);
+      } else {
+        const out = Math.min(1, Math.max(0, (FIELD_DISTANCE - d) / FIELD_FADE));
+        w = g * g * out * out;
+      }
+      if (w > 0) {
         const r = Math.max(1, d);
         power += w;
         dirX += (w * x) / r;

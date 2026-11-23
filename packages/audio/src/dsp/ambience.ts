@@ -33,7 +33,10 @@ export const AMBIENCE_PROFILES: Readonly<
   'city-night': { trees: 0, birds: 0, city: 1 },
 };
 
-const CROWD_GAIN = 0.25;
+/** −10 dB from the first cut, which put a full stand level with the field (PR 51 review). */
+const CROWD_GAIN = 0.079;
+/** Insect pulse rate, Hz. */
+const INSECT_HZ = 38;
 const TREES_GAIN = 0.08;
 const BIRD_GAIN = 0.02;
 const RUMBLE_GAIN = 0.25;
@@ -103,6 +106,7 @@ export class Ambience {
   private birdPhase = 0;
   // Hum.
   private humPhase = 0;
+  private insectPhase = 0;
   private crowdAwake = false;
   private treesAwake = false;
   private cityAwake = false;
@@ -201,7 +205,9 @@ export class Ambience {
       const step = (this.cityLevel - g0) / CHUNK;
       const wave = this.insectWave;
       let hum = this.humPhase;
+      let chirp = this.insectPhase;
       const dHum = 100 / this.sampleRate;
+      const dChirp = INSECT_HZ / this.sampleRate;
       const table = SINE_TABLE;
       const steps = SINE_STEPS;
       const mask = SINE_MASK;
@@ -209,6 +215,8 @@ export class Ambience {
         const g = g0 + step * (offset + i + 1);
         hum += dHum;
         hum -= Math.floor(hum);
+        chirp += dChirp;
+        chirp -= Math.floor(chirp);
         // 100, 200 and 300 Hz partials and the 38 Hz insect pulse, each read inline.
         let x = hum * steps;
         let q = x | 0;
@@ -225,11 +233,14 @@ export class Ambience {
         k = q & mask;
         const h3 =
           (table[k] as number) + (x - q) * ((table[k + 1] as number) - (table[k] as number));
-        x = 0.38 * hum * steps;
+        x = chirp * steps;
         q = x | 0;
         k = q & mask;
+        // One pulse per cycle: (½ + ½ sin)² (a bare sin² would pulse twice per cycle).
         const pulse =
-          (table[k] as number) + (x - q) * ((table[k + 1] as number) - (table[k] as number));
+          0.5 +
+          0.5 *
+            ((table[k] as number) + (x - q) * ((table[k + 1] as number) - (table[k] as number)));
         const tone = HUM_1 * h1 + HUM_2 * h2 + HUM_3 * h3;
         const insect = (a[i] as number) * INSECT_GAIN * wave * pulse * pulse;
         left[i] = (left[i] as number) + g * ((c[i] as number) * RUMBLE_GAIN + tone + insect);
@@ -237,6 +248,7 @@ export class Ambience {
           (right[i] as number) + g * ((d[i] as number) * RUMBLE_GAIN + 0.9 * tone - insect * 0.6);
       }
       this.humPhase = hum;
+      this.insectPhase = chirp;
     }
     this.clock += n;
   }
