@@ -20,12 +20,10 @@
  *   __undercut.gridCars(19)                  // static cars on the grid slots, every livery
  *   __undercut.tvCamera(x, y, z, fov)        // trackside camera at a world point (stations)
  *   __undercut.quality() / setQuality('ultra')
- *   __undercut.updateBar(true)               // the real "new version" bar; false removes it
  */
 import type { SettingsPatch } from '@undercut/protocol';
 import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
-import { showUpdateBar } from './pwa/register';
 import type { QuickRaceOptions } from './game/session';
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
@@ -79,8 +77,6 @@ export interface DebugApi {
   /** Draw only the sky dome through one render path until cleared with null (RaceView.setSkyProbe). */
   skyProbe(path: 'hdr' | 'direct' | null): void;
   setQuality(name: string): Promise<void>;
-  /** Show the real "new version" bar (its Reload does nothing here), or remove it. */
-  updateBar(show: boolean): void;
   /** World point at lap (s, d), height h above the ground, and the track edges there. */
   trackPoint(
     s: number,
@@ -305,7 +301,6 @@ export function installDebugApi(
       if (!isQuality(name)) throw new Error(`unknown preset ${name}`);
       await need().setQuality(name);
     },
-    updateBar: (show) => showUpdateBar(show ? () => {} : null),
 
     setStartLights: (mask) => need().view.world?.setStartLights(mask),
     treeSwap: (distance) => need().view.world?.treeSwapDistance(distance) ?? 0,

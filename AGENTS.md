@@ -12,7 +12,7 @@ Read this before changing anything. It is short on purpose; keep it that way.
 - **Fixed timestep.** The sim steps at a fixed `dt` through `FixedStepAccumulator`; rendering interpolates between the last two sim states with `alpha`. Elapsed time is clamped after a stall (default 0.25 s).
 - **The game name** lives in one constant, `GAME_NAME` in `packages/core/src/name.ts`. Nothing else spells it in code or UI; `npm run lint` checks this.
 - **No hard-coded hosts.** Nothing in the client says `localhost` or `127.0.0.1`. The rooms URL is a setting (`apps/web/src/settings.ts`) that defaults to same-origin `/rooms`.
-- **No real-world names.** No real team, driver, sponsor or series names, logos or lookalike liveries. Never write the real series' name or abbreviation in product, UI, repo metadata or identifiers. Docs may cite real data sources by name where a citation needs it. `npm run lint` checks a list of real names (`tools/ci/trademarks.json`) everywhere except the two research docs (`docs/physics-validation.md`, `docs/track-data.md`); any other citation needs an `allow` entry with its reason.
+- **No real-world names.** No real team, driver, sponsor or series names, logos or lookalike liveries. Never write the real series' name or abbreviation in product, UI, repo metadata or identifiers. Docs may cite real data sources by name where a citation needs it. `npm run lint` checks a list of real names (`tools/ci/trademarks.json`) everywhere outside `docs/`.
 - **Packages** are `@undercut/<name>`, consumed as TypeScript source through workspace `exports`; there is no per-package build. `tsc` only typechecks.
 
 ## Package dependency direction

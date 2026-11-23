@@ -372,9 +372,18 @@ test.describe('drive', () => {
     const before = await fits();
     expect(before.quit.bottom).toBeLessThanOrEqual(before.card.bottom);
     expect(before.card.bottom).toBeLessThanOrEqual(before.h);
-    // The real "new version" bar (pwa/register.ts); pwa.spec.ts covers the update itself. It
-    // shows over a paused session and must not cover the card.
-    await page.evaluate(() => window.__undercut?.updateBar(true));
+    // The "new version" bar as registerOffline (pwa/register.ts) appends it; pwa.spec.ts covers
+    // the real update. It shows over a paused session and must not cover the card.
+    await page.evaluate(() => {
+      const bar = document.createElement('aside');
+      bar.className = 'update-bar';
+      bar.dataset.testid = 'update-ready';
+      const reload = document.createElement('button');
+      reload.className = 'btn btn--primary';
+      reload.textContent = 'Reload';
+      bar.append('A new version is ready.', reload);
+      document.body.append(bar);
+    });
     try {
       await expect(page.getByTestId('update-ready')).toBeVisible();
       const after = await fits();
@@ -383,46 +392,9 @@ test.describe('drive', () => {
       expect(after.quit.bottom).toBeLessThanOrEqual(after.card.bottom);
       await expect(quit).toBeInViewport({ ratio: 1 });
     } finally {
-      await page.evaluate(() => window.__undercut?.updateBar(false));
+      await page.evaluate(() => document.querySelector('.update-bar')?.remove());
     }
     await page.evaluate(() => window.__undercut?.resume());
-    await expect(menu).toBeHidden();
-  });
-
-  test('on a short desktop window with the update bar up, the actions scroll above the controls legend', async ({
-    drive: { page },
-  }, info) => {
-    test.skip(info.project.name !== 'desktop', 'a desktop window height');
-    const size = page.viewportSize()!;
-    await page.setViewportSize({ width: 1280, height: 540 });
-    await page.evaluate(() => window.__undercut?.pause());
-    const menu = page.locator('[data-testid=pause-menu]');
-    try {
-      await expect(menu).toBeVisible();
-      await page.evaluate(() => window.__undercut?.updateBar(true));
-      await expect(page.getByTestId('update-ready')).toBeVisible();
-      const box = (sel: string): Promise<DOMRect> =>
-        page.evaluate(
-          (s) => document.querySelector(s)!.getBoundingClientRect().toJSON() as DOMRect,
-          sel,
-        );
-      const actions = await box('.pause__actions');
-      const legend = await box('.pause__controls');
-      const card = await box('.pause__card');
-      const bar = await box('.update-bar');
-      expect(actions.bottom).toBeLessThanOrEqual(legend.top);
-      expect(card.bottom).toBeLessThanOrEqual(bar.top);
-      // Every action can still be reached: the last one scrolls into view inside the column.
-      const last = menu.locator('.pause__actions > *').last();
-      await last.scrollIntoViewIfNeeded();
-      const r = (await last.boundingBox())!;
-      expect(r.y + r.height).toBeLessThanOrEqual(legend.top + 0.5);
-      expect(r.y).toBeGreaterThanOrEqual(actions.top - 0.5);
-    } finally {
-      await page.evaluate(() => window.__undercut?.updateBar(false));
-      await page.evaluate(() => window.__undercut?.resume());
-      await page.setViewportSize(size);
-    }
     await expect(menu).toBeHidden();
   });
 

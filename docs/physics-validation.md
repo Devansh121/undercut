@@ -77,7 +77,7 @@ How the drag values were derived: at the end of a straight that is long enough, 
 | Trim | CdA, DRS closed (m²) | DRS drag change | ClA (m²) | Aero balance (front share of downforce) | Notes |
 |---|---|---|---|---|---|
 | Low drag (Monza) | 1.15 (1.05–1.25); model 1.16 (section 7) | −12 % | 3.6 (3.0–4.2) | 44 % | Monza wings are already small, so DRS gains less than at Spa. A constructor's explainer gives downforce equal to the car's weight (795 kg) at about 150 km/h [57], an effective ClA of about 7.5 m² there (trim and circuit not stated): it points to the upper part of this table's ranges, not past them. The top of the low-trim range was investigated and not adopted (section 7.3). |
-| Medium (Spa) | 1.30 (1.15–1.45) | −15 % | 4.6 (4.0–5.2) | 44 % | |
+| Medium (Spa) | 1.30 (1.15–1.45); model 1.25 (section 7.12) | −15 % | 4.6 (4.0–5.2) | 44 % | The Spa derivation above (DRS open 0.90–1.13 m²) gives 1.06–1.33 m² with the flap shut. |
 | High downforce (Singapore) | 1.60 (1.45–1.75) | −18 % | 5.8 (5.0–6.5) | 45 % | No terminal-speed check is possible: the Singapore speed trap is 150 m before Turn 1 at the end of a short straight [6]. |
 | Cross-check, older car [44] | 1.56 | −17 % | 4.88 | 45 % | Pre-2022 car at a medium-high downforce circuit |
 
@@ -337,12 +337,12 @@ Also published: distance from pole position to the Turn 1 braking point is Monza
 | 18-inch tyre working ranges unpublished | Thermal model windows are estimates | Use the 2019 ranges shifted down; calibrate warm-up behaviour against the 70 °C blanket limit |
 | Brembo per-corner data partial (only 1–3 events per circuit in the era) | Braking validation covers only the hardest stops | Add more events if Brembo publishes them; the speed-dependent curve test covers the rest |
 | Braking times short (section 7) | Spa T5 1.13 and 1.20 s against 1.48 and 1.62 s ± 12 %; Singapore T7 1.45 s against 1.90; Singapore T14 1.81 s against 2.19 | Hypothesis, not established: Brembo's times may include the trail-off and turn-in into the corner, which the scripted stop (at the limit to v2; its pedal ceiling is an assumed estimate that barely acts, section 7.1) does not reproduce. The Monza times pass. Measure the stops on the real circuits with the reference driver's own trail braking once Spa and Singapore exist |
-| Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.3 and 78.5 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.05 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
+| Medium and high-downforce stops short and high-downforce peaks high (section 7) | Spa T5 77.6 and 78.8 m against 93 and 99 m ± 10 %; Singapore T7 83.1 m against 96 m ± 10 %; peaks Spa 2024 5.03 g against 4.5 ± 0.4, Singapore T7 5.40 g against 4.9 ± 0.4, Singapore T14 5.06 g against 4.6 ± 0.4 | The tyre's load slopes are set from [56], not fitted to braking, so these are not absorbed by the tyre. Competing explanations, none separated: more downforce lost under braking pitch than the modelled floor stall (a mechanism the model has, with unsourced settings); braking that becomes front-limited as load moves forward (an experiment in the review of this change, with an ideal instantaneous axle-capacity brake balance, did not bring the high-trim peaks into band on its own); the drivers' pedal build-up and the published peak's filtering; or a tyre more load-sensitive than both cited sets. Spa and Singapore laps with lateral data would separate tyre from aero |
 | Monza T1 2023 peak 4.75 g against 5.2 ± 0.4 (section 7) | One event | The 2023 figure stands apart from 2024 (4.6 g) and 2025 (4.7 g) at the same corner and speed; the model gives about 4.7–4.8 g for all three. Check the 2023 source |
-| Pouhon 4.59 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
+| Pouhon 4.61 g against 5.7 ± 0.7 (section 7) | Fast-corner lateral grip below the one secondary figure | Flat constant-speed sweep; the corner is downhill with two apexes and the source is a blog with no trace. With [56]'s load slope the tyre gives up more at high load than with [44]'s (4.92 g with it). Re-test on the Spa surface with the reference controller |
 | Published brake powers (section 7.9) | Model 4401 / 4297 / 4026 / 3846 kW against 2715 / 2584 / 2542 / 2239 kW ± 10 % (+58 to +72 %) | Validation targets added in 7.9, recorded gaps. The sources do not say where in the stop the power falls. A capacity matched to it near v1 cannot lock a wheel at full pedal from 330 km/h in high trim and moves passing braking checks; the owner kept the passing checks. Not separated: when the power is reached, pad friction through the stop (not modelled), or a stronger brake system than the estimate |
 | Downforce below [57] in low and medium trim (section 7.9) | At top speed the low and medium trims make 2.44 and 2.90 times the car's weight against "three or four times" [57] | Every increase tried moves a passing check (the Monza T1 2025 stop time, the Spa T5 2025 peak and trap, three PR 19 kerb cases) with brakes that can lock at full pedal; kept. This is most of the Monza and Spa lap gaps |
-| Spa reference lap 109.072 s against the M4 band 97.545–103.579 s (section 7.8) | 5.49 s outside M4; all three sectors outside their ±3 % bands, sector 2 by most (+14 % on the session best) | The car's fast-corner grip: the line asks for the measured flat limit through Pouhon, Stavelot and Les Fagnes. Same cause as the Pouhon sweep row above and Monza's fast corners |
+| Spa reference lap 108.757 s against the M4 band 97.545–103.579 s (sections 7.8, 7.12) | 5.18 s outside M4 (5.49 s before 7.12); all three sectors outside their ±3 % bands, sector 2 by most (+13.9 % on the session best) | The car's fast-corner grip: the line asks for the measured flat limit through Pouhon, Stavelot and Les Fagnes. Same cause as the Pouhon sweep row above and Monza's fast corners |
 | Raidillon lift on `spa-medium` (section 7.8) | Profile plans a brief braking pulse at s = 1008–1016 m; the reference driver lifts for 0.167 s (< 99 % throttle) and brakes for 0.063 s (> 1 % brake) at s = 991–1005 m, whereas real cars take T3–T4 flat | Caused by linear extrapolation of the `[0.8, 1.0, 1.2] g` envelope load grid to 2.0–2.2 g Eau Rouge compression after the floor enters the 20 mm stall band at 320 km/h (`−0.129 g/g` slope). Forcing full throttle through Raidillon is clean (1.47° max sideslip) and gains 0.032 s in S1 |
 | Singapore sectors 1 and 3 (section 7.8) | +3.1 % and +4.1 % on the session best; the lap itself is inside its band by 0.016 s | Recorded gaps; the lap is close to its band edge, so a small change to the car can move it outside |
 | Monza reference lap 84.872 s against the M1 band 74.852–82.732 s (section 7.6) | 2.14 s outside M1 (2.24 s before DRS zone 2 moved to its mapped activation), 3.72 s outside M4 | Not reached. On the footprint-checked legal corridor the quasi-steady full-envelope profile predicts 83.447 s; the ideal reference controller loses 0.83 s to its own plan and plans at 98/95/98 % (0.69 s). That prediction is not an optimum or a bound (7.6). The top of the low-trim ClA range was investigated (84.036 s) and not adopted (7.3). Nothing here forces the band |
@@ -1288,3 +1288,71 @@ re-planned. It costs **0.216 s**, a recorded gap (`monza-fuel-10kg`, pinned by
 `packages/ai/validation/fuel-effect.test.ts`); Spa 0.296 s, Singapore 0.315 s. Monza is the
 circuit least sensitive to mass. The band is an estimate from the widely quoted 0.3 s per
 10 kg.
+
+### 7.12 Closing the gap without moving a passing check (M1/M4 physics pace)
+
+The time-loss budget (7.10) puts the Monza and Spa gaps in fast-corner grip, with drag and
+power next. This section tries every term it names that has a source, against every check that
+passes on master. The first-chicane kerb checks at Monza stay as they are (owner's choice), so
+time had to be found where they do not move. The candidates below were judged in this order: the
+36 component targets, the three reference laps (re-planned on the committed lines, then on lines
+rebuilt for the candidate), both kerb suites (`apps/web/test/kerb-safety.test.ts`,
+`packages/track/validation/kerb-strikes.test.ts`), and the Spa ten-lap soak from 39.7 kg.
+
+**Kept: medium-trim drag 1.30 → 1.25 m².** Section 1.4's own derivation from the Spa
+intermediate (I1 340–345 km/h [13], DRS open) gives CdA 0.90–1.13 m², 1.06–1.33 m² with the
+flap shut (−15 %); the table's 1.30 sits at the top of that. 1.25 is inside both ranges. It is
+not lower because the reference driver plans its speed profile for qualifying fuel: at 1.20 the
+soak's heavy first laps (39.7 kg) arrive at Bruxelles (T8) up to 17 km/h over the plan, the lock
+recovery releases the brake while trail-braking at 2.3 g, and the car runs onto the grass on
+exit (47 tyre samples on each of the first three laps, four wheels off; clean from lap 5). At
+1.25 all ten laps are clean. Only the medium trim changes, so Monza (low) and Singapore (high)
+are untouched: their envelopes and lines rebuild byte-identical, and the kerb suites, which run
+the low-trim car, give the same results as before.
+
+| Spa (medium trim) | Master | This change |
+|---|---|---|
+| Reference lap (pole 100.562 s, M4 band to 103.579 s) | 109.072 s (+8.46 %) | **108.757 s (+8.15 %)** |
+| Plan / full envelope | 107.725 / 106.756 s | 107.457 / 106.465 s |
+| Sectors (session best 29.761 / 42.532 / 27.857) | 31.750 / 48.486 / 28.836 | 31.584 / 48.451 / 28.722 |
+| Speed trap (315 ± 6) | 312.9 km/h | 313.4 km/h |
+| Driver / planning margin / full − pole lap | 1.347 / 0.969 / 6.194 s | 1.300 / 0.992 / 5.903 s |
+| Racing line (`ai:build`), refined | 107.721 s | 107.453 s |
+| Ten laps from 39.7 kg | clean | clean, 109.132–109.558 s |
+| Spa T5 2025 peak (band to 5.1 g) | 5.099 g | 5.076 g |
+| Recorded gaps that moved | — | T5 2025 77.64 m, 1.140 s; T5 2024 78.82 m, 1.201 s, 5.032 g; Pouhon 4.61 g |
+
+| Spa phase (full envelope), s: full / driver / margin | Master | This change |
+|---|---|---|
+| Braking limit | 20.285 / −0.255 / +0.404 | 20.381 / −0.200 / +0.408 |
+| Grip-limited exit | 22.016 / +0.431 / +0.293 | 22.399 / +0.372 / +0.298 |
+| Full-throttle run | 62.998 / +1.168 / +0.252 | 62.256 / +1.152 / +0.267 |
+| Corner limit, transition | 0.069, 1.388 | 0.069, 1.360 |
+
+Monza 84.872 s and Singapore 91.817 s are unchanged, as are their budgets (7.10). Every target
+that passed on master passes; the component targets stay at 20 of 36.
+
+AI races at Spa, lap one, 20 cars, seeds 101–140 (`runRace`, no pit stop): 789 of 800 cars clean
+through turn one against 794 on master; nine seeds differ by one to three cars, four better and
+five worse; the worst seed is 117 with 17 clean (master's worst is 18); no spins and every car
+classified in both. Contact ticks 17 126 against 16 812.
+
+**Measured and not kept**, each against master 851a39d (merging 06a8574 leaves all three laps
+unchanged; the kerb cases below were not re-run on it). Laps are on the committed lines.
+
+| Candidate (source) | Monza / Spa / Singapore lap | Passing check it moves |
+|---|---|---|
+| Lateral load slope −5 × 10⁻⁵ N⁻¹ ([44], the other end of 1.2's cited range; longitudinal kept at [56]'s), μy refitted to the slow-corner centre (2.125) | −0.353 / −0.870 / −0.473 s; Pouhon 4.92 g | Kerb cases teleport(540, 8, 300 km/h) steer −0.1 at TC 0 and TC 2, and teleport(610, 8) steer −0.1 TC 0 need the safety reset (eight open cases and both open PR 19 review seeds pass instead) |
+| Seamless upshift ([59]), on that tyre | a further −0.30 / −0.34 / −0.40 s | teleport(540, 8) steer 0 TC 0 (as in 7.10) |
+| Low-trim ClA 3.7 ([57]; 3.9 also takes the Monza T1 2025 time to 2.398 s, band from 2.42) | about −0.5 s at Monza with the two above | teleport(540, 8) steer −0.1 TC 0, teleport(610, 8) steer −0.1 TC 0 |
+| Floor height sensitivity 0.015 / 0.010 / 0.005 / 0 per mm (doc 1.4 estimate 0.02; [57]'s weight at 150 km/h points to more downforce at medium speed than the map gives) | −0.26 to −0.99 / −0.57 to −1.68 / −0.87 to −3.17 s | From 0.010: the low-trim DRS top speed (354.2 against 354), the Monza T1 2025 time (2.407 against 2.42); from 0.005 the Singapore T14 2024 distance. Every braking gap widens |
+| Medium CdA 1.20 with ClA 4.8 (3.15 × the car's weight at top speed, inside [57]) | 0 / −1.22 s (107.849 on a rebuilt line) / 0 | Spa ten-lap soak: grass at Bruxelles on laps 1–4 |
+| Medium CdA 1.20 with ClA 4.6 or 4.7, 1.25 with 4.7 | — | The same soak: 17 and 11, 125 and 90, 29 grass samples on the first laps |
+| Medium ClA 4.8 at CdA 1.30 | — | Spa T5 2025 peak 5.132 g (band to 5.1) |
+
+**What remains.** Every sourced term that would make the low-trim car faster also changes which
+of the first-chicane kerb cases need the safety reset, in both directions; with those checks held,
+Monza's 2.14 s outside M1 stays. At Spa the next 0.9 s (medium CdA 1.20, ClA 4.8, both sourced) is
+held by the reference driver rather than the car: its plan does not see the heavier car of the
+soak's first laps. A plan that re-scales for fuel, as it already does for tyre grip (7.11), would
+be the next step; it belongs to `packages/ai`.

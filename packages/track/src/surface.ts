@@ -78,9 +78,6 @@ export class TrackSurface implements SurfaceSampler {
   private refX = NaN;
   private refZ = NaN;
   private refBehind = false;
-  private refInWall = false;
-  private readonly refWallHint = { index: -1 };
-  private readonly refOut: WallSample = { depth: 0, normalX: 0, normalZ: 0 };
 
   /**
    * `breakables: false` leaves the lightweight objects out of the contact: for validation runs
@@ -193,8 +190,6 @@ export class TrackSurface implements SurfaceSampler {
     }
     if (!(refX === refX) || this.wallNear < 0 || this.wallSide !== this.track.pitSide) return;
     const behind = this.behindBarrier(refX, refZ);
-    // A reference inside the wall has no side to keep to: the nearest face stands, as without one.
-    if (this.refInWall) return;
     if (!behind) {
       // The car is on the track: a corner sent out to the pit lane came through the wall.
       if (!this.pitFace) return;
@@ -228,23 +223,6 @@ export class TrackSurface implements SurfaceSampler {
     this.refZ = z;
     this.refBehind =
       side === track.pitSide && (side === LEFT ? q.d : -q.d) > track.barrierAt(q.s, side);
-    // Whether the reference is itself inside a wall. `wallAt` overwrites the last query's
-    // scratch, so the caller's is kept and put back.
-    const lapDepth = this.lapDepth,
-      lapNx = this.lapNx,
-      lapNz = this.lapNz,
-      wallSide = this.wallSide,
-      wallNear = this.wallNear,
-      pitFace = this.pitFace;
-    this.refWallHint.index = -1;
-    this.wallAt(x, z, this.refWallHint, this.refOut);
-    this.refInWall = this.refOut.depth > 0;
-    this.lapDepth = lapDepth;
-    this.lapNx = lapNx;
-    this.lapNz = lapNz;
-    this.wallSide = wallSide;
-    this.wallNear = wallNear;
-    this.pitFace = pitFace;
     return this.refBehind;
   }
 

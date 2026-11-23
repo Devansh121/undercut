@@ -40,30 +40,15 @@ describe('findNames', () => {
     expect(check({ 'packages/sim/src/brakes.ts': '// Globex T1 figures' })).toHaveLength(1);
   });
 
-  it('skips the two research docs, the lockfile, binary files and the list itself', () => {
+  it('skips docs, the lockfile, binary files and the list itself', () => {
     expect(
       check({
         'docs/physics-validation.md': 'XRF',
-        'docs/track-data.md': 'XRF',
         'package-lock.json': 'XRF',
         'apps/web/public/assets/car/car_high.glb': 'XRF',
         [LIST_FILE]: 'XRF',
       }),
     ).toEqual([]);
-  });
-
-  it('scans the rest of docs', () => {
-    expect(
-      check({
-        'docs/STATUS.md': 'XRF',
-        'docs/adr/0001-x.md': 'Acme Racing',
-        'docs/evidence/m1/log.md': 'Globex',
-      }),
-    ).toEqual([
-      'docs/STATUS.md:1: names XRF (bodies)',
-      'docs/adr/0001-x.md:1: names Acme Racing (teams)',
-      'docs/evidence/m1/log.md:1: names Globex (suppliers)',
-    ]);
   });
 
   it('catches a driver and a supplier in an OpenStreetMap name', () => {

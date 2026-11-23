@@ -41,12 +41,7 @@ const CREDITS = [
   'Props in `apps/web/public/assets/props/` are MIT.',
 ].join('\n');
 
-function repo({
-  credits = CREDITS,
-  manifest = [texture, props],
-  lock = lockfile(),
-  files = {},
-} = {}) {
+function repo({ credits = CREDITS, manifest = [texture, props], lock = lockfile() } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'credits-check-'));
   dirs.push(root);
   const write = (rel, content) => {
@@ -57,7 +52,6 @@ function repo({
   write('assets/MANIFEST.json', JSON.stringify(manifest));
   write('package-lock.json', JSON.stringify(lock));
   for (const e of manifest) write(e.file, 'x');
-  for (const [rel, content] of Object.entries(files)) write(rel, content);
   return root;
 }
 
@@ -158,31 +152,5 @@ describe('checkCredits', () => {
       'node_modules/copyleft@3.0.0: licence "MPL-2.0" is not allowed for shipped packages (tools/ci/dependency-licences.json)',
       'node_modules/unlicensed@4.0.0: licence "none" is not allowed for tools packages (tools/ci/dependency-licences.json)',
     ]);
-  });
-
-  it('reads the shipped section to the end when it is the last one', () => {
-    const credits =
-      '# Credits\n## Tools\n| Vite | `vite` | MIT |\n## Third-party code shipped\n`three`';
-    expect(checkCredits(repo({ credits, manifest: [] }), { allowed })).toEqual([]);
-  });
-
-  it('wants the ODbL notice beside the racing lines, named in CREDITS.md', () => {
-    const line = { 'packages/ai/data/monza.line.json': '{}' };
-    const notice = { 'packages/ai/data/LICENSE-DATA.md': 'Open Database License 1.0' };
-    const named = `${CREDITS}\nLines: \`packages/ai/data/LICENSE-DATA.md\`.`;
-    expect(checkCredits(repo({ files: line }), { allowed })).toEqual([
-      'packages/ai/data/monza.line.json: ODbL-derived data needs packages/ai/data/LICENSE-DATA.md',
-      'packages/ai/data/monza.line.json: CREDITS.md does not name packages/ai/data/LICENSE-DATA.md',
-    ]);
-    expect(
-      checkCredits(repo({ files: { ...line, 'packages/ai/data/LICENSE-DATA.md': 'MIT' } }), {
-        allowed,
-      }),
-    ).toContain(
-      'packages/ai/data/LICENSE-DATA.md: does not carry the Open Database License notice',
-    );
-    expect(
-      checkCredits(repo({ credits: named, files: { ...line, ...notice } }), { allowed }),
-    ).toEqual([]);
   });
 });

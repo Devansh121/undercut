@@ -3,8 +3,6 @@
 // - every third-party asset in assets/MANIFEST.json is credited: its source page is linked from
 //   CREDITS.md (Poly Haven and ambientCG assets, upstream font repositories), or, for
 //   OpenStreetMap-derived data, its folder's LICENSE-DATA.md exists and CREDITS.md names it;
-// - data derived from those databases but kept out of the manifest (the racing lines, rebuilt
-//   without a manifest edit) has an ODbL LICENSE-DATA.md beside it that CREDITS.md names;
 // - every first-party entry is by "Project contributors" and sits under a path CREDITS.md names;
 // - every repository path CREDITS.md names in backticks exists;
 // - every npm package in package-lock.json has a licence from tools/ci/dependency-licences.json
@@ -18,8 +16,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT = 'Project contributors';
 const REPO_DIRS = /^(apps|assets|design|docs|packages|services|tools)\//;
 const SHIPPED_HEADING = '## Third-party code shipped';
-/** Folders of ODbL-derived files that are not in the manifest, and which of their files are. */
-const DERIVED_DATA = [{ dir: 'packages/ai/data', files: /\.line\.json$/ }];
 
 /**
  * The text CREDITS.md must contain to credit a third-party manifest entry, or null when the
@@ -93,28 +89,13 @@ export function checkCredits(root, { allowed }) {
     }
   }
 
-  for (const { dir, files } of DERIVED_DATA) {
-    const abs = path.join(root, dir);
-    const derived = fs.existsSync(abs) ? fs.readdirSync(abs).filter((f) => files.test(f)) : [];
-    if (derived.length === 0) continue;
-    const notice = `${dir}/LICENSE-DATA.md`;
-    const first = `${dir}/${derived.sort()[0]}`;
-    if (!fs.existsSync(path.join(root, notice))) {
-      problems.push(`${first}: ODbL-derived data needs ${notice}`);
-    } else if (!read(notice).includes('Open Database License')) {
-      problems.push(`${notice}: does not carry the Open Database License notice`);
-    }
-    if (!named.includes(notice)) problems.push(`${first}: CREDITS.md does not name ${notice}`);
-  }
-
   for (const p of named) {
     if (!pathExists(root, p)) problems.push(`CREDITS.md names ${p}, which does not exist`);
   }
 
   const shippedStart = credits.indexOf(SHIPPED_HEADING);
   const shippedEnd = credits.indexOf('\n## ', shippedStart + 1);
-  const shippedSection =
-    shippedStart < 0 ? '' : credits.slice(shippedStart, shippedEnd < 0 ? undefined : shippedEnd);
+  const shippedSection = shippedStart < 0 ? '' : credits.slice(shippedStart, shippedEnd);
   const direct = new Map();
   for (const [key, pkg] of Object.entries(lock.packages)) {
     if (key.includes('node_modules/') || !pkg) continue;

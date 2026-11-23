@@ -22,13 +22,6 @@ export const NOTICE_PARTS: readonly NoticePart[] = [
     files: ['node_modules/three/LICENSE'],
   },
   {
-    // The area and search textures ship inside three.js's SMAAPass, which carries no upstream
-    // notice. The text, copyright lines included, is upstream's LICENSE.txt verbatim.
-    title:
-      'SMAA anti-aliasing textures (https://github.com/iryoku/smaa, in three.js SMAAPass): MIT License',
-    files: ['apps/web/licences/SMAA-MIT.txt'],
-  },
-  {
     title: 'Draco decoder (assets/draco/, from three.js): Apache License 2.0',
     copyright: 'Copyright 2016 The Draco Authors. https://github.com/google/draco',
     files: ['apps/web/licences/Apache-2.0.txt'],
