@@ -220,6 +220,7 @@ export class ControlsPanel {
   private readonly list: HTMLElement;
   private readonly note: HTMLElement;
   private readonly padNote: HTMLElement;
+  private readonly body: HTMLElement;
   private readonly close: HTMLButtonElement;
   private tabs: TabStrip | null = null;
   private tabIds = '';
@@ -258,6 +259,7 @@ export class ControlsPanel {
     this.head.append(title);
 
     const body = el('div', 'dialog__body');
+    this.body = body;
     body.id = 'controls-body';
     body.setAttribute('role', 'tabpanel');
     this.padNote = el('p', 'controls__pad-note', S.controls.noPad);
@@ -273,11 +275,12 @@ export class ControlsPanel {
       onClick: () => this.hide(),
     });
     this.close.dataset.navDefault = '';
-    // Tab and Shift+Tab cycle through the dialog's own controls.
+    // Tab and Shift+Tab cycle through the dialog's own stops: the selected tab (the tab strip
+    // is one stop; the arrows move along it) and Back.
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       e.preventDefault();
-      const items = focusables(root);
+      const items = focusables(root).filter((x) => x.tabIndex >= 0);
       const at = items.indexOf(document.activeElement as HTMLElement);
       const next = items[(at + (e.shiftKey ? -1 : 1) + items.length) % items.length];
       (next ?? this.close).focus({ preventScroll: true });
@@ -353,12 +356,28 @@ export class ControlsPanel {
         )
       : [];
     for (const c of this.inerted) c.inert = true;
+    window.addEventListener('gamepadconnected', this.onPadChange);
+    window.addEventListener('gamepaddisconnected', this.onPadChange);
     this.close.focus({ preventScroll: true });
   }
+
+  /**
+   * A controller plugged in or out: redraw (the no-controller note) once the input layer has
+   * polled the change, a couple of frames on.
+   */
+  private readonly onPadChange = (): void => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (this.open) this.render();
+      }),
+    );
+  };
 
   hide(): void {
     if (!this.open) return;
     this.root.hidden = true;
+    window.removeEventListener('gamepadconnected', this.onPadChange);
+    window.removeEventListener('gamepaddisconnected', this.onPadChange);
     for (const c of this.inerted) c.inert = false;
     this.inerted = [];
     this.returnFocus?.focus({ preventScroll: true });
@@ -388,13 +407,19 @@ export class ControlsPanel {
         },
       });
       this.tabs.root.classList.add('controls__tabs');
-      for (const b of this.tabs.root.querySelectorAll<HTMLElement>('[role=tab]'))
+      for (const b of this.tabs.root.querySelectorAll<HTMLElement>('[role=tab]')) {
+        b.id = `controls-tab-${b.dataset.tab ?? ''}`;
         b.setAttribute('aria-controls', 'controls-body');
+      }
       this.head.append(this.tabs.root);
       if (focusedTab) this.close.focus({ preventScroll: true });
     } else {
       this.tabs.select(this.view);
     }
+    // One Tab stop for the strip (roving tabindex): the selected tab.
+    for (const b of this.tabs.root.querySelectorAll<HTMLElement>('[role=tab]'))
+      b.tabIndex = b.dataset.tab === this.view ? 0 : -1;
+    this.body.setAttribute('aria-labelledby', `controls-tab-${this.view}`);
 
     const device = this.view;
     const map = this.source.bindings();
