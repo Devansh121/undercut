@@ -336,3 +336,32 @@ describe('race driver: memory', () => {
     }
   });
 });
+
+describe('race driver: two cars level with no room for both', () => {
+  // Against the right edge, a car level with this one and half a metre back to its left, the
+  // other car with the lower id: at speed both give way (neither turns in on the other). Slowed to a crawl, the car ahead stops waiting for the
+  // car behind, or the two follow each other to a standstill (Spa, seed 103: two cars side by
+  // side into La Source stood still for 6 s and the field queued behind them).
+  function levelPair(speed: number) {
+    const dr = driver();
+    const edge = -track.halfWidthAt(STRAIGHT, 1) + BODY_HALF_WIDTH + 0.3;
+    const ld = lineD(dr, STRAIGHT);
+    const me = { id: 1, s: STRAIGHT, d: edge, speed };
+    dr['o'] = edge - ld;
+    const beside = { id: 0, s: STRAIGHT - 0.5, d: edge + 2.2, speed };
+    tick(dr, me, [beside]);
+    return dr;
+  }
+
+  it('at speed, gives way to the car level with it as well', () => {
+    const dr = levelPair(40);
+    expect(dr.last.yielding).toBe(true);
+    expect(dr.last.leader).toBe(0);
+  });
+
+  it('at a crawl, does not follow a car level with it or behind it', () => {
+    const dr = levelPair(8);
+    expect(dr.last.leader).not.toBe(0);
+    expect(dr.last.accelLimit).toBeGreaterThan(0);
+  });
+});

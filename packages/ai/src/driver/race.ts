@@ -114,6 +114,12 @@ const SLOW_STOP_BRAKE = 0.6;
 const STOP_DECEL = 6;
 /** Line slope across the road, m/m, past which there is no going round a stopped car there. */
 const SWEEP_MAX = 0.3;
+/**
+ * Two cars level with no room for both each give way to the other at speed (each drops back
+ * until it is settled who goes first). Below this speed, m/s, a car no longer follows a car level
+ * with it or behind it for speed, or the two follow each other down to a standstill.
+ */
+const LEVEL_YIELD_SPEED = SLOW_STOP_BELOW;
 /** Gap to the car ahead in the lane, m, under which the queue beyond it counts on the launch. */
 const LAUNCH_QUEUE_GAP = 15;
 /** Lateral distance below which a car ahead is in this car's path, m. */
@@ -704,7 +710,9 @@ export class RaceDriver implements Driver {
       else hi = Math.min(hi, Math.max(myO, this.o));
     }
     if (lo > hi) lo = hi = Math.max(oMin, Math.min(oMax, this.o));
-    if (yieldTo && yieldDs < leaderDs) {
+    // (A car level or behind that this one gives way to, followed at a crawl, gave way to this
+    // one too: two cars side by side into La Source followed each other to a standstill.)
+    if (yieldTo && yieldDs < leaderDs && (yieldDs > 0 || v >= LEVEL_YIELD_SPEED)) {
       leader = yieldTo;
       leaderDs = yieldDs;
     }
