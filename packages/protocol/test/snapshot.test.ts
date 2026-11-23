@@ -66,10 +66,10 @@ const BOUNDS: Record<string, number> = {
 const EPS = 1e-9;
 
 describe('snapshot codec', () => {
-  it('uses a 56-byte record', () => {
-    expect(CAR_RECORD_BYTES).toBe(56);
-    expect(encodeUpFrame([randomCar(1)], EPOCH).byteLength).toBe(UP_HEADER_BYTES + 56);
-    expect(encodeDownFrame([randomCar(1)], EPOCH, EPOCH).byteLength).toBe(DOWN_HEADER_BYTES + 56);
+  it('uses a 88-byte record including four recent board hits', () => {
+    expect(CAR_RECORD_BYTES).toBe(88);
+    expect(encodeUpFrame([randomCar(1)], EPOCH).byteLength).toBe(UP_HEADER_BYTES + 88);
+    expect(encodeDownFrame([randomCar(1)], EPOCH, EPOCH).byteLength).toBe(DOWN_HEADER_BYTES + 88);
   });
 
   it('round-trips 10 000 random cars within the documented error bounds', () => {
@@ -208,5 +208,15 @@ describe('snapshot codec', () => {
       if (!decoded.ok) throw new Error(decoded.detail);
       expect(decoded.frame.cars[0]).toMatchObject({ flags: 0b111111, resets: resets % 4 });
     }
+  });
+});
+
+describe('breakable hit relay', () => {
+  it('retains four hit ids, ages and impulses exactly at their canonical precision', () => {
+    const car = randomCar(1);
+    car.breakableHits = [4, 0.123, 24.51, -2.34, 5, 0.027, 2, 30, -1, 0, 0, 0, -1, 0, 0, 0];
+    const result = decodeUpFrame(encodeUpFrame([car], EPOCH), EPOCH);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.frame.cars[0]!.breakableHits).toEqual(car.breakableHits);
   });
 });

@@ -59,6 +59,7 @@ export function toSnapshot(c: LocalCar): CarSnapshot {
   }
   const spin = c.wheelSpin;
   return {
+    ...(p.breakableHits ? { breakableHits: Array.from(p.breakableHits) } : {}),
     seat: c.seat,
     flags: c.drs ? CAR_FLAG.drs : 0,
     resets: ((c.resets % 4) + 4) % 4,
@@ -96,6 +97,12 @@ export function poseFromView(
   dt: number,
   out: CarPose,
 ): CarPose {
+  const hits = (out.breakableHits ??= new Float64Array(16));
+  if (view.breakableHits) hits.set(view.breakableHits);
+  else {
+    hits.fill(0);
+    for (let i = 0; i < 4; i++) hits[i * 4] = -1;
+  }
   out.x = view.x;
   out.y = view.y;
   out.z = view.z;

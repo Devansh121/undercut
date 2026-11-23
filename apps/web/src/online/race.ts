@@ -351,6 +351,15 @@ export class OnlineRace implements DriveExtension {
         this.poses.set(v.seat, pose);
       }
       poseFromView(v, this.wheelDrop, f.dt, pose);
+      // A remote hit consumes the lightweight object here too; its debris has no contact.
+      const hits = v.breakableHits;
+      if (hits)
+        for (let k = 0; k < hits.length; k += 4) {
+          const id = hits[k]!;
+          if (id < 0 || id >= 2048) continue;
+          const flags = session.car.state.brokenObjects;
+          flags[id >>> 5] = flags[id >>> 5]! | (1 << (id & 31));
+        }
       const l = seatLivery(v.seat);
       drawn.push({
         livery: {

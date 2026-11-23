@@ -1277,6 +1277,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       frameMs: elapsedMs,
       dt: realDt,
       time: clock,
+      simulationTime: session.world.time,
       lookBack,
       gear: t.gear,
       revLights,

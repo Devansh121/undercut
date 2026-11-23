@@ -89,6 +89,13 @@ function interpolate(a: CarSnapshot, b: CarSnapshot, t: number): CarSnapshot {
   const dt = (b.t - a.t) / 1000;
   return {
     ...near,
+    ...(near.breakableHits
+      ? {
+          breakableHits: near.breakableHits.map((v, i) =>
+            i % 4 === 1 ? Math.max(0, v + (lerp(a.t, b.t, t) - near.t) / 1000) : v,
+          ),
+        }
+      : {}),
     t: lerp(a.t, b.t, t),
     x: hermite(a.x, a.vx, b.x, b.vx, t, dt),
     y: hermite(a.y, a.vy, b.y, b.vy, t, dt),
@@ -133,6 +140,9 @@ function extrapolate(c: CarSnapshot, ms: number): CarSnapshot {
   const dt = ms / 1000;
   return {
     ...c,
+    ...(c.breakableHits
+      ? { breakableHits: c.breakableHits.map((v, i) => (i % 4 === 1 ? v + dt : v)) }
+      : {}),
     t: c.t + ms,
     x: c.x + c.vx * dt,
     y: c.y + c.vy * dt,

@@ -44,6 +44,7 @@ try {
   const [w, h] = opt('size', '1440x900').split('x').map(Number);
   const browser = await chromium.launch({
     args: [
+      '--mute-audio',
       '--use-gl=angle',
       '--use-angle=gl-egl',
       '--ignore-gpu-blocklist',

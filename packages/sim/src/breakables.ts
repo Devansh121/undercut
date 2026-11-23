@@ -148,6 +148,6 @@ export function debrisPose(hit: BreakableHit, time: number) {
     z: o.z + hit.vz * travel,
     yaw: o.yaw + spin * 0.7,
     roll,
-    scale: time - hit.time > 12 ? 0 : 1,
+    scale: 1,
   };
 }
