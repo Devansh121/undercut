@@ -40,11 +40,16 @@ export class PageAudio {
   private active = false;
   private fallback: string | null = null;
   private pointerAt = -Infinity;
+  /** `?debug=1&audioProfile=1`: the worklet measures its own processing time. */
+  private readonly profiling: boolean;
+  private profileReport: Readonly<Record<string, unknown>> | null = null;
   private menuTimer: ReturnType<typeof setTimeout> | null = null;
   readonly settings: AudioSettingsStore;
 
   constructor(storage: StoragePort, win: Window = window) {
     this.settings = new AudioSettingsStore(storage);
+    const query = new URLSearchParams(win.location.search);
+    this.profiling = query.get('debug') === '1' && query.get('audioProfile') === '1';
     void this.settings.load().then(() => this.applyVolumes());
     // The first key, click or touch anywhere counts as the gesture that unlocks audio.
     const onGesture = (): void => this.gesture();
@@ -82,6 +87,11 @@ export class PageAudio {
   /** Why the engine went silent, or null. */
   get fallbackReason(): string | null {
     return this.fallback;
+  }
+
+  /** The worklet's latest processing-time report (`?debug=1&audioProfile=1` only), or null. */
+  get profile(): Readonly<Record<string, unknown>> | null {
+    return this.profileReport;
   }
 
   /** Engine status, or 'none' before the engine exists. */
@@ -162,6 +172,7 @@ export class PageAudio {
       onFallback: (reason) => {
         this.fallback = reason;
       },
+      ...(this.profiling ? { onProfile: (report) => (this.profileReport = report) } : {}),
     });
     this.applyVolumes();
     void this.engine.resume();

@@ -56,7 +56,10 @@ export interface AudioContextLike {
 
 /** The parts of an AudioWorkletNode this facade uses. */
 export interface AudioNodeLike {
-  readonly port: { postMessage(message: ToProcessor): void };
+  readonly port: {
+    postMessage(message: ToProcessor): void;
+    onmessage?: ((event: { data: unknown }) => void) | null;
+  };
   connect(destination: never): unknown;
   disconnect(): void;
 }
@@ -87,6 +90,11 @@ export interface AudioEngineOptions {
   visibility?: VisibilitySource | null;
   /** Called once if audio cannot start, with the reason. Defaults to `console.warn`. */
   onFallback?: (reason: string) => void;
+  /**
+   * Measure the worklet's processing time (a diagnostic, off in normal play): the processor
+   * reports every 4096 blocks to `onProfile`.
+   */
+  onProfile?: (report: Readonly<Record<string, unknown>>) => void;
 }
 
 /** Null object: the same interface, no sound. */
@@ -276,7 +284,12 @@ class WorkletAudioEngine implements AudioEngine {
       await context.audioWorklet.addModule(this.options.workletUrl);
       // Disposed (or failed) while loading: never create the node.
       if (this.disposed || !this.isNot('silent')) return;
-      const processorOptions: ProcessorOptions = { seed: this.options.seed, startPaused: true };
+      const onProfile = this.options.onProfile;
+      const processorOptions: ProcessorOptions = {
+        seed: this.options.seed,
+        startPaused: true,
+        ...(onProfile ? { profile: true } : {}),
+      };
       const node = this.options.createNode(context, PROCESSOR_NAME, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
@@ -284,6 +297,12 @@ class WorkletAudioEngine implements AudioEngine {
         processorOptions,
       });
       this.node = node;
+      if (onProfile) {
+        node.port.onmessage = (event) => {
+          const data = event.data as { type?: string } | null;
+          if (data?.type === 'profile') onProfile(data as Record<string, unknown>);
+        };
+      }
       if (this.hasScene) this.post({ type: 'scene', packed: this.packedScene });
       if (this.pendingCue) {
         this.post({ type: 'cue', cue: this.pendingCue });
@@ -389,5 +408,6 @@ export function createAudioEngine(
     createNode,
     visibility: options.visibility === undefined ? (g.document ?? null) : options.visibility,
     ...(options.onFallback ? { onFallback: options.onFallback } : {}),
+    ...(options.onProfile ? { onProfile: options.onProfile } : {}),
   });
 }
