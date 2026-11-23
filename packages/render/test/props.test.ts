@@ -1,5 +1,5 @@
 import type { InstancedMesh } from 'three';
-import { BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
+import { BoxGeometry, Matrix4, MeshBasicMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { PropRegistry, bucketBySector, chunkLod, sectorOf } from '../src/props/registry';
 
@@ -172,6 +172,33 @@ it('caps moving debris at 32 and retains settled boards in the original instance
       visible++;
   expect(visible).toBe(40);
   expect(reg.movingDebrisCount).toBe(32);
+  reg.dispose();
+  geo.dispose();
+  material.dispose();
+});
+
+it('lays a settled board flat on the ground, not standing on one end', async () => {
+  const { createCarPose } = await import('@undercut/sim');
+  const geo = new BoxGeometry(0.68, 0.88, 4.36).translate(0, 0.44, 0);
+  const material = new MeshBasicMaterial();
+  const reg = new PropRegistry(1000, 1000);
+  reg.define({ id: 'board', lods: [{ geometry: geo, material, maxDistance: 1000 }] });
+  const o = { id: 0, x: 0, y: 0, z: 0, yaw: 0, halfWidth: 2.18, halfDepth: 0.34, mass: 12 };
+  reg.place('board', { ...o, s: 0, breakable: o });
+  reg.build();
+  const pose = createCarPose();
+  pose.breakableHits!.set([0, 0, 25, 0], 0);
+  reg.observeCar(pose, 1);
+  reg.updateDebris(30);
+  const mesh = reg.group.children[0] as InstancedMesh;
+  const m = new Matrix4();
+  mesh.getMatrixAt(0, m);
+  const box = geo.boundingBox ?? (geo.computeBoundingBox(), geo.boundingBox!);
+  const world = box.clone().applyMatrix4(m);
+  // Resting on the ground at its depth: the 4.36 m width stays level, the face points up or down.
+  expect(world.min.y).toBeGreaterThanOrEqual(-0.01);
+  expect(world.max.y - world.min.y).toBeLessThan(0.7);
+  expect(Math.max(world.max.x - world.min.x, world.max.z - world.min.z)).toBeGreaterThan(4);
   reg.dispose();
   geo.dispose();
   material.dispose();

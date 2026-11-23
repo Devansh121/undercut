@@ -309,7 +309,7 @@ export class PropRegistry {
       pose.y += this.groundHeight(pose.x, pose.z) - hit.object.y;
     for (const ref of this.breakableInstances.get(id) ?? []) {
       const scale = pose?.scale ?? 0;
-      this.debrisEuler.set(pose?.roll ?? 0, pose?.yaw ?? 0, 0, 'YXZ');
+      this.debrisEuler.set(0, pose?.yaw ?? 0, pose?.roll ?? 0, 'YXZ');
       q.setFromEuler(this.debrisEuler);
       m.compose(pos.set(pose?.x ?? 0, pose?.y ?? 0, pose?.z ?? 0), q, scl.setScalar(scale));
       ref.mesh.setMatrixAt(ref.index, m);

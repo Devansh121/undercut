@@ -139,9 +139,10 @@ export function debrisPose(hit: BreakableHit, time: number) {
   const spin = (1 - Math.exp(-t * 1.5)) * (3 + seed * 5);
   const settle = Math.min(1, Math.max(0, (t - 2) / 2));
   const roll = spin * (1 - settle) + (Math.PI / 2) * settle;
-  // Pivot height keeps the rotating whole board above its contact plane, including its posts.
+  // `roll` tips the board about its long (width) axis, so it comes to rest lying on its face or
+  // back. The pivot height keeps the whole board, posts included, above its contact plane.
   const clearance =
-    Math.abs(Math.sin(roll)) * o.halfWidth + Math.max(0, -Math.cos(roll)) * (o.height ?? 0.88);
+    Math.abs(Math.sin(roll)) * o.halfDepth + Math.max(0, -Math.cos(roll)) * (o.height ?? 0.88);
   return {
     x: o.x + hit.vx * travel,
     y: o.y + 0.1 + clearance + height,
