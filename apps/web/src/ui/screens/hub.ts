@@ -58,7 +58,6 @@ const MODE_ICON: Record<ModeId, IconKey> = {
 /** Modes that start a session in this build. */
 const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial', 'quickRace', 'online']);
 /** Circuits a Quick Race runs on in this build (its AI field and grid are set up for these). */
-const QUICK_RACE_CIRCUITS: ReadonlySet<string> = new Set(['monza']);
 
 const kmText = (m: number): string => (m / 1000).toFixed(3);
 
@@ -287,7 +286,7 @@ export class HubScreen implements Screen {
    * presets, steering help): rebuild both when either changed since they were built.
    */
   private syncPanels(): void {
-    const key = `${this.circuit().id}|${this.device}`;
+    const key = `${this.circuit().id}|${this.device}|${this.o.prefs.get().mode}`;
     if (key === this.panelsKey) return;
     this.panelsKey = key;
     this.inline.build();
@@ -444,6 +443,8 @@ export class HubScreen implements Screen {
       chip('drop', S.circuit.dry),
     );
     if (!c.raceReady) chips.append(chip('stopwatch', S.circuit.timeTrialOnly));
+    else if (mode === 'quickRace' && c.raceTrim)
+      chips.append(chip('car', S.circuit.raceDownforce[c.raceTrim] ?? c.raceTrim));
     if (c.airTemperature !== null)
       chips.append(chip('temp', S.circuit.air(Math.round(c.airTemperature - 273.15))));
     // Keep focus on the change button across a re-render.
@@ -451,10 +452,11 @@ export class HubScreen implements Screen {
     this.circuitCard.replaceChildren(head, hero, chips);
     if (hadFocus) this.changeCircuit.focus({ preventScroll: true });
 
-    // Session settings for time trial; otherwise a note: what online rooms offer (their own
-    // settings are in the lobby), or that race sessions are not in this build.
-    const settings = mode === 'timeTrial';
+    // Session settings (time of day and assists) for the modes that start a session here; a
+    // note for the rest: what online rooms offer (their own settings are in the lobby), that a
+    // circuit without a racing line has no races, or that race sessions are not in this build.
     const race = mode === 'quickRace';
+    const settings = mode === 'timeTrial' || (race && c.raceReady);
     this.settingsCard.hidden = !settings;
     this.summaryCard.hidden = !settings;
     this.noticeCard.hidden = settings;
@@ -473,13 +475,7 @@ export class HubScreen implements Screen {
         el(
           'p',
           online || race ? 'notice__body' : 'notice__body notice__body--races',
-          online
-            ? S.notices.onlineBody
-            : race
-              ? QUICK_RACE_CIRCUITS.has(c.id)
-                ? S.notices.quickRaceBody
-                : S.notices.quickRaceCircuits(c.name)
-              : S.notices.racesBody,
+          online ? S.notices.onlineBody : race ? S.circuit.noRaceLine(c.name) : S.notices.racesBody,
         ),
         ...(!online && !race && !c.raceReady
           ? [el('p', 'notice__body notice__body--circuit', S.circuit.noRaceLine(c.name))]
@@ -557,7 +553,8 @@ export class HubScreen implements Screen {
   /** A mode that starts in this build, on this circuit. */
   private canStart(mode: ModeId, circuit: string): boolean {
     if (!PLAYABLE.has(mode)) return false;
-    return mode !== 'quickRace' || QUICK_RACE_CIRCUITS.has(circuit);
+    // A race needs the AI field's racing line at the circuit.
+    return mode !== 'quickRace' || this.o.circuits.some((c) => c.id === circuit && c.raceReady);
   }
 
   private summaryPart(a: string, b: string): HTMLElement {

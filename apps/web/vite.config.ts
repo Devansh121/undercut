@@ -100,13 +100,16 @@ function circuitCatalog(): Plugin {
         const lines = fs
           .readdirSync(aiDir)
           .filter((f) => f.startsWith(`${t.id}-`) && f.endsWith('.line.json'));
-        // Braking help needs a line built for the player's car (low downforce).
+        // Braking help needs a line built for the player's car (low downforce). The race line's
+        // trim (`<circuit>-<trim>.line.json`) is the one every car runs in a race.
+        const raceLine = lines.sort()[0];
         return summarizeTrack(
           t,
           rules?.raceLaps ?? fullRaceLaps(t.length),
           line,
           lines.length > 0,
           lines.includes(`${t.id}-low.line.json`),
+          raceLine ? raceLine.slice(t.id.length + 1, -'.line.json'.length) : null,
         );
       });
       // Monza first (the default and round 1), then by name.

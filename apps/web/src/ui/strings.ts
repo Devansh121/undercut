@@ -121,10 +121,6 @@ export const S = {
     racesBody:
       'The race rules are built: start lights, flags, track limits, penalties, pit stops and points. The race screen that runs them is not in this build yet. Time Trial runs on the same rules today.',
     quickRaceTitle: 'Five laps against nineteen cars',
-    quickRaceBody:
-      'A standing start from the middle of the grid, the full race rules, pit stops and race control. Race length and grid position arrive with the race setup screen.',
-    quickRaceCircuits: (name: string) =>
-      `Quick Race runs at Monza in this build; ${name} is Time Trial only for now.`,
     onlineTitle: 'Private rooms',
     onlineBody:
       'Create a room and share its invite, or join one with a room code. Up to eight drivers race at Monza on equal cars; the host sets the laps and which assists are allowed.',
@@ -150,6 +146,12 @@ export const S = {
     km: 'km',
     onlyOne: 'More circuits arrive with their track data.',
     timeTrialOnly: 'Time Trial only',
+    /** In a race every car, the player's included, runs the trim the circuit's racing line was built for. */
+    raceDownforce: {
+      low: 'Low downforce',
+      medium: 'Medium downforce',
+      high: 'High downforce',
+    } as Record<string, string>,
     noRaceLine: (name: string) =>
       `The AI drivers have no racing line at ${name} yet, so race modes are not available there. Time Trial is.`,
   },
