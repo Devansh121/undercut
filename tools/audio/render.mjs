@@ -3,6 +3,8 @@
 import { fileURLToPath } from 'node:url';
 import { runnerImport } from 'vite';
 
-const entry = fileURLToPath(new URL('./cli.ts', import.meta.url));
+const entry = fileURLToPath(
+  new URL(process.argv[2] === 'scene' ? './scene-render.ts' : './cli.ts', import.meta.url),
+);
 const { module } = await runnerImport(entry, { configFile: false, logLevel: 'error' });
 await module.main(process.argv.slice(2));
