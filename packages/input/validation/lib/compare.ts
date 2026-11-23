@@ -100,7 +100,7 @@ export const DRIVABILITY_GAPS = Object.freeze({
     reason:
       'Braking at the driving line marks and flooring it on green, on keys: three barrier ' +
       'strikes just past the Lesmo 1 and Lesmo 2 exits (54 and 46 km/h) and one spin out of ' +
-      'Ascari over the kerb with the rear unloaded; about 42 s a lap off the asphalt, 35 % ' +
+      'Vialone over the kerb with the rear unloaded; about 42 s a lap off the asphalt, 35 % ' +
       'slower than the reference.',
   }),
   /** Target: at most 1 spin in 10 laps. */
