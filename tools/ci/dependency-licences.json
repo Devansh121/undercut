@@ -1,0 +1,19 @@
+{
+  "$comment": "Licences allowed for npm packages (SPDX expressions as package-lock.json records them). 'shipped' is for packages the client or the rooms Worker bundles (production dependencies); 'tools' adds what build, test and dev tooling may use, which is never shipped. Read by tools/ci/check-credits.mjs. Anything new needs a read of the licence first. MPL-2.0: lightningcss, Vite's CSS minifier, used unmodified. LGPL-3.0-or-later: libvips in sharp's optional prebuilt binaries, pulled in by Wrangler's local runtime and dynamically linked.",
+  "shipped": ["MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "0BSD"],
+  "tools": [
+    "MIT",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "0BSD",
+    "MIT OR Apache-2.0",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    "LGPL-3.0-or-later",
+    "Apache-2.0 AND LGPL-3.0-or-later",
+    "Apache-2.0 AND LGPL-3.0-or-later AND MIT"
+  ]
+}

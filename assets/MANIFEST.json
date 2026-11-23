@@ -130,7 +130,7 @@
   {
     "file": "apps/web/public/assets/index.json",
     "source_url": "tools/assets/build_textures.py (this repository)",
-    "author": "UNDERCUT contributors",
+    "author": "Project contributors",
     "licence": "MIT",
     "changes": "Generated index of the environment textures and skies",
     "sha256": "f2dbdcefcf827b99d441372d144e4f82a36000f7f117592e4faeaa44df1c411d"
