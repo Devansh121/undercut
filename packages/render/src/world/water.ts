@@ -418,7 +418,11 @@ export class WaterSurface {
     renderer.setRenderTarget(target);
     renderer.state.buffers.depth.setMask(true);
     renderer.clear();
+    // The frame's own render has just updated every world matrix: skip doing it again.
+    const autoUpdate = scene.matrixWorldAutoUpdate;
+    scene.matrixWorldAutoUpdate = false;
     renderer.render(scene, this.mirror.camera);
+    scene.matrixWorldAutoUpdate = autoUpdate;
     renderer.shadowMap.autoUpdate = shadows;
     renderer.setRenderTarget(previous);
     this.passes++;
