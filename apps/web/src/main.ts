@@ -119,7 +119,10 @@ const hub: HubScreen = new HubScreen({
     start(choice).catch(() => undefined);
   },
   onOnline: () => {
-    audio.prime();
+    // Not primed here: creating the context on this press stalled WebKit's page (the phone-fit
+    // sweep's Online step froze one run in six). An online race's sound starts on the first
+    // touch release instead (PageAudio.gesture unlocks the context then).
+    audio.gesture();
     showOnline(null);
   },
   onCircuits: () => shell.push(circuits),
