@@ -16,3 +16,16 @@ export function runFollowupRace(circuit: RaceCircuit, seed: number, laps = 1): R
   }
   return runRace({ circuit, cars: 20, laps, seed, pitLap: null, tyres: true, startFuel });
 }
+
+/**
+ * Starts that still fail the follow-up acceptance with the game's tyres and fuel: lane changes
+ * into Monza's turn-one braking zone (docs/STATUS.md, open gaps). Tests hold these as expected
+ * failures so a fix shows; filled in from the recorded sweep.
+ */
+const GAPS: Partial<Record<RaceCircuit, readonly number[]>> = {
+  monza: [1022, 7307],
+};
+
+export function followupGap(circuit: RaceCircuit, seed: number): boolean {
+  return (GAPS[circuit] ?? []).includes(seed);
+}
