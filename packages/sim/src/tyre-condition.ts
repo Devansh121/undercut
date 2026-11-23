@@ -80,7 +80,10 @@ export interface TyreThermalParams {
   /** Cooling to the air: h0 + h1·v, W/K, v in m/s. */
   readonly coolStill: number;
   readonly coolPerSpeed: number;
-  /** Grip lost per kelvin below the window and above it (4.2: −1 % per 5 °C above). */
+  /**
+   * Grip lost per kelvin below the window and above it: 4.2 gives −1 % per 5 °C above; the
+   * same below is an estimate (a steeper cold slope spun cars on Monza's cool front right).
+   */
   readonly coldSlope: number;
   readonly hotSlope: number;
   /** Least grip the temperature can leave. */
@@ -102,7 +105,7 @@ export const TYRE_THERMAL: TyreThermalParams = Object.freeze({
   rollingResistance: 0.015,
   coolStill: 15,
   coolPerSpeed: 0.955,
-  coldSlope: 0.003,
+  coldSlope: 0.002,
   hotSlope: 0.002,
   tempGripFloor: 0.75,
   wearGripLoss: 0.2,

@@ -57,8 +57,8 @@ describe('tyre grip factor', () => {
     expect(temperatureGrip(SOFT, SOFT.windowHigh + 1e-9)).toBeCloseTo(1, 6);
     // Doc 4.2: −1 % per 5 °C above the window.
     expect(temperatureGrip(SOFT, SOFT.windowHigh + 5)).toBeCloseTo(0.99, 9);
-    // Cold costs more than hot, per kelvin (estimate).
-    expect(temperatureGrip(SOFT, SOFT.windowLow - 5)).toBeLessThan(0.99);
+    // Below it the same per kelvin (estimate: doc 4.2 gives the slope above only).
+    expect(temperatureGrip(SOFT, SOFT.windowLow - 5)).toBeCloseTo(0.99, 9);
     expect(temperatureGrip(SOFT, K - 50)).toBe(TYRE_THERMAL.tempGripFloor);
   });
 

@@ -1106,7 +1106,7 @@ softest compound"), so it has a grip factor of exactly 1.
 |---|---|---|
 | Working ranges | soft 80–110 °C, medium 85–115 °C, hard 100–130 °C | Section 4.2 [38]: C5, C4 and C3 shifted 5 °C lower. That is Monza's and Singapore's 2025 nomination; Spa's hard was C1 (110–140 °C), not modelled separately. |
 | Grip between compounds | medium 0.991, hard 0.982 of the soft | **Estimate**. At Monza that is 0.28 s and 0.55 s a lap. |
-| Grip out of the window | −0.3 % per K below, −0.2 % per K above (section 4.2: −1 % per 5 °C), at least 0.75 | **Estimate** below the window. |
+| Grip out of the window | −0.2 % per K either side (section 4.2: −1 % per 5 °C above), at least 0.75 | **Estimate** below the window: section 4.2 gives the slope above only. |
 | Grip lost to wear | 20 % at a worn-through tread, linear | **Estimate**. |
 | Wear | proportional to the sliding energy into the tread, × 1.5 per 10 K above the window (section 4.2) | Rates calibrated to section 4.2's lap-time bands at Monza: soft 0.10, medium 0.065, hard 0.04 s a lap. |
 | Heating | 20 % of the sliding power, plus carcass flex at the rolling-resistance power (0.015 · Fz · v) | **Estimate**. |
@@ -1127,7 +1127,7 @@ the soft. That is the lap's clockwise loading and the rear's traction sliding. A
 per 1 % of grip there (Spa 0.44 s, Singapore 0.46 s). That is measured quasi-steady: the racing
 line re-planned on the envelope scaled down by 1 %. The reference driver drives one fixed plan,
 so its own laps barely show grip: 0.07 s for 1 %. From the blankets the hard is 30 K under its
-window, with 9 % less grip on the out-lap. The reference driver, on a plan for new softs, spins
+window, with 6 % less grip on the out-lap. The reference driver, on a plan for new softs, spins
 on it. Warming tyres up is the race AI's job and arrives with its strategy (M4 Race Weekend).
 
 Fuel already burns at the regulated flow (section 1.3) and its mass, centre of gravity and yaw

@@ -78,7 +78,7 @@ describe('tyres on the reference driver at Monza', () => {
   });
 
   // The hard set starts at 100 °C: from the blankets (70 °C, 30 K under its window) it has
-  // 9 % less grip on the out-lap, and the reference driver, on a plan made for new softs in
+  // 6 % less grip on the out-lap, and the reference driver, on a plan made for new softs in
   // their window, spins. Warming it up is the driver's job (the race AI's, later).
   for (const [compound, start] of [
     ['soft', undefined],
