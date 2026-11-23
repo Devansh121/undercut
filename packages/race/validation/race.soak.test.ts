@@ -28,8 +28,8 @@ describe('Quick Race on more seeds, with pit stops', () => {
 
 describe('Quick Race at Spa and Singapore on more seeds', () => {
   const MORE: Record<'spa' | 'singapore', number[]> = {
-    spa: [1, 3, 17, 29],
-    singapore: [1, 2, 3, 211],
+    spa: [1, 3, 17, 29, 211],
+    singapore: [1, 2, 3, 29, 211],
   };
   for (const [circuit, seeds] of Object.entries(MORE) as ['spa' | 'singapore', number[]][]) {
     for (const seed of seeds) {
