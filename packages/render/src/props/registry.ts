@@ -167,6 +167,8 @@ export class PropRegistry {
   private readonly cars: number[] = [];
   /** Per moving board, how far it has been pushed out of cars so far (x, z), m. */
   private readonly debrisPush = new Map<number, [number, number]>();
+  /** A board not pushed yet works on this zeroed pair; it gets its own on its first push. */
+  private readonly noPush: [number, number] = [0, 0];
 
   /**
    * The shadow pass's depth material for props without their own: owned here and released with
@@ -308,6 +310,7 @@ export class PropRegistry {
         const oldest = this.debris.get(first)!;
         this.writeDebris(first, oldest, oldest.time + 6);
         this.debris.delete(first);
+        this.debrisPush.delete(first);
       }
     }
     if (pose.brokenObjects)
@@ -326,7 +329,11 @@ export class PropRegistry {
     }
     for (const [id, hit] of this.debris) {
       this.writeDebris(id, hit, time);
-      if (time - hit.time >= 6) this.debris.delete(id);
+      if (time - hit.time >= 6) {
+        // Settled: its pose, push included, is written for good.
+        this.debris.delete(id);
+        this.debrisPush.delete(id);
+      }
     }
     this.cars.length = 0;
   }
@@ -368,7 +375,11 @@ export class PropRegistry {
       push[0] += along * c - across * sn;
       push[1] += -along * sn - across * c;
     }
-    if (push[0] !== 0 || push[1] !== 0) this.debrisPush.set(id, push);
+    if (push === this.noPush && (push[0] !== 0 || push[1] !== 0)) {
+      this.debrisPush.set(id, [push[0], push[1]]);
+      push[0] = 0;
+      push[1] = 0;
+    }
   }
 
   /**
@@ -380,8 +391,11 @@ export class PropRegistry {
     const refs = this.breakableInstances.get(id);
     if (!o || !refs) return;
     const pose = debrisPose(hit ?? settledHit(o), time, this.debrisPose);
-    const push = this.debrisPush.get(id) ?? [0, 0];
-    if (hit && time - hit.time < 6) this.pushOutOfCars(id, pose.x, pose.z, pose.lift, push);
+    let push = this.debrisPush.get(id) ?? this.noPush;
+    if (hit && time - hit.time < 6) {
+      this.pushOutOfCars(id, pose.x, pose.z, pose.lift, push);
+      push = this.debrisPush.get(id) ?? this.noPush;
+    }
     pose.x += push[0];
     pose.z += push[1];
     const [minX, maxX, minY, maxY] = this.boundsOf(id, refs);
@@ -422,6 +436,11 @@ export class PropRegistry {
       this.debrisBounds.set(id, b);
     }
     return b;
+  }
+
+  /** Boards holding a push out of a car's body (moving boards only). */
+  get pushedDebrisCount(): number {
+    return this.debrisPush.size;
   }
 
   get movingDebrisCount(): number {

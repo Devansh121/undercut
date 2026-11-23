@@ -283,6 +283,17 @@ it('keeps a slowly struck board out of the car that struck it while it is low', 
     if (low && inBody) inside++;
   }
   expect(inside).toBe(0);
+  // The push is held only while the board moves, and stays in its settled place.
+  expect(reg.pushedDebrisCount).toBe(1);
+  (reg.group.children[0] as InstancedMesh).getMatrixAt(0, m);
+  const moving = new Vector3().setFromMatrixPosition(m);
+  reg.updateDebris(8);
+  expect(reg.pushedDebrisCount).toBe(0);
+  expect(reg.movingDebrisCount).toBe(0);
+  (reg.group.children[0] as InstancedMesh).getMatrixAt(0, m);
+  const settled = new Vector3().setFromMatrixPosition(m);
+  expect(settled.x).toBeGreaterThan(o.x + 0.45 * v);
+  expect(Math.abs(settled.x - moving.x)).toBeLessThan(1);
   reg.dispose();
   geo.dispose();
   material.dispose();
