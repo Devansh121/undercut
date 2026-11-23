@@ -163,8 +163,12 @@ export {
 export {
   BreakableIndex,
   BROKEN_OBJECT_WORDS,
+  breakableContact,
   touchesBreakable,
+  createDebrisPose,
   debrisPose,
+  settledHit,
+  type DebrisPose,
   type BreakableObject,
   type BreakableHit,
 } from './breakables';

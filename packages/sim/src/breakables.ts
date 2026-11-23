@@ -90,6 +90,8 @@ export function breakableContact(car: CarState, index: BreakableIndex): void {
     const word = o.id >>> 5,
       mask = 1 << (o.id & 31);
     if ((car.brokenObjects[word]! & mask) !== 0) continue;
+    // A car in the air over a board, its body above the board's top, passes it by.
+    if (car.y - o.y > (o.height ?? 0.88)) continue;
     if (!touchesBreakable(o, car, mass.a + BODY_NOSE, mass.b + BODY_TAIL)) continue;
     const speed = Math.hypot(car.vx, car.vy);
     if (speed < 0.2) continue;
@@ -120,8 +122,34 @@ export interface BreakableHit {
   readonly vz: number;
 }
 
-/** Analytic cosmetic trajectory: reproducible at any frame rate, three damped bounces, then rest. */
-export function debrisPose(hit: BreakableHit, time: number) {
+/** A board's cosmetic pose: position of its origin (m), yaw about +Y and roll about its width (rad). */
+export interface DebrisPose {
+  x: number;
+  /** Origin height clearing the analytic footprint (`height`, `halfDepth`) above `o.y`, m. */
+  y: number;
+  z: number;
+  yaw: number;
+  roll: number;
+  /** Height of the board's lowest point above the ground in its bounce, m (0 at rest). */
+  lift: number;
+}
+
+export function createDebrisPose(): DebrisPose {
+  return { x: 0, y: 0, z: 0, yaw: 0, roll: 0, lift: 0 };
+}
+
+/** The pose of a board known to be down with no hit to replay: knocked flat where it stood. */
+export function settledHit(object: BreakableObject): BreakableHit {
+  return { object, time: -Infinity, vx: 0, vz: 0 };
+}
+
+const SETTLED_ROLL = -Math.PI / 2;
+
+/**
+ * Analytic cosmetic trajectory: reproducible at any frame rate, three damped bounces, then rest
+ * face down. Fills and returns `out`; allocates nothing.
+ */
+export function debrisPose(hit: BreakableHit, time: number, out: DebrisPose): DebrisPose {
   const o = hit.object;
   const t = Math.min(6, Math.max(0, time - hit.time));
   const seed = ((o.id * 1664525 + 1013904223) >>> 0) / 4294967296;
@@ -138,17 +166,16 @@ export function debrisPose(hit: BreakableHit, time: number) {
   const travel = (1 - Math.exp(-t)) * 0.45 * launchScale;
   const spin = (1 - Math.exp(-t * 1.5)) * (3 + seed * 5);
   const settle = Math.min(1, Math.max(0, (t - 2) / 2));
-  const roll = spin * (1 - settle) + (Math.PI / 2) * settle;
-  // `roll` tips the board about its long (width) axis, so it comes to rest lying on its face or
-  // back. The pivot height keeps the whole board, posts included, above its contact plane.
+  const roll = spin * (1 - settle) + SETTLED_ROLL * settle;
+  // `roll` tips the board about its long (width) axis, so it comes to rest on its face. The
+  // origin height keeps the analytic footprint, posts included, on or above its contact plane.
   const clearance =
     Math.abs(Math.sin(roll)) * o.halfDepth + Math.max(0, -Math.cos(roll)) * (o.height ?? 0.88);
-  return {
-    x: o.x + hit.vx * travel,
-    y: o.y + 0.1 + clearance + height,
-    z: o.z + hit.vz * travel,
-    yaw: o.yaw + spin * 0.7,
-    roll,
-    scale: 1,
-  };
+  out.x = o.x + hit.vx * travel;
+  out.y = o.y + clearance + height;
+  out.z = o.z + hit.vz * travel;
+  out.yaw = o.yaw + spin * 0.7;
+  out.roll = roll;
+  out.lift = height;
+  return out;
 }

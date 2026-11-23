@@ -195,10 +195,47 @@ it('lays a settled board flat on the ground, not standing on one end', async () 
   mesh.getMatrixAt(0, m);
   const box = geo.boundingBox ?? (geo.computeBoundingBox(), geo.boundingBox!);
   const world = box.clone().applyMatrix4(m);
-  // Resting on the ground at its depth: the 4.36 m width stays level, the face points up or down.
+  // Resting on the ground, face down: the 4.36 m width stays level, the face points down.
   expect(world.min.y).toBeGreaterThanOrEqual(-0.01);
+  expect(world.min.y).toBeLessThan(0.03);
   expect(world.max.y - world.min.y).toBeLessThan(0.7);
   expect(Math.max(world.max.x - world.min.x, world.max.z - world.min.z)).toBeGreaterThan(4);
+  const face = new Vector3(1, 0, 0).transformDirection(m);
+  expect(face.y).toBeLessThan(-0.99);
+  reg.dispose();
+  geo.dispose();
+  material.dispose();
+});
+
+it('draws a board known broken only from the shared set knocked down where it stood', async () => {
+  const { createCarPose } = await import('@undercut/sim');
+  const geo = new BoxGeometry(0.68, 0.88, 4.36).translate(0, 0.44, 0);
+  const material = new MeshBasicMaterial();
+  const reg = new PropRegistry(
+    1000,
+    1000,
+    () => undefined,
+    () => 2,
+  );
+  reg.define({ id: 'board', lods: [{ geometry: geo, material, maxDistance: 1000 }] });
+  const o = { id: 37, x: 50, y: 2, z: 8, yaw: 0.4, halfWidth: 2.18, halfDepth: 0.34, mass: 12 };
+  reg.place('board', { ...o, s: 50, breakable: o });
+  reg.build();
+  const pose = createCarPose();
+  pose.brokenObjects![1] = 1 << 5;
+  reg.observeCar(pose, 3);
+  reg.updateDebris(3);
+  const m = new Matrix4();
+  (reg.group.children[0] as InstancedMesh).getMatrixAt(0, m);
+  geo.computeBoundingBox();
+  const world = geo.boundingBox!.clone().applyMatrix4(m);
+  expect(world.max.y - world.min.y).toBeLessThan(0.7);
+  expect(world.min.y).toBeGreaterThanOrEqual(2 - 0.01);
+  expect(world.min.y).toBeLessThan(2.03);
+  const centre = new Vector3();
+  world.getCenter(centre);
+  expect(Math.hypot(centre.x - o.x, centre.z - o.z)).toBeLessThan(1);
+  expect(reg.movingDebrisCount).toBe(0);
   reg.dispose();
   geo.dispose();
   material.dispose();

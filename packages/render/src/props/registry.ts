@@ -1,4 +1,11 @@
-import { debrisPose, type BreakableObject, type BreakableHit, type CarPose } from '@undercut/sim';
+import {
+  createDebrisPose,
+  debrisPose,
+  settledHit,
+  type BreakableObject,
+  type BreakableHit,
+  type CarPose,
+} from '@undercut/sim';
 import {
   CanvasTexture,
   Color,
@@ -141,6 +148,9 @@ export class PropRegistry {
   private readonly consumed = new Uint32Array(64);
   private readonly debris = new Map<number, BreakableHit>();
   private readonly debrisEuler = new Euler();
+  private readonly debrisPose = createDebrisPose();
+  /** Per object, the local bounds of all its meshes (x and y, m): what rests on the ground. */
+  private readonly debrisBounds = new Map<number, readonly [number, number, number, number]>();
 
   /**
    * The shadow pass's depth material for props without their own: owned here and released with
@@ -303,18 +313,53 @@ export class PropRegistry {
     }
   }
 
+  /**
+   * Pose an object's instances as debris: replaying `hit`, or knocked flat where it stood when
+   * only its broken flag is known. The lowest point of its real geometry meets the ground.
+   */
   private writeDebris(id: number, hit: BreakableHit | null, time: number): void {
-    const pose = hit ? debrisPose(hit, time) : null;
-    if (pose && hit && this.groundHeight)
-      pose.y += this.groundHeight(pose.x, pose.z) - hit.object.y;
-    for (const ref of this.breakableInstances.get(id) ?? []) {
-      const scale = pose?.scale ?? 0;
-      this.debrisEuler.set(0, pose?.yaw ?? 0, pose?.roll ?? 0, 'YXZ');
-      q.setFromEuler(this.debrisEuler);
-      m.compose(pos.set(pose?.x ?? 0, pose?.y ?? 0, pose?.z ?? 0), q, scl.setScalar(scale));
+    const o = this.breakableObjects.get(id);
+    const refs = this.breakableInstances.get(id);
+    if (!o || !refs) return;
+    const pose = debrisPose(hit ?? settledHit(o), time, this.debrisPose);
+    const [minX, maxX, minY, maxY] = this.boundsOf(id, refs);
+    // Rolled about its width (local z), a local point (x, y) rises to x·sin + y·cos.
+    const sr = Math.sin(pose.roll),
+      cr = Math.cos(pose.roll);
+    const lowest = (sr >= 0 ? minX : maxX) * sr + (cr >= 0 ? minY : maxY) * cr;
+    const ground = this.groundHeight ? this.groundHeight(pose.x, pose.z) : o.y;
+    this.debrisEuler.set(0, pose.yaw, pose.roll, 'YXZ');
+    q.setFromEuler(this.debrisEuler);
+    m.compose(pos.set(pose.x, ground + pose.lift - lowest, pose.z), q, scl.setScalar(1));
+    for (const ref of refs) {
       ref.mesh.setMatrixAt(ref.index, m);
       ref.mesh.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  private boundsOf(
+    id: number,
+    refs: readonly { mesh: InstancedMesh }[],
+  ): readonly [number, number, number, number] {
+    let b = this.debrisBounds.get(id);
+    if (!b) {
+      let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
+      for (const { mesh } of refs) {
+        const g = mesh.geometry;
+        if (!g.boundingBox) g.computeBoundingBox();
+        const box = g.boundingBox!;
+        minX = Math.min(minX, box.min.x);
+        maxX = Math.max(maxX, box.max.x);
+        minY = Math.min(minY, box.min.y);
+        maxY = Math.max(maxY, box.max.y);
+      }
+      b = [minX, maxX, minY, maxY];
+      this.debrisBounds.set(id, b);
+    }
+    return b;
   }
 
   get movingDebrisCount(): number {
