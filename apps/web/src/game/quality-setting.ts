@@ -69,3 +69,18 @@ export function autoSwitchAllowed(
 ): boolean {
   return pick !== current && (online || pick === OFFLINE_PRESET);
 }
+
+/**
+ * The preset to start on when `quality` fails to load as a session starts, or null to ask the
+ * player (Try again or Back). Auto falls back to the cached preset whatever the reason. A preset
+ * the player chose falls back only offline, where trying again cannot help: for that session
+ * only, and the choice stays saved for when the connection returns.
+ */
+export function launchFallback(
+  quality: QualityName,
+  auto: boolean,
+  online: boolean,
+): QualityName | null {
+  if (quality === OFFLINE_PRESET) return null;
+  return auto || !online ? OFFLINE_PRESET : null;
+}

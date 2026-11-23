@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { startTimeTrial } from './helpers';
 import { test, expect } from './base';
 
-test('installable shell survives a redirecting host, updates on reload, and drives offline on Auto', async ({
+test('installable shell survives a redirecting host, updates on reload, and drives offline on Auto or a chosen preset', async ({
   page,
   context,
   baseURL,
@@ -124,6 +124,23 @@ test('installable shell survives a redirecting host, updates on reload, and driv
     // it, and first runs whatever the GPU still has queued. On software WebGL that is the
     // session's start-up work plus at most two frames (FramePacer): about 4 s idle, 9 to 11 s
     // on two busy cores.
+    await page.keyboard.press('Escape');
+    await page.getByTestId('pause-menu').locator('[data-action=quit]').click();
+    await expect(page.locator('html')).not.toHaveAttribute('data-screen', 'drive');
+
+    // Offline with Medium chosen by the player (not Auto): the session starts on Mobile too,
+    // says so, and keeps the player's choice for when the connection returns.
+    await page.evaluate(() => localStorage.setItem('settings.quality', 'medium'));
+    await page.goto(origin + '/?world=lite');
+    await expect(page.locator('[data-action=press-start]')).toBeVisible();
+    await startTimeTrial(page);
+    await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+    await expect(page.locator('html')).toHaveAttribute('data-quality', 'mobile');
+    await expect(page.getByTestId('loading')).toHaveCount(0);
+    await expect(page.getByTestId('hud-message')).toContainText(
+      'Medium needs a connection: running on Mobile',
+    );
+    expect(await page.evaluate(() => localStorage.getItem('settings.quality'))).toBe('medium');
     await page.keyboard.press('Escape');
     await page.getByTestId('pause-menu').locator('[data-action=quit]').click();
     await expect(page.locator('html')).not.toHaveAttribute('data-screen', 'drive');
