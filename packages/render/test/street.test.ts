@@ -139,10 +139,15 @@ describe('Singapore street circuit', () => {
     const stands = placed.get('temporary-stand') ?? [];
     expect(res.counts.tempStands).toBeGreaterThanOrEqual(5);
     expect(stands.length).toBe(res.counts.tempStandModules);
-    for (const s of stands) {
-      for (const f of [...dressing.mapped.building, ...dressing.mapped.water])
-        expect(inRing(f.p, s.x, s.z)).toBe(false);
+    const obstacles = [...dressing.mapped.building, ...dressing.mapped.water];
+    const occupied: { stand: number; feature: string }[] = [];
+    for (const [index, stand] of stands.entries()) {
+      for (const feature of obstacles) {
+        if (inRing(feature.p, stand.x, stand.z))
+          occupied.push({ stand: index, feature: feature.id });
+      }
     }
+    expect(occupied).toEqual([]);
     // Eight rows of twelve per module, about the crowd fill taken.
     const seats = stands.length * 8 * 12;
     expect(spectators.length).toBe(res.counts.crowd);
