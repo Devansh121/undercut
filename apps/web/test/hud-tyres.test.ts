@@ -8,6 +8,8 @@ it('bands a tread temperature against its compound window', () => {
   const high = K + 115;
   expect(tyreBand(K + 70, low, high)).toBe('cold');
   expect(tyreBand(K + 85, low, high)).toBe('ok');
+  expect(tyreBand(K + 84.6, low, high)).toBe('ok');
+  expect(tyreBand(K + 115.4, low, high)).toBe('ok');
   expect(tyreBand(K + 115, low, high)).toBe('ok');
   expect(tyreBand(K + 120, low, high)).toBe('warm');
   expect(tyreBand(K + 126, low, high)).toBe('hot');

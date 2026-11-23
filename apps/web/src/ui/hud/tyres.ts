@@ -18,8 +18,9 @@ export type TyreBand = 'cold' | 'ok' | 'warm' | 'hot';
 /** Over the window by up to this much a tread is warm, past it hot, K. */
 const WARM = 10;
 
-/** Where a tread temperature sits against its compound's working range. */
+/** Band the displayed whole-degree temperature against the working range. */
 export function tyreBand(temp: number, low: number, high: number): TyreBand {
+  temp = Math.round(temp - 273.15) + 273.15;
   if (temp < low) return 'cold';
   if (temp <= high) return 'ok';
   return temp <= high + WARM ? 'warm' : 'hot';
