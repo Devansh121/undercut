@@ -157,8 +157,8 @@ describe('power unit', () => {
   });
 
   it('takes a seamless upshift when the upshift time is 0: the next gear at once, no torque cut', () => {
-    // Honda R&D Technical Review 2009, "Development of Seamless Shift for Formula One Car": an
-    // up-shift "with a torque loss time of zero" (docs/physics-validation.md 7.10).
+    // A seamless shift: an up-shift "with a torque loss time of zero" (docs/physics-validation.md
+    // 7.10, source 59).
     const params = createCarParams('low', { gearbox: { upshiftTime: 0 } });
     const car = createCarState(params, { speed: 40, gear: 3 });
     run(car, input({ throttle: 1 }), 0.2);
