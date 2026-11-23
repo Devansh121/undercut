@@ -81,10 +81,31 @@ interface PitLaneState {
   follower: FollowerState;
   /** Seconds stopped in the lane short of the box (bumped off the path), s. */
   still?: number;
+  /** Seconds stopped on the way to the lane, s. */
+  stillBefore?: number;
 }
 
 /** Half a car's length, m (5.6 m nose to tail). */
 const CAR_HALF_LENGTH = 2.8;
+/**
+ * Seconds after its start reaction that a car stops launching however slow it is, s; and, with
+ * a car standing still just ahead of it in its lane, s.
+ */
+const LAUNCH_GIVE_UP = 4;
+const LAUNCH_BOXED_IN = 1.5;
+
+/** A car standing still within 30 m ahead of this one, in its lane (a car stalled on the grid). */
+function stalledAhead(ctx: ControlContext): boolean {
+  const me = ctx.facts;
+  const L = ctx.circuit.length;
+  for (let j = 0; j < ctx.field.length; j++) {
+    if (j === ctx.car || ctx.unseen[j]) continue;
+    const o = ctx.field[j]!;
+    const ahead = forward(L, me.s, o.s);
+    if (ahead > 0 && ahead < 30 && Math.abs(o.d - me.d) < 2.5 && o.speed < 1) return true;
+  }
+  return false;
+}
 /** Seconds stopped short of the box before a car gives the stop up and drives out. */
 const PIT_STALL = 3;
 /** How far past the track edge a car in the pit lane still counts as traffic, m. */
@@ -118,6 +139,7 @@ class PitLaneDriving {
   /** Metres before the pit lane leaves the lap at which the car turns for it. */
   readonly takeover: number;
   private still = 0;
+  private stillBefore = 0;
 
   /** Hand the car back as soon as it leaves the pit lane (a racing driver that can rejoin). */
   readonly handBackOnExit: boolean;
@@ -131,16 +153,23 @@ class PitLaneDriving {
   reset(): void {
     this.mode = 'none';
     this.still = 0;
+    this.stillBefore = 0;
     this.follower.reset();
   }
 
   getState(): PitLaneState {
-    return { mode: this.mode, follower: this.follower.getState(), still: this.still };
+    return {
+      mode: this.mode,
+      follower: this.follower.getState(),
+      still: this.still,
+      stillBefore: this.stillBefore,
+    };
   }
 
   setState(s: PitLaneState): void {
     this.mode = s.mode;
     this.still = s.still ?? 0;
+    this.stillBefore = s.stillBefore ?? 0;
     this.follower.setState(s.follower);
   }
 
@@ -161,7 +190,11 @@ class PitLaneDriving {
       this.follower.reset();
       this.follower.setPath(pitOutPath(ctx.track, ctx.circuit, f.pitS, f.pitD), false);
     }
-    if (this.mode === 'none' && c.pitRequested(i) && phase === 'none' && !f.inPitLane) {
+    // (Off the road the racing driver gets the car back on it first: the lane follower has no
+    // way out of the run-off, and the car stood there until retired.)
+    const onRoad =
+      Math.abs(f.d) <= ctx.track.halfWidthAt(ctx.track.wrap(f.s), f.d >= 0 ? 0 : 1) + 1;
+    if (this.mode === 'none' && c.pitRequested(i) && phase === 'none' && !f.inPitLane && onRoad) {
       const toEntry = forward(L, f.s, ctx.circuit.pit.entryS);
       if (toEntry < this.takeover) {
         const box = c.pitBox(i);
@@ -175,6 +208,18 @@ class PitLaneDriving {
     // Stopped in the lane short of the box and not held (knocked off the path by another car):
     // drive on out, and come in again next lap.
     const stopped = this.mode === 'in' && phase === 'lane' && ctx.telemetry.speed < 0.5;
+    // Stopped on the way to the lane (off the road, against a car): the racing driver has it
+    // back and recovers; the stop is tried again on a later lap.
+    const stalledBefore = this.mode === 'in' && phase === 'none' && ctx.telemetry.speed < 0.5;
+    if (stalledBefore) {
+      this.stillBefore += ctx.dt;
+      if (this.stillBefore > PIT_STALL) {
+        this.stillBefore = 0;
+        this.mode = 'none';
+        this.follower.reset();
+        return false;
+      }
+    } else this.stillBefore = 0;
     this.still = stopped ? this.still + ctx.dt : 0;
     if (this.still > PIT_STALL) {
       this.still = 0;
@@ -371,7 +416,17 @@ export class AiController implements CarController {
       const slip = Math.max(tel.slipRatio[2] ?? 0, tel.slipRatio[3] ?? 0);
       if (slip > 0.12) this.launchCap = Math.max(0.1, this.launchCap - 4 * ctx.dt);
       else this.launchCap = Math.min(1, this.launchCap + 1.5 * ctx.dt);
-      if (tel.speed > this.launchSpeed && (this.race.throttle > 0.9 || this.race.brake > 0)) {
+      // Launched once at speed; or, boxed in behind a car that never got away (a player who
+      // stalled on the grid), a few seconds after the lights all the same: the racing driver
+      // then goes round it as round any stopped car. (Still launching, the cars behind a stalled
+      // player sat on the grid behind it for good.)
+      const since = out0 !== null ? ctx.time - out0 - this.reaction : 0;
+      const boxedIn =
+        out0 !== null && (since > LAUNCH_GIVE_UP || (since > LAUNCH_BOXED_IN && stalledAhead(ctx)));
+      if (
+        boxedIn ||
+        (tel.speed > this.launchSpeed && (this.race.throttle > 0.9 || this.race.brake > 0))
+      ) {
         this.launching = false;
       } else if (this.driver.following) {
         out.throttle = Math.min(this.race.throttle, this.launchCap);
