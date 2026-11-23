@@ -15,6 +15,7 @@ npm run telemetry -- lap --laps 10     # ten consecutive laps (fuel for all of t
 npm run telemetry -- lap --circuit spa # the same at Spa (medium trim) or singapore (high trim)
 npm run telemetry -- race --circuit monza --cars 20 --laps 5 --seed 1
 npm run telemetry -- weekend --cars 20 --laps 5 --qualifying 600 --seed 1
+npm run telemetry -- budget            # where each reference lap's time goes (--circuit spa)
 npm run telemetry -- calibrate         # every target + the Monza lap, one score
 npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only targets|lap]
 ```
@@ -32,6 +33,7 @@ npm run telemetry -- calibrate --set candidate.json [--line rebuild] [--only tar
 | `assists` | Full throttle out of a slow corner and full brake in a turn (both at 85 % of the limit) with TC or ABS 0–3; full-pedal straight stop from 300 km/h with ABS 0–3 |
 | `validate` | The table of every target: result, stated target, band, verdict (pass, gap, fail) |
 | `lap` | The reference driver on the committed racing line (`packages/ai`): an out-lap, then timed lap(s) from the control line at Monza, Spa or Singapore (`--circuit`) in the doc 2.1 conditions; lap, sector, corner, corner-geometry and trap tables against the published figures, driver cost per tick; `lap-<circuit>.csv` (s, speed, target, pedals, steer, gear, rpm, g, DRS, ERS, line and lateral error, sideslip, wheel slip and load) and `lap-<circuit>.json` (`--laps`, `--fuel`, `--every` ticks between trace rows) |
+| `budget` | The reference lap's time-loss budget per circuit (docs/physics-validation.md 7.10): driven lap, the driver's plan and the full-envelope plan by sector and by phase (braking, corners, traction exits, straights); what +5 % of lateral, braking, traction or propulsion, −5 % drag, no DRS and no MGU-K are worth; the factor on lateral grip or propulsion alone that reaches each published sector; and the full envelope with lateral grip scaled by the published Pouhon figure. `budget.json` |
 | `race` | AI cars race at Monza from a standing start (`packages/race`): `--cars` (20), `--laps` (5), `--seed` (1), `--spread` of skill 0–1 (0.5), `--no-pit` (otherwise one tyre stop each around half distance for races of five laps or more). Prints the classification, the event log (positions, sectors and speed traps counted, everything else listed), per-car first-lap position, slowest point and track-limit figures, the watchdog's findings, the first-lap overlap count (cars are ghosts to each other), the speed and a digest of the result so two runs can be compared; writes `race-monza-c<cars>-l<laps>-s<seed>.json` with the result and every event |
 | `weekend` | Qualifying (`--qualifying` seconds, 600; `--practice` seconds to add practice) and then the race on the grid from qualifying, with the same output per session |
 

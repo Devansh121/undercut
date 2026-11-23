@@ -73,6 +73,12 @@ interface Outcome {
   cars: number;
   /** The stopped car became a ghost for holding up traffic. */
   ghostFormed: boolean;
+  /**
+   * When it turned solid again while still racing, s after it was released to drive on (null:
+   * never, or not released), and how long it was a ghost, s.
+   */
+  solidAfterRelease: number | null;
+  ghostSeconds: number;
   /** Fastest contact the stopped car had, m/s, from the stop on. */
   stopperMaxContact: number;
   /** Spins (pointing over 0.8 rad off the lap's direction), every car, from the stop on. */
@@ -149,6 +155,10 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number, cars 
   const past = new Array<number | null>(n).fill(null);
   const spinning = new Array<boolean>(n).fill(false);
   let ghostFormed = false;
+  let ghostFrom: number | null = null;
+  let ghostSeconds = 0;
+  let solidAfterRelease: number | null = null;
+  let releasedAt: number | null = null;
   let stopperMaxContact = 0;
   let spins = 0;
   let retiredAt: number | null = null;
@@ -168,9 +178,19 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number, cars 
     if (releaseAfter !== undefined && !released && session.time - parkedAt >= releaseAfter) {
       stopper.parked = false;
       released = true;
+      releasedAt = session.time;
     }
     if (retiredAt === null && c.cars[0]!.status === 'dnf') retiredAt = session.time;
-    if (session.blockingGhost(0)) ghostFormed = true;
+    if (session.blockingGhost(0)) {
+      ghostFormed = true;
+      if (ghostFrom === null) ghostFrom = session.time;
+    } else if (ghostFrom !== null) {
+      ghostSeconds += session.time - ghostFrom;
+      ghostFrom = null;
+      if (releasedAt !== null && solidAfterRelease === null && c.cars[0]!.status === 'running') {
+        solidAfterRelease = session.time - releasedAt;
+      }
+    }
     stopperMaxContact = Math.max(stopperMaxContact, session.worldCar(0).state.carContactSpeed);
     for (let i = 0; i < n; i++) {
       const off = Math.abs(session.carFacts(i).heading);
@@ -208,6 +228,8 @@ function stopIn(s: number, d: number, seed: number, releaseAfter?: number, cars 
     stopperFinished: c.cars[0]!.status === 'finished',
     cars: n,
     ghostFormed,
+    solidAfterRelease,
+    ghostSeconds: ghostFrom !== null ? ghostSeconds + session.time - ghostFrom : ghostSeconds,
     stopperMaxContact,
     spins,
   };
@@ -269,6 +291,14 @@ describe('a car stopped in the road', () => {
     (seed) => {
       const o = stopIn(1842, 5.49, seed, 30);
       expect(o.ghostFormed).toBe(true);
+      // And solid again while it races on, soon after it drives off: a ghost for good would
+      // pass every other check here.
+      expect(o.solidAfterRelease).not.toBeNull();
+      expect(o.solidAfterRelease!).toBeLessThan(15);
+      // (A ghost from soon after it stopped to soon after it drove on: under the 30 s stop
+      // plus those 15 s.)
+      expect(o.ghostSeconds).toBeGreaterThan(0);
+      expect(o.ghostSeconds).toBeLessThan(45);
       expect(o.stopperMaxContact).toBeLessThan(2);
       expect(o.spins).toBe(0);
       expect(o.finished).toBe(CARS - 1);

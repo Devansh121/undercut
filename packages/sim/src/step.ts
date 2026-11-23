@@ -213,7 +213,19 @@ function applyDriverRequests(s: CarState, input: ControlInput): void {
     if (after > rpm(p.engine.revLimit)) return;
   }
   s.shiftTarget = target;
-  s.shiftTimer = target > s.gear ? p.gearbox.upshiftTime : p.gearbox.downshiftTime;
+  const time = target > s.gear ? p.gearbox.upshiftTime : p.gearbox.downshiftTime;
+  if (time > 0) {
+    s.shiftTimer = time;
+    return;
+  }
+  // A seamless shift: the next gear takes the drive before the last one lets go, so there is no
+  // torque cut. The ECU brings the engine to the new gear's speed (no inertia shock, as in a
+  // timed shift) and the drive carries on in the same step.
+  s.gear = target;
+  if (target >= 1) {
+    const axle = Math.abs(s.wheelSpeed[2]! + s.wheelSpeed[3]!) / 2;
+    s.engineSpeed = Math.max(rpm(p.engine.idleRpm), Math.abs(gearRatio(p, target)) * axle);
+  }
 }
 
 function substep(

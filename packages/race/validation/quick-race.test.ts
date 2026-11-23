@@ -12,7 +12,11 @@ describe('Quick Race: twenty cars, five laps, pit stops', () => {
   // chicane of the second.
   for (const seed of [17, 29, 211]) {
     it(`seed ${seed}: clean start, every car classified, no stuck cars, cars pass`, () => {
-      expectCleanRace(runRace({ cars: 20, laps: 5, seed }), 5);
+      const run = runRace({ cars: 20, laps: 5, seed });
+      expectCleanRace(run, 5);
+      // 211: a 10.8 m/s contact at the first chicane's exit on lap 5, two cars converging on
+      // the line as one came back from a pass before their bodies were clear.
+      if (seed === 211) expect(Math.max(...run.cars.map((c) => c.maxContactSpeed))).toBeLessThan(8);
     }, 300_000);
   }
 

@@ -157,6 +157,11 @@ export class ReferenceDriver implements Driver {
    */
   brakeFloor = 0;
   /**
+   * The least share of the throttle kept whatever the wheelspin feel says (0 to 1). At walking
+   * pace on grass a touch of throttle reads as wheelspin, and a car pulling away there crawled.
+   */
+  throttleFloor = 0;
+  /**
    * The most curvature the lateral feedback may add to the line's, 1/m. At walking pace a car
    * turns far tighter than this, and a racing driver pulling away off the line uses it.
    */
@@ -386,6 +391,7 @@ export class ReferenceDriver implements Driver {
       brake = ((-aDemand - drag) * mass * p.tyre.rollingRadius) / this.brakeTorque;
     }
     throttle = Math.max(0, Math.min(1, throttle));
+    const throttleWanted = throttle;
     brake = Math.max(0, Math.min(1, brake));
 
     // Feel for wheelspin and lock-up.
@@ -421,6 +427,11 @@ export class ReferenceDriver implements Driver {
     if (saturated) {
       throttle *= g.understeerLift;
       brake *= g.understeerLift;
+    }
+    // At walking pace (see `throttleFloor`) at least that share of what was asked for stays on,
+    // whatever the feel for wheelspin and understeer took away.
+    if (this.throttleFloor > 0) {
+      throttle = Math.max(throttle, Math.min(throttleWanted, this.throttleFloor));
     }
 
     // ---- Hands and feet: lag and noise (none for the reference driver). ----

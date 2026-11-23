@@ -97,7 +97,14 @@ export interface RaceSessionSnapshot {
    */
   hints: { surface: number[]; lap: number; pit: number; limits: number[] | null }[];
   /** The stopped-queue ghost state per car (absent in older snapshots: none). */
-  blockers?: { underway: boolean[]; still: number[]; block: number[]; ghost: boolean[] };
+  blockers?: {
+    underway: boolean[];
+    still: number[];
+    block: number[];
+    ghost: boolean[];
+    /** Has been at speed since the start (absent in older snapshots: as under way). */
+    atSpeed?: boolean[];
+  };
 }
 
 /**
@@ -109,11 +116,17 @@ export interface RaceSessionSnapshot {
  * car for more than a few seconds, let alone the full minute before the rules retire it.
  */
 const BLOCK_GHOST_AFTER = 6;
+/** The same for a car stalled on the grid (never yet at speed), s. */
+const STALLED_GHOST_AFTER = 1.5;
 /** Held up: a car within `HELD_REACH` m behind, on the road anywhere across it, under this speed, m/s. */
 const HELD_SPEED = 5;
 const HELD_REACH = 60;
-/** Under way: has gone faster than this since the start, m/s (a car held on the grid is not). */
+/**
+ * Under way: has gone faster than this since the start, m/s, or is still racing this long after
+ * the lights went out, s (a car stalled on the grid).
+ */
 const UNDERWAY_SPEED = 10;
+const STALL_GRACE = 1;
 /** Still: under this speed, m/s (the watchdog's stationary speed). */
 const STILL_SPEED = 1;
 /** At the head: no other car standing still within this far ahead of it on the road, m. */
@@ -172,6 +185,8 @@ export class RaceSession {
   private readonly blockGhost: boolean[];
   private readonly stillTime: number[];
   private readonly underway: boolean[];
+  /** Has been at speed since the start (a car under way only by the clock stalled on the grid). */
+  private readonly atSpeed: boolean[];
   private readonly blockTime: number[];
   private readonly limits: WheelsOffCounter[];
   private readonly hints: { index: number }[];
@@ -235,6 +250,7 @@ export class RaceSession {
     this.blockGhost = o.cars.map(() => false);
     this.stillTime = o.cars.map(() => 0);
     this.underway = o.cars.map(() => false);
+    this.atSpeed = o.cars.map(() => false);
     this.blockTime = o.cars.map(() => 0);
     this.contexts = o.cars.map((_, i) => ({
       car: i,
@@ -358,7 +374,12 @@ export class RaceSession {
     const dt = this.world.step;
     const n = this.cars.length;
     for (let i = 0; i < n; i++) {
-      if (f[i]!.speed > UNDERWAY_SPEED && this.control.racing(i)) this.underway[i] = true;
+      // Under way once at speed, or, still on the grid, a couple of seconds after the lights went
+      // out: a car stalled at the start holds up the cars behind it like any stopped car.
+      const out = this.control.lightsOutAt;
+      const stalled = out !== null && this.world.time > out + STALL_GRACE;
+      if (f[i]!.speed > UNDERWAY_SPEED && this.control.racing(i)) this.atSpeed[i] = true;
+      if ((this.atSpeed[i] || stalled) && this.control.racing(i)) this.underway[i] = true;
       this.stillTime[i] =
         this.queueable(i) && f[i]!.speed < STILL_SPEED ? this.stillTime[i]! + dt : 0;
     }
@@ -377,7 +398,9 @@ export class RaceSession {
         }
       } else if (this.headOfStillQueue(i)) {
         this.blockTime[i]! += dt;
-        if (this.blockTime[i]! >= BLOCK_GHOST_AFTER) {
+        // (Stalled on the grid, sooner: the cars behind it have not got away at all.)
+        const after = this.atSpeed[i] ? BLOCK_GHOST_AFTER : STALLED_GHOST_AFTER;
+        if (this.blockTime[i]! >= after) {
           this.blockGhost[i] = true;
           this.blockTime[i] = 0;
         }
@@ -565,6 +588,7 @@ export class RaceSession {
       })),
       blockers: {
         underway: [...this.underway],
+        atSpeed: [...this.atSpeed],
         still: [...this.stillTime],
         block: [...this.blockTime],
         ghost: [...this.blockGhost],
@@ -604,6 +628,7 @@ export class RaceSession {
       this.cars[i]!.controller.restore(snap.controllers[i]!);
       this.locate(i);
       this.underway[i] = snap.blockers?.underway[i] ?? false;
+      this.atSpeed[i] = snap.blockers?.atSpeed?.[i] ?? this.underway[i]!;
       this.stillTime[i] = snap.blockers?.still[i] ?? 0;
       this.blockTime[i] = snap.blockers?.block[i] ?? 0;
       this.blockGhost[i] = snap.blockers?.ghost[i] ?? false;
