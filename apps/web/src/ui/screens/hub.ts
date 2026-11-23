@@ -177,6 +177,17 @@ export class HubScreen implements Screen {
         this.settingsDialog.show();
       },
     });
+    const raceEdit = iconButton({
+      icon: 'edit',
+      label: 'Race distance and pit limiter',
+      action: 'edit-race-settings',
+      onClick: () => {
+        this.inDialog.sync();
+        this.settingsDialog.show();
+      },
+    });
+    raceEdit.classList.add('race-setup-edit');
+    settingsAside.append(raceEdit);
     this.summaryCard.append(this.summaryText, edit);
 
     this.noticeCard = el('section', 'card notice');

@@ -8,6 +8,30 @@ import {
 import type { StoragePort } from '@undercut/input';
 import type { SessionChoice } from '../ui/screens/hub';
 
+function validResult(r: SessionResult): boolean {
+  return (
+    Array.isArray(r.entries) &&
+    r.entries.length === 20 &&
+    new Set(r.entries.map((e) => e.car)).size === 20 &&
+    r.entries.every(
+      (e) =>
+        Number.isInteger(e.car) &&
+        e.car >= 0 &&
+        e.car < 20 &&
+        typeof e.id === 'string' &&
+        typeof e.name === 'string' &&
+        Number.isInteger(e.position) &&
+        e.position >= 1 &&
+        e.position <= 20 &&
+        ['finished', 'dnf', 'dsq', 'notClassified'].includes(e.status) &&
+        Array.isArray(e.compounds) &&
+        e.compounds.every((c) => ['soft', 'medium', 'hard'].includes(c)) &&
+        Number.isFinite(e.pitStops) &&
+        (e.bestLap === null || Number.isFinite(e.bestLap)),
+    )
+  );
+}
+
 export const SEASON_KEY = 'championship.progress';
 export const SEASON_CIRCUITS = ['monza', 'spa', 'singapore'];
 export interface SeasonSave {
@@ -90,7 +114,10 @@ export class WeekendProgress {
       )
         return null;
       const c = new Championship(SEASON_CIRCUITS);
-      for (const round of s.championship.rounds) c.record(round.result);
+      for (const round of s.championship.rounds) {
+        if (!validResult(round.result)) return null;
+        c.record(round.result);
+      }
       const w = new RaceWeekend(s.weekend.plan, 20);
       if (
         !SEASON_CIRCUITS.includes(w.plan.circuit) ||
@@ -99,7 +126,7 @@ export class WeekendProgress {
       )
         return null;
       for (const r of s.weekend.results) {
-        if (r.entries.length !== 20 || r.circuit !== w.plan.circuit) return null;
+        if (!validResult(r) || r.circuit !== w.plan.circuit) return null;
         w.complete(r);
       }
       if (c.round > 3 || (!w.done && c.nextCircuit() !== w.plan.circuit)) return null;

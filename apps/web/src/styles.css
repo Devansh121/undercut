@@ -2173,3 +2173,13 @@ html[data-drs='open'] .ut-touch .ut-touch__btn--drs {
 html:not([data-screen='launch']) .home-hint {
   display: none;
 }
+
+/* Pit calls belong to racing sessions. The input laboratory still exposes every binding. */
+html:has(.hud:not([data-mode='race'])) .ut-touch__btn--boxThisLap,
+html:has(.hud:not([data-mode='race'])) .ut-touch__btn--nextCompound,
+html:has(.hud:not([data-mode='race'])) .ut-touch__btn--pitLimiter,
+html[data-race-finished] .ut-touch__btn--boxThisLap,
+html[data-race-finished] .ut-touch__btn--nextCompound,
+html[data-race-finished] .ut-touch__btn--pitLimiter {
+  display: none;
+}

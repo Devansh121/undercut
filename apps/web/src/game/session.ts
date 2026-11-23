@@ -304,7 +304,7 @@ export class DriveSession {
       session:
         options.quickRace?.session ??
         (this.quickRace ? { kind: 'race', laps } : { kind: 'timeTrial' }),
-      pitStrategy: options.quickRace?.pitStrategy ?? false,
+      pitStrategy: options.quickRace?.pitStrategy ?? (this.quickRace && laps >= circuit.raceLaps),
       seed: options.seed,
       params: this.params,
       // A race: tyre temperature and wear for every car, and the start load for the distance

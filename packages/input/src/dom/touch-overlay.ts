@@ -85,9 +85,9 @@ const CSS = `
   position: absolute; left: 12px; right: 12px; bottom: 34px; top: 12px; border-radius: var(--r-1);
   transform-origin: bottom; transform: scaleY(0); opacity: 0.85;
 }
-.ut-touch__btn--boxThisLap { top: 104px; left: 50%; }
-.ut-touch__btn--nextCompound { top: 104px; left: calc(50% + 60px); }
-.ut-touch__btn--pitLimiter { top: 104px; left: calc(50% - 60px); }
+.ut-touch__btn--boxThisLap { bottom: calc(var(--ut-b) + 196px); left: var(--ut-l); }
+.ut-touch__btn--nextCompound { bottom: calc(var(--ut-b) + 196px); left: calc(var(--ut-l) + 56px); }
+.ut-touch__btn--pitLimiter { bottom: calc(var(--ut-b) + 196px); left: calc(var(--ut-l) + 112px); }
 .ut-touch__pedal--throttle { right: var(--ut-r); height: 172px; }
 .ut-touch__pedal--throttle .ut-touch__fill { background: var(--c-time-personal); }
 .ut-touch__pedal--brake { right: calc(var(--ut-r) + 86px); }

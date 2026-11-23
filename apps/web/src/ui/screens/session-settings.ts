@@ -121,10 +121,12 @@ export class SettingsPanel {
         laps.set(prefs.get().race.laps);
         limiter.set(prefs.get().race.automaticPitLimiter);
       });
-      rows.push(
+      const raceRows = [
         settingRow('Race distance', laps.root),
         settingRow('Automatic pit limiter', limiter.root),
-      );
+      ];
+      for (const row of raceRows) row.classList.add('race-setting');
+      rows.push(...raceRows);
     }
 
     const setAssist = <K extends keyof AssistChoice>(key: K, v: AssistChoice[K]): void => {

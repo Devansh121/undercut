@@ -61,9 +61,9 @@ or 240 s after the flag.
 | Penalties | served stationary at the next stop, before service; otherwise added to the race time at the finish. A penalty awarded during a hold is not part of it: it stays outstanding for the next stop or the finish | [2]; the in-hold case is a decision |
 | Classified | 90 % of the winner's laps, whether or not the car took the flag | [2] |
 | Exact ties in the final classification | the order the cars took the flag (by time, then position before the tick), then the live order; never the car number | Decision |
-| Two-compound rule | on by default at full race distance; a finisher on one compound is disqualified | [2]; the sanction is the conservative reading |
+| Two-compound rule | on for every Race Weekend race and by default at full Quick Race distance; a finisher on one compound is disqualified | [2]; the sanction is the conservative reading |
 | Points | 25, 18, 15, 12, 10, 8, 6, 4, 2, 1; no fastest-lap point | Published scale since 2010; fastest-lap point dropped for 2025 (not re-checked against [2] here) |
-| Fuel in every session | 10 kg (time trial 20 kg), topped up at each timing line | Decision for this slice: fuel arrives in M4 |
+| Fuel | Practice and qualifying 10 kg, time trial 20 kg, topped up at each timing line; races carry `raceStartFuel` for the chosen distance plus a lap in hand, burnt without refuelling | Race start load from physics-validation 4.3; per-lap reserve an estimate |
 
 ## Timing
 
@@ -146,7 +146,7 @@ at all. The state is carried in `RaceSession.snapshot` (`blockers`).
 
 ## Snapshots and cost
 
-`RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 2) adds
+`RaceControl.snapshot` is the whole rules state as JSON. `RaceSession.snapshot` (version 3) adds
 the world, the blocking-ghost state, every driver's memory (the AI driver's controllers and RNG, the launch, the pit-lane
 follower's path) and every search hint, so a session restored from it continues bit for bit
 (checked at the lights, mid-race, on the pit approach and mid-service).
@@ -187,3 +187,28 @@ follower (`PathFollower` in `packages/ai`); a player can have the same as an ass
   red flags and weather are not modelled; the phase machine has room for them.
 - The track file's DRS zone 2 activation at Monza is anchored to s = 0 rather than the control
   line (about 320 m late, physics-validation 7.6); the rules use the zones as the file has them.
+
+## Playable weekends and pit strategy
+
+Race Weekend offers a five-minute practice or a skip, then the documented 18-minute qualifying
+session and the race. The qualifying order sets the grid, with untimed cars at the back. Every
+weekend race requires two compounds. Championship runs the three circuits in order and saves
+completed sessions, race points and count-back standings locally; abandoning a session restarts it.
+
+Quick Race and weekend players call or cancel the crew and select their next compound from the
+HUD or the bound controls. The player drives into the pit lane. On entry with a call, the pit
+assist follows the lane into the box, stops, waits for the existing penalty/service/release
+sequence and drives out. An uncalled visit is a drive-through; a missed box never causes a car
+to drive back down the lane. Automatic limiter engagement defaults on, with a saved manual
+setting. Switching it off preserves the player's limiter input and the normal speeding offence.
+The HUD shows the crew confirmation, countdown, safe-release wait, stops and compounds used.
+
+The deterministic pit wall runs in weekend races and full-distance Quick Races and uses only saved race state. One or two stops are selected by comparing
+estimated degradation (0.16 s per equivalent 100 s lap per lap of medium age) with estimated pit
+loss (lane length / speed limit + 5 s). Stops are staggered by car. A worn set can undercut a
+close rival if its estimated one-lap loss exceeds the gap and the predicted rejoin has more than
+2 s of clear air; a healthy set can extend one lap while the rival pits. The final stop cannot
+be postponed beyond the penultimate lap. These are estimates, separate from the tyre physics.
+The session snapshot carries pit-wall enablement and the player's limiter assist; decisions
+carry no additional memory. A slowing pit entrant is tested against the follower's lane at the
+entrant's position, before crossing onto the pit surface.

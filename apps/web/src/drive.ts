@@ -373,6 +373,7 @@ async function racingLine(
 }
 
 export interface DriveHandle {
+  readonly closed: boolean;
   readonly session: DriveSession;
   readonly loop: GameLoop;
   readonly view: RaceView;
@@ -620,6 +621,26 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let autoQuality = o.autoQuality ?? false;
   // Rows at the end of the pause settings, so Resume, Restart and Reset stay in view.
   const commands: PauseCommand[] = [
+    {
+      id: 'pit-manual',
+      label: 'Pit limiter: automatic',
+      button: 'Use manual',
+      visible: () => session.quickRace && session.automaticLimiter,
+      run: () => {
+        session.automaticLimiter = false;
+        o.onPitLimiter?.(false);
+      },
+    },
+    {
+      id: 'pit-auto',
+      label: 'Pit limiter: manual',
+      button: 'Use automatic',
+      visible: () => session.quickRace && !session.automaticLimiter,
+      run: () => {
+        session.automaticLimiter = true;
+        o.onPitLimiter?.(true);
+      },
+    },
     {
       id: 'skip-intro',
       label: S.intro.row,
@@ -1044,7 +1065,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let resultDelivered = false;
   if (session.quickRace) {
     const control = hud.root.querySelector('.hud-control') ?? o.host;
-    control.append(raceStatus, skipResults, pitPanel);
+    control.append(raceStatus, skipResults);
+    hud.root.append(pitPanel);
     hud.root.dataset.mode = 'race';
   }
 
@@ -1203,6 +1225,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         player: 1 + standings.findIndex((r) => r.car === 0),
       };
     }
+    if (c.strategy.kind === 'practice' || c.strategy.kind === 'qualifying') {
+      const left = Math.max(
+        0,
+        (c.strategy.duration ?? 0) - (session.world.time - (c.greenTime ?? 0)),
+      );
+      return {
+        lines: [
+          `${c.strategy.kind === 'practice' ? 'Practice' : 'Qualifying'} · ${Math.ceil(left / 60)} min remaining · P${row?.position ?? 20} / 20`,
+        ],
+        player: -1,
+      };
+    }
     const line =
       c.phase === 'grid'
         ? `Quick Race · 20 cars · ${totalLaps} ${totalLaps === 1 ? 'lap' : 'laps'}`
@@ -1351,7 +1385,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const remaining = pitControl.pitRemaining(0);
       pitMessage.textContent = pitControl.held(0)
         ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
-        : `${pitControl.pitRequested(0) ? 'Box confirmed · drive into pit lane' : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : 'Pit crew ready'} · ${pitCar.pitStops} stops · ${pitCar.compounds.join(' / ')}`;
+        : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${pitCar.pitStops} ${pitCar.pitStops === 1 ? 'stop' : 'stops'} · ${pitCar.compounds.join(' / ')}`;
+      if (pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2)
+        pitMessage.textContent = `Compound change required · ${pitMessage.textContent}`;
       continueButton.hidden = !session.result || !o.onSessionComplete;
       if (session.result && !resultDelivered) {
         resultDelivered = true;
@@ -1700,6 +1736,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   };
 
   return {
+    get closed() {
+      return quitting;
+    },
     session,
     loop,
     get view() {

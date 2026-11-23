@@ -194,7 +194,9 @@ class PitLaneDriving {
       Math.abs(f.d) <= ctx.track.halfWidthAt(ctx.track.wrap(f.s), f.d >= 0 ? 0 : 1) + 1;
     if (this.mode === 'none' && this.manualEntry && phase === 'lane' && c.pitRequested(i)) {
       const box = c.pitBox(i);
-      if (box) {
+      if (box && f.pitS > box.s + ctx.control.rules.boxToleranceS) {
+        c.cancelPit(i);
+      } else if (box) {
         this.mode = 'in';
         this.follower.reset();
         this.follower.setPath(pitInPath(ctx.track, ctx.circuit, f.s, f.d, box, f.pitS), true);
@@ -498,7 +500,9 @@ export class InputController implements CarController {
     out.wheelBrake = undefined;
     this.source(ctx, out);
     const limiter = out.pitLimiter;
-    if (this.pit?.drive(ctx, out))
+    if (this.pit?.drive(ctx, out)) {
+      out.wheelBrake = undefined;
       out.pitLimiter = this.autoLimiter ? ctx.control.limiterZone(ctx.car) : limiter;
+    }
   }
 }

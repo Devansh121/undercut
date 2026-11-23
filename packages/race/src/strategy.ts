@@ -1,8 +1,8 @@
 import type { CompoundId } from '@undercut/sim';
 
-/** Estimates: medium loses 0.08 s per equivalent 100 s lap per lap of age. */
+/** Estimates: medium loses 0.16 s per equivalent 100 s lap per lap of age. */
 function degradation(laps: number, lapTime: number): number {
-  return (0.08 * (lapTime / 100) * laps * laps) / 2;
+  return (0.16 * (lapTime / 100) * laps * laps) / 2;
 }
 export function plannedStops(laps: number, lapTime: number, pitLoss: number): 1 | 2 {
   return laps >= 12 &&

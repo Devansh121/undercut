@@ -254,10 +254,15 @@ async function start(
 ): Promise<DriveHandle> {
   const quickRace =
     raceOptions ?? (choice.mode === 'quickRace' ? { laps: choice.laps ?? 5 } : undefined);
-  if (drive) return drive;
-  if (starting) return starting;
+  if (drive && !drive.closed) return drive;
+  drive = null;
+  if (starting) {
+    await starting.catch(() => undefined);
+    return drive ?? start(choice, extension, quit, raceOptions, onSessionComplete);
+  }
   if (!extension) hub.setLoading(true);
   menuInput.stop();
+  let active = true;
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -313,6 +318,7 @@ async function start(
           }),
         ...(extension ? { extension } : {}),
         onQuit: () => {
+          active = false;
           drive = null;
           if (restartWith) {
             const again = restartWith;
@@ -327,7 +333,7 @@ async function start(
           } else showMenus('hub');
         },
       });
-      drive = handle;
+      if (active) drive = handle;
       return handle;
     } catch (error) {
       if (error instanceof Error && error.name === 'LoadCancelled') {

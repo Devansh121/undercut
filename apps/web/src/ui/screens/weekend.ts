@@ -4,6 +4,7 @@ import type { WeekendProgress } from '../../game/weekend';
 import { formatLapTime } from '../../game/format';
 import type { QuickRaceOptions } from '../../game/session';
 import { el } from '../dom';
+import { TEAMS } from '../data/teams';
 import { button } from '../kit/components';
 import type { Screen } from '../shell';
 import type { SessionChoice } from './hub';
@@ -120,7 +121,7 @@ export class WeekendScreen implements Screen {
           String(e.position),
           e.name,
           last.kind === 'race'
-            ? `${e.points} pts · ${e.pitStops} stops · ${e.compounds.join(' / ')}`
+            ? `${e.status === 'finished' ? `${e.points} pts` : e.status === 'dsq' ? 'Disqualified' : e.status === 'dnf' ? 'Retired' : 'Not classified'} · ${e.pitStops} stops · ${e.compounds.join(' / ')}${e.penaltyTime ? ` · +${e.penaltyTime.toFixed(1)} s penalty` : ''}`
             : formatLapTime(e.bestLap),
         ])
           row.append(el('td', '', v));
@@ -136,19 +137,48 @@ export class WeekendScreen implements Screen {
           `Standings · round ${p.championship.round} / 3${p.championship.done ? ' · Season complete' : ''}`,
         ),
       );
+      const names = last ?? p.championship.toJSON().rounds.at(-1)?.result;
       const table = el('table', 'weekend-table');
+      table.append(el('caption', 'label', 'Drivers'));
       p.championship.drivers().forEach((s, i) => {
         const row = el('tr', s.id === 'player' ? 'is-player' : '');
-        const name = last?.entries.find((e) => e.id === s.id)?.name ?? s.id;
+        const name = names?.entries.find((e) => e.id === s.id)?.name ?? s.id;
         for (const v of [String(i + 1), name, `${s.points} pts`]) row.append(el('td', '', v));
         table.append(row);
       });
       results.append(table);
+      const teamTable = el('table', 'weekend-table');
+      teamTable.append(el('caption', 'label', 'Teams'));
+      const teams = [...TEAMS].sort((a, b) =>
+        a.id === p.choice.team ? -1 : b.id === p.choice.team ? 1 : 0,
+      );
+      p.championship.teams(names?.entries ?? []).forEach((standing, i) => {
+        const team = teams[Number(standing.id)];
+        const row = el('tr', Number(standing.id) === 0 ? 'is-player' : '');
+        for (const value of [String(i + 1), team?.name ?? standing.id, `${standing.points} pts`])
+          row.append(el('td', '', value));
+        teamTable.append(row);
+      });
+      results.append(teamTable);
     }
     this.root.replaceChildren(
       title,
       summary,
+      ...(p.championship
+        ? [el('p', 'label', 'Monza / Spa-Francorchamps / Singapore Marina Bay')]
+        : []),
       schedule,
+      el(
+        'p',
+        'weekend-note',
+        spec?.kind === 'practice'
+          ? 'Practice is optional. Qualifying decides the race grid.'
+          : spec?.kind === 'qualifying'
+            ? 'Your best valid lap decides the race grid. Untimed cars start at the back.'
+            : spec?.kind === 'race'
+              ? 'Start on mediums. Use another compound before the finish. No refuelling.'
+              : 'Classification includes time penalties. Points use count-back to break ties.',
+      ),
       actions,
       ...(!p.durable ? [el('p', '', 'Storage unavailable. Progress lasts for this visit.')] : []),
       results,
