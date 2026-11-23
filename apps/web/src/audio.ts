@@ -121,24 +121,25 @@ export class PageAudio {
   };
 
   /**
-   * Play a menu cue. Needs a gesture first (browsers block audio until one). Outside a driving
-   * session the context runs just long enough for the cue, with only the UI bus open.
+   * Play a menu cue, once the engine exists (the first session start creates it). A menu press
+   * never creates the engine itself: that would start an AudioContext and fetch the worklet in
+   * the same click as whatever the press does, such as reloading into a new build (the offline
+   * worker's handover then stalled the reload in CI). Outside a driving session the context runs
+   * just long enough for the cue, with only the UI bus open.
    */
   uiCue(cue: AudioCue): void {
-    if (!this.gestured) return;
-    if (this.active) {
-      this.engine?.cue(cue);
-      return;
-    }
-    this.play();
     const engine = this.engine;
-    if (!engine) return;
-    engine.cue(cue); // play() above held the car and circuit buses at 0
-    if (this.menuTimer !== null) clearTimeout(this.menuTimer);
-    this.menuTimer = setTimeout(() => {
-      this.menuTimer = null;
-      if (!this.active) void this.engine?.suspend();
-    }, MENU_LINGER);
+    if (!this.gestured || !engine) return;
+    if (!this.active) {
+      this.applyVolumes(); // the car and circuit buses at 0 outside a session
+      void engine.resume();
+      if (this.menuTimer !== null) clearTimeout(this.menuTimer);
+      this.menuTimer = setTimeout(() => {
+        this.menuTimer = null;
+        if (!this.active) void this.engine?.suspend();
+      }, MENU_LINGER);
+    }
+    engine.cue(cue);
   }
 
   get volumes(): Readonly<Record<AudioSettingKey, number>> {

@@ -287,7 +287,10 @@ exact zero; two players alternate so a cue never cuts the last one off.
 
 The page (`apps/web/src/audio.ts`) plays `focus` when a menu control takes focus by keyboard or
 gamepad (not from a pointer press), and `accept` or `back` (`data-action="back"` or `…-back`)
-when one is pressed, after the first gesture. Outside a driving session the context runs for
+when one is pressed, once the engine exists: the first session start creates it, so the menus
+are silent until the first drive. A menu press never creates the engine itself; doing so started an
+AudioContext and fetched the worklet in the same click as the update bar's reload, and the offline
+worker's handover then stalled that reload in CI. Outside a driving session the context runs for
 0.8 s after a cue with the car and circuit buses held at 0, then suspends again.
 
 **Checks** (`packages/audio/test/scene.test.ts`, `apps/web/test/audio-scene.test.ts`):
