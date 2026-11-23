@@ -1,3 +1,27 @@
+import { Track } from '@undercut/track';
+import monza from '@undercut/track/data/monza.json';
+import dressing from '../data/monza.dressing.json';
+import catalog from '../data/props.catalog.json';
+import type { PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
+import type { DressingFile } from '../src/world/dressing';
+import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
+import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
+import { placeKitBarriers } from '../src/world/kit-barriers';
+import { LapIndex } from '../src/world/lap-index';
+import { DataTexture, type Mesh } from 'three';
+
+function fakeKit(): PropKitAssets {
+  const entries = new Map((catalog.props as unknown as PropCatalogEntry[]).map((p) => [p.id, p]));
+  return {
+    entries,
+    has: (id: string) => entries.has(id),
+    lodsFor: (id: string) =>
+      entries.has(id)
+        ? [{ geometry: new BoxGeometry(), material: new MeshStandardMaterial(), maxDistance: 100 }]
+        : null,
+  } as unknown as PropKitAssets;
+}
+
 import { describe, expect, it, vi } from 'vitest';
 import {
   BoxGeometry,
@@ -80,5 +104,130 @@ describe('crowd handover', () => {
       );
       material.dispose();
     }
+  });
+});
+
+describe('kit structures', () => {
+  it('places the gantry facing the grid and keeps five independent light channels', () => {
+    const track = Track.fromJSON(monza);
+    const props = new PropRegistry(track.length);
+    const kit = fakeKit();
+    const texture = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    const gantry = buildStartGantry(track, texture, 0, kit, props);
+    expect(props.count('start-gantry')).toBe(1);
+    expect(gantry.group.children).toHaveLength(5);
+    gantry.setLights(1 << 2);
+    const intensities = gantry.group.children.map(
+      (o) => ((o as Mesh).material as MeshStandardMaterial).emissiveIntensity,
+    );
+    expect(intensities).toEqual([0, 0, 9, 0, 0]);
+    gantry.setLights(32);
+    for (const child of gantry.group.children) {
+      const material = (child as Mesh).material as MeshStandardMaterial;
+      expect(material.emissiveIntensity).toBe(8);
+      expect(material.emissive.getHex()).toBe(0x10e048);
+    }
+    gantry.geometries.forEach((g) => g.dispose());
+    gantry.materials.forEach((m) => m.dispose());
+    props.dispose();
+    texture.dispose();
+  });
+
+  it('uses kit bridges at the same crossings as the existing builder', () => {
+    const track = Track.fromJSON(monza);
+    const lap = new LapIndex(track);
+    const props = new PropRegistry(track.length);
+    const texture = new DataTexture();
+    const baseline = buildTrackBridges(track, dressing as unknown as DressingFile, lap, texture);
+    const built = buildTrackBridges(
+      track,
+      dressing as unknown as DressingFile,
+      lap,
+      texture,
+      fakeKit(),
+      props,
+    );
+    expect(built.count).toBeGreaterThan(0);
+    expect(built.count).toBe(baseline.count);
+    expect(props.instanceCount).toBe(built.count);
+    expect(built.group.children).toHaveLength(0);
+    for (const b of [baseline, built]) {
+      b.geometries.forEach((g) => g.dispose());
+      b.materials.forEach((m) => m.dispose());
+    }
+    props.dispose();
+    texture.dispose();
+  });
+});
+
+describe('kit barrier pitch', () => {
+  it('tiles across vertices closer together than the module length', () => {
+    const track = Track.fromJSON(monza);
+    const sampled = {
+      ...track,
+      barriers: [
+        {
+          type: 'armco',
+          side: 'left',
+          points: Float64Array.from(Array.from({ length: 11 }, (_, i) => [i * 2, 4, 50]).flat()),
+        },
+      ],
+    } as unknown as Track;
+    const props = new PropRegistry(track.length);
+    const place = vi.spyOn(props, 'place');
+    expect(placeKitBarriers(sampled, new LapIndex(track), fakeKit(), props, false)).toBe(5);
+    expect(place.mock.calls.map(([, p]) => p.x)).toEqual([2, 6, 10, 14, 18]);
+    expect(place.mock.calls.every(([, p]) => p.y === 4 && Number.isFinite(p.yaw))).toBe(true);
+    props.dispose();
+  });
+});
+
+describe('permanent stand banks', () => {
+  it('keeps human-scale row heights and grounds the supports of all raised banks', () => {
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    const place = vi.spyOn(props, 'place');
+    const seats: KitSpectator[] = [];
+    const result = placeKitStands(
+      [
+        {
+          id: 'stand',
+          ox: 0,
+          oz: 0,
+          ax: 0,
+          az: 1,
+          bx: -1,
+          bz: 0,
+          length: 20,
+          depth: 26.7,
+          base: 0,
+          rows: 30,
+          roof: true,
+          s: 100,
+          seat: [0.1, 0.2, 0.3],
+        },
+      ],
+      fakeKit(),
+      props,
+      1,
+      true,
+      (seat) => seats.push(seat),
+    );
+    expect(result.modules).toBe(6);
+    expect(result.fallback).toHaveLength(0);
+    const heights = [...new Set(seats.map((p) => Math.round(p.y * 1000) / 1000))].sort(
+      (a, b) => a - b,
+    );
+    expect(heights[1]! - heights[0]!).toBeCloseTo(0.42);
+    expect(heights.at(-1)).toBeCloseTo(14.2);
+    for (const [kind] of define.mock.calls) {
+      expect(kind.gridCell).toBeGreaterThan(0);
+      const geometry = kind.lods[0]!.geometry;
+      geometry.computeBoundingBox();
+      const placement = place.mock.calls.find(([id]) => id === kind.id)![1];
+      expect(placement.y + geometry.boundingBox!.min.y).toBeCloseTo(-0.5);
+      geometry.dispose();
+    }
+    props.dispose();
   });
 });

@@ -535,7 +535,7 @@ export function buildStartGantry(
   group.position.set(p.x, groundY, p.z);
   group.rotation.y = yaw;
 
-  const banner = brandHoardingMaterial(brandAtlasTex, false);
+  const banner = brandHoardingMaterial(brandAtlasTex, true);
   const kitLods = kit?.lodsFor('start-gantry', {
     materialOverrides: { 'board-face': banner },
     slotColors: { 'lamp-red': [0.015, 0.004, 0.003] },
@@ -783,7 +783,9 @@ export function buildTrackBridges(
 
   const sm = new MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.22 });
   sm.name = 'track-bridge-struct';
-  const bm = new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
+  const bm = kit?.has('pedestrian-bridge')
+    ? brandHoardingMaterial(brandAtlasTex, true)
+    : new MeshStandardMaterial({ map: brandAtlasTex, roughness: 0.5, metalness: 0.04 });
   bm.name = 'track-bridge-banner';
   materials.push(sm, bm);
 

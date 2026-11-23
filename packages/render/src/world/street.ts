@@ -362,7 +362,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
               yaw: b.yaw,
               s,
               k,
-              near: Number(r.name.replace('crowd-row-', '')) < 4,
+              near: true,
             });
             spectators++;
           }

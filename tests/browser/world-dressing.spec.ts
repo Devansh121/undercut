@@ -58,6 +58,9 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   expect(counts!.pitCanopies).toBeGreaterThanOrEqual(10);
   expect(counts!.pitCrew).toBeGreaterThan(20);
   expect(counts!.stands).toBeGreaterThan(5);
+  expect(counts!.kitStandModules).toBeGreaterThan(5);
+  expect(counts!.kitBarriers).toBeGreaterThan(100);
+  expect(counts!.pitGarages).toBeGreaterThanOrEqual(20);
   expect(counts!.crowd).toBeGreaterThan(100);
   expect((counts!.treesWood ?? 0) + (counts!.treesRow ?? 0)).toBeGreaterThan(200);
   expect(counts!.hoardings).toBeGreaterThan(40);

@@ -43,6 +43,7 @@ import {
 } from './grandstands';
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
+import { placeKitStands } from './kit-stands';
 import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
@@ -655,10 +656,9 @@ export class CircuitWorld {
       id: 'pit-crew-engineer',
       castShadow: false,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('crew-engineer-seated')?.map((l) => {
-        l.geometry.translate(0, -0.5, 0);
-        return l;
-      }) ?? [{ geometry: engGeo, material: crewMat, maxDistance: far * 0.7 }],
+      lods: o.propKit?.lodsFor('crew-engineer-seated') ?? [
+        { geometry: engGeo, material: crewMat, maxDistance: far * 0.7 },
+      ],
     });
     props.define({
       id: 'pit-crew-mechanic',
@@ -674,21 +674,25 @@ export class CircuitWorld {
     pit.pitWallSpots.forEach((spot, idx) => {
       const team = teams[spot.teamIndex % teams.length]!;
       const tint = hexLinear(team.primary);
+      const kitWall = o.propKit?.has('pit-wall') ?? false;
+      const wallInset = kitWall ? 0.6 : 0;
       props.place('pit-wall-canopy', {
-        x: spot.x,
+        x: spot.x - spot.nx * wallInset,
         y: spot.y,
-        z: spot.z,
+        z: spot.z - spot.nz * wallInset,
         yaw: spot.yaw,
         s: spot.s,
         colour: tint,
       });
       if (!isLite) {
         // 3 seated race engineers per pit-wall canopy looking toward the track / monitors.
-        for (const offsetAlong of [-1.25, 0, 1.25]) {
+        for (const offsetAlong of kitWall ? [-1, 0, 1] : [-1.25, 0, 1.25]) {
+          const kitEngineer = o.propKit?.has('crew-engineer-seated') ?? false;
+          const behind = kitWall ? wallInset + 0.95 : 0.28;
           props.place('pit-crew-engineer', {
-            x: spot.x - spot.nx * 0.28 + spot.tx * offsetAlong,
-            y: spot.y + 0.22,
-            z: spot.z - spot.nz * 0.28 + spot.tz * offsetAlong,
+            x: spot.x - spot.nx * behind + spot.tx * offsetAlong,
+            y: spot.y + (kitEngineer ? 0 : 0.22),
+            z: spot.z - spot.nz * behind + spot.tz * offsetAlong,
             yaw: spot.yaw,
             s: spot.s,
             scale: 0.96 + hash01(idx, Math.round(offsetAlong * 10) + 20) * 0.08,
@@ -1070,62 +1074,17 @@ export class CircuitWorld {
     });
     this.counts.stands = this.stands.length;
     if (this.stands.length === 0) return;
-    const fallback: StandFrame[] = [];
     const spectator = this.spectators(o);
-    let kitCrowd = 0;
-    for (const [i, fr] of this.stands.entries()) {
-      const kitId = fr.roof ? 'grandstand-roof' : 'grandstand';
-      const entry = o.propKit?.entries.get(kitId);
-      const lods = o.propKit?.lodsFor(kitId, { maxDistanceScale: 2.7 });
-      if (!entry || !lods) {
-        fallback.push(fr);
-        continue;
-      }
-      const n = Math.max(1, Math.round(fr.length / 10));
-      const pitch = fr.length / n;
-      const sx = fr.depth / 9.47;
-      const sy = Math.max(0.7, fr.rows / 10);
-      const sz = pitch / 10;
-      for (const l of lods) l.geometry.scale(sx, sy, sz);
-      const id = `stand-kit-${i}`;
-      o.props.define({
-        id,
-        lods,
-        chunkLength: 40,
-        castShadow: o.quality.sceneryShadows,
-        shadowMaxDistance: 240,
-      });
-      const yaw = Math.atan2(fr.bz, -fr.bx);
-      for (let m = 0; m < n; m++) {
-        const x = fr.ox + fr.ax * ((m + 0.5) * pitch) + fr.bx * (4.76 * sx);
-        const z = fr.oz + fr.az * ((m + 0.5) * pitch) + fr.bz * (4.76 * sx);
-        o.props.place(id, { x, y: fr.base, z, yaw, s: fr.s, colour: fr.seat });
-        for (const [row, a] of (entry.attachments ?? [])
-          .filter((a) => a.name.startsWith('crowd-row-'))
-          .entries()) {
-          for (let j = 0; j < (a.count ?? 0); j++) {
-            const k = i * 100000 + m * 1000 + row * 30 + j;
-            if (hash01(k, 77) > o.quality.world.crowd * 0.85) continue;
-            const lx = a.position[0] * sx;
-            const lz = (a.position[2] + j * (a.spacing ?? 0.55)) * sz;
-            spectator({
-              x: x - fr.bx * lx + fr.ax * lz,
-              y: fr.base + a.position[1] * sy,
-              z: z - fr.bz * lx + fr.az * lz,
-              yaw,
-              s: fr.s,
-              k,
-              near: row < 4,
-            });
-            kitCrowd++;
-          }
-        }
-      }
-    }
-    this.counts.kitStandModules = this.stands.reduce(
-      (sum, fr) => sum + Math.max(1, Math.round(fr.length / 10)),
-      0,
+    const kitStands = placeKitStands(
+      this.stands,
+      o.propKit,
+      o.props,
+      o.quality.world.crowd,
+      o.quality.sceneryShadows,
+      spectator,
     );
+    const { fallback } = kitStands;
+    this.counts.kitStandModules = kitStands.modules;
     const standChunks = buildStandChunks(fallback);
     const standMat = grandstandMaterial();
     this.materials.push(standMat);
@@ -1150,7 +1109,7 @@ export class CircuitWorld {
       return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
     });
     for (const seat of seats) spectator(seat);
-    this.counts.crowd = seats.length + kitCrowd;
+    this.counts.crowd = seats.length + kitStands.crowd;
   }
 
   /**
@@ -1181,7 +1140,7 @@ export class CircuitWorld {
         o.props.define({
           id: `crowd-far-${v}`,
           castShadow: false,
-          gridCell: 16,
+          chunkLength: 100,
           lods: [{ geometry: g, material: farMat, maxDistance: 650 }],
         });
         o.props.define({
@@ -1205,7 +1164,7 @@ export class CircuitWorld {
           id: `crowd-near-${v}`,
           castShadow: false,
           gridCell: 16,
-          lods: lods.map((l) => ({ ...l, maxDistance: Math.min(l.maxDistance, 65) })),
+          lods: lods.map((l) => ({ ...l, maxDistance: Math.min(l.maxDistance, 50) })),
         });
       }
       this.crowdKinds = variants;

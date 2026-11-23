@@ -34,38 +34,44 @@ export function placeKitBarriers(
     }
     const pitch = kit.entries.get(kitId)?.moduleLength || 4;
     const face = kit.entries.get(kitId)?.bounds?.max[0] ?? 0.3;
-    // Walk each polyline at a continuous pitch; no short overlapping module at every vertex.
-    let next = pitch / 2;
-    let arc = 0;
-    for (let i = 3; i < bar.points.length; i += 3) {
-      const ax = bar.points[i - 3]!;
-      const ay = bar.points[i - 2]!;
-      const az = bar.points[i - 1]!;
-      const dx = bar.points[i]! - ax;
-      const dz = bar.points[i + 2]! - az;
-      const length = Math.hypot(dx, dz);
-      while (next + pitch / 2 <= arc + length) {
-        const u = (next - arc) / length;
-        const x = ax + dx * u;
-        const z = az + dz * u;
-        const hit = lap.nearest(x, z);
-        const nx = -dz / length;
-        const nz = dx / length;
-        const inward =
-          (track.lap.x[hit.index]! - x) * nx + (track.lap.z[hit.index]! - z) * nz >= 0 ? 1 : -1;
-        props.place(id, {
-          x: x - nx * inward * (face - 0.03),
-          y: ay + (bar.points[i + 1]! - ay) * u,
-          z: z - nz * inward * (face - 0.03),
-          yaw: Math.atan2(-nz * inward, nx * inward),
-          s: hit.s,
-        });
-        count++;
-        next += pitch;
-      }
-      arc += length;
-      // Advance to the next full module centre when a segment ended inside one module.
-      if (next < arc) next = arc + pitch / 2;
+    const points = bar.points;
+    const vertices = points.length / 3;
+    if (vertices < 2) continue;
+    const arc = new Float64Array(vertices);
+    for (let i = 1; i < vertices; i++) {
+      arc[i] =
+        arc[i - 1]! +
+        Math.hypot(
+          points[i * 3]! - points[(i - 1) * 3]!,
+          points[i * 3 + 2]! - points[(i - 1) * 3 + 2]!,
+        );
+    }
+    let segment = 1;
+    // Continuous pitch across vertices, including runs sampled more finely than a module.
+    for (let at = pitch / 2; at + pitch / 2 <= arc[vertices - 1]!; at += pitch) {
+      while (segment < vertices - 1 && arc[segment]! < at) segment++;
+      const lo = (segment - 1) * 3;
+      const hi = segment * 3;
+      const length = arc[segment]! - arc[segment - 1]!;
+      if (length <= 0) continue;
+      const u = (at - arc[segment - 1]!) / length;
+      const dx = points[hi]! - points[lo]!;
+      const dz = points[hi + 2]! - points[lo + 2]!;
+      const x = points[lo]! + dx * u;
+      const z = points[lo + 2]! + dz * u;
+      const hit = lap.nearest(x, z);
+      const nx = -dz / length;
+      const nz = dx / length;
+      const inward =
+        (track.lap.x[hit.index]! - x) * nx + (track.lap.z[hit.index]! - z) * nz >= 0 ? 1 : -1;
+      props.place(id, {
+        x: x - nx * inward * (face - 0.03),
+        y: points[lo + 1]! + (points[hi + 1]! - points[lo + 1]!) * u,
+        z: z - nz * inward * (face - 0.03),
+        yaw: Math.atan2(-nz * inward, nx * inward),
+        s: hit.s,
+      });
+      count++;
     }
   }
   return count;

@@ -167,7 +167,7 @@ export function crowdMaterial(time: { value: number }): MeshStandardMaterial {
   return m;
 }
 
-/** Complementary per-person handover; a small screen-door band avoids a visible crowd ring. */
+/** Complementary per-person handover; a seeded threshold per person avoids partial bodies at the handover. */
 export function crowdSwapMaterial(
   material: MeshStandardMaterial,
   eye: { value: Vector3 },
@@ -181,20 +181,25 @@ export function crowdSwapMaterial(
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nuniform vec3 uCrowdEye; varying float vCrowdFar;',
+        '#include <common>\nuniform vec3 uCrowdEye; varying float vCrowdFar; varying float vCrowdChoice;',
       )
       .replace(
         '#include <project_vertex>',
         `#include <project_vertex>
         vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
-        vCrowdFar = smoothstep(38.0, 48.0, distance(crowdOrigin, uCrowdEye));`,
+        vCrowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
+        vCrowdChoice = fract(sin(dot(crowdOrigin.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        if (${near ? 'vCrowdChoice < vCrowdFar' : 'vCrowdChoice >= vCrowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vCrowdFar;')
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying float vCrowdFar; varying float vCrowdChoice;',
+      )
       .replace(
         '#include <alphatest_fragment>',
         `#include <alphatest_fragment>
-        float crowdNoise = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+        float crowdNoise = vCrowdChoice;
         if (${near ? 'crowdNoise < vCrowdFar' : 'crowdNoise >= vCrowdFar'}) discard;`,
       );
   };
