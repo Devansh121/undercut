@@ -552,7 +552,23 @@ function substep(
 }
 
 /**
- * Barrier contact at the body's four footprint corners, resolved every substep. A corner behind
+ * Barrier contact points beyond the corners, as fractions of the footprint: x from the rear (0)
+ * to the nose (1), y from the right (-1) to the left (1). A barrier's end, a pit wall's blunt
+ * tip, can meet the body between two corners. They are checked only where a corner's query
+ * reports such a wall (`WallSample.thin`); elsewhere the corners alone meet the barriers.
+ */
+const WALL_EDGE_POINTS = [
+  [1, 0],
+  [0, 0],
+  [2 / 3, 1],
+  [1 / 3, 1],
+  [2 / 3, -1],
+  [1 / 3, -1],
+] as const;
+
+/**
+ * Barrier contact at the body's four footprint corners, then at points along its edges
+ * (`WALL_EDGE_POINTS`), resolved every substep. A corner behind
  * a barrier face is pushed back onto it (the whole car moves; position only). If that corner is
  * moving into the face, a planar impulse at the corner removes its normal speed (keeping
  * WALL_RESTITUTION of it) and a friction impulse, at most WALL_FRICTION times the normal one,
@@ -568,15 +584,30 @@ function wallContact(
   a: number,
   b: number,
 ): void {
-  for (let k = 0; k < 4; k++) {
+  const nose = a + BODY_NOSE;
+  const tail = -b - BODY_TAIL;
+  let thin = false;
+  for (let k = 0; k < 4 + WALL_EDGE_POINTS.length; k++) {
+    // Edge points only where a corner found a barrier with a far side (a pit wall).
+    if (k === 4 && !thin) break;
     const c = Math.cos(s.yaw);
     const sn = Math.sin(s.yaw);
-    const bx = k < 2 ? a + BODY_NOSE : -b - BODY_TAIL;
-    const by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    let bx: number;
+    let by: number;
+    if (k < 4) {
+      bx = k < 2 ? nose : tail;
+      by = k % 2 === 0 ? BODY_HALF_WIDTH : -BODY_HALF_WIDTH;
+    } else {
+      const e = WALL_EDGE_POINTS[k - 4]!;
+      bx = tail + (nose - tail) * e[0];
+      by = BODY_HALF_WIDTH * e[1];
+    }
     // Corner offset from the CoG in the world frame.
     const rx = bx * c - by * sn;
     const rz = -bx * sn - by * c;
-    surface.wall!(s.x + rx, s.z + rz, s.wallHints[k] as SurfaceHint, wallSample);
+    wallSample.thin = false;
+    surface.wall!(s.x + rx, s.z + rz, s.wallHints[k] as SurfaceHint, wallSample, s.x, s.z);
+    if (wallSample.thin) thin = true;
     const depth = wallSample.depth;
     if (!(depth > 0)) continue;
     const nx = wallSample.normalX;
