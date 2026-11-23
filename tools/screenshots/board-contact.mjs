@@ -1,14 +1,19 @@
-// GPU evidence at the second chicane's left verge, beside the screen and catch fence.
-// timeout 900 flock ~/.cache/undercut/gpu.lock node tools/screenshots/board-contact.mjs <out> [before]
+// GPU evidence at the second chicane's left verge (s 1800 m), beside the screen and catch fence:
+// the same scripted run into the verge panel there, framed by one trackside camera, captured at
+// the same sim times. Point CLIENT_DIR at another build (master) for the before frames.
+//
+//   timeout 900 flock ~/.cache/undercut/gpu.lock node tools/screenshots/board-contact.mjs <out>
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 
-const out = path.resolve(process.argv[2]);
+const out = path.resolve(process.argv[2] ?? 'board-contact');
 fs.mkdirSync(out, { recursive: true });
 const port = Number(process.env.SHOTS_PORT ?? 4493);
 if (port === 6151) throw new Error('reserved capture port');
+/** Sim seconds after the car is placed 15 m before the panel at 90 km/h. */
+const TIMES = [0.3, 0.5, 0.65, 0.8, 1.0, 1.3, 1.8, 2.6, 4.0, 7.0];
 const server = spawn(process.execPath, ['tools/serve/start.mjs'], {
   env: {
     ...process.env,
@@ -49,66 +54,55 @@ try {
       timeout: 90000,
     },
   );
-  await page.evaluate(() => {
+  const t0 = await page.evaluate(() => {
     const u = globalThis.__undercut;
     u.setTimeScale(0);
-    u.camera('tcam');
     u.setHudVisible(false);
     globalThis.document.querySelectorAll('.onboarding').forEach((el) => el.remove());
+    const d = u.trackPoint(1800).left + 2.7;
+    const board = u.trackPoint(1800, d);
+    const eye = u.trackPoint(1814, u.trackPoint(1814).left - 3.5, 1.8);
+    u.teleport(1785, d, 90);
+    u.tvCamera(eye.x, eye.y, eye.z, 45, { x: board.x, y: board.y + 0.6, z: board.z });
+    u.drive({ throttle: 0, brake: 0, steer: 0 });
+    return u.state().time;
   });
-  if (process.argv.includes('before')) {
-    for (const s of [1792, 1800, 1820, 1840]) {
-      await page.evaluate((s) => {
-        const u = globalThis.__undercut;
-        u.teleport(s, u.trackPoint(s).left + 2.7, 0);
-      }, s);
-      await page.waitForTimeout(300);
-      await page.screenshot({ path: path.join(out, `before-${s}.png`) });
-    }
-  } else {
-    await page.evaluate(() => {
-      const u = globalThis.__undercut;
-      const objects = u.view().props.breakableObjects;
-      const b = [...objects.values()].filter(
-        (o) =>
-          Math.hypot(
-            o.x - u.trackPoint(1800, u.trackPoint(1800).left + 2.7).x,
-            o.z - u.trackPoint(1800, u.trackPoint(1800).left + 2.7).z,
-          ) < 1,
-      )[0];
-      if (!b) throw new Error('missing contact board at station');
-      globalThis.__board = b;
-      u.teleport(1792, u.trackPoint(1800).left + 2.7, 90);
-      const eye = u.trackPoint(1808, u.trackPoint(1800).left - 1, 2.8);
-      u.tvCamera(eye.x, eye.y, eye.z, 50, { x: b.x, y: b.y + 0.5, z: b.z });
-      u.drive({ throttle: 0, brake: 0, steer: 0 });
-      u.setTimeScale(1);
-    });
+  const log = [];
+  for (const at of TIMES) {
+    await page.evaluate(() => globalThis.__undercut.setTimeScale(0.25));
     await page.waitForFunction(
-      () => globalThis.__undercut.view().props.debris.has(globalThis.__board.id),
-      null,
-      { timeout: 15000, polling: 10 },
+      ({ t0, at }) => globalThis.__undercut.state().time - t0 >= at,
+      { t0, at },
+      {
+        polling: 'raf',
+        timeout: 60000,
+      },
     );
-    for (const age of [0.03, 0.15, 0.35, 0.7, 1.5]) {
-      await page.waitForFunction(
-        (age) => {
+    await page.evaluate(() => globalThis.__undercut.setTimeScale(0));
+    await page.waitForTimeout(150);
+    const name = `t${String(Math.round(at * 1000)).padStart(4, '0')}`;
+    await page.screenshot({ path: path.join(out, `${name}.png`) });
+    log.push(
+      await page.evaluate(
+        ({ t0, name }) => {
           const u = globalThis.__undercut,
-            hit = u.view().props.debris.get(globalThis.__board.id);
-          return u.state().time - hit.time >= age;
+            s = u.state();
+          return {
+            frame: name,
+            t: +(s.time - t0).toFixed(3),
+            s: +s.s.toFixed(2),
+            d: +s.d.toFixed(2),
+            speed: u.dashboard()?.speed,
+            wallHits: s.wallHits,
+            safetyResets: s.safetyResets,
+          };
         },
-        age,
-        { polling: 10 },
-      );
-      await page.evaluate(() => globalThis.__undercut.setTimeScale(0));
-      await page.waitForTimeout(100);
-      await page.screenshot({ path: path.join(out, `break-${Math.round(age * 1000)}.png`) });
-      fs.writeFileSync(
-        path.join(out, `break-${Math.round(age * 1000)}.json`),
-        JSON.stringify(await page.evaluate(() => globalThis.__undercut.capture()), null, 2),
-      );
-      await page.evaluate(() => globalThis.__undercut.setTimeScale(1));
-    }
+        { t0, name },
+      ),
+    );
   }
+  fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify(log, null, 2));
+  console.log(JSON.stringify(log));
 } finally {
   await browser?.close();
   server.kill('SIGTERM');
