@@ -22,8 +22,15 @@ const LIFECYCLE = /\/(lifecycle|context-loss)\.spec\.ts$/;
  */
 const PHONE_FIT = /\/phone-fit\.spec\.ts$/;
 
+// Muted: the game's audio still runs (the audio tests read its state and cost), but nothing
+// plays out of the shared laptop's speakers.
 const launchOptions = {
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: [
+    '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
+    '--ignore-gpu-blocklist',
+    '--mute-audio',
+  ],
 };
 
 export default defineConfig({

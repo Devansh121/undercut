@@ -278,12 +278,16 @@ function digest(run) {
     .slice(0, 16);
 }
 
-// N AI cars race at Monza; classification, event log, anomalies; JSON to artifacts/telemetry/.
+// N AI cars race on a circuit; classification, event log, anomalies; JSON to artifacts/telemetry/.
 async function race(options, weekend = false) {
   const lib = await loadRaceLib();
   const circuit = options.circuit ?? 'monza';
-  if (circuit !== 'monza') throw new Error(`only monza has a racing line so far, not ${circuit}`);
+  if (!(circuit in lib.RACE_CIRCUITS))
+    throw new Error(
+      `no racing line for ${circuit}; one of ${Object.keys(lib.RACE_CIRCUITS).join(', ')}`,
+    );
   const o = {
+    circuit,
     cars: Number(options.cars ?? 20),
     laps: Number(options.laps ?? 5),
     seed: Number(options.seed ?? 1),
@@ -373,7 +377,7 @@ if (name === 'list' || options.help) {
     `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
   );
   console.log(
-    `  ${'race'.padEnd(15)} AI race at Monza (--cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit)`,
+    `  ${'race'.padEnd(15)} AI race (--circuit monza|spa|singapore, --cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit)`,
   );
   console.log(
     `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,

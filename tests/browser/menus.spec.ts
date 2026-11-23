@@ -280,14 +280,17 @@ test.describe('menus, keyboard only', () => {
     await page.keyboard.press('Enter');
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
 
-    // Q and E step through the modes; the notice replaces the settings for race modes. Quick
-    // Race starts at Monza (the default circuit).
+    // Q and E step through the modes. Quick Race has the session settings, as Time Trial does,
+    // and says the downforce every car runs at the circuit; the modes not in this build have a
+    // notice in their place. Quick Race starts at Monza (the default circuit).
     await page.keyboard.press('KeyE');
     await expect(page.locator('[data-action=mode-quickRace]')).toHaveAttribute(
       'aria-current',
       'true',
     );
-    await expect(page.locator('[data-testid=mode-notice]')).toBeVisible();
+    await expect(page.locator('[data-testid=mode-notice]')).toBeHidden();
+    await expect(page.locator('.settings [data-setting=timeOfDay]')).toBeVisible();
+    await expect(page.locator('.conditions')).toContainText('Low downforce');
     await expect(page.locator('[data-action=start]')).toBeEnabled();
     await expect(page.locator('[data-action=start]')).toContainText('Start race');
     await page.keyboard.press('KeyE');

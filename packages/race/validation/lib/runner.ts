@@ -1,6 +1,13 @@
 import { createCarParams } from '@undercut/sim';
 import type { Track } from '@undercut/track';
-import { MONZA, loadEnvelope, loadLine } from '../../../ai/validation/lib/index';
+import {
+  MONZA,
+  SINGAPORE,
+  SPA,
+  loadEnvelope,
+  loadLine,
+  type CircuitSetup,
+} from '../../../ai/validation/lib/index';
 import type { RaceEvent } from '../../src/events';
 import type { SessionSpec } from '../../src/kinds';
 import type { EntrantInfo, SessionResult } from '../../src/results';
@@ -14,8 +21,13 @@ import { RaceWeekend } from '../../src/weekend';
  * the event log, the classification and the watchdog's anomalies. Shared by the telemetry
  * runner (`npm run telemetry -- race | weekend`), the physics job and the nightly soak.
  */
+/** Circuits with a racing line and envelope, each in the trim its line was built for. */
+export const RACE_CIRCUITS = { monza: MONZA, spa: SPA, singapore: SINGAPORE } as const;
+export type RaceCircuit = keyof typeof RACE_CIRCUITS;
+
 export interface RaceRunOptions {
-  circuit?: 'monza';
+  /** Default Monza. */
+  circuit?: RaceCircuit;
   cars: number;
   laps: number;
   seed: number;
@@ -128,15 +140,21 @@ export function entrantsFor(count: number): EntrantInfo[] {
 }
 
 interface Loaded {
+  setup: CircuitSetup;
   track: Track;
   line: ReturnType<typeof loadLine>;
   envelope: ReturnType<typeof loadEnvelope>;
 }
 
-let cache: Loaded | null = null;
-function load(): Loaded {
-  cache ??= { track: MONZA.track(), line: loadLine(MONZA), envelope: loadEnvelope(MONZA) };
-  return cache;
+const cache = new Map<RaceCircuit, Loaded>();
+function load(circuit: RaceCircuit = 'monza'): Loaded {
+  let hit = cache.get(circuit);
+  if (!hit) {
+    const setup = RACE_CIRCUITS[circuit];
+    hit = { setup, track: setup.track(), line: loadLine(setup), envelope: loadEnvelope(setup) };
+    cache.set(circuit, hit);
+  }
+  return hit;
 }
 
 /** Build a session of AI cars. */
@@ -144,11 +162,20 @@ export function aiSession(
   spec: SessionSpec,
   o: Pick<
     RaceRunOptions,
-    'cars' | 'seed' | 'spread' | 'rules' | 'grid' | 'gridNoise' | 'tyres' | 'compound' | 'startFuel'
+    | 'circuit'
+    | 'cars'
+    | 'seed'
+    | 'spread'
+    | 'rules'
+    | 'grid'
+    | 'gridNoise'
+    | 'tyres'
+    | 'compound'
+    | 'startFuel'
   >,
 ): RaceSession {
-  const { track, line, envelope } = load();
-  const params = createCarParams(MONZA.trim);
+  const { setup, track, line, envelope } = load(o.circuit);
+  const params = createCarParams(setup.trim);
   const field = createAiField({
     track,
     line,
@@ -373,7 +400,7 @@ export function runSession(
   };
 }
 
-/** A race of AI cars at Monza. */
+/** A race of AI cars (at Monza unless `circuit` says otherwise). */
 export function runRace(o: RaceRunOptions): RaceRun {
   const session = aiSession({ kind: 'race', laps: o.laps }, o);
   const pitLap = o.pitLap === undefined ? defaultPitLap(o.laps) : o.pitLap;
@@ -391,7 +418,7 @@ export function runWeekend(o: RaceRunOptions & { practice?: number | null; quali
 } {
   const weekend = new RaceWeekend(
     {
-      circuit: 'monza',
+      circuit: o.circuit ?? 'monza',
       practice: o.practice ?? null,
       qualifying: o.qualifying ?? 600,
       raceLaps: o.laps,

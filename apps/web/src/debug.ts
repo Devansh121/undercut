@@ -30,6 +30,9 @@ import type { DriveHandle } from './drive';
 import type { OnlineState } from './online/session';
 import type { OnlineRaceReport } from './online/race';
 
+/** The debug API's Quick Race options: the race's, and the circuit (default Monza). */
+export type QuickRaceDebugOptions = Omit<QuickRaceOptions, 'laps'> & { circuit?: string };
+
 export interface DebugApi {
   online(): {
     state: OnlineState | null;
@@ -37,7 +40,8 @@ export interface DebugApi {
   };
   onlineSettings(patch: SettingsPatch): boolean;
   start(): Promise<void>;
-  startQuickRace(laps?: number, options?: Omit<QuickRaceOptions, 'laps'>): Promise<void>;
+  /** A Quick Race (at Monza unless `circuit` names another circuit with a racing line). */
+  startQuickRace(laps?: number, options?: QuickRaceDebugOptions): Promise<void>;
   state(): Record<string, unknown>;
   telemetry(): Record<string, unknown>;
   teleport(s: number, d?: number, kmh?: number): void;
@@ -131,7 +135,7 @@ export function debugEnabled(): boolean {
 
 export function installDebugApi(
   getDrive: () => DriveHandle | null,
-  start: (o?: { quickRace?: QuickRaceOptions }) => Promise<DriveHandle>,
+  start: (o?: { quickRace?: QuickRaceOptions; circuit?: string }) => Promise<DriveHandle>,
   rendererInfo: () => Record<string, number>,
   rendererPrograms: () => { name: string; key: string; used: number; uniforms: string }[],
   audioStatus: () => string,
@@ -155,6 +159,9 @@ export function installDebugApi(
     const timer = s.timer;
     return {
       screen: 'drive',
+      circuit: s.track.id,
+      trim: s.trim,
+      timeOfDay: d.timeOfDay,
       phase: s.phase,
       racePhase: s.race.control.phase,
       cars: s.race.world.cars.length,
@@ -213,9 +220,10 @@ export function installDebugApi(
     start: async () => {
       if (!getDrive()) await start();
     },
-    startQuickRace: async (laps = 5, options?: Omit<QuickRaceOptions, 'laps'>) => {
+    startQuickRace: async (laps = 5, options: QuickRaceDebugOptions = {}) => {
       needQuit();
-      await start({ quickRace: { laps, ...options } });
+      const { circuit, ...race } = options;
+      await start({ quickRace: { laps, ...race }, ...(circuit ? { circuit } : {}) });
     },
     state,
     telemetry,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatDelta, formatGear, formatLapTime, formatSpeedKmh } from '../src/game/format';
+import {
+  formatRaceStatus,
+  formatDelta,
+  formatGear,
+  formatLapTime,
+  formatSpeedKmh,
+} from '../src/game/format';
 
 describe('format', () => {
   it('formats lap times to the millisecond, rounding down', () => {
@@ -25,5 +31,15 @@ describe('format', () => {
     expect(formatGear(-1)).toBe('R');
     expect(formatGear(0)).toBe('N');
     expect(formatGear(7)).toBe('7');
+  });
+});
+
+describe('race statuses for the results', () => {
+  it('reads as words, not codes', () => {
+    expect(formatRaceStatus('finished')).toBe('');
+    expect(formatRaceStatus('running')).toBe('Racing');
+    expect(formatRaceStatus('dnf')).toBe('Retired');
+    expect(formatRaceStatus('dsq')).toBe('Disqualified');
+    expect(formatRaceStatus('notClassified')).toBe('Not classified');
   });
 });

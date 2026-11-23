@@ -42,6 +42,8 @@ export interface CircuitSummary {
    * works here.
    */
   brakingHelp: boolean;
+  /** The aero trim the AI racing line was built for, which every car runs in a race; null without one. */
+  raceTrim: string | null;
   plan: CircuitPlan;
 }
 
@@ -185,6 +187,7 @@ export function summarizeTrack(
   timingLine: number,
   raceReady = false,
   brakingHelp = false,
+  raceTrim: string | null = null,
 ): CircuitSummary {
   const corners = new Set(t.corners.map((c) => c.number)).size;
   return {
@@ -204,6 +207,7 @@ export function summarizeTrack(
     timesOfDay: timesOfDayFor(t.id, t.environment?.lighting),
     raceReady,
     brakingHelp,
+    raceTrim,
     plan: buildPlan(t, 208, 150, 14, timingLine),
   };
 }
