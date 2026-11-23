@@ -8,6 +8,7 @@ import { GAME_NAME } from '../../packages/core/src/name.ts';
 import { CIRCUIT_DATA, fullRaceLaps } from '../../packages/race/src/circuit.ts';
 import { summarizeTrack, type TrackFileLike } from './src/ui/data/circuit-summary.ts';
 import { raceLineFile, raceLineTrim } from './src/game/race-line.ts';
+import { licenceNotices } from './licences.ts';
 
 function buildHash(): string {
   if (process.env.BUILD_HASH) return process.env.BUILD_HASH;
@@ -66,6 +67,24 @@ function dracoDecoder(): Plugin {
           source: fs.readFileSync(dir + name),
         });
       }
+    },
+  };
+}
+
+/**
+ * `licences.txt` at the site root: the licence texts of everything the build ships (licences.ts).
+ * The minifier drops the licence comments of bundled code, so the notices travel here.
+ */
+function licenceFile(): Plugin {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  return {
+    name: 'licence-file',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'licences.txt',
+        source: licenceNotices(GAME_NAME, (file) => fs.readFileSync(root + file, 'utf8')),
+      });
     },
   };
 }
@@ -149,7 +168,7 @@ const roomsPort = Number(process.env.ROOMS_PORT ?? 8787);
 
 export default defineConfig({
   base: './',
-  plugins: [gameName(), dracoDecoder(), networkInfoFallback(), circuitCatalog()],
+  plugins: [gameName(), dracoDecoder(), licenceFile(), networkInfoFallback(), circuitCatalog()],
   define: {
     __BUILD_HASH__: JSON.stringify(buildHash()),
   },

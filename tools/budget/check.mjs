@@ -90,14 +90,15 @@ function sent(rel) {
   return sentCache.has(rel) ? sentCache.get(rel) : null;
 }
 // Build outputs the game loads: everything outside assets/{tex,env,car,draco,props} and the asset
-// index, except source maps, the diagnostic pages (input lab, UI gallery) and the bundler's unused
-// Draco decoder copies.
+// index, except source maps, the diagnostic pages (input lab, UI gallery), the bundler's unused
+// Draco decoder copies and the licence notices (licences.txt, which the game never fetches).
 const code = all.filter(
   (f) =>
     !f.endsWith('.map') &&
     !f.startsWith('.vite/') &&
     !/^assets\/(tex|env|car|draco|props)\//.test(f) &&
     f !== 'assets/index.json' &&
+    f !== 'licences.txt' &&
     !/input-?lab/i.test(f) &&
     !/ui-?gallery/i.test(f) &&
     !/^assets\/draco_(decoder|wasm_wrapper)-/.test(f),
