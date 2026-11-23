@@ -1,7 +1,7 @@
 import { addCar, createCarParams, createWallSample, createWorld, stepWorld } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
 import spa from '../data/spa.json';
-import { createVec3 } from '../src/path';
+import { createPathPoint, createVec3 } from '../src/path';
 import { TrackSurface } from '../src/surface';
 import { Track } from '../src/track';
 
@@ -31,5 +31,8 @@ describe('a car whose centre is inside a pit wall', () => {
     expect(contact).toBeGreaterThan(0);
     surface.wall(car.state.x, car.state.z, { index: -1 }, w);
     expect(w.depth).toBeLessThanOrEqual(0);
+    // Out on the track side of the face at 13.54, not through to the far side of the wall.
+    const q = track.lap.project(car.state.x, car.state.z, { index: -1 }, createPathPoint());
+    expect(Math.abs(q.d)).toBeLessThan(13.54);
   });
 });
