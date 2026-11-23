@@ -47,12 +47,33 @@ export async function startTimeTrial(page: Page): Promise<void> {
 }
 
 /**
- * From the launch screen through the main menu into a Quick Race at Monza (real clicks). Waits
- * for the loading to begin, not for the session.
+ * From the launch screen through the main menu into a Quick Race (real clicks): at the
+ * circuit given, picked on the circuit select, and at the time of day given, picked in the
+ * session settings (inline on a desktop, the settings dialog on a phone). Waits for the loading
+ * to begin, not for the session.
  */
-export async function startQuickRace(page: Page): Promise<void> {
+export async function startQuickRace(
+  page: Page,
+  o: { circuit?: string; timeOfDay?: string } = {},
+): Promise<void> {
   await openMenu(page);
+  if (o.circuit) {
+    await page.locator('[data-action=change-circuit]').click();
+    await page.locator(`.ccard[data-circuit=${o.circuit}]`).click();
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
+  }
   await page.locator('[data-action=mode-quickRace]').click();
+  if (o.timeOfDay) {
+    const choice = `[data-setting=timeOfDay] [data-value=${o.timeOfDay}]`;
+    const inline = page.locator(`.settings ${choice}`);
+    if (await inline.isVisible()) await inline.click();
+    else {
+      await page.locator('[data-action=edit-settings]').click();
+      const dialog = page.locator('[data-testid=settings-dialog]');
+      await dialog.locator(choice).click();
+      await dialog.locator('[data-action=dialog-close]').click();
+    }
+  }
   await page.locator('[data-action=start]').click();
 }
 

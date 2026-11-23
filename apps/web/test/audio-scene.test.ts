@@ -62,6 +62,9 @@ describe('crowd from the grandstands', () => {
   it('names the bed for each circuit', () => {
     expect(ambienceFor('spa')).toBe('forest');
     expect(ambienceFor('singapore')).toBe('city-night');
+    expect(ambienceFor('singapore', 'night-floodlit')).toBe('city-night');
+    // Singapore by day: the city without its floodlights.
+    expect(ambienceFor('singapore', 'overcast-day')).toBe('city-day');
     expect(ambienceFor('monza')).toBe('park');
   });
 });

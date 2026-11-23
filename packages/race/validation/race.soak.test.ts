@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { raceStartFuel } from '../src/rules';
 import { runRace, runWeekend } from './lib/runner';
-import { expectCleanRace } from './lib/expect-race';
+import { expectCleanRace, expectQuickRace } from './lib/expect-race';
 
 // Nightly: twenty AI cars, race distance, and a race weekend. The product's acceptance test is a
 // scripted race weekend against nineteen AI cars with no stuck cars.
@@ -24,6 +24,20 @@ describe('Quick Race on more seeds, with pit stops', () => {
     it(`seed ${seed}`, () => {
       expectCleanRace(runRace({ cars: 20, laps: 5, seed }), 5);
     }, 600_000);
+  }
+});
+
+describe('Quick Race at Spa and Singapore on more seeds', () => {
+  const MORE: Record<'spa' | 'singapore', number[]> = {
+    spa: [1, 3, 17, 29, 211],
+    singapore: [1, 2, 3, 29, 211],
+  };
+  for (const [circuit, seeds] of Object.entries(MORE) as ['spa' | 'singapore', number[]][]) {
+    for (const seed of seeds) {
+      it(`${circuit}, seed ${seed}`, () => {
+        expectQuickRace(runRace({ circuit, cars: 20, laps: 5, seed, pitLap: null }), 5);
+      }, 600_000);
+    }
   }
 });
 

@@ -1,5 +1,5 @@
 /**
- * The drive screen: a time-trial session at Monza in the browser. Loaded on demand from the
+ * The drive screen: a time trial or a Quick Race at any circuit in the browser. Loaded on demand from the
  * launch screen so the first paint does not wait for three.js and the track. Wires the pure
  * session and loop (game/) to the renderer (@undercut/render), the HUD and menus (ui/), the
  * input layer, storage and the audio seam.
@@ -84,10 +84,13 @@ import {
 import { GameLoop, MAX_TIME_SCALE, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
+import { formatRaceStatus } from './game/format';
+import { raceLineFile } from './game/race-line';
 import {
   DriveSession,
   TIME_TRIAL_FUEL,
   type QuickRaceOptions,
+  type RaceArtefacts,
   type SessionEvent,
 } from './game/session';
 import { Hud, type HudIdentity, type HudMessage, type HudState, type HudTyres } from './ui/hud';
@@ -335,30 +338,43 @@ const AI_ENVELOPES = import.meta.glob<unknown>('../../../packages/ai/data/*.enve
 });
 
 /**
- * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, and the
- * driving line for braking help. The guide's advised speeds come from the envelope of the car
- * the line was built for, so it is used only when that is the player's trim (low downforce).
+ * The circuit's racing line (lateral offset per lap sample, m) for the rubbered line, the
+ * driving line for braking help, and for a race the line and envelope the AI field drives on.
+ * The guide's advised speeds come from the envelope of the car the line was built for, so it is
+ * used only when that is the player's car: a race runs every car in the line's trim, time trial
+ * the low-drag car.
  */
 async function racingLine(
   track: Track,
-): Promise<{ offsets: Float64Array; guide: EnvelopeArtefact | null } | null> {
-  const prefix = `../../../packages/ai/data/${track.id}-`;
-  const key = Object.keys(AI_LINES).find((k) => k.startsWith(prefix));
+  race: boolean,
+): Promise<{
+  offsets: Float64Array;
+  guide: EnvelopeArtefact | null;
+  artefacts: RaceArtefacts | null;
+} | null> {
+  // The rule the menus use too (game/race-line.ts), so the trim the card names is the one raced.
+  const key = raceLineFile(track.id, Object.keys(AI_LINES));
   const load = key ? AI_LINES[key] : undefined;
   if (!key || !load) return null;
-  const raw = (await load()) as { count: number; offsetTenthMm: number[] };
+  const raw = (await load()) as { count: number; trim: string; offsetTenthMm: number[] };
   if (raw.count !== track.lap.count) return null;
   const offsets = Float64Array.from(raw.offsetTenthMm, (c) => c / 1e4);
-  const envelope = key.endsWith('-low.line.json')
-    ? AI_ENVELOPES[key.replace('.line.json', '.envelope.json')]
-    : undefined;
-  return { offsets, guide: envelope ? ((await envelope()) as EnvelopeArtefact) : null };
+  const loadEnvelope = AI_ENVELOPES[key.replace('.line.json', '.envelope.json')];
+  const playerTrim = race ? raw.trim : 'low';
+  const envelope = loadEnvelope && (race || raw.trim === playerTrim) ? await loadEnvelope() : null;
+  return {
+    offsets,
+    guide: envelope && raw.trim === playerTrim ? (envelope as EnvelopeArtefact) : null,
+    artefacts: race && envelope ? { line: raw, envelope } : null,
+  };
 }
 
 export interface DriveHandle {
   readonly session: DriveSession;
   readonly loop: GameLoop;
   readonly view: RaceView;
+  /** The time of day the session is lit for (`TIMES_OF_DAY` id). */
+  readonly timeOfDay: string;
   /** The render preset in use, and a switch to another (rebuilds the view, keeps the session). */
   readonly quality: QualityName;
   /** Views built for this session (the first, quality switches, context restores). */
@@ -405,7 +421,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const ai = await racingLine(track);
+  const ai = await racingLine(track, o.quickRace !== undefined);
   const line = ai?.offsets ?? null;
   const drivingLine =
     ai && ai.guide
@@ -413,12 +429,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           buildPlan(track, ai.offsets, decodeEnvelope(ai.guide), { scale: DRIVING_LINE_SCALE }),
         )
       : null;
+  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
+  const all = liveries(teamId, o.driver ?? 0);
+  // The driver in each car, by the livery it wears (car i wears `all[i]`, the player's first).
+  const drivers = all.slice(0, 20).map((l) => {
+    const d = teams.teams.flatMap((t) => t.drivers).find((x) => x.code === l.code);
+    return { name: d ? `${d.first} ${d.last}` : l.code, code: l.code };
+  });
   const session = new DriveSession({
     track,
     seed: o.seed,
     record,
     today: o.today,
-    ...(o.quickRace ? { quickRace: o.quickRace } : {}),
+    ...(o.quickRace ? { quickRace: o.quickRace, drivers } : {}),
+    ...(ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
@@ -444,8 +468,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     yawInertia: 0,
   });
   const ext = o.extension;
-  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
-  const all = liveries(teamId, o.driver ?? 0);
   const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -741,7 +763,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         label: S.setup.braking,
         description: S.setup.help.braking,
         choices: levels,
-        // Braking help follows the driving line, which exists at Monza only for now.
+        // Braking help follows the driving line, which exists where the player's car has one.
         disabled: () => drivingLine === null,
         hint: S.setup.brakingNoLine,
         get: () => session.assists.braking,
@@ -985,7 +1007,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
-  const audioScene = new RaceAudioScene();
+  const audioScene = new RaceAudioScene(tod.id);
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
   /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
@@ -1108,7 +1130,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
                 : 'laps' in e.gap
                   ? `  +${e.gap.laps}L`
                   : `  +${e.gap.time.toFixed(3)}s`;
-            return `${e.position}  ${e.code}  ${e.status}${g}`;
+            const name = session.race.entrants[e.car]?.name ?? e.code;
+            const status = formatRaceStatus(e.status);
+            return `${e.position}  ${name}${status ? `  ${status}` : ''}${g}`;
           }),
         ],
         player: 1 + entries.findIndex((e) => e.car === 0),
@@ -1119,14 +1143,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         lines: [
           `Chequered flag · P${row?.position ?? 20} · provisional`,
           ...standings.map((r) => {
-            const code = session.race.entrants[r.car]?.code ?? '';
+            const name = session.race.entrants[r.car]?.name ?? '';
             const state =
               r.status === 'running'
                 ? `racing, lap ${Math.min(r.lap, totalLaps)}`
                 : r.status === 'finished'
                   ? 'finished'
-                  : r.status;
-            return `${r.position}  ${code}  ${state}`;
+                  : formatRaceStatus(r.status).toLowerCase();
+            return `${r.position}  ${name}  ${state}`;
           }),
         ],
         player: 1 + standings.findIndex((r) => r.car === 0),
@@ -1600,6 +1624,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     get view() {
       return view;
     },
+    timeOfDay: tod.id,
     get quality() {
       return quality;
     },

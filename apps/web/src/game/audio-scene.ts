@@ -46,10 +46,13 @@ export function voicesFor(quality: string): number {
   return quality === 'mobile' || quality === 'lite' ? 3 : 6;
 }
 
-/** The circuit's location bed by track id. */
-export function ambienceFor(trackId: string): AmbienceKind {
+/**
+ * The circuit's location bed by track id and time of day (a `TIMES_OF_DAY` id): Singapore by
+ * day is its city without the floodlights' hum and the night's insects.
+ */
+export function ambienceFor(trackId: string, timeOfDay = 'night-floodlit'): AmbienceKind {
   if (trackId === 'spa') return 'forest';
-  if (trackId === 'singapore') return 'city-night';
+  if (trackId === 'singapore') return timeOfDay === 'night-floodlit' ? 'city-night' : 'city-day';
   return 'park';
 }
 
@@ -101,6 +104,9 @@ function softCrowd(x: number): number {
 
 /** Reused per-frame scene, with stable race-index slots for up to nineteen opponents. */
 export class RaceAudioScene {
+  /** `timeOfDay`: the session's lighting (a `TIMES_OF_DAY` id), for the location bed. */
+  constructor(private readonly timeOfDay?: string) {}
+
   private readonly cars: OtherCarSound[] = Array.from({ length: 19 }, () => ({
     x: 0,
     z: 0,
@@ -149,7 +155,7 @@ export class RaceAudioScene {
       out.engineSpeed = a.engineSpeed;
       out.throttle = input.throttle;
     }
-    this.state.ambience = ambienceFor(session.track.id);
+    this.state.ambience = ambienceFor(session.track.id, this.timeOfDay);
     crowdAt(p, stands, this.crowd);
     this.state.crowdLeft = this.crowd.left;
     this.state.crowdRight = this.crowd.right;

@@ -31,3 +31,21 @@ export function formatGear(gear: number): string {
   if (gear === 0) return 'N';
   return String(gear);
 }
+
+/** A car's race status for the standings and results: words, none for a finisher. */
+export function formatRaceStatus(
+  status: 'running' | 'finished' | 'dnf' | 'dsq' | 'notClassified',
+): string {
+  switch (status) {
+    case 'finished':
+      return '';
+    case 'running':
+      return 'Racing';
+    case 'dnf':
+      return 'Retired';
+    case 'dsq':
+      return 'Disqualified';
+    case 'notClassified':
+      return 'Not classified';
+  }
+}

@@ -23,7 +23,12 @@ declare global {
     start(): Promise<void>;
     startQuickRace(
       laps?: number,
-      options?: { gridPosition?: number; skillSpread?: number; fieldStartDelay?: number },
+      options?: {
+        gridPosition?: number;
+        skillSpread?: number;
+        fieldStartDelay?: number;
+        circuit?: string;
+      },
     ): Promise<void>;
     state(): Record<string, unknown>;
     telemetry(): Record<string, unknown>;

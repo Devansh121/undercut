@@ -7,27 +7,61 @@ import { startQuickRace } from './helpers';
 // the direct way to the result (the player never starts and retires, so the field finishes
 // with no provisional stage).
 
-test('Quick Race: grid, lights, moving field; a reset parks off line; the pause menu restarts the race', async ({
+test('Quick Race at Spa or Singapore: grid, lights, moving field; a reset parks off line; the pause menu restarts the race', async ({
   page,
-}) => {
+}, info) => {
   test.setTimeout(120_000);
   await page.goto('/?debug=1&quality=lite&world=lite');
   await page.waitForFunction(() => !!window.__undercut);
-  // Through the menus: the main menu's Quick Race starts twenty cars on the Monza grid.
-  await startQuickRace(page);
+  // Through the menus at another circuit than Monza: Spa on a desktop, Singapore by day on a
+  // phone (its own first sky is the night). Twenty cars on that circuit's grid, all in the trim
+  // its racing line was built for.
+  const at =
+    info.project.name === 'phone'
+      ? { circuit: 'singapore', timeOfDay: 'overcast-day', trim: 'high' }
+      : { circuit: 'spa', timeOfDay: 'overcast-day', trim: 'medium' };
+  await startQuickRace(page, { circuit: at.circuit, timeOfDay: at.timeOfDay });
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
-  expect(await page.evaluate(() => window.__undercut!.state().cars)).toBe(20);
-  await page.evaluate(() => window.__undercut!.quit());
-  await page.evaluate(() => window.__undercut!.startQuickRace(1));
-  expect(await page.evaluate(() => window.__undercut!.state().cars)).toBe(20);
-  expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toBe('grid');
+  const started = await page.evaluate(() => {
+    const st = window.__undercut!.state();
+    return { cars: st.cars, circuit: st.circuit, trim: st.trim, timeOfDay: st.timeOfDay };
+  });
+  expect(started).toEqual({
+    cars: 20,
+    circuit: at.circuit,
+    trim: at.trim,
+    timeOfDay: at.timeOfDay,
+  });
+  // The same race goes on: the grid, the five lights and lights out, the field moving off.
+  expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toMatch(/grid|lights/);
+  // Every lights event as it comes (the state keeps only the last few race events).
   await page.evaluate(() => {
+    const w = window as unknown as { lights: number[] };
+    w.lights = [];
+    const seen = new Set<number>();
+    const watch = () => {
+      const events = window.__undercut!.state().raceEvents as {
+        type: string;
+        t: number;
+        count: number;
+      }[];
+      for (const e of events) {
+        if (e.type !== 'lights' || seen.has(e.t)) continue;
+        seen.add(e.t);
+        w.lights.push(e.count);
+      }
+      requestAnimationFrame(watch);
+    };
+    watch();
     window.__undercut!.autopilot(true);
     window.__undercut!.setTimeScale(8);
   });
   await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', null, {
     timeout: 60_000,
   });
+  expect(await page.evaluate(() => (window as unknown as { lights: number[] }).lights)).toEqual([
+    1, 2, 3, 4, 5, 0,
+  ]);
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
   // Tyres and fuel on the HUD: the panel's four treads by temperature band and the fuel on board

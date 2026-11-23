@@ -7,6 +7,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { GAME_NAME } from '../../packages/core/src/name.ts';
 import { CIRCUIT_DATA, fullRaceLaps } from '../../packages/race/src/circuit.ts';
 import { summarizeTrack, type TrackFileLike } from './src/ui/data/circuit-summary.ts';
+import { raceLineFile, raceLineTrim } from './src/game/race-line.ts';
 
 function buildHash(): string {
   if (process.env.BUILD_HASH) return process.env.BUILD_HASH;
@@ -100,13 +101,16 @@ function circuitCatalog(): Plugin {
         const lines = fs
           .readdirSync(aiDir)
           .filter((f) => f.startsWith(`${t.id}-`) && f.endsWith('.line.json'));
-        // Braking help needs a line built for the player's car (low downforce).
+        // Braking help needs a line built for the player's car (low downforce). The race line's
+        // trim (`<circuit>-<trim>.line.json`) is the one every car runs in a race.
+        const raceLine = raceLineFile(t.id, lines);
         return summarizeTrack(
           t,
           rules?.raceLaps ?? fullRaceLaps(t.length),
           line,
           lines.length > 0,
           lines.includes(`${t.id}-low.line.json`),
+          raceLine ? raceLineTrim(t.id, raceLine) : null,
         );
       });
       // Monza first (the default and round 1), then by name.

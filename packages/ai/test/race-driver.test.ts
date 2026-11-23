@@ -195,6 +195,17 @@ describe('race driver: passing', () => {
     expect(Math.abs(dr.last.offset)).toBeLessThan(0.5);
   });
 
+  it('pulls away from the grid in the lane it stands in, a move picked on the grid waiting', () => {
+    const dr = driver();
+    const ld = lineD(dr, STRAIGHT);
+    const me = { id: 0, s: STRAIGHT, d: ld + 3, speed: 0 };
+    // A move chosen while standing for the lights, its lane already drifted 1.5 m outward.
+    dr['passId'] = 1;
+    dr['o'] = 4.5;
+    tick(dr, me, [{ id: 1, s: STRAIGHT + 8, d: ld + 3, speed: 0 }], { launching: true });
+    expect(dr['o']).toBeCloseTo(3, 6);
+  });
+
   it('does not start a pass from the grid (launching)', () => {
     const dr = driver({ aggression: 1 });
     const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 8 };
@@ -205,6 +216,22 @@ describe('race driver: passing', () => {
 });
 
 describe('race driver: side by side', () => {
+  it('keeps more room to a car alongside while moving across the road', () => {
+    // Clearance to the car beside, for this car heading `yaw` off the lap's direction.
+    const room = (yaw: number) => {
+      const dr = driver();
+      const ld = lineD(dr, STRAIGHT);
+      const me = { id: 0, s: STRAIGHT, d: ld, speed: 30 };
+      const beside = { id: 1, s: STRAIGHT, d: ld + SIDE_BY_SIDE + 0.05, speed: 30 };
+      dr.sense(view(me, [beside]));
+      dr.drive(at(me.s, me.d, me.speed, yaw), DT, { ...NEUTRAL_INPUT });
+      return beside.d - ld - dr.last.target;
+    };
+    expect(room(0)).toBeGreaterThanOrEqual(SIDE_BY_SIDE - 1e-9);
+    // 30 m/s at 0.05 rad is 1.5 m/s across: 0.15 s of seeing and reacting is 0.22 m more.
+    expect(room(0.05)).toBeGreaterThanOrEqual(SIDE_BY_SIDE + 0.2);
+  });
+
   it('keeps a car width and some air to a car alongside, moving away from it', () => {
     const dr = driver();
     const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 80 };
@@ -334,5 +361,129 @@ describe('race driver: memory', () => {
       me.s += me.speed * DT;
       slow.s += slow.speed * DT;
     }
+  });
+});
+
+describe('race driver: two cars level with no room for both', () => {
+  // Against the right edge, a car level with this one and half a metre back to its left, the
+  // other car with the lower id: at speed both give way (neither turns in on the other). Slowed to a crawl, the car ahead stops waiting for the
+  // car behind, or the two follow each other to a standstill (Spa, seed 103: two cars side by
+  // side into La Source stood still for 6 s and the field queued behind them).
+  function levelPair(speed: number) {
+    const dr = driver();
+    const edge = -track.halfWidthAt(STRAIGHT, 1) + BODY_HALF_WIDTH + 0.3;
+    const ld = lineD(dr, STRAIGHT);
+    const me = { id: 1, s: STRAIGHT, d: edge, speed };
+    dr['o'] = edge - ld;
+    const beside = { id: 0, s: STRAIGHT - 0.5, d: edge + 2.2, speed };
+    tick(dr, me, [beside]);
+    return dr;
+  }
+
+  it('at speed, gives way to the car level with it as well', () => {
+    const dr = levelPair(40);
+    expect(dr.last.yielding).toBe(true);
+    expect(dr.last.leader).toBe(0);
+  });
+
+  it('at a crawl, does not follow a car level with it or behind it', () => {
+    const dr = levelPair(8);
+    expect(dr.last.leader).not.toBe(0);
+    expect(dr.last.accelLimit).toBeGreaterThan(0);
+  });
+});
+
+describe('race driver: closing on a queue', () => {
+  // The tail of a queue braking to a crawl in the lane behind a car stopped in the road: the car
+  // closing on it must be able to stop behind it with the brakes it really has at the end of the
+  // stop. At walking pace the wheels are light and the pedal is held well short of the plan's
+  // braking (8–9 m/s² below 10 m/s, measured at Spa's Bus Stop, where queues rear-ended at
+  // 5–7 m/s).
+  it('closes on the tail of a crawling queue without touching it when its brakes give 8 m/s² there', () => {
+    const dr = driver();
+    dr['cooldown'] = 1e9;
+    // As at the Bus Stop (seed 1, car 5 behind car 3): 28 m/s, 19.75 m behind a car at 22.6 m/s
+    // that brakes at 12 m/s² to a crawl.
+    const me = { id: 0, s: STRAIGHT - 25.35, d: lineD(dr, STRAIGHT - 25.35), speed: 28 };
+    const tail = { id: 1, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 22.6 };
+    // The car stopped in the road that the queue forms behind, 90 m on (beyond the reach at which
+    // it is an obstacle to stop for itself).
+    const parked = { id: 2, s: STRAIGHT + 90, d: lineD(dr, STRAIGHT + 90), speed: 0 };
+    let closest = Infinity;
+    for (let k = 0; k < 240 * 10; k++) {
+      tick(dr, me, [tail, parked]);
+      // The car's brakes: the plan's braking at speed, no more than 8 m/s² below 10 m/s.
+      const floor = me.speed < 10 ? -8 : -14;
+      const a = Math.max(floor, Math.min(dr.last.accelLimit, 5));
+      me.speed = Math.max(0, me.speed + a * DT);
+      me.s += me.speed * DT;
+      me.d = lineD(dr, me.s) + dr.last.offset;
+      tail.speed = Math.max(1.5, tail.speed - 12 * DT);
+      tail.s += tail.speed * DT;
+      if (me.s < tail.s && Math.abs(tail.d - me.d) < 2 * BODY_HALF_WIDTH) {
+        closest = Math.min(closest, tail.s - me.s - CAR_LENGTH);
+      }
+    }
+    expect(closest).toBeGreaterThan(0.5);
+  });
+});
+
+describe('race driver: stopped cars on the road', () => {
+  it('keeps the walking-pace steering rules after the stopped car turns into an unseen ghost', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 5 };
+    tick(dr, me, [{ id: 1, s: 175, d: lineD(dr, 175), speed: 0 }]);
+    expect(dr['inner'].holdFrontSlip).toBe(false);
+    // Gone from the view (a ghost standing still), the car still crawling: the rules hold.
+    tick(dr, me, []);
+    expect(dr['inner'].holdFrontSlip).toBe(false);
+    // Back above walking pace they end, and stay ended at walking pace after.
+    tick(dr, { ...me, speed: 13 }, []);
+    tick(dr, me, []);
+    expect(dr['inner'].holdFrontSlip).toBe(true);
+  });
+
+  it('keeps the obstruction caution ceiling when following a moving leader', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+    const ahead = { id: 1, s: 210, d: lineD(dr, 210), speed: 40 };
+    tick(dr, me, [ahead]);
+    expect(dr.last.accelLimit).toBeGreaterThan(0);
+    tick(dr, me, [ahead, { id: 2, s: 250, d: 5, speed: 0 }]);
+    expect(dr.last.leader).toBe(1);
+    expect(dr.last.accelLimit).toBeLessThan(-10);
+  });
+
+  it('stays at queue speed until clear of a stopped car in a sweeping chicane', () => {
+    const dr = driver();
+    const me = { id: 0, s: 670, d: lineD(dr, 670), speed: 20 };
+    tick(dr, me, [{ id: 1, s: 650, d: lineD(dr, 650), speed: 0 }]);
+    expect(dr.last.accelLimit).toBeLessThan(-10);
+  });
+
+  for (const side of [-1, 1]) {
+    it(`ignores a stopped car beyond the ${side > 0 ? 'left' : 'right'} road edge`, () => {
+      const dr = driver();
+      const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+      const out = tick(dr, me, [{ id: 1, s: 250, d: side * 30, speed: 0 }]);
+      expect(dr.last.accelLimit).toBe(Infinity);
+      expect(out.brake).toBe(0);
+      expect(out.throttle).toBeGreaterThan(0);
+    });
+
+    it(`counts a footprint overlapping the ${side > 0 ? 'left' : 'right'} road edge`, () => {
+      const dr = driver();
+      const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+      const d = side * (track.halfWidthAt(250, side > 0 ? 0 : 1) + BODY_HALF_WIDTH / 2);
+      tick(dr, me, [{ id: 1, s: 250, d, speed: 0 }]);
+      expect(dr.last.accelLimit).toBeLessThan(0);
+    });
+  }
+
+  it('does not enable queue caution for stationary grid traffic during launch', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+    tick(dr, me, [{ id: 1, s: 250, d: 5, speed: 0 }], { launching: true });
+    expect(dr.last.accelLimit).toBe(Infinity);
   });
 });

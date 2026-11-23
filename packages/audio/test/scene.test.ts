@@ -255,6 +255,14 @@ describe('circuit ambience', () => {
     expect(band(city, 30, 150) - band(bed('forest'), 30, 150)).toBeGreaterThan(15);
   });
 
+  it('rumbles as at night in the city by day, with no floodlight hum and no insects', () => {
+    const day = bed('city-day');
+    const night = bed('city-night');
+    expect(Math.abs(band(day, 30, 90) - band(night, 30, 90))).toBeLessThan(1.5);
+    expect(band(night, 99, 101) - band(day, 99, 101)).toBeGreaterThan(10);
+    expect(band(night, 4800, 5600) - band(day, 4800, 5600)).toBeGreaterThan(10);
+  });
+
   it('puts the crowd on the side of the stands and scales with it', () => {
     const left = bed('none', { crowdLeft: 1, crowdRight: 0.25 });
     const side = rmsDbfs(left.left.subarray(2 * FS)) - rmsDbfs(left.right.subarray(2 * FS));
