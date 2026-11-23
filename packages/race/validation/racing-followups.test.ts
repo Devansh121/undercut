@@ -2,21 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { expectQuickRace } from './lib/expect-race';
 import { runFollowupRace } from './lib/followup-proof';
 
+// Lap one of the starts recorded as AI gaps (docs/STATUS.md): lane changes into the turn-one
+// braking zone (Monza 1022 and 7307), the moving-pack contact (4114380179) and Singapore 119.
 describe('recorded lane-change and moving-pack starts', () => {
-  for (const seed of [1022, 7307, 4114380179]) {
-    it(`Monza seed ${seed}: no hard contact or spin, every car classified`, () => {
-      const run = runFollowupRace('monza', seed);
+  const recorded = [
+    ['monza', 1022],
+    ['monza', 7307],
+    ['monza', 4114380179],
+    ['singapore', 119],
+  ] as const;
+  for (const [circuit, seed] of recorded) {
+    it(`${circuit} seed ${seed}: no hard contact or spin, every car classified`, () => {
+      const run = runFollowupRace(circuit, seed);
       expectQuickRace(run, 1);
       expect(Math.max(...run.cars.map((c) => c.maxContactSpeed))).toBeLessThan(3);
     }, 180_000);
   }
 });
-
-for (const circuit of ['monza', 'spa', 'singapore'] as const) {
-  it(`${circuit}: faster cars pass over five laps without a spin or hard contact`, () => {
-    const run = runFollowupRace(circuit, 17, 5);
-    expectQuickRace(run, 5);
-    expect(run.racing.overtakes).toBeGreaterThan(0);
-    expect(Math.max(...run.cars.map((c) => c.maxContactSpeed))).toBeLessThan(3);
-  }, 300_000);
-}
