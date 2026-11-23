@@ -30,7 +30,7 @@ or 240 s after the flag.
 
 | Rule | Value | Source |
 | --- | --- | --- |
-| Time on the grid before the first light | 2 s | Estimate (formation lap out of scope) |
+| Time on the grid before the first light | 2 s | Estimate (formation lap out of scope; when tyres are modelled, starting sets are initialized 5 K inside their working window to represent its warm-up) |
 | Interval between the five lights | 1 s | [2], start procedure |
 | Hold after the fifth light, before lights out | uniform 0.2–3.0 s, from the session seed | Estimate: the procedure only says the hold is random |
 | Jump start: forward movement before lights out | more than 0.5 m from the grid position | Estimate: transponder sensitivity is not published |
