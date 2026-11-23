@@ -392,14 +392,16 @@ function paintTree(
     const nx = (x - 0.5) / Math.max(0.05, sp.crownRx);
     const coreAO = 0.72 + 0.34 * (1 - inside);
     const light = (0.48 + 0.42 * ny + 0.26 * z - 0.14 * nx) * coreAO;
-    // The crown as a volume: out from its centre, toward the viewer by the clump's depth.
+    // The crown as a volume: out from its centre, toward the viewer by the clump's depth, leaning
+    // up as the near trees' and the plain cards' normals do (sky light on the top).
     const n: [number, number, number] = [
       Math.max(-1, Math.min(1, nx)),
-      Math.max(-1, Math.min(1, ny)),
-      0.35 + Math.max(0, z),
+      Math.max(-1, Math.min(1, ny)) * 0.8 + 0.25,
+      0.3 + Math.max(0, z),
     ];
-    // Light that stays without the painted sun: the core's occlusion and the sky's, darker low.
-    const ao = coreAO * (0.6 + 0.2 * Math.max(-1, Math.min(1, ny)));
+    // The painted light without its sun from the front and side (the normals bring the scene's
+    // own): the core's occlusion and the sky's from above stay, as on the near trees' clusters.
+    const ao = (0.48 + 0.42 * ny) * coreAO;
     clumps.push({ x, y, r: sp.clump * (0.55 + R(k, 15) * 0.65), z, light, n, ao });
   }
   clumps.sort((a, b) => a.z - b.z);
@@ -427,7 +429,7 @@ function paintTree(
           c.n[0] + 0.5 * ox2,
           c.n[1] + 0.5 * oy2,
           c.n[2],
-          Math.min(2, Math.max(0.25, c.ao / base)),
+          Math.min(2, Math.max(0.25, Math.max(0.18, c.ao) / base)),
         );
       } else ctx.fillStyle = shade(leaf, base * lift * (0.82 + R(k, 50 + j) * 0.36));
       ctx.beginPath();

@@ -15,6 +15,9 @@
 //   npm run shots -- monza --tree-swap-check          also near trees against the cards they replace:
 //                                                      mean luma with and without them, day and
 //                                                      night, within 10 %
+//   npm run shots -- monza --tree-relief-check        also the relief cards against the plain
+//                                                      cards: mean luma, same poses (a report:
+//                                                      the relief is meant to change the light)
 //   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
 //                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
@@ -984,7 +987,13 @@ const SWAP_POSES = {
     },
   },
 };
-async function treeSwapCheck(browser, report) {
+/**
+ * `swap`: near trees on and off (the tree-swap check). `relief`: the relief cards on and off,
+ * near trees as the preset has them, reported only: the relief lights the crowns by the scene's
+ * sun and lamps instead of the painted light, so it is meant to differ; it fades to the plain
+ * cards before the far level takes over, so the level switch cannot show it.
+ */
+async function treeSwapCheck(browser, report, mode = 'swap') {
   const problems = [];
   const cases = [];
   for (const [label, tod] of SWAP_LIGHTING[circuit]) {
@@ -1005,19 +1014,26 @@ async function treeSwapCheck(browser, report) {
     for (const [name, set] of Object.entries(poses)) {
       await page.evaluate(set);
       const shots = [];
-      for (const d of [swap, 0]) {
-        await page.evaluate((v) => {
-          globalThis.__undercut.treeSwap(v);
-          globalThis.__undercut.resetFrameTimes();
-        }, d);
+      for (const d of mode === 'swap' ? [swap, 0] : [1, 0]) {
+        await page.evaluate(
+          ([v, m]) => {
+            if (m === 'swap') globalThis.__undercut.treeSwap(v);
+            else globalThis.__undercut.treeRelief(v === 1);
+            globalThis.__undercut.resetFrameTimes();
+          },
+          [d, mode],
+        );
         await page.waitForFunction(() => (globalThis.__undercut.frameTimes().length ?? 0) >= 20);
         const png = await page
           .locator('#view')
           .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
-        fs.writeFileSync(path.join(outDir, `tree-swap-${label}-${name}-${d}.png`), png);
+        fs.writeFileSync(path.join(outDir, `tree-${mode}-${label}-${name}-${d}.png`), png);
         shots.push(png.toString('base64'));
       }
-      await page.evaluate((v) => globalThis.__undercut.treeSwap(v), swap);
+      await page.evaluate((v) => {
+        globalThis.__undercut.treeSwap(v);
+        globalThis.__undercut.treeRelief(true);
+      }, swap);
       const m = await page.evaluate(async ([a, b]) => {
         const read = async (b64) => {
           const img = new globalThis.Image();
@@ -1060,14 +1076,18 @@ async function treeSwapCheck(browser, report) {
   const ok =
     problems.length === 0 &&
     cases.length === 4 &&
-    cases.every((c) => c.swap > 0 && Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE);
-  report.treeSwapCheck = { ok, tolerance: TREE_SWAP_TOLERANCE, cases, problems };
+    cases.every(
+      (c) => c.swap > 0 && (mode === 'relief' || Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE),
+    );
+  const key = mode === 'swap' ? 'treeSwapCheck' : 'treeReliefCheck';
+  report[key] = { ok, tolerance: mode === 'swap' ? TREE_SWAP_TOLERANCE : null, cases, problems };
+  const [a, b] = mode === 'swap' ? ['near', 'cards'] : ['relief', 'plain'];
   for (const c of cases)
     console.log(
-      `  tree-swap ${c.tod} ${c.pose}: near ${c.nearLuma} vs cards ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
+      `  tree-${mode} ${c.tod} ${c.pose}: ${a} ${c.nearLuma} vs ${b} ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
     );
-  console.log(`  tree-swap-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
-  if (!ok) report.errors.push(`Tree swap check failed: ${JSON.stringify(report.treeSwapCheck)}`);
+  console.log(`  tree-${mode}-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
+  if (!ok) report.errors.push(`Tree ${mode} check failed: ${JSON.stringify(report[key])}`);
 }
 
 async function skyCheck(browser, report) {
@@ -1204,6 +1224,7 @@ try {
     if (flag('lifecycle')) await lifecycle(browser, report);
     if (flag('sky-check')) await skyCheck(browser, report);
     if (flag('tree-swap-check')) await treeSwapCheck(browser, report);
+    if (flag('tree-relief-check')) await treeSwapCheck(browser, report, 'relief');
   } finally {
     await browser.close();
   }

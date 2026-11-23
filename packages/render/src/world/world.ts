@@ -76,6 +76,8 @@ import {
   treeCards,
   treeCloudGeometry,
   nearKitTreeMaterial,
+  RELIEF_WEIGHT,
+  treeReliefParams,
   treeCloudMaterials,
   treeMaterials,
   type TreeMaterials,
@@ -245,6 +247,9 @@ export class CircuitWorld {
   /** Per-tree swap between near trees and cards (eye updated every frame). */
   private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
   private readonly crowdTime = { value: 0 };
+  /** The relief cards' shared fade and weight (trees.ts, TreeRelief), and their own fade, m. */
+  private readonly reliefParams = treeReliefParams(0, 0);
+  private reliefFade: [number, number] = [0, 0];
   /** Nearest lap sample to a world point (shared with the view's lamp map). */
   readonly lap: LapIndex;
   private readonly worldChunks: WorldChunk[] = [];
@@ -537,6 +542,16 @@ export class CircuitWorld {
   }
 
   /**
+   * The relief cards on or off (for comparisons: off draws the plain cards' shading at every
+   * distance). Read back when called without an argument.
+   */
+  treeRelief(on?: boolean): boolean {
+    const v = this.reliefParams.value;
+    if (on !== undefined) v.set(on ? this.reliefFade[0] : 0, on ? this.reliefFade[1] : 0, v.z);
+    return v.y > 0;
+  }
+
+  /**
    * Distance within which trees are real geometry, m; 0 shows the cards everywhere. Read back
    * when called without an argument (the tree-swap check compares the two).
    */
@@ -746,9 +761,9 @@ export class CircuitWorld {
     if (atlases.relief) this.textures.push(atlases.relief);
     // The relief fades out over the last fifth of the near cards' reach: a tree the far level
     // draws (its chunk's near edge past `treeNear`) is past the fade, so the switch is unseen.
-    const relief = atlases.relief
-      ? { map: atlases.relief, fadeStart: wq.treeNear * 0.8, fadeEnd: wq.treeNear }
-      : null;
+    this.reliefFade = [wq.treeNear * 0.8, wq.treeNear];
+    const relief = atlases.relief ? { map: atlases.relief, params: this.reliefParams } : null;
+    if (relief) this.reliefParams.value.set(this.reliefFade[0], this.reliefFade[1], RELIEF_WEIGHT);
     const coverage = quality.msaa > 0;
     const theme = this.theme;
     const conifers = theme.conifers;

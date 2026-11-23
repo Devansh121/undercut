@@ -120,6 +120,18 @@ function tileChunk(tiles: readonly number[]): string {
 #endif`;
 }
 
+/**
+ * The crown's normals point out of the crown on both faces of a leaf card: three.js turns a
+ * double-sided material's normal round on back faces, which on bent crown normals puts half the
+ * cards' faces in the crown's own shade (under floodlights, half the crown dark at random). Undo
+ * it (faceDirection is ±1).
+ */
+const CROWN_NORMAL = /* glsl */ `
+#include <normal_fragment_begin>
+#ifdef DOUBLE_SIDED
+  normal *= faceDirection;
+#endif`;
+
 /** Wind: the crown sways with height, phase from the instance position (High only). */
 const WIND = /* glsl */ `
 #include <begin_vertex>
@@ -165,7 +177,9 @@ varying float vTreeMirror;`;
 const RELIEF_MAP_FRAGMENT = /* glsl */ `
 #include <map_fragment>
 vec4 treeRelief = texture2D(uTreeReliefMap, vMapUv);
-float treeReliefK = 1.0 - smoothstep(uTreeRelief.x, uTreeRelief.y, length(vViewPosition));
+float treeReliefK = uTreeRelief.y > uTreeRelief.x
+  ? 1.0 - smoothstep(uTreeRelief.x, uTreeRelief.y, length(vViewPosition))
+  : 0.0;
 diffuseColor.rgb *= mix(1.0, treeRelief.b * 2.0, treeReliefK);`;
 const RELIEF_NORMAL_FRAGMENT = /* glsl */ `
 #include <normal_fragment_maps>
@@ -181,18 +195,23 @@ const RELIEF_NORMAL_FRAGMENT = /* glsl */ `
   normal = normalize(mix(normal, rn, treeReliefK * uTreeRelief.z));
 }`;
 
-/** Relief level settings: the relief atlas and the distances over which it fades out, m. */
+/**
+ * Relief level settings: the relief atlas and, shared by every relief material, its fade (x:
+ * start, y: end, m from the eye; both 0 turns the relief off) and the relief normal's weight (z).
+ */
 export interface TreeRelief {
   map: Texture;
-  fadeStart: number;
-  fadeEnd: number;
+  params: { value: Vector3 };
+}
+
+/** The relief's shared settings, fading out between `fadeStart` and `fadeEnd` from the eye. */
+export function treeReliefParams(fadeStart: number, fadeEnd: number): { value: Vector3 } {
+  return { value: new Vector3(fadeStart, fadeEnd, RELIEF_WEIGHT) };
 }
 
 function addRelief(shader: WebGLProgramParametersWithUniforms, relief: TreeRelief): void {
   shader.uniforms.uTreeReliefMap = { value: relief.map };
-  shader.uniforms.uTreeRelief = {
-    value: new Vector3(relief.fadeStart, relief.fadeEnd, RELIEF_WEIGHT),
-  };
+  shader.uniforms.uTreeRelief = relief.params;
   shader.defines = { ...(shader.defines ?? {}), TREE_RELIEF: '' };
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', `#include <common>\n${RELIEF_PARS_VERTEX}`)
@@ -204,7 +223,7 @@ function addRelief(shader: WebGLProgramParametersWithUniforms, relief: TreeRelie
 }
 
 /** How far the relief normal replaces the card's crown-bent vertex normal. */
-const RELIEF_WEIGHT = 0.85;
+export const RELIEF_WEIGHT = 0.85;
 
 /**
  * Per-tree swap between the near trees (real geometry) and the cards, by the tree's distance
@@ -294,6 +313,10 @@ export function treeMaterials(
     // The relief's defines come first: the tile pick writes the mirror sign under them.
     if (relief) addRelief(shader, relief);
     hook(shader);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normal_fragment_begin>',
+      CROWN_NORMAL,
+    );
     if (swap) addSwap(shader, swap, false);
   };
   const material = new MeshStandardMaterial({
@@ -308,7 +331,7 @@ export function treeMaterials(
   material.name = relief ? `tree-${key}-relief` : `tree-${key}`;
   material.onBeforeCompile = colourHook;
   material.customProgramCacheKey = () =>
-    `tree-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
+    `tree-v2-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,
@@ -508,6 +531,10 @@ export function treeCloudMaterials(
     if (options.wind)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WIND);
     addSwap(shader, swap, true);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normal_fragment_begin>',
+      CROWN_NORMAL,
+    );
   };
   const material = new MeshStandardMaterial({
     map: atlas,
@@ -521,7 +548,7 @@ export function treeCloudMaterials(
   });
   material.name = `tree-cloud-${key}`;
   material.onBeforeCompile = hook;
-  material.customProgramCacheKey = () => `tree-cloud-${options.wind ? 1 : 0}`;
+  material.customProgramCacheKey = () => `tree-cloud-v2-${options.wind ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,

@@ -117,6 +117,8 @@ export interface DebugApi {
   setStartLights(mask: number): void;
   /** Near-tree swap distance, m (0: cards only); returns the distance in use (0 without a world). */
   treeSwap(distance?: number): number;
+  /** The relief cards (the trees' mid level) on or off; reads back without an argument. */
+  treeRelief(on?: boolean): boolean;
   /** Counts of placed world dressing objects and props. */
   worldCounts(): Record<string, number> | null;
   quit(): void;
@@ -304,6 +306,7 @@ export function installDebugApi(
 
     setStartLights: (mask) => need().view.world?.setStartLights(mask),
     treeSwap: (distance) => need().view.world?.treeSwapDistance(distance) ?? 0,
+    treeRelief: (on) => need().view.world?.treeRelief(on) ?? false,
     worldCounts: () => {
       const w = need().view.world;
       return w ? { ...w.counts, propsTotal: need().view.props.instanceCount } : null;
