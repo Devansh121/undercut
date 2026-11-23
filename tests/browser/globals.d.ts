@@ -33,6 +33,20 @@ declare global {
     state(): Record<string, unknown>;
     telemetry(): Record<string, unknown>;
     teleport(s: number, d?: number, kmh?: number): void;
+    /** World point at lap (s, d) and the track edges and kerbs there (debug.ts `trackPoint`). */
+    trackPoint(
+      s: number,
+      d?: number,
+      h?: number,
+    ): {
+      x: number;
+      y: number;
+      z: number;
+      left: number;
+      right: number;
+      kerbLeft: boolean;
+      kerbRight: boolean;
+    };
     setTimeScale(scale: number): void;
     drive(control: Record<string, number | boolean> | null): void;
     autopilot(on: boolean): void;
