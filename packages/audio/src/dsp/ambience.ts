@@ -18,19 +18,31 @@ import { SINE_MASK, SINE_STEPS, SINE_TABLE } from './sine';
  * - City at night: traffic rumble (noise low-passed at 140 Hz), floodlight transformer hum at
  *   twice the 50 Hz mains (100, 200, 300 Hz) and insects (noise band-passed at 5.2 kHz, Q 3,
  *   pulsed at 38 Hz in slow waves).
+ * - City by day: the same rumble, no floodlights or insects, a few birds.
  */
 
-export type AmbienceKind = 'none' | 'park' | 'forest' | 'city-night';
-export const AMBIENCE_KINDS: readonly AmbienceKind[] = ['none', 'park', 'forest', 'city-night'];
+export type AmbienceKind = 'none' | 'park' | 'forest' | 'city-night' | 'city-day';
+/** In this order on the wire (the scene sends the index): new kinds go at the end. */
+export const AMBIENCE_KINDS: readonly AmbienceKind[] = [
+  'none',
+  'park',
+  'forest',
+  'city-night',
+  'city-day',
+];
 
-/** Level of each location layer per circuit kind, 0–1. */
+/**
+ * Level of each location layer per circuit kind, 0–1; `night` is the share of the city layer's
+ * floodlight hum and insects (the traffic rumble is the city's day and night).
+ */
 export const AMBIENCE_PROFILES: Readonly<
-  Record<AmbienceKind, { trees: number; birds: number; city: number }>
+  Record<AmbienceKind, { trees: number; birds: number; city: number; night: number }>
 > = {
-  none: { trees: 0, birds: 0, city: 0 },
-  park: { trees: 0.45, birds: 0.6, city: 0 },
-  forest: { trees: 1, birds: 1, city: 0 },
-  'city-night': { trees: 0, birds: 0, city: 1 },
+  none: { trees: 0, birds: 0, city: 0, night: 0 },
+  park: { trees: 0.45, birds: 0.6, city: 0, night: 0 },
+  forest: { trees: 1, birds: 1, city: 0, night: 0 },
+  'city-night': { trees: 0, birds: 0, city: 1, night: 1 },
+  'city-day': { trees: 0, birds: 0.2, city: 1, night: 0 },
 };
 
 /** −10 dB from the first cut, which put a full stand level with the field (PR 51 review). */
@@ -78,6 +90,8 @@ export class Ambience {
   treesTarget = 0;
   birdsTarget = 0;
   cityTarget = 0;
+  /** Share of the city layer's hum and insects (`AMBIENCE_PROFILES` night). */
+  private night = 0;
   crowdLevelL = 0;
   crowdLevelR = 0;
   treesLevel = 0;
@@ -136,6 +150,7 @@ export class Ambience {
     this.treesTarget = p.trees;
     this.birdsTarget = p.birds;
     this.cityTarget = p.city;
+    this.night = p.night;
     this.crowdTargetL = crowd[at] as number;
     this.crowdTargetR = crowd[at + 1] as number;
   }
@@ -204,6 +219,7 @@ export class Ambience {
       const g0 = this.cityFrom;
       const step = (this.cityLevel - g0) / CHUNK;
       const wave = this.insectWave;
+      const night = this.night;
       let hum = this.humPhase;
       let chirp = this.insectPhase;
       const dHum = 100 / this.sampleRate;
@@ -241,8 +257,8 @@ export class Ambience {
           0.5 +
           0.5 *
             ((table[k] as number) + (x - q) * ((table[k + 1] as number) - (table[k] as number)));
-        const tone = HUM_1 * h1 + HUM_2 * h2 + HUM_3 * h3;
-        const insect = (a[i] as number) * INSECT_GAIN * wave * pulse * pulse;
+        const tone = (HUM_1 * h1 + HUM_2 * h2 + HUM_3 * h3) * night;
+        const insect = (a[i] as number) * INSECT_GAIN * wave * pulse * pulse * night;
         left[i] = (left[i] as number) + g * ((c[i] as number) * RUMBLE_GAIN + tone + insect);
         right[i] =
           (right[i] as number) + g * ((d[i] as number) * RUMBLE_GAIN + 0.9 * tone - insect * 0.6);
