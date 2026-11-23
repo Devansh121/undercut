@@ -115,8 +115,6 @@ const SLOW_STOP_BELOW = 12;
 const SLOW_STOP_BRAKE = 0.6;
 /** Deceleration to a stop behind a car stopped in the road with no way round it, m/s². */
 const STOP_DECEL = 6;
-/** A car behind closing faster than this, m/s, is one to hold the lane for (see `laneBehindBusy`). */
-const BACK_CLOSING_MIN = 10;
 /** Line slope across the road, m/m, past which there is no going round a stopped car there. */
 const SWEEP_MAX = 0.3;
 /** Gap to the car ahead in the lane, m, under which the queue beyond it counts on the launch. */
@@ -1018,18 +1016,7 @@ export class RaceDriver implements Driver {
     }
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
-    let target = Math.max(lo, Math.min(hi, base));
-    // Not back across to the line into a car closing on it from behind: after a move, a car
-    // came back to the line in the turn-one braking zone into a car coming up the line at 15 m/s.
-    // Hold the lane until it is by. Only a fast car: in a pack passing a slow car, cars held off
-    // the line by the next one closing a little were never by.
-    const backToLine = this.passId < 0 && Math.abs(target) < Math.abs(this.o) - 0.05;
-    if (!this.recovering && backToLine) {
-      const dir = target > this.o ? 1 : -1;
-      if (this.laneBehindBusy(view, s0, v, self.d, ldHere + target, dir, BACK_CLOSING_MIN)) {
-        target = this.o;
-      }
-    }
+    const target = Math.max(lo, Math.min(hi, base));
     const yielding = yieldTo !== null;
     // Launching, the car holds its grid lane while traction is limited.
     // Off the line (in a move, or coming back from one) the line sweeps across under the car into
@@ -1536,37 +1523,6 @@ export class RaceDriver implements Driver {
     return true;
   }
 
-  /**
-   * A car behind on side `dir` of this one (at `d`), in the lane up to `dest` that this car
-   * would move into, closing faster than `closingMin` and close enough to arrive within two
-   * seconds at that speed.
-   */
-  private laneBehindBusy(
-    view: TrafficView,
-    s0: number,
-    v: number,
-    d: number,
-    dest: number,
-    dir: number,
-    closingMin: number,
-  ): boolean {
-    for (let k = 0; k < view.count; k++) {
-      const c = view.cars[k]!;
-      const ds = this.ahead(s0, c.s);
-      if (ds >= 0 || ds < -80) continue;
-      // (A car keeping station behind, as in a queue for the same pass, is not coming by.)
-      const closing = c.speed - v;
-      if (closing < closingMin) continue;
-      const reach = CAR_LENGTH + 2 + closing * 2;
-      if (-ds > reach) continue;
-      // On the side it moves to, and short of the far side of the lane it would take.
-      const across = (c.d - d) * dir;
-      if (across <= 0.5) continue;
-      if (across < (dest - d) * dir + SIDE_BY_SIDE) return true;
-    }
-    return false;
-  }
-
   /** A car within `range` m behind, at speed, near this lateral position. */
   private carApproaching(view: TrafficView, s0: number, d: number, range: number): boolean {
     for (let k = 0; k < view.count; k++) {
@@ -1656,7 +1612,7 @@ export class RaceDriver implements Driver {
     }
   }
 
-  /** Standing still from here, now. */
+  /** Not standing still (or not counting): the clock starts again from here. */
   private markStill(view: TrafficView): void {
     this.stillTime = 0;
     this.stillS = view.self.s;
@@ -1686,13 +1642,14 @@ export class RaceDriver implements Driver {
     const queued =
       !offRoad &&
       ((this.last.leader >= 0 && this.last.gap < 15) || this.standingAhead(view, s0, 30));
-    // Standing still: within a metre and a half of where it stood (a car rocking against a
-    // barrier or on the grass, now and then over walking pace, is still going nowhere).
+    // Standing still: under 0.7 m/s, or rocking within a metre and a half of where it stood (a
+    // car against a barrier, now and then over that pace, is still going nowhere).
     const here = view.self;
     const away = Number.isFinite(this.stillS)
       ? Math.hypot(this.ahead(this.stillS, here.s), here.d - this.stillD)
       : Number.POSITIVE_INFINITY;
-    if (!view.active || queued || away > STILL_RADIUS) this.markStill(view);
+    const still = Math.abs(v) < 0.7 || (away <= STILL_RADIUS && Math.abs(v) < 1.5);
+    if (!view.active || queued || !still) this.markStill(view);
     else this.stillTime += dt;
     if (!this.recovering && view.active) {
       if (Math.abs(err) > 1.4 && Math.abs(v) < 12) this.recovering = true;

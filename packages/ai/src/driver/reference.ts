@@ -386,6 +386,7 @@ export class ReferenceDriver implements Driver {
       brake = ((-aDemand - drag) * mass * p.tyre.rollingRadius) / this.brakeTorque;
     }
     throttle = Math.max(0, Math.min(1, throttle));
+    const throttleWanted = throttle;
     brake = Math.max(0, Math.min(1, brake));
 
     // Feel for wheelspin and lock-up.
@@ -409,7 +410,7 @@ export class ReferenceDriver implements Driver {
     if (lockOver > 0) this.brakeCap -= g.lockGain * lockOver * dt;
     else this.brakeCap += g.lockRecover * dt;
     this.brakeCap = Math.max(0, Math.min(1, this.brakeCap));
-    throttle = Math.min(throttle, Math.max(this.throttleCap, this.throttleFloor));
+    throttle = Math.min(throttle, this.throttleCap);
     brake = Math.min(brake, Math.max(this.brakeCap, this.brakeFloor));
     if (betaOver > 0) brake *= Math.max(0, 1 - g.slideBrakeRelease * betaOver);
     // Sliding with the brakes off: never let engine braking act on the rear (lift-off
@@ -421,6 +422,11 @@ export class ReferenceDriver implements Driver {
     if (saturated) {
       throttle *= g.understeerLift;
       brake *= g.understeerLift;
+    }
+    // At walking pace (see `throttleFloor`) at least that share of what was asked for stays on,
+    // whatever the feel for wheelspin and understeer took away.
+    if (this.throttleFloor > 0) {
+      throttle = Math.max(throttle, Math.min(throttleWanted, this.throttleFloor));
     }
 
     // ---- Hands and feet: lag and noise (none for the reference driver). ----
