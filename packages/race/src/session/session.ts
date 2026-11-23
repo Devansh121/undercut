@@ -9,8 +9,10 @@ import {
   createWorld,
   readCarPose,
   readCarTelemetry,
+  fitTyres,
   restoreCar,
   snapshotCar,
+  type CompoundId,
   stepWorld,
   type CarParams,
   type CarTelemetry,
@@ -61,6 +63,17 @@ export interface RaceSessionOptions {
   params?: CarParams;
   /** Fuel load, kg, topped up at every timing line; null: no top-up. Default `SESSION_FUEL`. */
   fuel?: number | null;
+  /**
+   * A race's start load instead, kg: the cars carry it from the start and burn it, with no
+   * top-up and no refuelling (none in the modelled era). Overrides `fuel`.
+   */
+  startFuel?: number;
+  /**
+   * Tyre temperature and wear (`@undercut/sim` tyre condition): each car starts on its
+   * entrant's compound (else medium) off the blankets, and a pit stop that changes tyres fits a
+   * fresh set. Off by default: grip as the reference tyre all race.
+   */
+  tyres?: boolean;
   step?: number;
   /** Race: grid order, car indices pole first. Default car order. */
   grid?: readonly number[];
@@ -147,6 +160,8 @@ export class RaceSession {
   readonly params: CarParams;
   readonly seed: number;
   readonly fuel: number | null;
+  /** Tyre temperature and wear are modelled (`RaceSessionOptions.tyres`). */
+  readonly tyres: boolean;
   private readonly facts: CarFacts[];
   private readonly telemetry: CarTelemetry[];
   private readonly contexts: ControlContext[];
@@ -170,7 +185,8 @@ export class RaceSession {
     this.circuit = o.circuit ?? circuitInfo(o.track);
     this.params = o.params ?? createCarParams('low');
     this.seed = o.seed;
-    this.fuel = o.fuel === undefined ? SESSION_FUEL : o.fuel;
+    this.fuel = o.startFuel !== undefined ? null : o.fuel === undefined ? SESSION_FUEL : o.fuel;
+    this.tyres = o.tyres ?? false;
     this.cars = o.cars;
     this.entrants = o.cars.map((c) => c.entrant);
     const surface = new TrackSurface(this.track);
@@ -200,9 +216,14 @@ export class RaceSession {
         z: pose.z,
         yaw: pose.yaw,
         speed: pose.speed,
-        ...(this.fuel !== null ? { fuel: this.fuel } : {}),
+        ...(o.startFuel !== undefined
+          ? { fuel: o.startFuel }
+          : this.fuel !== null
+            ? { fuel: this.fuel }
+            : {}),
       });
       if (car.ersMode !== undefined) setErsMode(wc.state, car.ersMode);
+      if (this.tyres) fitTyres(wc.state, this.control.cars[i]!.compound as CompoundId);
     });
     this.facts = o.cars.map(() => createFacts());
     this.telemetry = o.cars.map(() => createCarTelemetry());
@@ -304,6 +325,12 @@ export class RaceSession {
     const events = control.tick(world, this.facts);
     for (const e of events) {
       if (e.type === 'lapStart' || e.type === 'lap') this.onLine(e.car);
+      else if (e.type === 'pit' && e.stage === 'serviceEnd' && this.tyres) {
+        // A tyre change fits a fresh set of the compound the rules now have on the car.
+        if (e.actions?.some((a) => a.kind === 'tyres')) {
+          fitTyres(world.cars[e.car]!.state, control.cars[e.car]!.compound as CompoundId);
+        }
+      }
     }
     return events;
   }
@@ -491,8 +518,22 @@ export class RaceSession {
       airDensity: this.world.environment.airDensity,
     });
     const mode = wc.state.ersMode;
-    restoreCar(wc.state, snapshotCar(fresh));
-    wc.state.ersMode = mode;
+    // The car keeps its tyres (compound, temperature, wear) across the move.
+    const st = wc.state;
+    const tyres = {
+      compound: st.tyreCompound,
+      ambient: st.tyreAmbient,
+      temp: Float64Array.from(st.tyreTemp),
+      wear: Float64Array.from(st.tyreWear),
+      grip: Float64Array.from(st.gripScale),
+    };
+    restoreCar(st, snapshotCar(fresh));
+    st.ersMode = mode;
+    st.tyreCompound = tyres.compound;
+    st.tyreAmbient = tyres.ambient;
+    st.tyreTemp.set(tyres.temp);
+    st.tyreWear.set(tyres.wear);
+    st.gripScale.set(tyres.grip);
     readCarPose(wc.state, wc.pose);
     readCarPose(wc.state, wc.previousPose);
     this.hints[car]!.index = -1;
