@@ -49,6 +49,8 @@ export interface InputSystemOptions {
 
 /** Actions that become one-shot events instead of car demand. */
 const EVENT_ACTIONS: ReadonlySet<ButtonAction> = new Set<ButtonAction>([
+  'boxThisLap',
+  'nextCompound',
   'nextCamera',
   'pause',
   'resetToTrack',

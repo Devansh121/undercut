@@ -342,6 +342,10 @@ export class RaceControl implements RaceCore {
     return this.pit.held(car);
   }
 
+  pitRemaining(car: number): number {
+    return this.pit.remaining(car, this.time);
+  }
+
   pitPhase(car: number): PitPhase {
     return this.pit.phase(car);
   }

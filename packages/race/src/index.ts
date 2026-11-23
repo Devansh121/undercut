@@ -94,3 +94,5 @@ export {
   type WeekendPlan,
   type WeekendState,
 } from './weekend';
+
+export { choosePitStop, plannedStops, type StrategyReading } from './strategy';

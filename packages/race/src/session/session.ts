@@ -1,3 +1,4 @@
+import { choosePitStop } from '../strategy';
 import type { RngState } from '@undercut/core';
 import {
   CAR_SNAPSHOT_LENGTH,
@@ -87,6 +88,8 @@ export interface RaceSessionOptions {
    * fresh set. Off by default: grip as the reference tyre all race.
    */
   tyres?: boolean;
+  /** Deterministic pit wall for AI cars; player requests remain manual. */
+  pitStrategy?: boolean;
   step?: number;
   /** Race: grid order, car indices pole first. Default car order. */
   grid?: readonly number[];
@@ -100,6 +103,7 @@ export interface RaceSessionOptions {
 
 export interface RaceSessionSnapshot {
   version: 3;
+  pitStrategy?: boolean;
   control: RaceControlSnapshot;
   world: { tick: number; time: number; rng: RngState; cars: number[][] };
   /** Each car's driver (AI memory, pit-lane follower). */
@@ -188,6 +192,7 @@ export class RaceSession {
   readonly fuel: number | null;
   /** Tyre temperature and wear are modelled (`RaceSessionOptions.tyres`). */
   readonly tyres: boolean;
+  pitStrategy: boolean;
   private readonly facts: CarFacts[];
   private readonly telemetry: CarTelemetry[];
   private readonly contexts: ControlContext[];
@@ -215,6 +220,7 @@ export class RaceSession {
     this.seed = o.seed;
     this.fuel = o.startFuel !== undefined ? null : o.fuel === undefined ? SESSION_FUEL : o.fuel;
     this.tyres = o.tyres ?? false;
+    this.pitStrategy = o.pitStrategy ?? false;
     this.cars = o.cars;
     this.entrants = o.cars.map((c) => c.entrant);
     const surface = new TrackSurface(this.track);
@@ -339,6 +345,7 @@ export class RaceSession {
     const world = this.world;
     const control = this.control;
     this.updateGhosts();
+    if (this.pitStrategy) this.planStops();
     for (let i = 0; i < this.cars.length; i++) {
       const wc = world.cars[i]!;
       readCarTelemetry(wc.state, this.telemetry[i]!);
@@ -370,6 +377,54 @@ export class RaceSession {
       }
     }
     return events;
+  }
+
+  private planStops(): void {
+    const c = this.control;
+    if (c.strategy.kind !== 'race') return;
+    const laps = c.strategy.laps!;
+    const lapTime = this.circuit.length / 50;
+    const pitLoss = this.track.pit.length / this.circuit.pit.speedLimit + 5;
+    for (let i = 0; i < this.cars.length; i++) {
+      if (
+        this.cars[i]!.controller.kind !== 'ai' ||
+        !c.racing(i) ||
+        c.pitRequested(i) ||
+        c.pitPhase(i) !== 'none'
+      )
+        continue;
+      const f = this.facts[i]!;
+      const toEntry = (this.circuit.pit.entryS - f.s + this.circuit.length) % this.circuit.length;
+      if (toEntry > 600 || toEntry < 130) continue;
+      const car = c.cars[i]!;
+      let gapAhead: number | null = null;
+      let aheadPitting = false;
+      let rejoinGap = Infinity;
+      for (let j = 0; j < this.cars.length; j++) {
+        if (i === j || !c.racing(j)) continue;
+        const gap = (c.cars[j]!.dist - car.dist) / Math.max(10, f.speed);
+        if (gap > 0 && (gapAhead === null || gap < gapAhead)) {
+          gapAhead = gap;
+          aheadPitting = c.pitRequested(j) || c.pitPhase(j) !== 'none';
+        }
+        if (gap < 0) rejoinGap = Math.min(rejoinGap, Math.abs(gap + pitLoss));
+      }
+      const state = this.world.cars[i]!.state;
+      const stop = choosePitStop({
+        laps,
+        lap: c.timer(i).lap,
+        car: i,
+        stops: car.pitStops,
+        compound: car.compound,
+        wear: Math.max(...state.tyreWear),
+        lapTime,
+        pitLoss,
+        gapAhead,
+        aheadPitting,
+        rejoinGap,
+      });
+      if (stop) this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
+    }
   }
 
   /** Whether a car is a ghost this tick: no car touches it (retired, or blocking). */
@@ -594,6 +649,7 @@ export class RaceSession {
   snapshot(): RaceSessionSnapshot {
     return {
       version: 3,
+      pitStrategy: this.pitStrategy,
       control: this.control.snapshot(),
       world: {
         tick: this.world.tick,
@@ -626,6 +682,7 @@ export class RaceSession {
    * session continues exactly as the original would have.
    */
   restore(snap: RaceSessionSnapshot): void {
+    this.pitStrategy = snap.pitStrategy ?? false;
     if (snap.version !== 3)
       throw new Error(`unknown session snapshot version ${String(snap.version)}`);
     if (

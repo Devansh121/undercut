@@ -16,6 +16,8 @@ export interface TrafficCar {
    * the lap, up to half its length when it is across it (spun, turning round).
    */
   halfWidth: number;
+  /** Slowing for a requested stop, still on the racing surface. */
+  pitApproach?: boolean;
 }
 
 export interface TrafficView {
@@ -51,4 +53,18 @@ export function createTrafficView(capacity: number): TrafficView {
     active: false,
     launching: false,
   };
+}
+
+/** Include the road the follower will reach where the slowing entrant is now. */
+export function pitCarInPath(
+  followerD: number,
+  entrantD: number,
+  pathD: number,
+  followerHalfWidth: number,
+  entrantHalfWidth: number,
+): boolean {
+  return (
+    Math.min(Math.abs(entrantD - followerD), Math.abs(entrantD - pathD)) <
+    followerHalfWidth + entrantHalfWidth + 0.5
+  );
 }
