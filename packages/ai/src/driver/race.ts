@@ -730,7 +730,11 @@ export class RaceDriver implements Driver {
         e.car = c;
         e.ds = ds;
         e.od = od;
-        e.sep = SIDE_BY_SIDE + wide;
+        e.sep =
+          SIDE_BY_SIDE +
+          wide +
+          Math.max(0, self.halfWidth - BODY_HALF_WIDTH) +
+          Math.abs(dRate) * (SEE_DELAY + this.skill.reaction);
         e.left = myO >= od;
       }
     }
@@ -770,11 +774,11 @@ export class RaceDriver implements Driver {
       lo = oMin;
       hi = oMax;
     }
-    // Cars dropped from the bands because they are further back give way, but this car does
-    // not steer at them while they do: it holds its line on their side.
+    // Once a band has to be dropped, hold the lane on that car's side while the longitudinal
+    // yield opens room. This includes the car we yield to: braking does not clear its body.
     for (let k = 0; k < ns; k++) {
       const e = side[k]!;
-      if (e.ds > skipBelow || e.car === yieldTo) continue;
+      if (e.ds > skipBelow) continue;
       if (e.left) lo = Math.max(lo, Math.min(myO, this.o));
       else hi = Math.min(hi, Math.max(myO, this.o));
     }
@@ -1090,10 +1094,9 @@ export class RaceDriver implements Driver {
       const eHi = Math.max(0, this.at(plan.track.halfWidth[0], s0) - margin - ld0);
       this.o = Math.max(eLo, Math.min(eHi, this.o));
     }
-    // In a move the lane is held against the line sweeping under it, and the controller
-    // underneath steers for the offset's change as well as for the offset (it would trail the
-    // lane by a metre or more, into the other car).
-    const slope = this.passId >= 0 && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
+    // Steer for the offset's change while passing, yielding and returning to the line. Without
+    // this heading feedforward the car trails its moving lane by a metre or more into traffic.
+    const slope = view.launching ? -lineSlope : v > 5 ? (this.o - oBefore) / (v * dt) : 0;
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
