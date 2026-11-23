@@ -1,4 +1,4 @@
-import { SurfaceKind, type BreakableObject } from '@undercut/sim';
+import { BODY_HALF_WIDTH, SurfaceKind, type BreakableObject } from '@undercut/sim';
 import { createPathPoint, createVec3 } from './path';
 import type { Track } from './track';
 
@@ -22,27 +22,89 @@ export interface TracksideObject extends BreakableObject {
   readonly s: number;
 }
 
+/**
+ * A sign with no room in front of its barrier: drawn on the barrier (`extra` m behind its face,
+ * turned `cant` toward the track) and solid with it, so it has no contact of its own.
+ */
+export interface BarrierSign {
+  readonly kind: Exclude<TracksideObject['kind'], 'verge-board'>;
+  readonly s: number;
+  readonly side: 0 | 1;
+  readonly extra: number;
+  readonly cant: number;
+}
+
+/**
+ * Least distance from the track edge to a breakable object's footprint, m: a car's width and a
+ * margin, so a car with two wheels off the road, or one on its racing line, never meets one.
+ */
+export const BREAKABLE_EDGE_CLEARANCE = 2 * BODY_HALF_WIDTH + 0.3;
+
+interface Placements {
+  readonly objects: readonly TracksideObject[];
+  readonly signs: readonly BarrierSign[];
+}
+
 /** Quality-independent placement data consumed by both contact and dressing. */
-const cache = new WeakMap<Track, readonly TracksideObject[]>();
+const cache = new WeakMap<Track, Placements>();
 
 export function tracksideObjects(track: Track): readonly TracksideObject[] {
+  return placements(track).objects;
+}
+
+/** Distance and zone signs mounted on the barrier instead (see `BarrierSign`). */
+export function barrierSigns(track: Track): readonly BarrierSign[] {
+  return placements(track).signs;
+}
+
+function placements(track: Track): Placements {
   const cached = cache.get(track);
   if (cached) return cached;
   const out: TracksideObject[] = [];
+  const signs: BarrierSign[] = [];
+  const q = createPathPoint();
+  const corner = createVec3();
+  const hint = { index: -1 };
+  /** Least distance from the track edge to the footprint's corners, m. */
+  const edgeClearance = (o: BreakableObject): number => {
+    const c = Math.cos(o.yaw),
+      sn = Math.sin(o.yaw);
+    let least = Infinity;
+    for (const [lx, lz] of [
+      [o.halfDepth, o.halfWidth],
+      [o.halfDepth, -o.halfWidth],
+      [-o.halfDepth, o.halfWidth],
+      [-o.halfDepth, -o.halfWidth],
+    ] as const) {
+      // Local +X (depth) and +Z (width) turned by yaw about +Y.
+      corner.x = o.x + lx * c + lz * sn;
+      corner.z = o.z - lx * sn + lz * c;
+      track.project(corner.x, corner.z, hint, q);
+      least = Math.min(least, Math.abs(q.d) - track.halfWidthAt(q.s, q.d >= 0 ? 0 : 1));
+    }
+    return least;
+  };
   const p = createVec3(),
     t = createVec3(),
     ta = createVec3(),
     tb = createVec3();
-  const q = createPathPoint();
   const wrap = (s: number) => ((s % track.length) + track.length) % track.length;
-  const add = (kind: TracksideObject['kind'], s: number, side: 0 | 1, d: number, cant = 0) => {
+  /** Place a breakable object, or for a sign without room in front of its barrier, a solid one. */
+  const add = (
+    kind: TracksideObject['kind'],
+    s: number,
+    side: 0 | 1,
+    d: number,
+    cant = 0,
+    extra = 0,
+  ): void => {
     s = wrap(s);
     track.lap.pointAt(s, side === 0 ? d : -d, p);
     track.lap.tangent(s, t);
     const verge = kind === 'verge-board';
     const nx = side === 0 ? -t.z : t.z,
       nz = side === 0 ? t.x : -t.x;
-    out.push({
+    const o: TracksideObject = {
       id: out.length,
       kind,
       contact: 'breakable',
@@ -55,7 +117,9 @@ export function tracksideObjects(track: Track): readonly TracksideObject[] {
       height: verge ? 0.88 : 2.2,
       halfDepth: verge ? 0.34 : 0.19,
       mass: verge ? 12 : 5,
-    });
+    };
+    if (edgeClearance(o) >= BREAKABLE_EDGE_CLEARANCE) out.push(o);
+    else if (kind !== 'verge-board') signs.push({ kind, s, side, extra, cant });
   };
   for (let s = 20; s < track.length - 20; s += 10) {
     for (const side of [0, 1] as const) {
@@ -86,17 +150,8 @@ export function tracksideObjects(track: Track): readonly TracksideObject[] {
     const side = c.direction === 'right' ? 0 : 1;
     for (const dist of [150, 100, 50] as const) {
       const s = wrap(c.start - dist);
-      // Lightweight signs stand inside the solid barrier, reachable without crossing it.
-      add(
-        `board-${dist}`,
-        s,
-        side,
-        Math.max(
-          track.halfWidth[side][track.lap.sampleIndex(s)]! + 1,
-          track.barrierAt(s, side) - 1.2,
-        ),
-        side === 0 ? -0.22 : 0.22,
-      );
+      // 1.2 m in front of the barrier where that leaves room, else on the barrier (see `add`).
+      add(`board-${dist}`, s, side, track.barrierAt(s, side) - 1.2, side === 0 ? -0.22 : 0.22, 0.9);
     }
   }
   for (const zone of track.drsZones) {
@@ -105,9 +160,10 @@ export function tracksideObjects(track: Track): readonly TracksideObject[] {
         ['board-drs', zone.activation],
         ['board-drs-det', zone.detection],
       ] as const)
-        add(kind, s, side, track.barrierAt(s, side) - 1.2);
+        add(kind, s, side, track.barrierAt(s, side) - 1.2, 0, 0.95);
     }
   }
-  cache.set(track, out);
-  return out;
+  const result = { objects: out, signs };
+  cache.set(track, result);
+  return result;
 }

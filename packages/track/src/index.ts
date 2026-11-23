@@ -67,4 +67,11 @@ export {
   type TrackMeshes,
 } from './mesh';
 
-export { DRESSING_CONTACT, tracksideObjects, type TracksideObject } from './objects';
+export {
+  BREAKABLE_EDGE_CLEARANCE,
+  DRESSING_CONTACT,
+  barrierSigns,
+  tracksideObjects,
+  type BarrierSign,
+  type TracksideObject,
+} from './objects';

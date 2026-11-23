@@ -10,7 +10,7 @@ import {
   type Texture,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
-import { createVec3, tracksideObjects, type Track } from '@undercut/track';
+import { barrierSigns, createVec3, tracksideObjects, type Track } from '@undercut/track';
 import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { BRAND_ATLAS_COLS, BRAND_ATLAS_ROWS } from './brands';
@@ -1605,6 +1605,14 @@ export function placeTracksideFurniture(options: {
     const placement = { x: o.x, y: o.y, z: o.z, yaw: o.yaw, s: o.s, breakable: o };
     props.place(`${o.kind}-face`, placement);
     if (!kitSigns.has(o.kind)) props.place(`${o.kind}-post`, placement);
+    boards++;
+  }
+  // Signs with no room in front of the barrier stand on it, as solid as the barrier.
+  for (const sign of barrierSigns(track)) {
+    const b = atBarrier(sign.s, sign.side, sign.extra);
+    const placement = { x: b.x, y: b.y, z: b.z, yaw: b.yawOncoming + sign.cant, s: b.s };
+    props.place(`${sign.kind}-face`, placement);
+    if (!kitSigns.has(sign.kind)) props.place(`${sign.kind}-post`, placement);
     boards++;
   }
   counts.signBoards = boards;
