@@ -15,6 +15,13 @@ import { expect, test } from './base';
  * Writes artifacts/phone/soak.json.
  */
 const MINUTES = Number(process.env.SOAK_MINUTES ?? 10);
+/**
+ * Fewest frames for the run to count as a measurement. A machine starved of CPU draws a few
+ * hundred frames a minute; ten such minutes exercise the per-frame paths for about a minute of
+ * real play, too little to show a slow leak. Below this the result is "not measured", never a
+ * pass.
+ */
+const MIN_FRAMES = 3000;
 
 const pct = (sorted: number[], p: number): number =>
   sorted.length === 0 ? NaN : sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))]!;
@@ -95,7 +102,12 @@ test('sustained Mobile Quick Race on a phone: frame-time drift, heap growth, aud
     rows.reduce((a, r) => a + Number(r[key]), 0) / rows.length;
   const early = minutes.slice(1, 4);
   const late = minutes.slice(-3);
+  const totalFrames = minutes.reduce((a, r) => a + Number(r.frames), 0);
+  const measured = totalFrames >= MIN_FRAMES;
   const result = {
+    status: measured ? 'measured' : 'not measured',
+    totalFrames,
+    minFrames: MIN_FRAMES,
     device: 'Pixel 8 emulation (Chromium, 915x412 at 2.625, touch), software WebGL',
     preset: 'mobile',
     scene: 'Quick Race at Monza, full world, 19 AI cars, player on its racing driver, sound on',
@@ -116,6 +128,10 @@ test('sustained Mobile Quick Race on a phone: frame-time drift, heap growth, aud
   console.log(JSON.stringify({ ...result, rows: undefined }));
   await page.evaluate(() => window.__undercut!.quit());
 
+  expect(
+    totalFrames,
+    `not measured: ${totalFrames} frames in ${MINUTES} minutes, fewer than ${MIN_FRAMES}`,
+  ).toBeGreaterThanOrEqual(MIN_FRAMES);
   // No real leak and no slowdown over the run. The bounds are generous for software WebGL on
   // a shared machine; a leak or a pile-up shows as far more.
   expect(result.drift.heapMB.late).toBeLessThan(result.drift.heapMB.early * 1.15 + 4);

@@ -1,4 +1,8 @@
 {
+  "status": "not measured",
+  "totalFrames": 2579,
+  "minFrames": 3000,
+  "note": "Recorded before the frame floor existed. 2,579 frames in ten minutes on a machine at load 22 to 29 on 16 threads: below the 3,000-frame floor, so not a measurement of drift. Kept for the record.",
   "device": "Pixel 8 emulation (Chromium, 915x412 at 2.625, touch), software WebGL",
   "preset": "mobile",
   "scene": "Quick Race at Monza, full world, 19 AI cars, player on its racing driver, sound on",
