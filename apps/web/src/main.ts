@@ -250,6 +250,13 @@ async function start(
             p.assists[device] = { ...(p.assists[device] ?? {}), [key]: value };
           }),
         ...(extension ? { extension } : {}),
+        haptics: {
+          get: () => prefs.get().settings.haptics,
+          set: (on) =>
+            prefs.update((p) => {
+              p.settings.haptics = on;
+            }),
+        },
         onQuit: () => {
           drive = null;
           if (restartWith) {

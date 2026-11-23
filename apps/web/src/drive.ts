@@ -72,6 +72,7 @@ import { defaultCarState } from '@undercut/audio';
 import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
+import { Haptics } from './game/haptics';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
@@ -227,6 +228,8 @@ export interface DriveOptions {
   ) => void;
   /** A mode on top of the drive screen (online racing). */
   extension?: DriveExtension;
+  /** The player's haptics setting (menu prefs `settings.haptics`); on when absent. */
+  haptics?: { get(): boolean; set(on: boolean): void };
 }
 
 /**
@@ -570,6 +573,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const loop = new GameLoop(session, wrap(human));
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
+  // Kerbs and contacts as gamepad rumble, or phone vibration on touch controls.
+  let hapticsOn = o.haptics?.get() ?? true;
+  const haptics = new Haptics(
+    {
+      device: () => input.activeDevice,
+      rumble: (strong, weak, duration) => input.rumble(strong, weak, duration),
+      stopRumble: () => {
+        input.stopRumble();
+        if (input.activeDevice === 'touch') navigator.vibrate?.(0);
+      },
+      vibrate: (ms) => navigator.vibrate?.(ms),
+    },
+    () => hapticsOn,
+  );
 
   // UI.
   const plan = buildMinimap(track, 208, 150, 8);
@@ -660,6 +677,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           setAssist(key, value);
         view.setDrivingLine(session.assists.racingLine ?? 'off');
         setSpeedUnit('kmh');
+        hapticsOn = true;
+        o.haptics?.set(true);
         for (const key of ['master', 'engine', 'effects', 'ui', 'ambience'] as const)
           o.audio?.setVolume(key, AUDIO_DEFAULTS[key]);
         chooseAuto();
@@ -699,6 +718,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         ],
         get: speedUnit,
         set: (v) => setSpeedUnit(v as 'kmh' | 'mph'),
+      },
+      {
+        id: 'haptics',
+        label: S.pause.haptics,
+        description: S.pause.hapticsHelp,
+        choices: [
+          { value: 1, label: S.setup.on },
+          { value: 0, label: S.setup.off },
+        ],
+        get: () => (hapticsOn ? 1 : 0),
+        set: (v) => {
+          hapticsOn = Number(v) === 1;
+          o.haptics?.set(hapticsOn);
+        },
       },
       {
         id: 'camera',
@@ -855,7 +888,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let overlay: TouchOverlay | null = null;
   if (o.touch) {
     document.documentElement.dataset.touch = '';
-    overlay = mountTouchOverlay(document.body, input);
+    overlay = mountTouchOverlay(document.body, input, { haptics: () => hapticsOn });
   }
 
   // Messages: one at a time, each for a short real-time span.
@@ -922,6 +955,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   function openPause(): void {
     o.audio?.setActive(false);
+    haptics.stop();
     phone?.active(false);
     if (!pause.open) {
       input.setContext('menu');
@@ -1180,6 +1214,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       ext?.beforeFrame?.(dt);
       const r = loop.frame(dt);
       impacts.observe(r.wallImpact, dt);
+      haptics.update({
+        dt,
+        speed: Math.hypot(session.car.state.vx, session.car.state.vy),
+        kerb: session.kerbUnderWheels(),
+        wallImpact: r.wallImpact,
+        carImpact: r.carImpact,
+      });
       onEvents(r.events);
       lookBack = r.lookBack;
       for (const action of r.actions) {
@@ -1576,6 +1617,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (quitting) return;
     quitting = true;
     o.audio?.setActive(false);
+    haptics.stop();
     cancelAnimationFrame(handle);
     document.removeEventListener('visibilitychange', onVisibility);
     o.canvas.removeEventListener('webglcontextlost', onContextLost);

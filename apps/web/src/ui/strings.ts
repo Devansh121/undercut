@@ -292,6 +292,8 @@ export const S = {
     uiAudio: 'Interface volume',
     ambience: 'Ambience volume',
     units: 'Speed units',
+    haptics: 'Vibration',
+    hapticsHelp: 'Kerbs and contacts through gamepad rumble, or the phone motor where it has one',
     mph: 'mph',
     autoGraphics: 'Auto',
     resetDefaults: 'Reset settings',

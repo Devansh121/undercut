@@ -111,7 +111,16 @@ export interface TouchOverlay {
   destroy(): void;
 }
 
-export function mountTouchOverlay(host: HTMLElement, system: InputSystem): TouchOverlay {
+export interface TouchOverlayOptions {
+  /** Whether a button press may tap the vibration motor (the player's haptics setting). */
+  haptics?: () => boolean;
+}
+
+export function mountTouchOverlay(
+  host: HTMLElement,
+  system: InputSystem,
+  options: TouchOverlayOptions = {},
+): TouchOverlay {
   const doc = host.ownerDocument;
   if (!doc.getElementById(STYLE_ID)) {
     const style = doc.createElement('style');
@@ -201,7 +210,7 @@ export function mountTouchOverlay(host: HTMLElement, system: InputSystem): Touch
     const [x, y] = local(event);
     if (system.touch.pointerDown(event.pointerId, x, y)) {
       event.preventDefault();
-      if ((event.target as Element).closest('.ut-touch__btn')) {
+      if ((event.target as Element).closest('.ut-touch__btn') && (options.haptics?.() ?? true)) {
         try {
           doc.defaultView?.navigator.vibrate?.(8);
         } catch {
