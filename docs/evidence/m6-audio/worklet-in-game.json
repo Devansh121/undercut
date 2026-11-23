@@ -1,0 +1,27 @@
+{
+  "measured": "2026-11-23, this laptop (Ryzen 7 7435HS), muted Playwright Chromium",
+  "runs": [
+    {
+      "preset": "mobile",
+      "viewport": "844x390 (phone project), full Monza world, 19 AI cars, autopilot",
+      "audibleCars": 3,
+      "fieldLevel": 0.0624,
+      "audioSeconds": 59.4,
+      "cpuPercent": 3.94,
+      "windowPercents": [3.31, 4.03, 4.22, 4.27, 3.88],
+      "clock": "Date.now (coarse aggregate)",
+      "note": "shipped Mobile setting"
+    },
+    {
+      "preset": "mobile",
+      "viewport": "844x390 (phone project), full Monza world, 19 AI cars, autopilot",
+      "audibleCars": 6,
+      "fieldLevel": 0.0338,
+      "audioSeconds": 59.4,
+      "cpuPercent": 4.35,
+      "windowPercents": [3.47, 4.75, 4.63, 4.79, 4.09],
+      "clock": "Date.now (coarse aggregate)",
+      "note": "comparison run with a temporary local build (six voices on Mobile), not committed"
+    }
+  ]
+}

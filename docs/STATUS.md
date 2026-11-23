@@ -134,10 +134,11 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
   until spatial voices land in Slice 2. Collision audio accepts explicit speed/serial events;
   current master has no barrier or car-contact telemetry, so the seam stays silent by default.
   UI and ambience levels persist now; their sound sources and menu presentation follow later.
-- M6 audio Slice 2: six opponent voices (nearest within 300 m) plus one summed far-field voice
-  for the rest within 600 m, fixed for every preset; the Mobile worklet budget is 10 % of one
-  core and measured 2.3–2.4 % on this laptop's desktop core, since DevTools CPU throttling does
-  not reach the worklet thread (no phone figure yet). Doppler is bounded to 0.8–1.25. The listener
+- M6 audio Slice 2: six opponent voices (nearest within 300 m), three on Mobile and Lite, plus
+  one summed far-field voice for the rest within 600 m. The Mobile worklet budget is 10 % of one
+  core; in a muted Mobile Quick Race on this laptop it measured 3.94 % with three voices (4.35 %
+  with six). DevTools CPU throttling does not reach the worklet thread, so there is no phone
+  figure; at a 4–6 times slower core this would exceed the budget, so it needs a device. Doppler is bounded to 0.8–1.25. The listener
   is the player's car in every camera, including the TV camera. Circuit beds are chosen by track
   id (Monza parkland, Spa forest, Singapore city at night); the crowd follows the render world's
   stands, so the Lite world has none. Lamp tones (1 kHz per lamp, 2 kHz at lights out) are a game

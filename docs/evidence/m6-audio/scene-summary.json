@@ -3,11 +3,11 @@
     "name": "grid-start",
     "seconds": 14,
     "listen": "From the back of the grid, a stand to the left. Lamp tones at 1 s intervals over the field idling at 6000 rpm; lights out at 6 s: a 2 kHz tone, a cheer, the field revs to 11 500 rpm and pulls away, the cars sweep down in pitch as they leave and the far field takes over from the nearest six.",
-    "integratedLufs": -24.2,
-    "truePeakDbtp": -10.41,
-    "dcOffset": 2.89e-7,
-    "maxStep": 0.0688,
-    "realTimeFactor": 30
+    "integratedLufs": -28.9,
+    "truePeakDbtp": -14.36,
+    "dcOffset": 7.84e-8,
+    "maxStep": 0.0652,
+    "realTimeFactor": 31
   },
   {
     "name": "opponent-pass",
@@ -17,26 +17,26 @@
     "truePeakDbtp": -17.85,
     "dcOffset": -1.23e-8,
     "maxStep": 0.052,
-    "realTimeFactor": 52
+    "realTimeFactor": 51
   },
   {
     "name": "forest-leaving-stands",
     "seconds": 12,
     "listen": "Spa: leaving the start-straight stands for the forest. Crowd fades from both sides over 8 s; wind in the trees with slow gusts and bird calls remain.",
-    "integratedLufs": -32.4,
-    "truePeakDbtp": -20.27,
+    "integratedLufs": -38.1,
+    "truePeakDbtp": -27.33,
     "dcOffset": 1.55e-7,
-    "maxStep": 0.0238,
-    "realTimeFactor": 56
+    "maxStep": 0.0117,
+    "realTimeFactor": 55
   },
   {
     "name": "city-night",
     "seconds": 10,
     "listen": "Singapore at night: low traffic rumble, floodlight hum at 100, 200 and 300 Hz, insects at 5 kHz in slow waves, a stand on the right.",
-    "integratedLufs": -33.2,
-    "truePeakDbtp": -20.66,
-    "dcOffset": -0.0000032,
-    "maxStep": 0.056,
+    "integratedLufs": -35.9,
+    "truePeakDbtp": -21.04,
+    "dcOffset": -0.00000313,
+    "maxStep": 0.0549,
     "realTimeFactor": 52
   },
   {
@@ -47,6 +47,6 @@
     "truePeakDbtp": -24.34,
     "dcOffset": 1.05e-12,
     "maxStep": 0.0118,
-    "realTimeFactor": 61
+    "realTimeFactor": 59
   }
 ]
