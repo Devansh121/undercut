@@ -37,7 +37,7 @@
  *   down (server to client): u8 kind=2, u8 count, u32 server receive time (ms after
  *                            epoch), count x record
  *
- * At 30 Hz with 20 cars a client receives 19 cars a tick: about 1.7 kB, or 51 kB/s.
+ * At 30 Hz with 20 cars a client receives 19 cars a tick: about 1.8 kB, or 54 kB/s.
  */
 import { MAX_CARS } from './settings';
 
