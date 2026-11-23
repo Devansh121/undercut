@@ -1,4 +1,4 @@
-import type { ActionId } from '@undercut/input';
+import { MENU_BUTTONS, type ActionId, type MenuButton } from '@undercut/input';
 import { ControlsPanel, type ControlsSource } from './controls-help';
 import { el } from './dom';
 import { button } from './kit/components';
@@ -317,10 +317,11 @@ export class PauseMenu {
   navigate(action: string): boolean {
     if (!this.open) return false;
     const active = document.activeElement;
-    // The controls list sits on top: back or pause closes it, accept presses its focused button.
+    // The controls list sits on top: pause closes it, and it takes every menu action.
     if (this.controls?.open) {
-      if (action === 'menuBack' || action === 'pause') this.controls.hide();
-      else if (action === 'menuAccept') this.controls.accept();
+      if (action === 'pause') this.controls.hide();
+      else if (MENU_BUTTONS.includes(action as MenuButton))
+        this.controls.handle(action as MenuButton);
       return true;
     }
     const rowOf = (

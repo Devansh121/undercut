@@ -141,10 +141,15 @@ export interface WallSample {
   /** Unit horizontal normal of that face, world frame, pointing back into the drivable area. */
   normalX: number;
   normalZ: number;
+  /**
+   * Set by a sampler where the barrier has a far side (a pit wall), whose ends a body can meet
+   * between its corners: the vehicle model then also checks points along the body's edges.
+   */
+  thin?: boolean;
 }
 
 export function createWallSample(): WallSample {
-  return { depth: Number.NEGATIVE_INFINITY, normalX: 0, normalZ: 0 };
+  return { depth: Number.NEGATIVE_INFINITY, normalX: 0, normalZ: 0, thin: false };
 }
 
 /** A tyre contact patch's view of the ground: means over the patch (`contact.ts`). */
@@ -166,9 +171,18 @@ export interface SurfaceSampler {
   /**
    * Barrier query for the world point (x, z), called per body corner per substep; must not
    * allocate. Samplers without barriers (open flat ground, test surfaces) leave it out and the
-   * car is never stopped. `hint` belongs to this query point, as for `sample`.
+   * car is never stopped. `hint` belongs to this query point, as for `sample`. (refX, refZ), when
+   * given, is a point of the same body (its centre): a barrier with a far side resolves the query
+   * point toward the reference's side, so no corner passes through it.
    */
-  wall?(x: number, z: number, hint: SurfaceHint, out: WallSample): void;
+  wall?(
+    x: number,
+    z: number,
+    hint: SurfaceHint,
+    out: WallSample,
+    refX?: number,
+    refZ?: number,
+  ): void;
   /**
    * Optional fast path for a tyre's contact patch: the mean of `sample` over the grid
    * `PATCH_ACROSS` × `PATCH_ALONG` (`contact.ts`) of a patch centred at (x, z), forward along the

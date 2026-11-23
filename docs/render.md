@@ -107,7 +107,7 @@ Loaded per `docs/car-asset.md`: glTF with Draco (three.js's decoder, served from
 
 ## Performance (RTX 4050 laptop, `npm run shots -- monza --no-shots --perf`)
 
-Measured on the final build (`docs/evidence/m2-render/perf.json`); "drive" is the autopilot from Ascari to the line, "grid" is twenty cars on the grid in view.
+Measured on the final build (`docs/evidence/m2-render/perf.json`); "drive" is the autopilot from Vialone (turns 8 to 10) to the line, "grid" is twenty cars on the grid in view.
 
 | Run | vsync avg / 1 % low | Uncapped mean frame | Draw calls | Triangles | Texture and target memory |
 | --- | --- | --- | --- | --- | --- |

@@ -193,5 +193,10 @@ test('Quick Race: straight to the result when the player does not finish', async
   expect(end.clusterShown).toBe(false);
   expect(end.skipShown).toBe(false);
   await expect(page.getByTestId('race-status')).toContainText('Race result');
+  // Names and words, not the engine's car codes and status ids (D01, dnf, notClassified).
+  await expect(page.getByTestId('race-status')).toContainText('Retired');
+  expect(await page.getByTestId('race-status').textContent()).not.toMatch(
+    /\bD\d{1,2}\b|\bdnf\b|\bdsq\b|notClassified/,
+  );
   await page.evaluate(() => window.__undercut!.quit());
 });

@@ -25,7 +25,7 @@ Vite dev server with hot reload, plus the rooms service behind the same `/rooms`
 
 | Command | What it runs |
 | --- | --- |
-| `npm run lint` | ESLint, Prettier check, name checks |
+| `npm run lint` | ESLint, Prettier check, name checks (the game name, and no real series, team, driver or sponsor names) |
 | `npm run typecheck` | `tsc` over every package |
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:physics` | Physics validation suite (`packages/sim/validation/`) |
@@ -36,6 +36,7 @@ Vite dev server with hot reload, plus the rooms service behind the same `/rooms`
 | `npm run test:browser` | Playwright, desktop 1440×900 and landscape phone 844×390 (build first) |
 | `npm run shots -- monza` | Screenshot stations on the real GPU into `artifacts/screenshots/<sha>/` (build first; `--lap`, `--perf`) |
 | `npm run check:assets` | Asset licence check against `assets/MANIFEST.json` |
+| `npm run check:credits` | `CREDITS.md` against the asset manifest and the lockfile, and every npm package's licence |
 | `npm run check:secrets` | Secret scan with gitleaks (Linux x64) |
 
 Run `npx playwright install chromium` once before the browser tests.

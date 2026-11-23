@@ -11,7 +11,7 @@ import { entrantsFor } from './lib/runner';
 // other, long before the rules retire it as stuck (60 s) and park it out of the race as a ghost.
 // Where there is road beside it the cars go round it; where the line sweeps across the road (the
 // chicanes) they stop behind it, and the session makes it a ghost for the queue standing still
-// behind it. The review's cases were every car queueing behind one car stopped at Ascari until
+// behind it. The review's cases were every car queueing behind one car stopped at Vialone until
 // all of them retired, then Biassono, Roggia, the first chicane's edge and the turn-one braking
 // zone, where the queue stalled for most of a minute and the cars hurt each other.
 
@@ -245,7 +245,7 @@ function expectClean(o: Outcome): void {
 }
 
 describe('a car stopped in the road', () => {
-  it('at Ascari, on the centreline: the field goes round it, untouched, and finishes', () => {
+  it('at Vialone, on the centreline: the field goes round it, untouched, and finishes', () => {
     expectClean(stopIn(3679, 0, 61));
   }, 300_000);
 

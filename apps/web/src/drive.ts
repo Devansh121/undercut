@@ -8,7 +8,6 @@ import { Track } from '@undercut/track';
 import {
   COMPOUNDS,
   ErsMode,
-  SurfaceKind,
   computeMass,
   createCarPose,
   interpolateCarPose,
@@ -72,6 +71,7 @@ import { defaultCarState } from '@undercut/audio';
 import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
+import { carStopped } from './game/stopped';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
@@ -101,8 +101,8 @@ import { ResultsStrip } from './ui/results';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import {
-  OFFLINE_PRESET,
   autoSwitchAllowed,
+  launchFallback,
   loadAutoPick,
   saveAutoPick,
   saveQuality,
@@ -542,14 +542,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const modeLabel = ext?.label ?? (session.quickRace ? S.loading.quickRace : S.loading.timeTrial);
   const loading = mountLoadingScreen(o.host, track.name, modeLabel);
   let view: RaceView;
+  /** The player's preset when it could not load offline (this session runs on the cached one). */
+  let fellBackFrom: QualityName | null = null;
   try {
-    // Auto's saved pick may be a preset the offline cache does not hold: fall back to that one.
-    const fallback = (o.autoQuality ?? false) && quality !== OFFLINE_PRESET;
+    // Auto's saved pick, or offline the player's own choice, may be a preset the offline cache
+    // does not hold: fall back to the one it does.
+    const fallback = launchFallback(quality, o.autoQuality ?? false, navigator.onLine);
     try {
-      view = await loadView(quality, loading, fallback);
+      view = await loadView(quality, loading, fallback !== null);
     } catch (error) {
-      if (!fallback) throw error;
-      quality = OFFLINE_PRESET;
+      if (fallback === null) throw error;
+      if (!o.autoQuality) fellBackFrom = quality;
+      quality = fallback;
       loading.reset();
       view = await loadView(quality, loading);
     }
@@ -822,7 +826,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
-    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
+    {
+      bindings: () => input.profile.bindings,
+      device: () => input.activeDevice,
+      padConnected: () => input.gamepad.connected,
+      touchCapable: () => o.touch,
+    },
     commands,
   );
   o.host.replaceChildren(hud.root, results.root, pause.root, intro.root);
@@ -876,6 +885,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       : null;
   if (!records.persistent)
     say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
+  if (fellBackFrom) {
+    const offline: HudMessage = {
+      tag: S.hud.graphics,
+      text: S.hud.offlinePreset(QUALITY[fellBackFrom].label, QUALITY[quality].label),
+      tone: 'info',
+    };
+    // After the storage notice if one is up, unless the first-start hint already waits there.
+    if (message && !queued) queued = offline;
+    else say(offline, 6);
+  }
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
@@ -1191,6 +1210,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // The controls list follows the device before that device's first press is read.
+      pause.controls?.sync();
       // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
       const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
@@ -1381,11 +1402,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       } else {
         h.wrongWay = false;
       }
-      h.stopped =
-        playing &&
-        session.world.time > 2 &&
-        t.speed < 1.5 &&
-        session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      h.stopped = carStopped({
+        playing,
+        time: session.world.time,
+        speed: t.speed,
+        surface: session.surfaceUnderCar(),
+      });
       if (session.quickRace) {
         // A race has no out lap, no lap invalidation (track limits are strikes, shown as
         // notices) and no time-trial record or ghost.

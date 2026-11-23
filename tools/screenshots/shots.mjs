@@ -235,8 +235,8 @@ const MONZA_STATIONS = [
     },
   },
   {
-    // Elevated camera-tower angle over Variante Ascari: chicane kerbs, stands, big screen, woodland.
-    name: 'ascari-tower',
+    // Elevated camera-tower angle over Vialone (turns 8 to 10): kerbs, stands, big screen, woods.
+    name: 'vialone-tower',
     camera: 'tv',
     run: async (page) => {
       await page.evaluate(() => {
@@ -250,7 +250,7 @@ const MONZA_STATIONS = [
     },
   },
   {
-    // Outside Curva Alboreto (Parabolica): sweeping corner, gravel, stands, bridge, distant treeline.
+    // Outside the Parabolica: sweeping corner, gravel, stands, bridge, distant treeline.
     name: 'parabolica-outside',
     camera: 'tv',
     run: async (page) => {
@@ -598,7 +598,7 @@ function summarise(times) {
 }
 
 /**
- * Frame-time runs on the GPU: the scripted drive (autopilot from Ascari to the line) and the full
+ * Frame-time runs on the GPU: the scripted drive (autopilot from Vialone to the line) and the full
  * grid in view (twenty cars, cameras and sim running, cars static), at 1080p on High and 844x390
  * on Mobile; once with vsync (does it hold 60 fps) and once without (the headroom; its 1 % lows
  * are dominated by the browser's uncapped frame pacing and are not a target).
