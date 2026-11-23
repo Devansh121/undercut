@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { raceStartFuel } from '../src/rules';
 import { runRace, runWeekend } from './lib/runner';
 import { expectCleanRace, expectQuickRace } from './lib/expect-race';
 
@@ -37,6 +38,25 @@ describe('Quick Race at Spa and Singapore on more seeds', () => {
         expectQuickRace(runRace({ circuit, cars: 20, laps: 5, seed, pitLap: null }), 5);
       }, 600_000);
     }
+  }
+});
+
+describe('Quick Race at Monza with tyres and a start load, no stops, more seeds', () => {
+  for (const seed of [1, 5, 29, 211]) {
+    it(`seed ${seed}`, () => {
+      const run = runRace({
+        cars: 20,
+        laps: 5,
+        seed,
+        pitLap: null,
+        tyres: true,
+        startFuel: raceStartFuel(5, 53),
+      });
+      expect(run.result.anomalies).toEqual([]);
+      expect(run.result.entries.every((e) => e.status === 'finished')).toBe(true);
+      expect(run.cars.filter((c) => c.turnOne === 'clean').length).toBeGreaterThanOrEqual(18);
+      expect(run.cars.reduce((n, c) => n + c.spins, 0)).toBe(0);
+    }, 600_000);
   }
 });
 

@@ -64,6 +64,23 @@ test('Quick Race at Spa or Singapore: grid, lights, moving field; a reset parks 
   ]);
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
+  // Tyres and fuel on the HUD: the panel's four treads by temperature band and the fuel on board
+  // on a desktop, the compact strip on a phone.
+  const shown = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[data-testid="hud-tyres"]');
+    const strip = document.querySelector<HTMLElement>('[data-testid="hud-mini-tyres"]');
+    const visible = (e: HTMLElement | null) => !!e && getComputedStyle(e).display !== 'none';
+    const on = visible(panel) ? panel! : strip!;
+    return {
+      either: visible(panel) !== visible(strip),
+      bands: Array.from(on.querySelectorAll<HTMLElement>('[data-band]')).map((e) => e.dataset.band),
+      text: on.textContent ?? '',
+    };
+  });
+  expect(shown.either).toBe(true);
+  expect(shown.bands).toHaveLength(4);
+  for (const b of shown.bands) expect(['cold', 'ok', 'warm', 'hot']).toContain(b);
+  expect(shown.text).toMatch(/\d+\.\d kg/);
   // A reset in a race parks the car stopped at the edge, off the racing line, not on it in
   // front of the field.
   const parked = await page.evaluate(() => {

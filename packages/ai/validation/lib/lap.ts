@@ -93,6 +93,8 @@ export interface LapRunOptions {
   maxTime?: number;
   /** A wall clock (ms) to time the driver's ticks with; the runner itself never reads one. */
   clock?: () => number;
+  /** Prepare the car once it is built, before the first tick (fit tyres, for instance). */
+  prepare?: (car: WorldCar) => void;
   /** Observe each completed timed-lap tick; callers must copy mutable state. */
   onSample?: (car: WorldCar, telemetry: CarTelemetry, time: number) => void;
   /** Published stops to measure the same way, by corner number: [from, to] km/h. */
@@ -249,6 +251,7 @@ export function runLaps(o: LapRunOptions): LapRunResult {
     fuel: o.fuel,
     airDensity: o.airDensity,
   });
+  o.prepare?.(car);
   const driver = o.driver(params);
   setErsMode(car.state, driver.ersMode);
   const tel: CarTelemetry = createCarTelemetry();

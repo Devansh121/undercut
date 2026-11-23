@@ -13,6 +13,8 @@ export interface DrivingPlan {
   readonly line: LineGeometry;
   readonly profile: SpeedProfile;
   readonly model: EnvelopeModel;
+  /** The shares of the envelope the profile was planned with (the driver's skill). */
+  readonly scale: EnvelopeScale;
   /** Per sample: inside a DRS zone (qualifying rules: DRS free there). */
   readonly drsZone: Uint8Array;
   /** Per sample: the MGU-K may deploy here at full throttle (within the budget). */
@@ -75,6 +77,7 @@ export function buildPlan(
     line,
     profile,
     model,
+    scale: options.scale,
     drsZone,
     deployMask: ers,
     deployEnergy: profile.deployEnergy,
