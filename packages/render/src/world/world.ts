@@ -652,13 +652,15 @@ export class CircuitWorld {
         { geometry: canopyGeo, material: canopyMat, maxDistance: far },
       ],
     });
-    // The kit crew's finest level (5,000 to 7,000 triangles) only close by; none past the old
-    // crew's reach.
-    const crewLevels = { distanceCaps: [20, 250, far * 0.7] };
+    // The kit crew's finest level (5,000 to 7,000 triangles, sub-pixel beyond a few metres) only
+    // beside the eye, as in the pit lane; none past the old crew's reach. At 20 m it cost about
+    // 3 ms at Singapore's grid under the night lights.
+    const crewLevels = { distanceCaps: [6, 250, far * 0.7] };
     props.define({
       id: 'pit-crew-engineer',
-      // Small cells: levels go by a cell's near edge, so only crew really near draw finest.
-      gridCell: 20,
+      // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
+      // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
+      gridCell: 60,
       castShadow: false,
       receiveShadow: true,
       lods: o.propKit?.lodsFor('crew-engineer-seated', crewLevels) ?? [
@@ -667,8 +669,9 @@ export class CircuitWorld {
     });
     props.define({
       id: 'pit-crew-mechanic',
-      // Small cells: levels go by a cell's near edge, so only crew really near draw finest.
-      gridCell: 20,
+      // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
+      // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
+      gridCell: 60,
       castShadow: false,
       receiveShadow: true,
       lods: o.propKit?.lodsFor('crew-mechanic-standing', crewLevels) ?? [
