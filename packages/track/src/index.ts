@@ -66,3 +66,5 @@ export {
   type TrackMeshOptions,
   type TrackMeshes,
 } from './mesh';
+
+export { DRESSING_CONTACT, tracksideObjects, type TracksideObject } from './objects';

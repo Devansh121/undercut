@@ -73,7 +73,7 @@ export interface RaceSessionOptions {
 }
 
 export interface RaceSessionSnapshot {
-  version: 2;
+  version: 3;
   control: RaceControlSnapshot;
   world: { tick: number; time: number; rng: RngState; cars: number[][] };
   /** Each car's driver (AI memory, pit-lane follower). */
@@ -514,7 +514,9 @@ export class RaceSession {
       airDensity: this.world.environment.airDensity,
     });
     const mode = wc.state.ersMode;
+    const brokenObjects = wc.state.brokenObjects.slice();
     restoreCar(wc.state, snapshotCar(fresh));
+    wc.state.brokenObjects.set(brokenObjects);
     wc.state.ersMode = mode;
     readCarPose(wc.state, wc.pose);
     readCarPose(wc.state, wc.previousPose);
@@ -528,7 +530,7 @@ export class RaceSession {
 
   snapshot(): RaceSessionSnapshot {
     return {
-      version: 2,
+      version: 3,
       control: this.control.snapshot(),
       world: {
         tick: this.world.tick,
@@ -561,7 +563,7 @@ export class RaceSession {
    * session continues exactly as the original would have.
    */
   restore(snap: RaceSessionSnapshot): void {
-    if (snap.version !== 2)
+    if (snap.version !== 3)
       throw new Error(`unknown session snapshot version ${String(snap.version)}`);
     if (
       snap.world.cars.length !== this.world.cars.length ||

@@ -152,6 +152,7 @@ export interface DrsZone {
 
 /** A barrier run, as a polyline at the barrier's track-side face. */
 export interface Barrier {
+  readonly contact: 'solid';
   readonly type: BarrierType;
   /** Which edge it guards: the lap's left or right, or the pit lane's garage side. */
   readonly side: Side | 'pit';
@@ -974,6 +975,7 @@ export class Track {
       const flush = (): void => {
         if (ss.length >= 2) {
           out.push({
+            contact: 'solid',
             type: BARRIER_TYPES[runType]!,
             side: k === LEFT ? 'left' : 'right',
             points: Float64Array.from(pts),
@@ -1022,6 +1024,7 @@ export class Track {
       ss.push(sp);
     }
     out.push({
+      contact: 'solid',
       type: 'concrete',
       side: 'pit',
       points: Float64Array.from(pts),

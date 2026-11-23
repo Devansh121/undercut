@@ -1,4 +1,6 @@
+import { tracksideObjects } from './objects';
 import {
+  BreakableIndex,
   SurfaceKind,
   type SurfaceHint,
   type SurfaceSample,
@@ -50,6 +52,7 @@ export const HIGH_KERB: SurfaceProperties = Object.freeze({
  */
 export class TrackSurface implements SurfaceSampler {
   readonly track: Track;
+  readonly breakables: BreakableIndex;
   private readonly lapHint = { index: -1 };
   private readonly pitHint = { index: -1 };
   private readonly q = createPathPoint();
@@ -60,6 +63,7 @@ export class TrackSurface implements SurfaceSampler {
 
   constructor(track: Track) {
     this.track = track;
+    this.breakables = new BreakableIndex(tracksideObjects(track));
   }
 
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void {

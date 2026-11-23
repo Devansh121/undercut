@@ -1,3 +1,4 @@
+import { breakableContact } from './breakables';
 import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
 import { createWallSample } from './contracts';
 import { PATCH_HINTS, createPatchSample, samplePatch, tyreVerticalForce } from './contact';
@@ -89,6 +90,7 @@ export function stepCar(
   const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-9));
   const h = dt / n;
   applyDriverRequests(state, input);
+  state.breakableImpactSpeed = 0;
   state.wallImpactSpeed = 0;
   state.wallContact = 0;
   samplePatchesAhead(state, surface, dt);
@@ -99,7 +101,9 @@ export function stepCar(
     for (let i = 0; i < 4; i++) {
       patchHeight[i] = patchStart[i]! + (patchEnd[i]! - patchStart[i]!) * f;
     }
+    state.contactTime += h;
     substep(state, input, surface, h, n, env);
+    if (surface.breakables) breakableContact(state, surface.breakables);
   }
 }
 
