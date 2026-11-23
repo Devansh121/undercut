@@ -34,7 +34,6 @@ import { buildResult, type EntrantInfo, type SessionResult } from '../results';
 import type { RaceRules } from '../rules';
 import type { TimingBests } from '../timing/lap-timer';
 import type { CarController, ControlContext, ControllerState } from './controllers';
-import { wakeStrength } from './wake';
 
 /**
  * Estimated grid condition after an unmodelled formation lap: every starting set (human and
@@ -342,7 +341,6 @@ export class RaceSession {
     const world = this.world;
     const control = this.control;
     this.updateGhosts();
-    this.updateWakes();
     for (let i = 0; i < this.cars.length; i++) {
       const wc = world.cars[i]!;
       readCarTelemetry(wc.state, this.telemetry[i]!);
@@ -374,24 +372,6 @@ export class RaceSession {
       }
     }
     return events;
-  }
-
-  /** The same slipstream and lost aero load apply to every car, including the player's. */
-  private updateWakes(): void {
-    for (let i = 0; i < this.cars.length; i++) {
-      const state = this.world.cars[i]!.state;
-      let exposure = 0;
-      if (this.control.racing(i) && !this.ghosts[i] && !this.facts[i]!.inPitLane) {
-        for (let j = 0; j < this.cars.length; j++) {
-          if (j === i || this.ghosts[j] || this.facts[j]!.inPitLane || !this.control.racing(j))
-            continue;
-          exposure = Math.max(exposure, wakeStrength(state, this.world.cars[j]!.state));
-        }
-      }
-      // Estimates: up to 18 % less drag and 12 % less downforce. Wakes do not stack.
-      state.dragScale = 1 - 0.18 * exposure;
-      state.downforceScale = 1 - 0.12 * exposure;
-    }
   }
 
   /** Whether a car is a ghost this tick: no car touches it (retired, or blocking). */

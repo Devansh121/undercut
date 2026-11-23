@@ -173,28 +173,12 @@ its path short of its box (stopped 3 s, not held) gives the stop up, drives out 
 again next lap. The pit-lane driving is a plain path
 follower (`PathFollower` in `packages/ai`); a player can have the same as an assist.
 
-## Wake and racecraft
-
-The race session applies the same wake to every solid car outside the pit lane, human or
-computer. Exposure is measured in the leading car's world frame, from 6 to 100 m behind it,
-fading with distance and lateral separation. Cars below 30 m/s or facing over 0.2 rad apart
-have no tow. Wakes do not stack. The peak reductions, 18 % drag and 12 % downforce, are estimates,
-not measured calibration; the existing sim aero-scale fields carry them. A car pulling out
-loses the tow as it leaves the wake. The reference lap alone is unchanged.
-
-A racing driver checks closing traffic in its mirrors before pulling out or returning to
-the line, and opens lateral room before a faster car reaches its rear quarter. It can use
-up to 4 m/s above its solo straight speed target while attacking, with the normal braking
-profile restored before the braking zone and the traffic ceiling always in force. It still
-has the same engine, tyres and brakes. A driver with room on a straight can defend once toward
-the next corner's inside, holding that choice rather than following the attacker's changes
-of side. Its defensive choice is included in saves.
-
 ## Known gaps
 
 - Cars touch (car-to-car contact in the sim, planar boxes, no damage yet) and the AI races with the
-  racing driver of `packages/ai` (gap keeping, lanes, passing, blue flags, spin recovery).
-  In the older 20-car, 5-lap proof at Monza with one stop per car (seeds 1, 2, 3, 4, 17,
+  racing driver of `packages/ai` (gap keeping, lanes, passing, blue flags, spin recovery). There is
+  no slipstream or dirty air yet, so passes come from pace differences and DRS; no active defending
+  (one move) yet. In the 20-car, 5-lap proof at Monza with one stop per car (seeds 1, 2, 3, 4, 17,
   404): no watchdog findings, 18 to 20 of 20 clean through turn one, longest contact under 2 s,
   6 to 13 on-track position changes per race.
 - Pit loss at Monza comes out at about 33.2 s against the published 24.3 s (physics-validation
