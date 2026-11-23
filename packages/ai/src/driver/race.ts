@@ -1529,7 +1529,15 @@ export class RaceDriver implements Driver {
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       const ds = this.ahead(s0, c.s);
-      if (c.speed < 1 && ds > 0 && ds < range && (best < 0 || ds < best)) best = ds;
+      if (
+        c.speed < 1 &&
+        c.d - c.halfWidth <= this.at(this.plan.track.halfWidth[0], c.s) &&
+        c.d + c.halfWidth >= -this.at(this.plan.track.halfWidth[1], c.s) &&
+        ds > 0 &&
+        ds < range &&
+        (best < 0 || ds < best)
+      )
+        best = ds;
     }
     return best;
   }

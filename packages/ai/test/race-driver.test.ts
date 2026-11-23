@@ -400,3 +400,31 @@ describe('race driver: closing on a queue', () => {
     expect(closest).toBeGreaterThan(0.5);
   });
 });
+
+describe('race driver: stopped cars on the road', () => {
+  for (const side of [-1, 1]) {
+    it(`ignores a stopped car beyond the ${side > 0 ? 'left' : 'right'} road edge`, () => {
+      const dr = driver();
+      const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+      const out = tick(dr, me, [{ id: 1, s: 250, d: side * 30, speed: 0 }]);
+      expect(dr.last.accelLimit).toBe(Infinity);
+      expect(out.brake).toBe(0);
+      expect(out.throttle).toBeGreaterThan(0);
+    });
+
+    it(`counts a footprint overlapping the ${side > 0 ? 'left' : 'right'} road edge`, () => {
+      const dr = driver();
+      const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+      const d = side * (track.halfWidthAt(250, side > 0 ? 0 : 1) + BODY_HALF_WIDTH / 2);
+      tick(dr, me, [{ id: 1, s: 250, d, speed: 0 }]);
+      expect(dr.last.accelLimit).toBeLessThan(0);
+    });
+  }
+
+  it('does not enable queue caution for stationary grid traffic during launch', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
+    tick(dr, me, [{ id: 1, s: 250, d: 5, speed: 0 }], { launching: true });
+    expect(dr.last.accelLimit).toBe(Infinity);
+  });
+});
