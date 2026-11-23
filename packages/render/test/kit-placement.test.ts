@@ -250,6 +250,47 @@ describe('kit barrier slope', () => {
 });
 
 describe('permanent stand banks', () => {
+  it('shares one geometry per kit model and bank height across stands of any size', () => {
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    const place = vi.spyOn(props, 'place');
+    const frame = {
+      id: 'stand',
+      ox: 0,
+      oz: 0,
+      ax: 0,
+      az: 1,
+      bx: -1,
+      bz: 0,
+      base: 0,
+      roof: true,
+      s: 100,
+      seat: [0.1, 0.2, 0.3] as [number, number, number],
+    };
+    const frames = [
+      { ...frame, length: 20, depth: 26.7, rows: 30 },
+      { ...frame, length: 47, depth: 31, rows: 30, ox: 100 },
+      { ...frame, length: 33, depth: 9, rows: 10, roof: false, oz: 100 },
+    ];
+    placeKitStands(frames, fakeKit(), props, 0, false, () => undefined);
+    // Banks 0 and 1, the roofed rear bank 2; the one-bank stand reuses bank 0: three kinds.
+    expect(define.mock.calls.map(([kind]) => kind.id).sort()).toEqual([
+      'stand-kit-grandstand-0',
+      'stand-kit-grandstand-1',
+      'stand-kit-grandstand-roof-2',
+    ]);
+    // Each stand's fit rides on its instances: footprint depth over the banks' depth, module pitch.
+    const fits = new Set(place.mock.calls.map(([, p]) => p.stretch!.join(',')));
+    expect(fits).toEqual(
+      new Set([
+        [26.7 / 26.47, 1, 1].join(','),
+        [31 / 26.47, 1, 47 / 5 / 10].join(','),
+        [9 / 9.47, 1, 33 / 3 / 10].join(','),
+      ]),
+    );
+    props.dispose();
+  });
+
   it('keeps human-scale row heights and grounds the supports of all raised banks', () => {
     const props = new PropRegistry(1000);
     const define = vi.spyOn(props, 'define');
