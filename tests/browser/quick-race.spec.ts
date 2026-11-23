@@ -34,19 +34,34 @@ test('Quick Race at Spa or Singapore: grid, lights, moving field; a reset parks 
   });
   // The same race goes on: the grid, the five lights and lights out, the field moving off.
   expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toMatch(/grid|lights/);
+  // Every lights event as it comes (the state keeps only the last few race events).
   await page.evaluate(() => {
+    const w = window as unknown as { lights: number[] };
+    w.lights = [];
+    const seen = new Set<number>();
+    const watch = () => {
+      const events = window.__undercut!.state().raceEvents as {
+        type: string;
+        t: number;
+        count: number;
+      }[];
+      for (const e of events) {
+        if (e.type !== 'lights' || seen.has(e.t)) continue;
+        seen.add(e.t);
+        w.lights.push(e.count);
+      }
+      requestAnimationFrame(watch);
+    };
+    watch();
     window.__undercut!.autopilot(true);
     window.__undercut!.setTimeScale(8);
   });
   await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', null, {
     timeout: 60_000,
   });
-  const lights = await page.evaluate(() =>
-    (window.__undercut!.state().raceEvents as { type: string; count?: number }[])
-      .filter((e) => e.type === 'lights')
-      .map((e) => e.count),
-  );
-  expect(lights).toEqual([1, 2, 3, 4, 5, 0]);
+  expect(await page.evaluate(() => (window as unknown as { lights: number[] }).lights)).toEqual([
+    1, 2, 3, 4, 5, 0,
+  ]);
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
   // A reset in a race parks the car stopped at the edge, off the racing line, not on it in
