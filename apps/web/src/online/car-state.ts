@@ -37,11 +37,20 @@ export interface LocalCar {
   s: number;
   /** Placements so far (wraps modulo 4 on the wire). */
   resets: number;
+  /** Which word of the pose's broken-object set to send: step it once per snapshot. */
+  brokenCursor?: number;
 }
 
 function wrapAngle(a: number): number {
   const twoPi = 2 * Math.PI;
   return a - twoPi * Math.round(a / twoPi);
+}
+
+function brokenWord(p: CarPose, cursor: number): Pick<CarSnapshot, 'brokenIndex' | 'brokenWord'> {
+  if (!p.brokenObjects) return {};
+  const words = p.brokenObjects.length;
+  const brokenIndex = ((cursor % words) + words) % words;
+  return { brokenIndex, brokenWord: p.brokenObjects[brokenIndex]! >>> 0 };
 }
 
 export function toSnapshot(c: LocalCar): CarSnapshot {
@@ -60,6 +69,7 @@ export function toSnapshot(c: LocalCar): CarSnapshot {
   const spin = c.wheelSpin;
   return {
     ...(p.breakableHits ? { breakableHits: Array.from(p.breakableHits) } : {}),
+    ...brokenWord(p, c.brokenCursor ?? 0),
     seat: c.seat,
     flags: c.drs ? CAR_FLAG.drs : 0,
     resets: ((c.resets % 4) + 4) % 4,

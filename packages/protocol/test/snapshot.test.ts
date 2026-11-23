@@ -66,10 +66,10 @@ const BOUNDS: Record<string, number> = {
 const EPS = 1e-9;
 
 describe('snapshot codec', () => {
-  it('uses a 88-byte record including four recent board hits', () => {
-    expect(CAR_RECORD_BYTES).toBe(88);
-    expect(encodeUpFrame([randomCar(1)], EPOCH).byteLength).toBe(UP_HEADER_BYTES + 88);
-    expect(encodeDownFrame([randomCar(1)], EPOCH, EPOCH).byteLength).toBe(DOWN_HEADER_BYTES + 88);
+  it('uses a 94-byte record including four recent board hits and a word of the broken set', () => {
+    expect(CAR_RECORD_BYTES).toBe(94);
+    expect(encodeUpFrame([randomCar(1)], EPOCH).byteLength).toBe(UP_HEADER_BYTES + 94);
+    expect(encodeDownFrame([randomCar(1)], EPOCH, EPOCH).byteLength).toBe(DOWN_HEADER_BYTES + 94);
   });
 
   it('round-trips 10 000 random cars within the documented error bounds', () => {
@@ -218,5 +218,25 @@ describe('breakable hit relay', () => {
     const result = decodeUpFrame(encodeUpFrame([car], EPOCH), EPOCH);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.frame.cars[0]!.breakableHits).toEqual(car.breakableHits);
+  });
+
+  it('carries one 32-bit word of the broken set exactly, with its index', () => {
+    const car = randomCar(2);
+    car.brokenIndex = 63;
+    car.brokenWord = 0x80000001;
+    const result = decodeUpFrame(encodeUpFrame([car], EPOCH), EPOCH);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.frame.cars[0]!.brokenIndex).toBe(63);
+    expect(result.frame.cars[0]!.brokenWord).toBe(0x80000001);
+    // Absent, the word reads as index 0 with no bits: nothing to merge.
+    const plain = decodeUpFrame(encodeUpFrame([randomCar(3)], EPOCH), EPOCH);
+    if (plain.ok) expect(plain.frame.cars[0]!.brokenWord ?? 0).toBe(0);
+  });
+
+  it('rejects a broken-set word index past the last word', () => {
+    const bytes = encodeUpFrame([randomCar(4)], EPOCH);
+    new DataView(bytes.buffer).setUint16(UP_HEADER_BYTES + 88, 64, true);
+    expect(decodeUpFrame(bytes, EPOCH).ok).toBe(false);
   });
 });

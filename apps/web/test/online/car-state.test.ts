@@ -36,6 +36,14 @@ function local(over: Partial<LocalCar> = {}): LocalCar {
 }
 
 describe('toSnapshot', () => {
+  it('sends the word of the broken set that its cursor names', () => {
+    const pose = createCarPose();
+    pose.brokenObjects![7] = 0xfffffffe;
+    const snap = toSnapshot(local({ pose, brokenCursor: 71 }));
+    expect(snap.brokenIndex).toBe(7);
+    expect(snap.brokenWord).toBe(0xfffffffe);
+  });
+
   it('takes world velocity and yaw rate from the last sim step', () => {
     const snap = toSnapshot(local());
     expect(snap.vx).toBeCloseTo(50, 6);
