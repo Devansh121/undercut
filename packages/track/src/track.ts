@@ -32,6 +32,8 @@ import { TrackPath, createPathPoint, createVec3, type PathPoint, type Vec3 } fro
 export const PIT_GROUND_SIGMA = 15;
 /** Beyond the pit lane's edges its ground blends back to the lap's over this band, metres. */
 export const PIT_GROUND_BAND = 2;
+/** Least ground per metre of s used to stretch the barrier query's pit-lane reach (`pitWallNear`). */
+const PIT_WALL_MIN_STRETCH = 0.2;
 
 /** Smoothstep on [0, 1], and 1 above. */
 function smoothUnit(t: number): number {
@@ -336,6 +338,11 @@ export class Track {
   readonly frameLimit: readonly [Float64Array, Float64Array];
   /** Per lap sample, a pit-path sample near it when the pit lane runs alongside, else -1. */
   readonly pitNear: Int32Array;
+  /**
+   * As `pitNear`, for the barrier query: its reach along s is stretched where the lane runs on
+   * the inside of a bend, where a metre of ground beside the lane spans more than a metre of s.
+   */
+  readonly pitWallNear: Int32Array;
   readonly pitSide: SideIndex;
   /** The pit lane's ground height per pit-path sample (see PIT_GROUND_SIGMA). */
   readonly pitHeight: Float64Array;
@@ -446,6 +453,9 @@ export class Track {
     const q = createPathPoint();
     const hint = { index: -1 };
     const under = new Float64Array(pp.count);
+    const wallReach = new Float64Array(pp.count);
+    const wallS = new Float64Array(pp.count);
+    const wallD = new Float64Array(pp.count);
     for (let j = 0; j < pp.count; j++) {
       this.lap.project(pp.x[j]!, pp.z[j]!, hint, q);
       under[j] = this.ground(q.s, q.d, g).height;
@@ -453,6 +463,18 @@ export class Track {
       const i0 = this.lap.sampleIndex(q.s - reach);
       const span = Math.ceil((2 * reach) / this.lap.step);
       for (let k = 0; k <= span; k++) this.pitNear[(i0 + k) % n] = j;
+      wallReach[j] = reach;
+      wallS[j] = q.s;
+      wallD[j] = q.d;
+    }
+    // Ground metres per metre of s at the lane, 1 − κd, floored so the reach stays bounded.
+    this.pitWallNear = new Int32Array(n).fill(-1);
+    for (let j = 0; j < pp.count; j++) {
+      const m = Math.max(PIT_WALL_MIN_STRETCH, 1 - this.curvatureAt(wallS[j]!) * wallD[j]!);
+      const reach = wallReach[j]! / Math.min(1, m);
+      const i0 = this.lap.sampleIndex(wallS[j]! - reach);
+      const span = Math.ceil((2 * reach) / this.lap.step);
+      for (let k = 0; k <= span; k++) this.pitWallNear[(i0 + k) % n] = j;
     }
     this.pitHeight = smoothOpen(under, PIT_GROUND_SIGMA / pp.step);
     // The pit lane is its own surface, built from the original ground under it (above); the fill
