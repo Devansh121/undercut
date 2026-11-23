@@ -92,6 +92,8 @@ function today(): string {
 const shell = new Shell(app, () => undefined, {
   bindings: () => input.profile.bindings,
   device: () => input.activeDevice,
+  padConnected: () => input.gamepad.connected,
+  touchCapable: () => touch,
 });
 shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
@@ -101,6 +103,7 @@ const menuInput = new MenuInput(input, {
   },
   device: (d) => {
     shell.setDevice(d);
+    shell.controls?.sync();
     hub.setDevice(d);
   },
 });

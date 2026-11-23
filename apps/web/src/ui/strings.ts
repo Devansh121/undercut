@@ -84,7 +84,7 @@ export const S = {
     records: 'Best laps on this device',
     noRecord: 'No lap yet',
     recordsMemory: 'Records last until the page closes: storage is blocked',
-    deviceNames: { keyboard: 'Keyboard', gamepad: 'Gamepad', touch: 'Touch' },
+    deviceNames: { keyboard: 'Keyboard', gamepad: 'Controller', touch: 'Touch' },
     usingDevice: (device: string) => `Using ${device}`,
   },
 
@@ -345,6 +345,9 @@ export const S = {
       pause: 'Pause',
     },
     notBound: 'Not bound',
+    devices: 'Input device',
+    or: 'or',
+    noPad: 'No controller connected. Connect one and press a button to use it.',
     pauseMenu: 'Pause menu',
     arrowKeys: 'arrow keys',
     leftOnly: (c: string) => `${c} (left)`,

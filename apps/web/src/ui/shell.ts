@@ -136,12 +136,8 @@ export class Shell {
     const screen = this.current;
     if (!screen) return;
     if (action !== 'menuAccept' || !nativeAccept) showFocusRing(true);
-    // The controls list sits over everything: Back closes it; accept presses its Back button.
-    if (this.controls?.open) {
-      if (action === 'menuBack') this.controls.hide();
-      else if (action === 'menuAccept' && !nativeAccept) this.controls.accept();
-      return;
-    }
+    // The controls list sits over everything and takes every action while open.
+    if (this.controls?.handle(action, nativeAccept)) return;
     if (action === 'menuBack') {
       if (screen.back?.()) return;
       if (!this.pop()) this.onEmpty();

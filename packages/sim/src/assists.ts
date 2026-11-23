@@ -64,6 +64,10 @@ const DIRECT_CUT = 3;
 const TC_LAUNCH_SPEED = 2;
 const TC_LAUNCH_THROTTLE = 0.3;
 const TC_SPIN_SPEED = 1;
+/** Low-grip launch: below this speed (m/s), on driven-wheel surface grip under TC_LOW_GRIP. */
+const TC_LOW_GRIP_SPEED = 8;
+const TC_LOW_GRIP = 0.7;
+const TC_LOW_GRIP_SLIP = 0.5;
 /** Automatic gearbox: shift up at this rpm; shift down when the lower gear lands below it. */
 const UPSHIFT_RPM = 11800;
 /**
@@ -202,6 +206,16 @@ export function applyAssists(
   if (out.throttle < throttle)
     out.throttle = Math.max(out.throttle, Math.min(throttle, neutralThrottle(car)));
   if (out.throttle < throttle && Math.abs(car.vx) < TC_LAUNCH_SPEED && !driveWheelsSpin(car))
+    out.throttle = Math.max(out.throttle, Math.min(throttle, TC_LAUNCH_THROTTLE));
+  // On grass or gravel a little throttle spins the rears past the limit, and the cut then
+  // recovers too slowly to get a slow car going: there, below TC_LOW_GRIP_SPEED, the launch
+  // throttle stays while the driven wheels' slip ratio is under TC_LOW_GRIP_SLIP.
+  if (
+    out.throttle < throttle &&
+    Math.abs(car.vx) < TC_LOW_GRIP_SPEED &&
+    lowGrip(car) &&
+    drivenSlip(car) < TC_LOW_GRIP_SLIP
+  )
     out.throttle = Math.max(out.throttle, Math.min(throttle, TC_LAUNCH_THROTTLE));
 
   // ABS: hold every braked wheel's combined slip under the level's limit (lower at the rear).
@@ -400,6 +414,17 @@ function driveWheelsSpin(car: CarState): boolean {
   for (let i = 2; i < 4; i++)
     if ((car.wheelSpeed[i]! * r - car.vx) * drive > TC_SPIN_SPEED) return true;
   return false;
+}
+
+/** Both driven wheels on low-grip ground (grass, gravel) on the last step. */
+function lowGrip(car: CarState): boolean {
+  return car.surfaceGrip[2]! < TC_LOW_GRIP && car.surfaceGrip[3]! < TC_LOW_GRIP;
+}
+
+/** The driven wheels' larger slip ratio in the gear's direction of drive. */
+function drivenSlip(car: CarState): number {
+  const drive = car.gear < 0 ? -1 : 1;
+  return Math.max(car.slipRatio[2]! * drive, car.slipRatio[3]! * drive);
 }
 
 function combinedSlip(car: CarState, curve: TyreCurve, i: number): number {

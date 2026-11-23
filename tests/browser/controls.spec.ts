@@ -5,7 +5,7 @@ import { openMenu } from './helpers';
 /** The controls list, opened from the pause menu of the shared drive session. */
 const BRAKE: Record<string, string> = {
   Keyboard: 'S or Down arrow',
-  Gamepad: 'LT',
+  Controller: 'LT',
   Touch: 'Brake pedal',
 };
 
@@ -42,6 +42,21 @@ async function padButton(page: Page, index: number, value: number): Promise<void
   );
 }
 
+/** Press and let go of a pad button, a few frames each, so the menus' poll sees both. */
+async function padTap(page: Page, index: number): Promise<void> {
+  const frames = (): Promise<void> =>
+    page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  await padButton(page, index, 1);
+  await frames();
+  await padButton(page, index, 0);
+  await frames();
+}
+
 async function removePad(page: Page): Promise<void> {
   await page.evaluate(() => {
     delete (navigator as unknown as Record<string, unknown>).getGamepads;
@@ -61,7 +76,7 @@ test('the pause menu lists the controls for the device in use', async ({ drive: 
   const panel = page.locator('[data-testid=controls-panel]');
   const back = panel.getByRole('button', { name: 'Back' });
   await expect(panel).toBeVisible();
-  const device = (await panel.locator('.controls__device').textContent())?.trim() ?? '';
+  const device = (await panel.locator('[role=tab][aria-selected=true]').textContent()) ?? '';
   expect(Object.keys(BRAKE)).toContain(device);
   await expect(panel.locator('[data-row=brake] dd')).toHaveText(BRAKE[device] as string);
   await expect(panel.locator('.controls__note')).toContainText('twice');
@@ -79,11 +94,16 @@ test('the pause menu lists the controls for the device in use', async ({ drive: 
   if (process.env.CONTROLS_SHOT && test.info().project.name === 'desktop')
     await page.screenshot({ path: process.env.CONTROLS_SHOT });
 
-  // Focus stays in the dialog.
+  // Focus stays in the dialog: Tab cycles through the device tabs and Back.
   await expect(back).toBeFocused();
-  await page.keyboard.press('Tab');
+  const stops = await panel.locator('[role=tab], button[data-action=close-controls]').count();
+  for (let i = 0; i < stops; i++) {
+    await page.keyboard.press('Tab');
+    expect(await panel.evaluate((p) => p.contains(document.activeElement))).toBe(true);
+  }
   await expect(back).toBeFocused();
   await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
   await expect(back).toBeFocused();
 
   // Esc closes the list and leaves the pause menu open.
@@ -138,7 +158,7 @@ test('gamepad A on Back closes the controls list in the pause menu', async ({
   await expect(menu).toBeHidden();
 });
 
-test('main menu: the controls list keeps focus, and gamepad A on Back closes it without starting', async ({
+test('main menu: the controls list follows the device in use, and gamepad A on Back closes it without starting', async ({
   page,
 }) => {
   test.skip(test.info().project.name !== 'desktop', 'gamepad cases run on desktop');
@@ -153,11 +173,49 @@ test('main menu: the controls list keeps focus, and gamepad A on Back closes it 
   await expect(panel).toBeVisible();
   await expect(panel.locator('.controls__note')).toContainText('press Q twice');
 
-  // Tab does not reach the launch screen behind the dialog.
+  // Tab does not reach the menu behind the dialog.
   await page.keyboard.press('Tab');
+  expect(await panel.evaluate((p) => p.contains(document.activeElement))).toBe(true);
+
+  // Opened from the keyboard: its tab, a controller tab with a note while none is connected.
+  const tab = (name: string) => panel.getByRole('tab', { name });
+  await expect(tab('Keyboard')).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.getByRole('tab')).toHaveText(['Keyboard', 'Controller']);
+  await expect(panel.locator('[data-row=brake] dd')).toHaveText('S or Down arrow');
+  await tab('Controller').click();
+  await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.locator('[data-testid=controls-no-pad]')).toBeVisible();
+  await tab('Keyboard').click();
+  await back.focus();
+
+  // A controller press while the list is open switches it to the controller's bindings, drawn
+  // as pad glyphs. LS is not a menu control, so it does nothing else.
+  await installPad(page);
+  await padTap(page, 10);
+  await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.locator('[data-testid=controls-no-pad]')).toBeHidden();
+  const brake = panel.locator('[data-row=brake] dd');
+  await expect(brake).toHaveAttribute('aria-label', 'LT');
+  await expect(brake.locator('.glyph')).toHaveAttribute('data-shape', 'trigger');
+  await expect(panel.locator('[data-row=steer] dd .glyph')).toHaveAttribute('data-shape', 'stick');
+  await expect(panel.locator('[data-row=steer] dd')).toContainText('Left stick');
+  await expect(panel.locator('[data-row=gearUp] dd .glyph')).toHaveText('RB');
+  await expect(panel.locator('.controls__note')).toContainText('press LB twice');
+
+  // A key press switches back; the shoulder buttons step the tabs.
+  await page.keyboard.press('Shift');
+  await expect(tab('Keyboard')).toHaveAttribute('aria-selected', 'true');
+  // A shoulder button as the first press from the pad picks the controller and stays there.
+  await padTap(page, 5);
+  await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
+  await page.waitForTimeout(SETTLE_MS);
+  await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
+  await padTap(page, 4);
+  await expect(tab('Keyboard')).toHaveAttribute('aria-selected', 'true');
+  await padTap(page, 5);
+  await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
   await expect(back).toBeFocused();
 
-  await installPad(page);
   await padButton(page, 0, 1);
   await expect(panel).toBeHidden();
   await padButton(page, 0, 0);

@@ -8,7 +8,6 @@ import { Track } from '@undercut/track';
 import {
   COMPOUNDS,
   ErsMode,
-  SurfaceKind,
   computeMass,
   createCarPose,
   interpolateCarPose,
@@ -73,6 +72,7 @@ import { RaceAudioScene, voicesFor } from './game/audio-scene';
 import { silentAudio, type CarAudioSink } from './game/audio-seam';
 import { ImpactEvents, toAudioCarState } from './game/audio-map';
 import { Haptics } from './game/haptics';
+import { carStopped } from './game/stopped';
 import { AUDIO_DEFAULTS } from './game/audio-settings';
 import type { AudioSettingKey } from './game/audio-settings';
 import {
@@ -855,7 +855,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           set: (v: number) => o.audio?.setVolume(id, v),
         }))
       : [],
-    { bindings: () => input.profile.bindings, device: () => input.activeDevice },
+    {
+      bindings: () => input.profile.bindings,
+      device: () => input.activeDevice,
+      padConnected: () => input.gamepad.connected,
+      touchCapable: () => o.touch,
+    },
     commands,
   );
   o.host.replaceChildren(hud.root, results.root, pause.root, intro.root);
@@ -1235,6 +1240,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (loop.paused) openPause();
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
+      // The controls list follows the device before that device's first press is read.
+      pause.controls?.sync();
       // A focused button already clicked on the keyboard's Enter or Space; do not press it twice.
       const native = f.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
       for (const e of f.events) {
@@ -1425,11 +1432,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       } else {
         h.wrongWay = false;
       }
-      h.stopped =
-        playing &&
-        session.world.time > 2 &&
-        t.speed < 1.5 &&
-        session.surfaceUnderCar() !== SurfaceKind.Asphalt;
+      h.stopped = carStopped({
+        playing,
+        time: session.world.time,
+        speed: t.speed,
+        surface: session.surfaceUnderCar(),
+      });
       if (session.quickRace) {
         // A race has no out lap, no lap invalidation (track limits are strikes, shown as
         // notices) and no time-trial record or ghost.
