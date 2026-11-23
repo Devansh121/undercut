@@ -152,6 +152,11 @@ export class CarState {
   readonly tyreTemp = new Float64Array(4);
   readonly tyreWear = new Float64Array(4);
   /**
+   * Each tyre's surface grip on the last step (1 on asphalt, 0.4 on grass), from the contact
+   * patch: what the assists know of the ground under the car. Part of the snapshot.
+   */
+  readonly surfaceGrip = new Float64Array([1, 1, 1, 1]);
+  /**
    * Diagnostics from the last substep, never part of a snapshot (they are outputs, recomputed
    * every substep): the carcass damping share of each tyre's vertical load, N, and the total
    * vertical force of the floor's skid points on the ground, N.
@@ -262,6 +267,7 @@ const ARRAY_KEYS = [
   'gripScale',
   'tyreTemp',
   'tyreWear',
+  'surfaceGrip',
 ] as const satisfies readonly (keyof CarState)[];
 
 /** Length of a car snapshot in numbers. */

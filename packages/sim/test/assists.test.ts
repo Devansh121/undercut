@@ -153,6 +153,23 @@ describe('assists', () => {
     expect(out.throttle).toBeLessThan(0.3);
   });
 
+  it('traction control keeps the launch throttle on grass while the rears slip under 0.5', () => {
+    const settings = { tractionControl: 2, abs: 0, autoGears: false };
+    const run = (grip: number, slip: number) => {
+      const car = createCarState(REFERENCE_CAR, { gear: 1, speed: 4 });
+      car.surfaceGrip.set([grip, grip, grip, grip]);
+      car.slipRatio.set([0, 0, slip, slip]);
+      const memory = createAssistState();
+      memory.tcScale = 0;
+      return applyAssists(settings, memory, car, driver({ throttle: 1 }), DT, driver({}));
+    };
+    // Grass: spinning a little, the car keeps 0.3; spinning hard, the cut is whole.
+    expect(run(0.4, 0.3).throttle).toBeCloseTo(0.3, 12);
+    expect(run(0.4, 0.8).throttle).toBeLessThan(0.3);
+    // Asphalt: unchanged, the cut is whole.
+    expect(run(1, 0.3).throttle).toBeLessThan(0.3);
+  });
+
   it('speed-sensitive steering keeps full lock when slow and shrinks it with speed', () => {
     expect(speedSensitiveSteer(1, 5)).toBe(1);
     const scales = [20, 40, 60, 80, 100].map((v) => speedSensitiveSteer(1, v));

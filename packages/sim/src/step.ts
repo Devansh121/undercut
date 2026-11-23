@@ -151,6 +151,7 @@ function samplePatchesAhead(s: CarState, surface: SurfaceSampler, dt: number): v
     patchStart[i] = s.groundY[i]!;
     patchEnd[i] = patch.height;
     patchGrip[i] = patch.grip;
+    s.surfaceGrip[i] = patch.grip;
     patchDrag[i] = patch.drag;
     patchNx[i] = patch.normalX;
     patchNy[i] = patch.normalY;
