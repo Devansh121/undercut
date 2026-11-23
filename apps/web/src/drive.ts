@@ -94,6 +94,7 @@ import {
   type RaceArtefacts,
   type SessionEvent,
 } from './game/session';
+import { NoticeQueue } from './game/notices';
 import { Hud, type HudIdentity, type HudMessage, type HudState, type HudTyres } from './ui/hud';
 import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
@@ -903,34 +904,30 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const noPinch = (event: Event): void => event.preventDefault();
   document.addEventListener('gesturestart', noPinch, { passive: false });
 
-  // Messages: one at a time, each for a short real-time span.
-  let message: HudMessage | null = null;
-  let messageLeft = 0;
-  const say = (m: HudMessage, seconds = 2): void => {
-    message = m;
-    messageLeft = seconds;
-  };
-  // The storage warning goes first; the first-start controls hint follows it.
-  let queued: HudMessage | null =
-    takeFirstStartHint() && intro.root.hidden
-      ? {
-          tag: S.controls.hintTag,
-          text: controlsHint(input.profile.bindings, input.activeDevice),
-          tone: 'info',
-        }
-      : null;
+  // Messages: one at a time, each for a short real-time span. At the start the storage
+  // warning goes first, then the offline-graphics note, then the first-start controls hint.
+  const notices = new NoticeQueue<HudMessage>();
+  const say = (m: HudMessage, seconds = 2): void => notices.say(m, seconds);
   if (!records.persistent)
     say({ tag: S.hud.storage, text: S.hud.recordsUntilClose, tone: 'info' }, 5);
-  if (fellBackFrom) {
-    const offline: HudMessage = {
-      tag: S.hud.graphics,
-      text: S.hud.offlinePreset(QUALITY[fellBackFrom].label, QUALITY[quality].label),
-      tone: 'info',
-    };
-    // After the storage notice if one is up, unless the first-start hint already waits there.
-    if (message && !queued) queued = offline;
-    else say(offline, 6);
-  }
+  if (fellBackFrom)
+    notices.queue(
+      {
+        tag: S.hud.graphics,
+        text: S.hud.offlinePreset(QUALITY[fellBackFrom].label, QUALITY[quality].label),
+        tone: 'info',
+      },
+      6,
+    );
+  if (takeFirstStartHint() && intro.root.hidden)
+    notices.queue(
+      {
+        tag: S.controls.hintTag,
+        text: controlsHint(input.profile.bindings, input.activeDevice),
+        tone: 'info',
+      },
+      6,
+    );
 
   const log: SessionEvent[] = [];
   let lastLap: { time: number; cls: HudState['lastClass'] } | null = null;
@@ -1290,14 +1287,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const playing = session.phase === 'running';
     const realDt = playing ? dt : 0;
     clock += realDt;
-    if (message) {
-      messageLeft -= dt;
-      if (messageLeft <= 0) message = null;
-    }
-    if (!message && queued) {
-      say(queued, 6);
-      queued = null;
-    }
+    notices.tick(dt);
     results.tick(dt);
 
     const car = session.car;
@@ -1482,7 +1472,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         h.tyres = hudTyres;
       } else h.tyres = null;
       h.fuel = session.quickRace ? t.fuelMass : null;
-      h.message = message;
+      h.message = notices.current;
       if (others) h.others = others;
       else if (session.quickRace) h.others = fleetDots;
       hud.update(h);
@@ -1793,7 +1783,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       view.setCamera('chase-near');
       if (!ext && !session.quickRace) restartLap();
       results.hide();
-      message = null;
+      notices.clear();
     },
   };
 }

@@ -1240,6 +1240,10 @@ body {
   display: grid;
   gap: var(--sp-2);
   align-content: start;
+  /* The body is height-limited: on a short window the actions scroll instead of spilling over
+     the CONTROLS legend below them. */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .pause__action {
@@ -1963,10 +1967,11 @@ html[data-screen='drive']:not([data-paused]) #view {
 html[data-screen='drive']:not([data-paused]) .update-bar {
   display: none;
 }
-/* The bar shows over a paused session: keep the pause card clear of it. 44 px is the bar's
-   tallest button (a phone's touch target) plus its 6 px padding above and below. */
+/* The bar shows over a paused session: keep the pause card clear of it. pwa/register.ts
+   publishes the bar's measured height; 56 px (a 44 px touch target plus 6 px padding above and
+   below) stands in until it has. */
 html:has(.update-bar) .pause {
-  padding-bottom: calc(var(--safe-b, 16px) + 56px + var(--sp-2));
+  padding-bottom: calc(var(--safe-b, 16px) + var(--update-bar-h, 56px) + var(--sp-2));
 }
 [data-paused] .onboarding {
   display: none;
@@ -2011,10 +2016,6 @@ html:has(.update-bar) .pause {
   }
 }
 @media (max-height: 500px) {
-  .pause__actions {
-    min-height: 0;
-    overflow-y: auto;
-  }
   /* Phone landscape: a compact card under the tower that lets touches through to the steering
      zone; each tip moves on by itself, and Skip lives in the pause menu. */
   .onboarding {

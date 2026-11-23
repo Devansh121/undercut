@@ -1,7 +1,9 @@
 // Real-world name check, run by `npm run lint`: no real racing series, team, driver, sponsor or
 // official circuit name in code, data, assets' text files or repo metadata. The list and the few
-// allowed citations are in tools/ci/trademarks.json. docs/ is not scanned: docs may cite real data
-// sources by name. The real series' own name and abbreviation are checked by check-names.mjs.
+// allowed citations are in tools/ci/trademarks.json. Of docs/, only the two research documents are
+// skipped, because they cite real data sources throughout; any other citation in docs needs an
+// `allow` entry with its reason. The real series' own name and abbreviation are checked by
+// check-names.mjs.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const LIST_FILE = 'tools/ci/trademarks.json';
-const SKIP = /^(docs\/|package-lock\.json$)/;
+const SKIP = /^(docs\/(physics-validation|track-data)\.md|package-lock\.json)$/;
 const BINARY =
   /\.(png|jpe?g|webp|avif|gif|ico|glb|gltf|bin|ktx2|hdr|exr|woff2?|ttf|otf|ogg|mp3|wav|flac|wasm|pdf|blend|zip|gz|br)$/i;
 

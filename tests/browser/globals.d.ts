@@ -62,6 +62,8 @@ declare global {
       brakeCount: number;
       firstBrakeDistance: number | null;
     };
+    /** The real "new version" bar (pwa/register.ts); false removes it. */
+    updateBar(show: boolean): void;
     pause(): void;
     resume(): void;
     restartLap(): void;

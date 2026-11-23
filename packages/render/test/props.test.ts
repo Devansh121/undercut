@@ -241,6 +241,49 @@ it('draws a board known broken only from the shared set knocked down where it st
   material.dispose();
 });
 
+it('drops the push of a board retired as the oldest of 32 moving boards', async () => {
+  const { createCarPose } = await import('@undercut/sim');
+  const geo = new BoxGeometry(0.68, 0.88, 4.36).translate(0, 0.44, 0);
+  const material = new MeshBasicMaterial();
+  const reg = new PropRegistry(1000, 1000);
+  reg.define({ id: 'board', lods: [{ geometry: geo, material, maxDistance: 1000 }] });
+  // 33 panels 20 m apart along +x, each struck in turn by a slow car sitting on it.
+  for (let id = 0; id < 33; id++) {
+    const o = {
+      id,
+      x: 20 * id,
+      y: 0,
+      z: 0,
+      yaw: Math.PI / 2,
+      halfWidth: 2.18,
+      halfDepth: 0.34,
+      mass: 12,
+    };
+    reg.place('board', { ...o, s: 20 * id, breakable: o });
+  }
+  reg.build();
+  const v = 10 / 3.6;
+  const pose = createCarPose();
+  let most = 0;
+  for (let id = 0; id < 33; id++) {
+    const t = 1 + id / 60;
+    pose.breakableHits!.set([id, 0, v, 0], 0);
+    pose.x = 20 * id;
+    pose.z = 0;
+    pose.yaw = 0;
+    reg.observeCar(pose, t);
+    reg.updateDebris(t);
+    most = Math.max(most, reg.pushedDebrisCount);
+  }
+  // Every board was pushed; the 33rd hit retired the first, push and all.
+  expect(most).toBe(32);
+  expect(reg.movingDebrisCount).toBe(32);
+  expect(reg.pushedDebrisCount).toBeLessThanOrEqual(32);
+  reg.dispose();
+  geo.dispose();
+  material.dispose();
+});
+
 it('keeps a slowly struck board out of the car that struck it while it is low', async () => {
   const { createCarPose } = await import('@undercut/sim');
   const geo = new BoxGeometry(0.68, 0.88, 4.36).translate(0, 0.44, 0);
@@ -283,6 +326,17 @@ it('keeps a slowly struck board out of the car that struck it while it is low', 
     if (low && inBody) inside++;
   }
   expect(inside).toBe(0);
+  // The push is held only while the board moves, and stays in its settled place.
+  expect(reg.pushedDebrisCount).toBe(1);
+  (reg.group.children[0] as InstancedMesh).getMatrixAt(0, m);
+  const moving = new Vector3().setFromMatrixPosition(m);
+  reg.updateDebris(8);
+  expect(reg.pushedDebrisCount).toBe(0);
+  expect(reg.movingDebrisCount).toBe(0);
+  (reg.group.children[0] as InstancedMesh).getMatrixAt(0, m);
+  const settled = new Vector3().setFromMatrixPosition(m);
+  expect(settled.x).toBeGreaterThan(o.x + 0.45 * v);
+  expect(Math.abs(settled.x - moving.x)).toBeLessThan(1);
   reg.dispose();
   geo.dispose();
   material.dispose();
