@@ -6,6 +6,7 @@ import {
   InputController,
   RaceSession,
   circuitInfo,
+  raceStartFuel,
   type LapResult,
   type LapTimer,
   type RaceEvent,
@@ -91,6 +92,8 @@ export interface QuickRaceOptions {
    * player is sure to take the flag first). Default 0.
    */
   fieldStartDelay?: number;
+  /** Compound every car starts on. Default medium. */
+  compound?: 'soft' | 'medium' | 'hard';
 }
 
 export interface DriveSessionOptions {
@@ -229,22 +232,30 @@ export class DriveSession {
           ...Array.from({ length: 19 - gridSlot }, (_, i) => gridSlot + 1 + i),
         ]
       : undefined;
+    // Timed from the control line the track file carries (format 3), for every circuit.
+    const circuit = circuitInfo(this.track, { timingLine: this.track.timingLine });
+    const startCompound = options.quickRace?.compound
+      ? { compound: options.quickRace.compound }
+      : {};
+    const laps = options.quickRace?.laps ?? 5;
     this.race = new RaceSession({
       track: this.track,
-      // Timed from the control line the track file carries (format 3), for every circuit.
-      circuit: circuitInfo(this.track, { timingLine: this.track.timingLine }),
-      session: this.quickRace
-        ? { kind: 'race', laps: options.quickRace?.laps ?? 5 }
-        : { kind: 'timeTrial' },
+      circuit,
+      session: this.quickRace ? { kind: 'race', laps } : { kind: 'timeTrial' },
       seed: options.seed,
       params: this.params,
-      fuel: this.quickRace ? 10 : TIME_TRIAL_FUEL,
+      // A race: tyre temperature and wear for every car, and the start load for the distance
+      // and a lap in hand, burnt with no top-up. Time trial: reference tyres and a light load
+      // topped up at the line, as its records were set.
+      ...(this.quickRace
+        ? { tyres: true, startFuel: raceStartFuel(laps, circuit.raceLaps) }
+        : { fuel: TIME_TRIAL_FUEL }),
       step: SIM_STEP,
       rollingStart: { before: ROLLING_START_RUN_UP, speed: ROLLING_START_SPEED },
       ...(grid ? { grid } : {}),
       cars: [
         {
-          entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0 },
+          entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0, ...startCompound },
           controller: new InputController((ctx, out) => {
             if ((this.scriptedRaceDriver || this.playerFinished) && this.playerPilot) {
               this.playerPilot.control(ctx, out);
@@ -257,6 +268,7 @@ export class DriveSession {
             name: `Driver ${i + 1}`,
             code: `D${i + 1}`,
             team: Math.floor((i + 1) / 2),
+            ...startCompound,
           },
           controller,
           ersMode: controller.driver.ersMode,
