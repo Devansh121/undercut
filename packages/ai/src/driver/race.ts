@@ -302,6 +302,12 @@ export class RaceDriver implements Driver {
   private biasX = 0;
   private biasZ = 0;
   private haveSense = false;
+  /**
+   * In a queue behind a car stopped in the road, and not yet back above `SLOW_STEER_BELOW`:
+   * the walking-pace steering rules hold after that car turns into a ghost the drivers no longer
+   * see (at Raidillon the last car of a queue lost them on the climb and slid off the road).
+   */
+  private queueCrawl = false;
   private readonly slip = new Float64Array(4);
   private readonly angle = new Float64Array(4);
   private readonly load = new Float64Array(4);
@@ -382,6 +388,7 @@ export class RaceDriver implements Driver {
     this.biasX = 0;
     this.biasZ = 0;
     this.haveSense = false;
+    this.queueCrawl = false;
   }
 
   snapshot(): DriverMemory {
@@ -421,6 +428,7 @@ export class RaceDriver implements Driver {
     out.biasX = this.biasX;
     out.biasZ = this.biasZ;
     out.haveSense = this.haveSense;
+    out.queueCrawl = this.queueCrawl;
     out.slip = Array.from(this.slip);
     out.angle = Array.from(this.angle);
     out.load = Array.from(this.load);
@@ -477,6 +485,7 @@ export class RaceDriver implements Driver {
     this.biasX = num('biasX');
     this.biasZ = num('biasZ');
     this.haveSense = m.haveSense === true;
+    this.queueCrawl = m.queueCrawl === true;
     arr('slip', this.slip);
     arr('angle', this.angle);
     arr('load', this.load);
@@ -1067,6 +1076,8 @@ export class RaceDriver implements Driver {
         ? this.nearestStanding(view, s0, QUEUE_SEE + QUEUE_SEE_TIME * v)
         : -1;
     const queueStop = standing >= 0;
+    if (queueStop) this.queueCrawl = true;
+    else if (v >= SLOW_STEER_BELOW) this.queueCrawl = false;
     // Off the line (in a move, or coming back from one) the line sweeps across under the car into
     // a braking zone and through a chicane: the held offset may change as fast as the line moves,
     // on top of the lateral rate, so that the lane on the road holds and the edges never jerk it.
@@ -1082,7 +1093,7 @@ export class RaceDriver implements Driver {
     // (A move picked on the grid waits for the car to roll: the lane drifted 1.5 m from a car
     // standing for the lights, and it left them on full lock and slid half round at Spa.)
     if (view.launching && (this.passId < 0 || tel.speed < 1)) this.o = myO;
-    else if (queueStop && sweep > 0) {
+    else if ((queueStop || this.queueCrawl) && sweep > 0) {
       // Throughout the queue the lane moves on the road, toward the target lane at no more
       // than the car's own lateral rate. (Adding the rate to the line's sweep crossed a target
       // lying the way the line swept at twice the sweep: at Raidillon,
@@ -1237,7 +1248,7 @@ export class RaceDriver implements Driver {
     // And at walking pace round a car stopped in the road the steering turns the car back toward
     // its lane whatever the front tyres' slip: holding it within their peak slip kept a car
     // rotating on full lock (into Raidillon behind a stopped car, round a radian and off the road).
-    this.inner.holdFrontSlip = !(queueStop && v < SLOW_STEER_BELOW);
+    this.inner.holdFrontSlip = !((queueStop || this.queueCrawl) && v < SLOW_STEER_BELOW);
     // Standing in a queue the steering does not wind up (it held full lock as the car pulled
     // away, off the road). Not on the grid: the launch is the reference driver's own.
     this.inner.integrateFrom = view.launching ? 0 : INTEGRATE_FROM;

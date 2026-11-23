@@ -429,6 +429,20 @@ describe('race driver: closing on a queue', () => {
 });
 
 describe('race driver: stopped cars on the road', () => {
+  it('keeps the walking-pace steering rules after the stopped car turns into an unseen ghost', () => {
+    const dr = driver();
+    const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 5 };
+    tick(dr, me, [{ id: 1, s: 175, d: lineD(dr, 175), speed: 0 }]);
+    expect(dr['inner'].holdFrontSlip).toBe(false);
+    // Gone from the view (a ghost standing still), the car still crawling: the rules hold.
+    tick(dr, me, []);
+    expect(dr['inner'].holdFrontSlip).toBe(false);
+    // Back above walking pace they end, and stay ended at walking pace after.
+    tick(dr, { ...me, speed: 13 }, []);
+    tick(dr, me, []);
+    expect(dr['inner'].holdFrontSlip).toBe(true);
+  });
+
   it('keeps the obstruction caution ceiling when following a moving leader', () => {
     const dr = driver();
     const me = { id: 0, s: 150, d: lineD(dr, 150), speed: 40 };
