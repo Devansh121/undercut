@@ -110,12 +110,13 @@ const hub: HubScreen = new HubScreen({
   records,
   device: () => input.activeDevice,
   onStart: (choice) => {
-    // The Start press is the gesture that may start audio.
-    audio.gesture();
+    // The Start press is the gesture that may start audio: the context starts here, silent,
+    // so it may play once the session has loaded (iOS Safari allows no later start).
+    audio.prime();
     start(choice).catch(() => undefined);
   },
   onOnline: () => {
-    audio.gesture();
+    audio.prime();
     showOnline(null);
   },
   onCircuits: () => shell.push(circuits),
