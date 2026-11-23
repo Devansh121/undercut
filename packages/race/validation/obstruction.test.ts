@@ -245,6 +245,10 @@ function expectClean(o: Outcome): void {
 }
 
 describe('a car stopped in the road', () => {
+  it('at Lesmo 2: a mirror check does not trap the field behind the stopped car', () => {
+    expectClean(stopIn(2576, 0, 17));
+  }, 300_000);
+
   it('at Ascari, on the centreline: the field goes round it, untouched, and finishes', () => {
     expectClean(stopIn(3679, 0, 61));
   }, 300_000);

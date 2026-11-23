@@ -79,9 +79,15 @@ with racecraft on top. The race passes it a `TrafficView` before each tick (`sen
 - **Lanes**: an offset from the racing line, side by side a car's width and 0.8 m of air from the
   other car, never across it; where there is no room for both, the car further back falls in
   behind. Into a braking zone the car ahead owns the corner unless the other is alongside. Off line
-  in a corner it slows for the tighter radius.
+  in a corner it slows for the tighter radius. A lane change checks closing cars behind on that
+  side; at speed the lateral room opens before a faster car reaches the rear quarter.
 - **Passing**: on a straight, with a pace advantage or after being held up, it moves out to a side
-  with room; it gives up if not alongside by the braking zone.
+  with room; it gives up if not alongside by the braking zone, unless its inside move can reach
+  alongside by turn-in. While attacking on a straight it can use the speed available in a tow
+  or with DRS above the solo lap's target, with the normal braking profile restored before the
+  braking zone and the traffic ceiling always applied.
+- **Defending**: with clear road ahead, one move toward the next corner's inside; the chosen
+  side stays fixed as the attacker changes sides. Mirror and side-by-side clearance still apply.
 - **Blue flag**: off line to the side away from the car lapping it, held until it is by.
 - **Recovery**: facing the wrong way or stuck, it waits on the racing surface for the traffic, turns
   round with forward and reverse lock, and rejoins off line while cars approach.
