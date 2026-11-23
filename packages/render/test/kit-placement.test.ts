@@ -125,17 +125,30 @@ describe('kit structures', () => {
     const texture = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
     const gantry = buildStartGantry(track, texture, 0, kit, props);
     expect(props.count('start-gantry')).toBe(1);
-    expect(gantry.group.children).toHaveLength(5);
-    gantry.setLights(1 << 2);
-    const intensities = gantry.group.children.map(
-      (o) => ((o as Mesh).material as MeshStandardMaterial).emissiveIntensity,
+    // Five pods, each a face plate and two lenses.
+    expect(gantry.group.children).toHaveLength(15);
+    const pods = [0, 1, 2, 3, 4].map((i) =>
+      gantry.group.children
+        .slice(i * 3, i * 3 + 3)
+        .map((o) => (o as Mesh).material as MeshStandardMaterial),
     );
-    expect(intensities).toEqual([0, 0, 9, 0, 0]);
+    gantry.setLights(1 << 2);
+    expect(pods.map(([, a, b]) => [a!.emissiveIntensity, b!.emissiveIntensity])).toEqual([
+      [0, 0],
+      [0, 0],
+      [9, 9],
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(pods.map(([plate]) => plate!.emissiveIntensity)).toEqual([0, 0, 0.35, 0, 0]);
     gantry.setLights(32);
-    for (const child of gantry.group.children) {
-      const material = (child as Mesh).material as MeshStandardMaterial;
-      expect(material.emissiveIntensity).toBe(8);
-      expect(material.emissive.getHex()).toBe(0x10e048);
+    for (const [plate, a, b] of pods) {
+      for (const lens of [a!, b!]) {
+        expect(lens.emissiveIntensity).toBe(8);
+        expect(lens.emissive.getHex()).toBe(0x10e048);
+      }
+      expect(plate!.emissive.getHex()).toBe(0x10e048);
+      expect(plate!.emissiveIntensity).toBe(0.35);
     }
     gantry.geometries.forEach((g) => g.dispose());
     gantry.materials.forEach((m) => m.dispose());

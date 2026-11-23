@@ -7,6 +7,7 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
+  PlaneGeometry,
   type Material,
   type Texture,
   type WebGLProgramParametersWithUniforms,
@@ -548,23 +549,42 @@ export function buildStartGantry(
     props.define({ id: 'start-gantry', lods: kitLods, shadowMaxDistance: 240 });
     props.place('start-gantry', { x: p.x, y: groundY, z: p.z, yaw: yaw + Math.PI, s: 0 });
     group.rotation.y = yaw + Math.PI;
+    // Each pod: a face plate (0.6 by 1.0 m, the old pods' size) that glows faintly with its lamps,
+    // and two 0.17 m lenses, so the lit pods read from the back of the grid and at night; the
+    // kit's housing alone read as a plain black box.
     const lamps: MeshStandardMaterial[] = [];
+    const plates: MeshStandardMaterial[] = [];
+    const lens = new CircleGeometry(0.17, 16);
+    lens.rotateY(Math.PI / 2);
+    const plate = new PlaneGeometry(0.6, 1.0);
+    plate.rotateY(Math.PI / 2);
+    geometries.push(lens, plate);
     for (const a of kit?.entries.get('start-gantry')?.attachments ?? []) {
       if (!a.name.startsWith('start-light-')) continue;
-      const g = new CircleGeometry(0.19, 12);
-      g.rotateY(Math.PI / 2);
       const m = new MeshStandardMaterial({
         color: 0x180604,
         emissive: 0xff1808,
         emissiveIntensity: 0,
         roughness: 0.2,
       });
-      const mesh = new Mesh(g, m);
-      mesh.position.set(a.position[0] + 0.012, a.position[1], a.position[2] * wide);
-      group.add(mesh);
-      geometries.push(g);
-      materials.push(m);
+      const back = new MeshStandardMaterial({
+        color: 0x1c1d21,
+        emissive: 0xff1808,
+        emissiveIntensity: 0,
+        roughness: 0.45,
+        metalness: 0.3,
+      });
+      const face = new Mesh(plate, back);
+      face.position.set(a.position[0] + 0.006, a.position[1], a.position[2] * wide);
+      group.add(face);
+      for (const dy of [-0.24, 0.24]) {
+        const mesh = new Mesh(lens, m);
+        mesh.position.set(a.position[0] + 0.012, a.position[1] + dy, a.position[2] * wide);
+        group.add(mesh);
+      }
+      materials.push(m, back);
       lamps.push(m);
+      plates.push(back);
     }
     return {
       group,
@@ -572,8 +592,12 @@ export function buildStartGantry(
       materials,
       setLights(mask) {
         lamps.forEach((m, i) => {
+          const on = mask & 32 ? 1 : mask & (1 << i) ? 1 : 0;
           m.emissive.setHex(mask & 32 ? 0x10e048 : 0xff1808);
-          m.emissiveIntensity = mask & 32 ? 8 : mask & (1 << i) ? 9 : 0;
+          m.emissiveIntensity = mask & 32 ? 8 : on * 9;
+          const b = plates[i]!;
+          b.emissive.copy(m.emissive);
+          b.emissiveIntensity = on * 0.35;
         });
       },
     };
