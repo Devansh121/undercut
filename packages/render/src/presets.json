@@ -32,10 +32,12 @@
       "wind": true,
       "crowd": 0.85,
       "coverResolution": 1.5,
-      "treeNear": 260,
+      "treeNear": 320,
       "treeFar": 4500,
       "treeCloud": 110,
-      "structures": true
+      "structures": true,
+      "treeRelief": true,
+      "water": { "reflection": 0.5, "scenery": true, "waveTexels": 256 }
     }
   },
   "high": {
@@ -70,10 +72,12 @@
       "wind": true,
       "crowd": 0.8,
       "coverResolution": 2,
-      "treeNear": 220,
+      "treeNear": 300,
       "treeFar": 4000,
       "treeCloud": 95,
-      "structures": true
+      "structures": true,
+      "treeRelief": true,
+      "water": { "reflection": 0.5, "scenery": true, "waveTexels": 256 }
     }
   },
   "medium": {
@@ -108,10 +112,12 @@
       "wind": false,
       "crowd": 0.6,
       "coverResolution": 2,
-      "treeNear": 160,
+      "treeNear": 220,
       "treeFar": 3000,
       "treeCloud": 0,
-      "structures": true
+      "structures": true,
+      "treeRelief": true,
+      "water": { "reflection": 0.35, "scenery": false, "waveTexels": 256 }
     }
   },
   "mobile": {
@@ -146,10 +152,12 @@
       "wind": false,
       "crowd": 0.3,
       "coverResolution": 4,
-      "treeNear": 120,
+      "treeNear": 180,
       "treeFar": 2000,
       "treeCloud": 0,
-      "structures": true
+      "structures": true,
+      "treeRelief": true,
+      "water": { "reflection": 0.25, "scenery": false, "waveTexels": 128 }
     }
   },
   "lite": {
@@ -187,7 +195,9 @@
       "treeNear": 60,
       "treeFar": 800,
       "treeCloud": 0,
-      "structures": false
+      "structures": false,
+      "treeRelief": false,
+      "water": { "reflection": 0, "scenery": false, "waveTexels": 64 }
     }
   }
 }

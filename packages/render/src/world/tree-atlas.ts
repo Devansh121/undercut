@@ -281,7 +281,25 @@ function shade(rgb: readonly number[], k: number): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
-/** Paint one species into a tile of `size` pixels at (ox, oy) (canvas pixels, y down). */
+/**
+ * Relief of the species cards (the mid-distance level, trees.ts): per texel the crown's surface
+ * normal in the card's frame (red: toward the tile's right, green: up; the part toward the viewer
+ * follows from the two) and, in blue, the factor (÷ 2) that takes the painted colour to the
+ * colour without its painted sunlight, ambient occlusion only. With the normals the card is lit
+ * by the scene's sun from wherever it stands, so the painted light must come out first.
+ */
+const reliefByte = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 255);
+function reliefStyle(nx: number, ny: number, nz: number, ratio: number): string {
+  const l = Math.hypot(nx, ny, nz) || 1;
+  return `rgb(${reliefByte(0.5 + (0.5 * nx) / l)},${reliefByte(0.5 + (0.5 * ny) / l)},${reliefByte(ratio / 2)})`;
+}
+/** The flat relief: facing the viewer, colour unchanged (trunks, limbs). */
+const RELIEF_FLAT = reliefStyle(0, 0, 1, 1);
+
+/**
+ * Paint one species into a tile of `size` pixels at (ox, oy) (canvas pixels, y down): its
+ * colour, or (`relief`) its relief with the same shapes (see reliefStyle).
+ */
 function paintTree(
   ctx: CanvasRenderingContext2D,
   sp: Species,
@@ -289,6 +307,7 @@ function paintTree(
   ox: number,
   oy: number,
   size: number,
+  relief = false,
 ): void {
   const R = (a: number, b = 0): number => hash01(seed, a, b);
   const X = (u: number): number => ox + u * size;
@@ -309,7 +328,7 @@ function paintTree(
     const bend = (R(id, 1) - 0.5) * 0.5;
     const x1 = x + Math.cos(ang + bend) * len;
     const y1 = y + Math.sin(ang + bend) * len;
-    ctx.strokeStyle = sp.bark;
+    ctx.strokeStyle = relief ? RELIEF_FLAT : sp.bark;
     ctx.lineWidth = Math.max(0.6, width * size);
     ctx.beginPath();
     ctx.moveTo(X(x), Y(y));
@@ -329,7 +348,7 @@ function paintTree(
   };
   const trunkTop = sp.cone ? sp.crownY + sp.crownRy * 0.9 : sp.bole + 0.04;
   // Trunk with sunlit edge highlight.
-  ctx.strokeStyle = sp.bark;
+  ctx.strokeStyle = relief ? RELIEF_FLAT : sp.bark;
   ctx.lineWidth = Math.max(1.5, size * (sp.cone ? 0.022 : 0.032));
   ctx.beginPath();
   ctx.moveTo(X(0.5), Y(0));
@@ -349,7 +368,17 @@ function paintTree(
     }
   }
   // Leaf clumps: on and around the tips, inside the envelope, back to front.
-  type Clump = { x: number; y: number; r: number; z: number; light: number };
+  type Clump = {
+    x: number;
+    y: number;
+    r: number;
+    z: number;
+    light: number;
+    /** Crown normal at the clump (x right, y up, z toward the viewer). */
+    n: [number, number, number];
+    /** Painted light without its directional part: occlusion only. */
+    ao: number;
+  };
   const clumps: Clump[] = [];
   for (let k = 0; k < sp.clumps; k++) {
     const t = tips[Math.floor(R(k, 11) * tips.length)] ?? [0.5, sp.crownY];
@@ -363,7 +392,15 @@ function paintTree(
     const nx = (x - 0.5) / Math.max(0.05, sp.crownRx);
     const coreAO = 0.72 + 0.34 * (1 - inside);
     const light = (0.48 + 0.42 * ny + 0.26 * z - 0.14 * nx) * coreAO;
-    clumps.push({ x, y, r: sp.clump * (0.55 + R(k, 15) * 0.65), z, light });
+    // The crown as a volume: out from its centre, toward the viewer by the clump's depth.
+    const n: [number, number, number] = [
+      Math.max(-1, Math.min(1, nx)),
+      Math.max(-1, Math.min(1, ny)),
+      0.35 + Math.max(0, z),
+    ];
+    // Light that stays without the painted sun: the core's occlusion and the sky's, darker low.
+    const ao = coreAO * (0.6 + 0.2 * Math.max(-1, Math.min(1, ny)));
+    clumps.push({ x, y, r: sp.clump * (0.55 + R(k, 15) * 0.65), z, light, n, ao });
   }
   clumps.sort((a, b) => a.z - b.z);
   for (const [k, c] of clumps.entries()) {
@@ -382,7 +419,17 @@ function paintTree(
       const ly = c.y + Math.sin(ang) * dist * 0.85;
       const lr = c.r * (0.16 + R(k, 40 + j) * 0.19);
       const lift = 0.62 + 0.52 * (j / 9);
-      ctx.fillStyle = shade(leaf, base * lift * (0.82 + R(k, 50 + j) * 0.36));
+      if (relief) {
+        // Each sprig a small dome on the clump: tilted out by its offset from the clump's centre.
+        const ox2 = (lx - c.x) / c.r;
+        const oy2 = (ly - c.y) / c.r;
+        ctx.fillStyle = reliefStyle(
+          c.n[0] + 0.5 * ox2,
+          c.n[1] + 0.5 * oy2,
+          c.n[2],
+          Math.min(2, Math.max(0.25, c.ao / base)),
+        );
+      } else ctx.fillStyle = shade(leaf, base * lift * (0.82 + R(k, 50 + j) * 0.36));
       ctx.beginPath();
       ctx.ellipse(X(lx), Y(ly), lr * size, lr * size * 0.58, ang, 0, Math.PI * 2);
       ctx.fill();
@@ -402,6 +449,21 @@ export function treeAtlas(
   /** Per-species changes by name (a circuit's own form of a species; theme.ts). */
   species: Readonly<Record<string, Partial<Species>>> = {},
 ): DataTexture {
+  return treeAtlases(tile, anisotropy, species, false).colour;
+}
+
+/**
+ * The colour atlas and, with `relief`, the species cards' relief atlas in the same layout (half
+ * the colour's size from 512-pixel tiles up; the mid-distance cards it serves are never that
+ * close): normals and the factor that takes out the painted sunlight (reliefStyle), scaled per
+ * species so the colour without it keeps the painted colour's mean.
+ */
+export function treeAtlases(
+  tile: number,
+  anisotropy: number,
+  species: Readonly<Record<string, Partial<Species>>> = {},
+  relief = false,
+): { colour: DataTexture; relief: DataTexture | null } {
   const canvas = document.createElement('canvas');
   canvas.width = tile * ATLAS_COLS;
   canvas.height = tile * ATLAS_ROWS;
@@ -432,9 +494,45 @@ export function treeAtlas(
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = new Uint8Array(img.data.buffer.slice(0));
   matchClustersToCards(data, canvas.width, tile);
+  let reliefTexture: DataTexture | null = null;
+  if (relief) {
+    const rt = tile >= 512 ? tile / 2 : tile;
+    const rc = document.createElement('canvas');
+    rc.width = rt * ATLAS_COLS;
+    rc.height = rt * ATLAS_ROWS;
+    const rctx = rc.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+    rctx.clearRect(0, 0, rc.width, rc.height);
+    SPECIES.forEach((sp, i) => {
+      const ox = (i % ATLAS_COLS) * rt;
+      const oy = Math.floor(i / ATLAS_COLS) * rt;
+      rctx.save();
+      rctx.beginPath();
+      rctx.rect(ox, oy, rt, rt);
+      rctx.clip();
+      paintTree(rctx, { ...sp, ...species[sp.name] }, 7919 * (i + 1), ox, oy, rt, true);
+      rctx.restore();
+    });
+    const rd = new Uint8Array(rctx.getImageData(0, 0, rc.width, rc.height).data.buffer.slice(0));
+    SPECIES.forEach((_, t) => keepReliefMean(data, canvas.width, tile, rd, rc.width, rt, t));
+    bleed(rd, rc.width, rc.height);
+    reliefTexture = atlasTexture(rd, rc.width, rc.height, anisotropy, false);
+  }
   bleed(data, canvas.width, canvas.height);
-  const t = new DataTexture(data, canvas.width, canvas.height, RGBAFormat, UnsignedByteType);
-  t.colorSpace = SRGBColorSpace;
+  return {
+    colour: atlasTexture(data, canvas.width, canvas.height, anisotropy, true),
+    relief: reliefTexture,
+  };
+}
+
+function atlasTexture(
+  data: Uint8Array,
+  w: number,
+  h: number,
+  anisotropy: number,
+  colour: boolean,
+): DataTexture {
+  const t = new DataTexture(data, w, h, RGBAFormat, UnsignedByteType);
+  if (colour) t.colorSpace = SRGBColorSpace;
   t.generateMipmaps = true;
   t.minFilter = LinearMipmapLinearFilter;
   t.magFilter = LinearFilter;
@@ -442,6 +540,51 @@ export function treeAtlas(
   t.flipY = false;
   t.needsUpdate = true;
   return t;
+}
+
+/**
+ * Scale species tile `t`'s de-lighting factor (relief blue) so the colour times the factor keeps
+ * the painted colour's mean luminance over the opaque texels (the relief atlas may be smaller:
+ * each relief texel stands for the colour texels it covers).
+ */
+export function keepReliefMean(
+  colour: Uint8Array,
+  cw: number,
+  tile: number,
+  relief: Uint8Array,
+  rw: number,
+  rtile: number,
+  t: number,
+): void {
+  const ox = (t % ATLAS_COLS) * tile;
+  const oy = Math.floor(t / ATLAS_COLS) * tile;
+  const rox = (t % ATLAS_COLS) * rtile;
+  const roy = Math.floor(t / ATLAS_COLS) * rtile;
+  const k = tile / rtile;
+  let painted = 0;
+  let flat = 0;
+  for (let y = 0; y < tile; y++) {
+    for (let x = 0; x < tile; x++) {
+      const i = ((oy + y) * cw + ox + x) * 4;
+      if ((colour[i + 3] as number) < 128) continue;
+      const r = ((roy + Math.floor(y / k)) * rw + rox + Math.floor(x / k)) * 4;
+      if ((relief[r + 3] as number) < 128) continue;
+      const l =
+        0.2126 * toLinear(colour[i] as number) +
+        0.7152 * toLinear(colour[i + 1] as number) +
+        0.0722 * toLinear(colour[i + 2] as number);
+      painted += l;
+      flat += l * (((relief[r + 2] as number) / 255) * 2);
+    }
+  }
+  if (flat <= 1e-9) return;
+  const scale = painted / flat;
+  for (let y = roy; y < roy + rtile; y++) {
+    for (let x = rox; x < rox + rtile; x++) {
+      const r = (y * rw + x) * 4 + 2;
+      relief[r] = Math.round(Math.min(255, (relief[r] as number) * scale));
+    }
+  }
 }
 
 /** Fill transparent texels' colour from opaque neighbours (dilation), so mipmaps keep the leaf colour. */

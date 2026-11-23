@@ -5,8 +5,8 @@ import {
   MeshDepthMaterial,
   MeshStandardMaterial,
   RGBADepthPacking,
+  Vector3,
   type Texture,
-  type Vector3,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
 import { createPropKitMaterial } from '../props/catalog';
@@ -23,9 +23,15 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
   const nor: number[] = [];
   const uv: number[] = [];
   const idx: number[] = [];
+  // Each card's own frame (for the relief level): its uv's u direction and its front normal.
+  const cardT: number[] = [];
+  const cardP: number[] = [];
+  let frame: [number, number, number, number, number, number] = [1, 0, 0, 0, 0, 1];
   const crownY = 0.58;
   const push = (x: number, y: number, z: number, u: number, v: number): void => {
     pos.push(x, y, z);
+    cardT.push(frame[0], frame[1], frame[2]);
+    cardP.push(frame[3], frame[4], frame[5]);
     // Normal: outward from the crown centre, leaning up (light from the sky on the top).
     let nx = x;
     let ny = (y - crownY) * 0.8 + 0.35;
@@ -42,6 +48,8 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
     const a = (k / planes) * Math.PI;
     const cx = Math.cos(a) * half;
     const cz = Math.sin(a) * half;
+    // u runs along (cos a, 0, sin a); the winding below faces (-sin a, 0, cos a).
+    frame = [Math.cos(a), 0, Math.sin(a), -Math.sin(a), 0, Math.cos(a)];
     const base = pos.length / 3;
     // Split each card in two columns so the bent normals interpolate across the middle.
     push(-cx, 0, -cz, 0, 0);
@@ -65,6 +73,8 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
       pos.push(x, y, z);
       nor.push(0, 1, 0);
       uv.push(u, v);
+      cardT.push(1, 0, 0);
+      cardP.push(0, 1, 0);
     };
     pushTop(0, yTop, 0, 0.5, 0.64);
     pushTop(-r, yRim, -r, 0.2, 0.4);
@@ -80,6 +90,8 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+  g.setAttribute('cardT', new BufferAttribute(new Float32Array(cardT), 3));
+  g.setAttribute('cardP', new BufferAttribute(new Float32Array(cardP), 3));
   g.setIndex(idx);
   g.computeBoundingSphere();
   return g;
@@ -100,6 +112,9 @@ function tileChunk(tiles: readonly number[]): string {
     float row = floor(tile / ${ATLAS_COLS.toFixed(1)});
     // Mirror half of them so neighbours of one species differ.
     float u = fract(hsh * 7.31) > 0.5 ? uv.x : 1.0 - uv.x;
+#ifdef TREE_RELIEF
+    vTreeMirror = fract(hsh * 7.31) > 0.5 ? 1.0 : -1.0;
+#endif
     vMapUv = vec2((col + u) / ${ATLAS_COLS.toFixed(1)}, (row + 1.0 - uv.y) / ${ATLAS_ROWS.toFixed(1)});
   }
 #endif`;
@@ -117,6 +132,79 @@ const WIND = /* glsl */ `
     transformed.z += sway * bendK * 0.6;
   }
 #endif`;
+
+/**
+ * The relief level (the mid-distance cards): the crown's painted normals in each card's frame
+ * (tree-atlas.ts reliefStyle) light the card by the scene's sun and sky from wherever it stands,
+ * instead of by the light painted into the atlas, which the relief's de-lighting factor takes
+ * out of the colour. Both fade to the plain card by `uTreeRelief.y` from the eye, the distance at
+ * which the far level takes over, so the switch does not show.
+ */
+const RELIEF_PARS_VERTEX = /* glsl */ `
+attribute vec3 cardT;
+attribute vec3 cardP;
+varying vec3 vCardT;
+varying vec3 vCardP;
+varying float vTreeMirror;`;
+const RELIEF_VERTEX = /* glsl */ `
+#include <defaultnormal_vertex>
+#ifdef USE_INSTANCING
+  vCardT = normalMatrix * (mat3(instanceMatrix) * cardT);
+  vCardP = normalMatrix * (mat3(instanceMatrix) * cardP);
+#else
+  vCardT = normalMatrix * cardT;
+  vCardP = normalMatrix * cardP;
+#endif`;
+const RELIEF_PARS_FRAGMENT = /* glsl */ `
+uniform sampler2D uTreeReliefMap;
+/** x: fade start, y: fade end (m from the eye), z: weight of the relief normal. */
+uniform vec3 uTreeRelief;
+varying vec3 vCardT;
+varying vec3 vCardP;
+varying float vTreeMirror;`;
+const RELIEF_MAP_FRAGMENT = /* glsl */ `
+#include <map_fragment>
+vec4 treeRelief = texture2D(uTreeReliefMap, vMapUv);
+float treeReliefK = 1.0 - smoothstep(uTreeRelief.x, uTreeRelief.y, length(vViewPosition));
+diffuseColor.rgb *= mix(1.0, treeRelief.b * 2.0, treeReliefK);`;
+const RELIEF_NORMAL_FRAGMENT = /* glsl */ `
+#include <normal_fragment_maps>
+{
+  vec2 rxy = treeRelief.rg * 2.0 - 1.0;
+  rxy.x *= vTreeMirror;
+  float rz = sqrt(max(0.0, 1.0 - dot(rxy, rxy)));
+  vec3 cT = normalize(vCardT);
+  vec3 cP = normalize(vCardP);
+  vec3 cB = normalize(cross(cP, cT));
+  // The painted bulge faces whoever looks at the card, from either side.
+  vec3 rn = normalize(cT * rxy.x + cB * rxy.y + cP * (rz * faceDirection));
+  normal = normalize(mix(normal, rn, treeReliefK * uTreeRelief.z));
+}`;
+
+/** Relief level settings: the relief atlas and the distances over which it fades out, m. */
+export interface TreeRelief {
+  map: Texture;
+  fadeStart: number;
+  fadeEnd: number;
+}
+
+function addRelief(shader: WebGLProgramParametersWithUniforms, relief: TreeRelief): void {
+  shader.uniforms.uTreeReliefMap = { value: relief.map };
+  shader.uniforms.uTreeRelief = {
+    value: new Vector3(relief.fadeStart, relief.fadeEnd, RELIEF_WEIGHT),
+  };
+  shader.defines = { ...(shader.defines ?? {}), TREE_RELIEF: '' };
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>\n${RELIEF_PARS_VERTEX}`)
+    .replace('#include <defaultnormal_vertex>', RELIEF_VERTEX);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\n${RELIEF_PARS_FRAGMENT}`)
+    .replace('#include <map_fragment>', RELIEF_MAP_FRAGMENT)
+    .replace('#include <normal_fragment_maps>', RELIEF_NORMAL_FRAGMENT);
+}
+
+/** How far the relief normal replaces the card's crown-bent vertex normal. */
+const RELIEF_WEIGHT = 0.85;
 
 /**
  * Per-tree swap between the near trees (real geometry) and the cards, by the tree's distance
@@ -181,8 +269,15 @@ export function treeMaterials(
   atlas: Texture,
   tiles: readonly number[],
   key: string,
-  options: { wind: boolean; coverage: boolean; swap?: TreeSwap | null },
+  options: {
+    wind: boolean;
+    coverage: boolean;
+    swap?: TreeSwap | null;
+    /** The relief level (the cards' mid-distance level): lit through the relief atlas. */
+    relief?: TreeRelief | null;
+  },
 ): TreeMaterials {
+  const relief = options.relief ?? null;
   const time = { value: 0 };
   const swap = options.swap ?? null;
   const hook = (shader: WebGLProgramParametersWithUniforms): void => {
@@ -196,6 +291,8 @@ export function treeMaterials(
   // The colour pass hands the near trees over within the swap distance; the shadow pass keeps
   // the cards everywhere (the near trees cast no shadow), so each tree casts one shadow.
   const colourHook = (shader: WebGLProgramParametersWithUniforms): void => {
+    // The relief's defines come first: the tile pick writes the mirror sign under them.
+    if (relief) addRelief(shader, relief);
     hook(shader);
     if (swap) addSwap(shader, swap, false);
   };
@@ -208,9 +305,10 @@ export function treeMaterials(
     metalness: 0,
     envMapIntensity: 0.8,
   });
-  material.name = `tree-${key}`;
+  material.name = relief ? `tree-${key}-relief` : `tree-${key}`;
   material.onBeforeCompile = colourHook;
-  material.customProgramCacheKey = () => `tree-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}`;
+  material.customProgramCacheKey = () =>
+    `tree-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,

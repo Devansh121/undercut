@@ -3,7 +3,6 @@ import {
   Group,
   Mesh,
   MeshDepthMaterial,
-  MeshPhysicalMaterial,
   Vector3,
   type BufferGeometry,
   type Material,
@@ -69,7 +68,8 @@ import {
   type WaterBody,
 } from './terrain';
 import { coniferShare, worldTheme, type WorldTheme } from './theme';
-import { treeAtlas } from './tree-atlas';
+import { WaterSurface, type WaterQuality } from './water';
+import { treeAtlases } from './tree-atlas';
 import {
   BROADLEAF_CLOUD,
   COLUMNAR_CLOUD,
@@ -106,10 +106,17 @@ export interface WorldQuality {
   /** Trees nearer the eye than this are real geometry instead of cards, m (0: cards only). */
   treeCloud: number;
   /**
+   * The near cards (out to `treeNear`) are lit through the atlas's relief (normals, painted
+   * light taken out), fading to the plain cards by `treeNear` (trees.ts, TreeRelief).
+   */
+  treeRelief: boolean;
+  /**
    * Build the structures (pit complex, buildings, stands and crowd, trackside furniture,
    * bridges, decals). Off on Lite (software-WebGL tests): ground and a few trees only.
    */
   structures: boolean;
+  /** Open water: planar reflection size and content, wave map size (water.ts). */
+  water: WaterQuality;
 }
 
 export interface CircuitWorldOptions {
@@ -250,6 +257,8 @@ export class CircuitWorld {
   private crowdKinds = 0;
   /** Mapped water drawn as a surface (theme `water`), with the ground kept under it. */
   private water: WaterBody[] = [];
+  /** The water's material and reflection (null without water). */
+  waterSurface: WaterSurface | null = null;
 
   /** Milliseconds per build step (start-up budget). */
   readonly buildTimes: Record<string, number> = {};
@@ -314,7 +323,7 @@ export class CircuitWorld {
       });
       await timed('cover', () => {
         world.buildGround(o, terrain!, lapBox);
-        world.placeWater();
+        world.placeWater(quality);
       });
       if (!wq.structures) {
         await timed('trees', () => world.placeTrees(o, lapBox));
@@ -366,7 +375,7 @@ export class CircuitWorld {
       ),
     );
     this.buildGround(o, terrain, lapBox);
-    this.placeWater();
+    this.placeWater(o.quality);
     step('ground');
     if (!wq.structures) {
       this.placeTrees(o, lapBox);
@@ -481,28 +490,33 @@ export class CircuitWorld {
     });
   }
 
-  /** Flat water surfaces at each body's level: dark, smooth, reflecting the sky and the lamps. */
-  private placeWater(): void {
+  /**
+   * Water surfaces at each body's level (water.ts): waves, Fresnel, and a planar reflection of
+   * the sky and the skyline at the largest body's level.
+   */
+  private placeWater(quality: Quality): void {
     if (this.water.length === 0) return;
-    // Harbour water: dark green-grey, a broken sheen rather than a mirror of the sky (weaker
-    // specular than glass, so the overcast sky at a grazing angle does not turn it white).
-    const mat = new MeshPhysicalMaterial({
-      color: new Color('#0b1b1f'),
-      roughness: 0.2,
-      metalness: 0,
-      specularIntensity: 0.35,
-      envMapIntensity: 0.6,
-    });
-    mat.name = 'water';
-    this.materials.push(mat);
+    let largest = this.water[0] as WaterBody;
+    const area = (b: WaterBody): number => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]);
+    for (const b of this.water) if (area(b) > area(largest)) largest = b;
+    const backdrops = (this.theme.street?.backdrops ?? []).map((b) => `prop:${b.id}`);
+    const surface = new WaterSurface(
+      largest.level,
+      quality.world.water,
+      (name) => backdrops.some((id) => name.startsWith(id)),
+      quality.post,
+    );
+    this.waterSurface = surface;
     this.water.forEach((b, wi) => {
       const g = waterGeometry(b);
       if (!g) return;
       this.geometries.push(g);
-      const mesh = new Mesh(g, mat);
+      const flat = Math.abs(b.level - surface.level) > 0.75;
+      const mesh = new Mesh(g, flat ? surface.flatMaterial : surface.material);
       mesh.name = `world:water-${wi}`;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      surface.attach(mesh);
       this.group.add(mesh);
       const bs = g.boundingSphere;
       if (bs)
@@ -726,8 +740,15 @@ export class CircuitWorld {
     if (wq.treeDensity <= 0) return;
     const cover = this.cover;
     if (!cover) throw new Error('trees are placed after the ground');
-    const atlas = treeAtlas(wq.treeTile, quality.anisotropy, this.theme.species);
+    const atlases = treeAtlases(wq.treeTile, quality.anisotropy, this.theme.species, wq.treeRelief);
+    const atlas = atlases.colour;
     this.textures.push(atlas);
+    if (atlases.relief) this.textures.push(atlases.relief);
+    // The relief fades out over the last fifth of the near cards' reach: a tree the far level
+    // draws (its chunk's near edge past `treeNear`) is past the fade, so the switch is unseen.
+    const relief = atlases.relief
+      ? { map: atlases.relief, fadeStart: wq.treeNear * 0.8, fadeEnd: wq.treeNear }
+      : null;
     const coverage = quality.msaa > 0;
     const theme = this.theme;
     const conifers = theme.conifers;
@@ -768,6 +789,19 @@ export class CircuitWorld {
       });
       this.trees.push(mats);
       this.materials.push(mats.material, mats.depth);
+      // The near cards' own material with the relief (same wind time and swap as the far cards).
+      const nearMat = relief
+        ? treeMaterials(atlas, k.tiles, k.id, {
+            wind: wq.wind,
+            coverage,
+            swap: deep ? null : swap,
+            relief,
+          })
+        : null;
+      if (nearMat) {
+        this.trees.push(nearMat);
+        this.materials.push(nearMat.material, nearMat.depth);
+      }
       const kitIds =
         clouds && k.id === 'tree-conifer' && conifers
           ? conifers.kit.filter((id) => o.propKit?.has(id))
@@ -837,7 +871,7 @@ export class CircuitWorld {
         lods: [
           {
             geometry: near,
-            material: mats.material,
+            material: nearMat?.material ?? mats.material,
             depthMaterial: mats.depth,
             maxDistance: wq.treeNear,
           },
@@ -1267,6 +1301,7 @@ export class CircuitWorld {
     for (const t of this.trees) t.time.value = time;
     if (eye) this.treeSwap.eye.value.copy(eye);
     this.crowdTime.value = time;
+    this.waterSurface?.update(time);
     if (!eye) return;
     for (const c of this.worldChunks) {
       const dist = c.centre.distanceTo(eye) - c.radius;
@@ -1281,6 +1316,7 @@ export class CircuitWorld {
     for (const m of this.materials) m.dispose();
     for (const t of this.textures) t.dispose();
     this.cover?.dispose();
+    this.waterSurface?.dispose();
     this.group.removeFromParent();
   }
 }
