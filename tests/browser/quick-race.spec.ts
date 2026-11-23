@@ -7,7 +7,7 @@ import { startQuickRace } from './helpers';
 // the direct way to the result (the player never starts and retires, so the field finishes
 // with no provisional stage).
 
-test('Quick Race: grid, lights, moving field; a reset parks off line; the pause menu restarts the race', async ({
+test('Quick Race at Spa or Singapore: grid, lights, moving field; a reset parks off line; the pause menu restarts the race', async ({
   page,
 }, info) => {
   test.setTimeout(120_000);
@@ -32,10 +32,8 @@ test('Quick Race: grid, lights, moving field; a reset parks off line; the pause 
     trim: at.trim,
     timeOfDay: at.timeOfDay,
   });
-  await page.evaluate(() => window.__undercut!.quit());
-  await page.evaluate(() => window.__undercut!.startQuickRace(1));
-  expect(await page.evaluate(() => window.__undercut!.state().cars)).toBe(20);
-  expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toBe('grid');
+  // The same race goes on: the grid, the five lights and lights out, the field moving off.
+  expect(await page.evaluate(() => window.__undercut!.state().racePhase)).toMatch(/grid|lights/);
   await page.evaluate(() => {
     window.__undercut!.autopilot(true);
     window.__undercut!.setTimeScale(8);
@@ -43,6 +41,12 @@ test('Quick Race: grid, lights, moving field; a reset parks off line; the pause 
   await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', null, {
     timeout: 60_000,
   });
+  const lights = await page.evaluate(() =>
+    (window.__undercut!.state().raceEvents as { type: string; count?: number }[])
+      .filter((e) => e.type === 'lights')
+      .map((e) => e.count),
+  );
+  expect(lights).toEqual([1, 2, 3, 4, 5, 0]);
   await expect(page.getByTestId('race-status')).toContainText('/ 20');
   await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10);
   // A reset in a race parks the car stopped at the edge, off the racing line, not on it in
