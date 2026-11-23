@@ -326,6 +326,23 @@ describe('rebind capture', () => {
     expect(input.capturing).toBe(null);
   });
 
+  it('does not capture a press made before capture started (the press that started it)', () => {
+    const { input } = setup();
+    // Enter on a focused slot: the key goes down, then its click starts the capture.
+    input.keyboard.keyDown('Enter');
+    input.startCapture('keyboard');
+    let frame = input.sample(DT, 0);
+    expect(frame.events.filter((e) => e.type === 'captured')).toEqual([]);
+    input.keyboard.keyUp('Enter');
+    input.keyboard.keyDown('KeyJ');
+    frame = input.sample(DT, 0);
+    expect(frame.events).toContainEqual({
+      type: 'captured',
+      device: 'keyboard',
+      control: 'key:KeyJ',
+    });
+  });
+
   it('uses a new binding as soon as the profile changes', () => {
     const { input } = setup();
     const profile = defaultProfile();

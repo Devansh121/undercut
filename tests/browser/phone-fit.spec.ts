@@ -145,8 +145,31 @@ for (const size of SIZES) {
         { label: 'controls closed', click: '[data-action=close-controls]' },
         { label: 'circuit select', click: '[data-action=change-circuit]' },
         { label: 'main menu at spa', click: '.ccard[data-circuit=spa]' },
+        { label: 'Settings', click: '.shell__top [data-action=settings]' },
+        {
+          label: 'Settings, keyboard bindings',
+          click: '[data-setting=bindDevice] [data-value=keyboard]',
+        },
+        {
+          label: 'Settings, controller bindings',
+          click: '[data-setting=bindDevice] [data-value=gamepad]',
+        },
+        ...['assists', 'accessibility', 'display', 'audio', 'graphics'].map((s) => ({
+          label: `Settings, ${s}`,
+          click: `.settings-screen__tabs [data-tab=${s}]`,
+        })),
       ]),
     ).toEqual([]);
+    // Clicked in the page, as the sweep does: on an upright phone the update bar may sit over
+    // the action bar.
+    const press = (selector: string): Promise<void> =>
+      page.evaluate((sel) => document.querySelector<HTMLElement>(sel)?.click(), selector);
+    await press('[data-testid=settings] [data-action=credits]');
+    await expect(page.locator('[data-testid=credits]')).toBeVisible();
+    expect(await sweep(page, [{ label: 'credits' }])).toEqual([]);
+    await press('[data-testid=credits] [data-action=back]');
+    await press('[data-testid=settings] [data-action=back]');
+    await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
     await page.locator('[data-action=mode-online]').click();
     await page.locator('[data-action=start]').click();
     await expect(page.locator('.online-screen')).toBeVisible();

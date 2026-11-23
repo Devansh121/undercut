@@ -3,12 +3,13 @@ import { showHomeScreenHint } from './pwa/home-screen-hint';
 import '../../../design/mock/tokens.css';
 import './styles/kit.css';
 import './styles/menu.css';
+import './styles/settings.css';
 import './styles.css';
 import './online/race-hud.css';
 import { OnlineFlow } from './online/flow';
 import { codeFromUrl } from './online/invite';
 import type { DriveExtension } from './drive';
-import { InputSystem, type DeviceKind, type MenuButton } from '@undercut/input';
+import { InputSystem, ProfileStore, type DeviceKind, type MenuButton } from '@undercut/input';
 import {
   WebStorageAdapter,
   attachFocusGuard,
@@ -24,14 +25,23 @@ import { debugEnabled, installDebugApi } from './debug';
 import type * as DriveModuleNs from './drive';
 import type { DriveHandle } from './drive';
 import { RecordStore, durableStorage, memoryStorage } from './game/records';
-import { firstGuess, isQuality, loadAutoPick, loadQuality } from './game/quality-setting';
+import {
+  firstGuess,
+  isQuality,
+  loadAutoPick,
+  loadQuality,
+  saveQuality,
+} from './game/quality-setting';
+import { applyPlayerSettings } from './ui/apply-settings';
 import { PrefsStore } from './ui/data/prefs';
 import { MenuInput } from './ui/menu-input';
 import { CircuitSelectScreen } from './ui/screens/circuits';
 import { HubScreen, type SessionChoice } from './ui/screens/hub';
 import { LaunchScreen } from './ui/screens/launch';
 import { timeOfDayOf } from './ui/screens/session-settings';
+import { SettingsScreen } from './ui/screens/settings';
 import { Shell } from './ui/shell';
+import { setSpeedUnit, speedUnit } from './ui/player-settings';
 
 type DriveModule = typeof DriveModuleNs;
 import type { QuickRaceOptions } from './game/session';
@@ -53,12 +63,16 @@ const records = new RecordStore(
 // What the menus remember (mode, circuit, team, settings), through the same storage port.
 const prefs = new PrefsStore(webStorage);
 await prefs.load();
+applyPlayerSettings(prefs.get().settings, document.documentElement);
 // Engine sound for the page: created on the first gesture, saved volumes beside the settings.
 const audio = new PageAudio(webStorage);
+// The player's controls (bindings and stick, pedal and keyboard feel), rebound in Settings.
+const profiles = new ProfileStore(webStorage);
 const input = new InputSystem({
   readGamepads: navigatorGamepads(),
   rumble: navigatorRumble(),
   touchCapable: touch,
+  profile: (await profiles.load()).profile,
 });
 attachKeyboard(input);
 attachFocusGuard(input);
@@ -89,12 +103,17 @@ function today(): string {
 }
 
 // ---- Menus
-const shell = new Shell(app, () => undefined, {
-  bindings: () => input.profile.bindings,
-  device: () => input.activeDevice,
-  padConnected: () => input.gamepad.connected,
-  touchCapable: () => touch,
-});
+const shell = new Shell(
+  app,
+  () => undefined,
+  {
+    bindings: () => input.profile.bindings,
+    device: () => input.activeDevice,
+    padConnected: () => input.gamepad.connected,
+    touchCapable: () => touch,
+  },
+  () => shell.push(settingsScreen),
+);
 shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
   action: (a, native, device) => {
@@ -105,7 +124,9 @@ const menuInput = new MenuInput(input, {
     shell.setDevice(d);
     shell.controls?.sync();
     hub.setDevice(d);
+    settingsScreen.setDevice(d);
   },
+  captured: (d, control) => settingsScreen.captured(d, control),
 });
 const hub: HubScreen = new HubScreen({
   circuits: CIRCUITS,
@@ -125,6 +146,34 @@ const hub: HubScreen = new HubScreen({
   onBack: () => shell.pop(),
 });
 const circuits = new CircuitSelectScreen(CIRCUITS, prefs, records, () => shell.pop());
+const settingsScreen = new SettingsScreen({
+  prefs,
+  profile: () => input.profile,
+  device: () => input.activeDevice,
+  setProfile: (profile) => {
+    input.setProfile(profile);
+    menuInput.refreshGlyphs();
+    return profiles.save(profile);
+  },
+  startCapture: (d) => input.startCapture(d),
+  cancelCapture: () => input.cancelCapture(),
+  volume: (key) => audio.volumes[key],
+  setVolume: (key, v) => audio.setVolume(key, v),
+  // (A saved preset is never Lite: loadQuality drops it.)
+  graphics: () => (loadQuality() as Exclude<QualityName, 'lite'> | null) ?? 'auto',
+  setGraphics: (v) => saveQuality(v),
+  units: speedUnit,
+  setUnits: setSpeedUnit,
+  touch,
+  page: document.documentElement,
+  onCredits: () => {
+    // The credits (CREDITS.md and the asset manifest) load only when opened.
+    void import('./ui/screens/credits').then(({ CreditsScreen }) => {
+      if (shell.current === settingsScreen) shell.push(new CreditsScreen(() => shell.pop()));
+    });
+  },
+  onBack: () => shell.pop(),
+});
 const launch = new LaunchScreen(__BUILD_HASH__, () => {
   audio.gesture();
   shell.push(hub);

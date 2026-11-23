@@ -51,7 +51,15 @@ export interface PlayerSettings {
   /** HUD scale, 0.8 to 1.2. */
   hudScale: number;
   subtitles: boolean;
+  /** Menu and HUD text: the design sizes, or the small sizes stepped up one or two. */
+  textSize: TextSize;
+  /** Touch controls: steering on the left and pedals on the right, or the other way round. */
+  touchLayout: TouchLayoutChoice;
 }
+
+export type TextSize = 'default' | 'large' | 'larger';
+export const TEXT_SIZES: readonly TextSize[] = ['default', 'large', 'larger'];
+export type TouchLayoutChoice = 'standard' | 'mirrored';
 
 export interface MenuPrefs {
   version: typeof PREFS_VERSION;
@@ -83,6 +91,8 @@ export function defaultPrefs(): MenuPrefs {
       colourBlind: false,
       hudScale: 1,
       subtitles: true,
+      textSize: 'default',
+      touchLayout: 'standard',
     },
   };
 }
@@ -167,6 +177,12 @@ export function parsePrefs(text: string | null): MenuPrefs {
           : d.settings.hudScale,
       subtitles:
         typeof settings.subtitles === 'boolean' ? settings.subtitles : d.settings.subtitles,
+      textSize: oneOf(settings.textSize, TEXT_SIZES, d.settings.textSize),
+      touchLayout: oneOf(
+        settings.touchLayout,
+        ['standard', 'mirrored'] as const,
+        d.settings.touchLayout,
+      ),
     },
   };
 }

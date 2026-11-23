@@ -89,6 +89,14 @@ const CSS = `
 .ut-touch__pedal--throttle .ut-touch__fill { background: var(--c-time-personal); }
 .ut-touch__pedal--brake { right: calc(var(--ut-r) + 86px); }
 .ut-touch__pedal--brake .ut-touch__fill { background: var(--c-time-invalid); }
+/* Mirrored (Settings): steering on the right, pedals on the left; camera and pause stay put. */
+[data-touch-layout='mirrored'] .ut-touch__steer { left: auto; right: var(--ut-r); }
+[data-touch-layout='mirrored'] .ut-touch__btn--gearUp,
+[data-touch-layout='mirrored'] .ut-touch__btn--gearDown { left: auto; right: calc(var(--ut-r) + 208px); }
+[data-touch-layout='mirrored'] .ut-touch__btn--drs,
+[data-touch-layout='mirrored'] .ut-touch__btn--overtake { right: auto; left: calc(var(--ut-l) + 172px); }
+[data-touch-layout='mirrored'] .ut-touch__pedal--throttle { right: auto; left: var(--ut-l); }
+[data-touch-layout='mirrored'] .ut-touch__pedal--brake { right: auto; left: calc(var(--ut-l) + 86px); }
 `;
 
 const BUTTONS: Record<TouchButton, { label: string; icon?: IconName; text?: string }> = {

@@ -36,7 +36,14 @@ describe('menu prefs', () => {
         timeOfDay: { monza: 'night-floodlit', '<b>': 'x' },
         race: { laps: -3, aiSkill: 'elite', grid: 'set', slot: 21, field: 'equal' },
         assists: { keyboard: { tractionControl: 9, abs: 2, steering: 'max' } },
-        settings: { units: 'mph', hudScale: 3, colourBlind: 'yes', subtitles: false },
+        settings: {
+          units: 'mph',
+          hudScale: 3,
+          colourBlind: 'yes',
+          subtitles: false,
+          textSize: 'huge',
+          touchLayout: 'mirrored',
+        },
       }),
     );
     expect(p.mode).toBe('timeTrial');
@@ -46,7 +53,12 @@ describe('menu prefs', () => {
     expect(p.timeOfDay).toEqual({ monza: 'night-floodlit' });
     expect(p.race).toEqual({ laps: 5, aiSkill: 'elite', grid: 'set', slot: 10, field: 'equal' });
     expect(p.assists.keyboard).toEqual({ tractionControl: 0, abs: 2 });
-    expect(p.settings).toEqual({ ...defaultPrefs().settings, units: 'mph', subtitles: false });
+    expect(p.settings).toEqual({
+      ...defaultPrefs().settings,
+      units: 'mph',
+      subtitles: false,
+      touchLayout: 'mirrored',
+    });
   });
 
   it('keeps working in memory when storage fails', async () => {

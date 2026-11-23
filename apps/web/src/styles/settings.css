@@ -1,0 +1,427 @@
+/*
+ * Settings and Credits screens, and the page-wide effects of the player's settings: text size,
+ * colour-blind-safe flag colours and the mirrored touch layout's HUD strip. The timing colours,
+ * reduced motion and HUD scale hooks are in kit.css.
+ */
+
+/* ================= Text size (Settings, Accessibility) ================= */
+
+/* The small sizes step up; display sizes (titles, gear, speed) already read at a distance. */
+:root[data-text='large'] {
+  --fs-10: 12px;
+  --fs-11: 13px;
+  --fs-12: 14px;
+  --fs-14: 16px;
+  --fs-16: 18px;
+}
+
+:root[data-text='larger'] {
+  --fs-10: 13px;
+  --fs-11: 14px;
+  --fs-12: 16px;
+  --fs-14: 18px;
+  --fs-16: 20px;
+  --fs-20: 22px;
+}
+
+/* ================= Colour-blind-safe flags ================= */
+
+/* Green and red differ in lightness as well as hue (cyan against vermilion); yellow and blue
+   are already apart. Every flag also has its word in the HUD. */
+:root[data-cb='on'] {
+  --c-flag-green: #2ec4d6;
+  --c-flag-yellow: #f6c90e;
+  --c-flag-blue: #4f7dff;
+  --c-flag-red: #ff5a5f;
+}
+
+/* ================= Mirrored touch layout ================= */
+
+/* A small phone: the driver cluster sits between the two control groups, which swap sides. */
+@media (max-height: 500px) and (max-width: 760px) and (orientation: landscape) {
+  :root[data-touch-layout='mirrored']:has(.ut-touch) .hud-cluster {
+    left: calc(var(--safe-l) + 236px);
+    right: calc(var(--safe-r) + 264px);
+  }
+}
+
+/* ================= Settings screen ================= */
+
+.settings-screen {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.settings-screen__tabs {
+  padding: var(--sp-5) var(--safe-r) var(--sp-2) var(--safe-l);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.settings-screen__body {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-3) var(--safe-r) var(--sp-6) var(--safe-l);
+}
+
+.settings-pane {
+  width: min(880px, 100%);
+  padding: var(--sp-2) var(--sp-6) var(--sp-5);
+}
+
+.settings-pane[hidden] {
+  display: none;
+}
+
+.settings-pane .seg {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settings-pane .slider {
+  width: min(280px, 46vw);
+}
+
+.settings__lede {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--c-text-2);
+}
+
+.settings__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--sp-4);
+}
+
+.settings__notice {
+  min-height: 1.5em;
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--c-text-2);
+}
+
+.settings__notice[data-tone='warn'] {
+  color: var(--c-flag-yellow);
+}
+
+/* ---- Bindings: action, primary, secondary */
+
+.binds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 168px) minmax(0, 168px);
+  margin-top: var(--sp-2);
+}
+
+.binds__row {
+  display: contents;
+}
+
+.binds__action {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  font-size: var(--fs-14);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.binds__row.is-unbound .binds__action {
+  color: var(--c-flag-yellow);
+}
+
+.binds__slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: 40px;
+  margin: 4px 0 4px var(--sp-2);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-1);
+  background: var(--c-ink-2);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  font-weight: 650;
+  color: var(--c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color var(--t-quick) var(--ease-out);
+}
+
+.binds__slot:hover {
+  background: var(--c-ink-3);
+}
+
+.binds__slot:focus-visible,
+:root[data-focus-ring] .binds__slot:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.binds__slot.is-empty {
+  font-weight: 500;
+  color: var(--c-text-3);
+}
+
+.binds__slot.is-capturing {
+  background: var(--c-brand-ink);
+  box-shadow: inset 0 0 0 1px var(--c-brand);
+  color: var(--c-text-1);
+}
+
+.binds__glyph {
+  opacity: 1;
+}
+
+/* ---- Colour preview */
+
+.settings__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) 0;
+  box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-12);
+  color: var(--c-text-2);
+}
+
+.swatch__chip {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.swatch[data-swatch='overall'] .swatch__chip {
+  background: var(--c-time-overall);
+}
+.swatch[data-swatch='personal'] .swatch__chip {
+  background: var(--c-time-personal);
+}
+.swatch[data-swatch='slower'] .swatch__chip {
+  background: var(--c-time-slower);
+}
+.swatch[data-swatch='invalid'] .swatch__chip {
+  background: var(--c-time-invalid);
+}
+.swatch[data-swatch='green'] .swatch__chip {
+  background: var(--c-flag-green);
+}
+.swatch[data-swatch='yellow'] .swatch__chip {
+  background: var(--c-flag-yellow);
+}
+.swatch[data-swatch='blue'] .swatch__chip {
+  background: var(--c-flag-blue);
+}
+.swatch[data-swatch='red'] .swatch__chip {
+  background: var(--c-flag-red);
+}
+
+/* ================= Credits ================= */
+
+.credits__scroll {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--safe-r) var(--sp-6) var(--safe-l);
+}
+
+.credits__section {
+  width: min(960px, 100%);
+  padding: var(--sp-4) var(--sp-6) var(--sp-5);
+  outline: none;
+}
+
+.credits__section:focus-visible,
+:root[data-focus-ring] .credits__section:focus {
+  box-shadow: var(--focus-ring);
+}
+
+.credits__section--h3 {
+  background: var(--c-ink-0);
+}
+
+.credits__title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-20);
+  font-weight: 750;
+  font-stretch: var(--wdth-semi);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.credits__section--h3 .credits__title {
+  font-size: var(--fs-16);
+}
+
+.credits__p {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-14);
+  line-height: var(--lh-body);
+  color: var(--c-text-2);
+  overflow-wrap: anywhere;
+}
+
+.credits__link {
+  color: var(--c-text-1);
+  text-decoration: underline;
+  text-decoration-color: var(--c-line-strong);
+  text-underline-offset: 2px;
+}
+
+.credits__table {
+  overflow-x: auto;
+  margin-bottom: var(--sp-3);
+}
+
+.credits__table .table {
+  font-size: var(--fs-12);
+}
+
+.credits__table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.credits__assets {
+  display: grid;
+  margin: 0;
+}
+
+.credits__asset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-4);
+  padding: var(--sp-2) 0;
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  font-size: var(--fs-14);
+}
+
+.credits__asset dd {
+  margin: 0;
+  color: var(--c-text-2);
+  text-align: right;
+}
+
+/* ================= Phones ================= */
+
+@media (max-width: 640px) {
+  .binds {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .binds__action {
+    grid-column: 1 / -1;
+    min-height: 32px;
+    padding-top: var(--sp-2);
+    box-shadow: none;
+  }
+  .binds__slot {
+    margin-left: 0;
+    margin-right: var(--sp-2);
+  }
+  .credits__asset {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-1);
+  }
+  .credits__asset dd {
+    text-align: left;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
+  .settings-screen__tabs {
+    padding-top: var(--sp-2);
+  }
+  .settings-screen__tabs .tab {
+    min-height: 44px;
+  }
+  .settings-pane {
+    padding: var(--sp-1) var(--sp-4) var(--sp-4);
+  }
+  .binds__slot {
+    min-height: 44px;
+  }
+  .credits__scroll {
+    padding-top: var(--sp-3);
+  }
+  .credits__section {
+    padding: var(--sp-3) var(--sp-4);
+  }
+  /* Tables stack: each row a block, each cell a line under the column it came from. */
+  .credits__table {
+    overflow-x: visible;
+  }
+  .credits__table .table,
+  .credits__table tbody,
+  .credits__table tr,
+  .credits__table td {
+    display: block;
+    width: 100%;
+  }
+  .credits__table thead {
+    display: none;
+  }
+  .credits__table tr {
+    padding: var(--sp-2) 0;
+    box-shadow: inset 0 -1px 0 var(--c-line);
+  }
+  .credits__table td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  .credits__table td:first-child {
+    color: var(--c-text-1);
+    font-weight: 650;
+  }
+}
+
+/* Phone controls: the section tabs wrap instead of running off the side, and the sliders are
+   full touch targets (the line and thumb stay centred in the taller track). */
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
+  .settings-screen__tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .settings-screen__tabs .tabs__glyph {
+    display: none;
+  }
+  .settings-pane .slider__track {
+    height: 44px;
+  }
+  .settings-pane .slider__track::before,
+  .settings-pane .slider__fill {
+    top: 20px;
+  }
+  .settings-pane .slider__thumb {
+    top: 22px;
+  }
+}
+
+/* Upright phones: Settings and Controls in the top bar are icons (named by aria-label). */
+@media (max-width: 600px) and (orientation: portrait) {
+  .shell__controls {
+    width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .shell__controls .btn__label {
+    display: none;
+  }
+}
