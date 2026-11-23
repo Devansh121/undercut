@@ -358,13 +358,18 @@ export class ReferenceDriver implements Driver {
     // ---- Speed ----
     // Feedforward read a little ahead covers the time the car takes to build deceleration or
     // drive; the feedback holds the speed the profile wants here.
-    const vTarget = prof.v[i]! + (prof.v[j]! - prof.v[i]!) * f;
-    const aHere = prof.ax[i]! + (prof.ax[j]! - prof.ax[i]!) * f;
-    const aAhead = this.sampleAhead(prof.ax, s, v * g.speedPreview);
+    // The tyres' grip against the reference tyre the plan was made for (worn, cold or hot tyres
+    // have less): a profile re-planned on it would have speeds √grip and accelerations grip
+    // times the plan's. Exactly the plan with the reference tyre (grip 1).
+    const grip = tel.tyreGrip > 0 ? Math.min(1, tel.tyreGrip) : 1;
+    const vGrip = Math.sqrt(grip);
+    const vTarget = (prof.v[i]! + (prof.v[j]! - prof.v[i]!) * f) * vGrip;
+    const aHere = (prof.ax[i]! + (prof.ax[j]! - prof.ax[i]!) * f) * grip;
+    const aAhead = this.sampleAhead(prof.ax, s, v * g.speedPreview) * grip;
     // Already under the speed the profile wants a moment ahead: no reason to brake early for
     // it. (Compared with the target ahead, not here: braking early by design leaves the car
     // under the target here at every braking onset.)
-    const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview);
+    const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview) * vGrip;
     const aFf = v < vAhead - 1 ? Math.max(aHere, aAhead) : aAhead;
     const aDemand = Math.min(aFf + g.speedGain * (vTarget - v), this.accelLimit);
     const drsHere = plan.drsZone[i] === 1 && prof.phase[i] !== Phase.Brake;
