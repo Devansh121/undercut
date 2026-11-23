@@ -66,6 +66,16 @@ export const BODY_HALF_WIDTH = 1.0;
  */
 export const WALL_RESTITUTION = 0.1;
 export const WALL_FRICTION = 0.5;
+/**
+ * Moving off a barrier: below WALL_RELEASE_SPEED (m/s), a corner resting on the barrier (not
+ * striking it faster than that) does not hold the car by friction while the driver drives with
+ * the front wheels pointing along or away from the face: their heading, in the gear's direction,
+ * at most WALL_RELEASE_INTO (the sine of the angle) into it. The body's contact then rides along
+ * the face, as a wheel or endplate against a wall does, instead of pinning the car on the
+ * deflection its tyres stopped with. Impacts and scrapes at speed keep WALL_FRICTION.
+ */
+export const WALL_RELEASE_SPEED = 2;
+export const WALL_RELEASE_INTO = 0.5;
 
 /** Tyre deflection at which the rim reaches the ground, m. */
 export function tyreBottomDeflection(tyre: TyreParams): number {

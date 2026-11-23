@@ -132,6 +132,27 @@ describe('assists', () => {
     expect(out.throttle).toBeLessThan(0.5);
   });
 
+  it('traction control leaves a stopped car a launch throttle against the slip its tyres stopped with', () => {
+    // A car stopped against a barrier: the rears hold the deflection of the hit (slip angle
+    // 0.58), which reads as far past the limit. Before, the throttle stayed at the engine's drag.
+    const settings = { tractionControl: 2, abs: 0, autoGears: false };
+    const car = createCarState(REFERENCE_CAR, { gear: 1 });
+    car.slipRatio.set([0, 0, 0, 0.06]);
+    car.slipTan.set([0.05, -0.3, 0.04, -0.58]);
+    const memory = createAssistState();
+    const out = driver({});
+    for (let i = 0; i < 240; i++)
+      applyAssists(settings, memory, car, driver({ throttle: 1 }), DT, out);
+    expect(out.throttle).toBeCloseTo(0.3, 12);
+    // A lighter request than the launch throttle passes through.
+    applyAssists(settings, memory, car, driver({ throttle: 0.2 }), DT, out);
+    expect(out.throttle).toBeCloseTo(0.2, 12);
+    // Once moving at 2 m/s, the cut is whole again.
+    car.vx = 3;
+    applyAssists(settings, memory, car, driver({ throttle: 1 }), DT, out);
+    expect(out.throttle).toBeLessThan(0.3);
+  });
+
   it('speed-sensitive steering keeps full lock when slow and shrinks it with speed', () => {
     expect(speedSensitiveSteer(1, 5)).toBe(1);
     const scales = [20, 40, 60, 80, 100].map((v) => speedSensitiveSteer(1, v));
