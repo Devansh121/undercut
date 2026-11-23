@@ -353,7 +353,8 @@ describe('cost', () => {
           core.setCarState(packed);
         }
         if (i % 6 === 0) {
-          for (let c = 0; c < 19; c++) scene[5 + c * 6] = 3 + c * 9 - (i % 1200) * 0.05;
+          // Each car's x sits at HEADER (6) + c * PER_CAR (6) in the packed scene.
+          for (let c = 0; c < 19; c++) scene[6 + c * 6] = 3 + c * 9 - (i % 1200) * 0.05;
           scene[4] = Math.floor(i / 400) % 7;
           core.setScene(scene);
         }
@@ -363,6 +364,8 @@ describe('cost', () => {
     };
     // Warm up so every path is optimised and every lazily created buffer exists.
     run(6000);
+    // The measured loop must actually voice the six nearest cars, not just the field.
+    expect(core.scene.audibleCount).toBe(6);
     // Collect the garbage of earlier tests, then settle again: a full collection can throw
     // away optimised code that referred to objects it freed, and until a function is
     // re-optimised the interpreter boxes numbers. Nothing in steady play forces collections
