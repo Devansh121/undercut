@@ -120,6 +120,11 @@ function raceArtefactsFor(track: Track, given: RaceArtefacts | undefined): RaceA
 export interface DriveSessionOptions {
   track: Track;
   quickRace?: QuickRaceOptions;
+  /**
+   * Quick Race: the name and timing code of the driver in each car (index 0 the player's), as
+   * the standings and results show them. Default: "Player" and "Driver 1" to "Driver 19".
+   */
+  drivers?: readonly { name: string; code: string }[];
   /** Quick Race: the circuit's racing line and envelope (default: Monza's, at Monza only). */
   raceArtefacts?: RaceArtefacts;
   seed: number;
@@ -214,7 +219,7 @@ export class DriveSession {
       ? raceArtefactsFor(options.track, options.raceArtefacts)
       : null;
     const line = artefacts ? decodeRacingLine(artefacts.line) : null;
-    if (line && line.count !== options.track.lap.count) {
+    if (line && (line.circuit !== options.track.id || line.count !== options.track.lap.count)) {
       throw new Error(`the racing line for ${line.circuit} does not fit ${options.track.id}`);
     }
     // A race: every car in the trim the field's line and envelope were measured for (Monza low,
@@ -289,7 +294,12 @@ export class DriveSession {
       ...(grid ? { grid } : {}),
       cars: [
         {
-          entrant: { id: 'player', name: 'Player', code: 'PLY', team: 0 },
+          entrant: {
+            id: 'player',
+            name: options.drivers?.[0]?.name ?? 'Player',
+            code: options.drivers?.[0]?.code ?? 'PLY',
+            team: 0,
+          },
           controller: new InputController((ctx, out) => {
             if ((this.scriptedRaceDriver || this.playerFinished) && this.playerPilot) {
               this.playerPilot.control(ctx, out);
@@ -299,8 +309,8 @@ export class DriveSession {
         ...aiField.map((controller, i) => ({
           entrant: {
             id: `driver${i + 1}`,
-            name: `Driver ${i + 1}`,
-            code: `D${i + 1}`,
+            name: options.drivers?.[i + 1]?.name ?? `Driver ${i + 1}`,
+            code: options.drivers?.[i + 1]?.code ?? `D${i + 1}`,
             team: Math.floor((i + 1) / 2),
           },
           controller,
