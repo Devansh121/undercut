@@ -732,11 +732,13 @@ export class RaceDriver implements Driver {
         e.car = c;
         e.ds = ds;
         e.od = od;
+        // (Plus how far this car moves across in the time it takes to see and react: the line
+        // sweeping under a car near it carried it into the one beside, at Singapore's turn 1.)
+        // (A car standing still is placed where this one will be beside it, above.)
         e.sep =
           SIDE_BY_SIDE +
           wide +
-          Math.max(0, self.halfWidth - BODY_HALF_WIDTH) +
-          Math.abs(dRate) * (SEE_DELAY + this.skill.reaction);
+          (c.speed >= 1 ? Math.abs(dRate) * (SEE_DELAY + this.skill.reaction) : 0);
         e.left = myO >= od;
       }
     }
@@ -777,7 +779,7 @@ export class RaceDriver implements Driver {
       hi = oMax;
     }
     // Once a band has to be dropped, hold the lane on that car's side while the longitudinal
-    // yield opens room. This includes the car we yield to: braking does not clear its body.
+    // yield opens room. This includes the car yielded to: braking does not clear its body.
     for (let k = 0; k < ns; k++) {
       const e = side[k]!;
       if (e.ds > skipBelow) continue;
@@ -1077,7 +1079,9 @@ export class RaceDriver implements Driver {
       LATERAL_RATE,
       LATERAL_SLOPE * Math.max(v, this.passBypass ? BYPASS_SLOPE_FROM : LATERAL_SLOPE_FROM),
     );
-    if (view.launching && this.passId < 0) this.o = myO;
+    // (A move picked on the grid waits for the car to roll: the lane drifted 1.5 m from a car
+    // standing for the lights, and it left them on full lock and slid half round at Spa.)
+    if (view.launching && (this.passId < 0 || tel.speed < 1)) this.o = myO;
     else if (queueStop && sweep > 0) {
       // Throughout the queue the lane moves on the road, toward the target lane at no more
       // than the car's own lateral rate. (Adding the rate to the line's sweep crossed a target
@@ -1096,9 +1100,10 @@ export class RaceDriver implements Driver {
       const eHi = Math.max(0, this.at(plan.track.halfWidth[0], s0) - margin - ld0);
       this.o = Math.max(eLo, Math.min(eHi, this.o));
     }
-    // Steer for the offset's change while passing, yielding and returning to the line. Without
-    // this heading feedforward the car trails its moving lane by a metre or more into traffic.
-    const slope = view.launching ? -lineSlope : v > 5 ? (this.o - oBefore) / (v * dt) : 0;
+    // In a move the lane is held against the line sweeping under it, and the controller
+    // underneath steers for the offset's change as well as for the offset (it would trail the
+    // lane by a metre or more, into the other car).
+    const slope = this.passId >= 0 && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.

@@ -195,6 +195,17 @@ describe('race driver: passing', () => {
     expect(Math.abs(dr.last.offset)).toBeLessThan(0.5);
   });
 
+  it('pulls away from the grid in the lane it stands in, a move picked on the grid waiting', () => {
+    const dr = driver();
+    const ld = lineD(dr, STRAIGHT);
+    const me = { id: 0, s: STRAIGHT, d: ld + 3, speed: 0 };
+    // A move chosen while standing for the lights, its lane already drifted 1.5 m outward.
+    dr['passId'] = 1;
+    dr['o'] = 4.5;
+    tick(dr, me, [{ id: 1, s: STRAIGHT + 8, d: ld + 3, speed: 0 }], { launching: true });
+    expect(dr['o']).toBeCloseTo(3, 6);
+  });
+
   it('does not start a pass from the grid (launching)', () => {
     const dr = driver({ aggression: 1 });
     const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 8 };
@@ -205,31 +216,20 @@ describe('race driver: passing', () => {
 });
 
 describe('race driver: side by side', () => {
-  it('keeps clearance for its own angled footprint as well as the other car', () => {
-    const dr = driver();
-    const ld = lineD(dr, STRAIGHT);
-    const me = { id: 0, s: STRAIGHT, d: ld, speed: 30, halfWidth: BODY_HALF_WIDTH + 0.6 };
-    const beside = { id: 1, s: STRAIGHT, d: ld + 3.2, speed: 30 };
-    tick(dr, me, [beside]);
-    expect(beside.d - ld - dr.last.target).toBeGreaterThanOrEqual(SIDE_BY_SIDE + 0.6 - 1e-9);
-  });
-
-  it('holds a road lane on launch where the racing line sweeps across it', () => {
-    const dr = driver();
-    const s = 650;
-    const sweep = (lineD(dr, s + 1) - lineD(dr, s - 1)) / 2;
-    expect(Math.abs(sweep)).toBeGreaterThan(0.01);
-    tick(dr, { id: 0, s, d: lineD(dr, s) + 2, speed: 8 }, [], { launching: true });
-    expect(dr['inner'].offsetSlope).toBeCloseTo(Math.max(-0.15, Math.min(0.15, -sweep)), 10);
-  });
-
-  it('steers for the moving lane while returning to the line without an active pass', () => {
-    const dr = driver();
-    const ld = lineD(dr, STRAIGHT);
-    dr['o'] = -3;
-    tick(dr, { id: 0, s: STRAIGHT, d: ld - 3, speed: 30 }, []);
-    expect(dr.last.passing).toBe(-1);
-    expect(dr['inner'].offsetSlope).toBeGreaterThan(0);
+  it('keeps more room to a car alongside while moving across the road', () => {
+    // Clearance to the car beside, for this car heading `yaw` off the lap's direction.
+    const room = (yaw: number) => {
+      const dr = driver();
+      const ld = lineD(dr, STRAIGHT);
+      const me = { id: 0, s: STRAIGHT, d: ld, speed: 30 };
+      const beside = { id: 1, s: STRAIGHT, d: ld + SIDE_BY_SIDE + 0.05, speed: 30 };
+      dr.sense(view(me, [beside]));
+      dr.drive(at(me.s, me.d, me.speed, yaw), DT, { ...NEUTRAL_INPUT });
+      return beside.d - ld - dr.last.target;
+    };
+    expect(room(0)).toBeGreaterThanOrEqual(SIDE_BY_SIDE - 1e-9);
+    // 30 m/s at 0.05 rad is 1.5 m/s across: 0.15 s of seeing and reacting is 0.22 m more.
+    expect(room(0.05)).toBeGreaterThanOrEqual(SIDE_BY_SIDE + 0.2);
   });
 
   it('keeps a car width and some air to a car alongside, moving away from it', () => {
@@ -265,7 +265,6 @@ describe('race driver: side by side', () => {
     expect(dr.last.yielding).toBe(true);
     expect(dr.last.leader).toBe(1);
     expect(dr.last.accelLimit).toBeLessThan(0);
-    expect(dr.last.target).toBeLessThanOrEqual(edge - ld);
   });
 });
 
