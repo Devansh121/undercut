@@ -652,19 +652,26 @@ export class CircuitWorld {
         { geometry: canopyGeo, material: canopyMat, maxDistance: far },
       ],
     });
+    // The kit crew's finest level (5,000 to 7,000 triangles) only close by; none past the old
+    // crew's reach.
+    const crewLevels = { distanceCaps: [20, 250, far * 0.7] };
     props.define({
       id: 'pit-crew-engineer',
+      // Small cells: levels go by a cell's near edge, so only crew really near draw finest.
+      gridCell: 20,
       castShadow: false,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('crew-engineer-seated') ?? [
+      lods: o.propKit?.lodsFor('crew-engineer-seated', crewLevels) ?? [
         { geometry: engGeo, material: crewMat, maxDistance: far * 0.7 },
       ],
     });
     props.define({
       id: 'pit-crew-mechanic',
+      // Small cells: levels go by a cell's near edge, so only crew really near draw finest.
+      gridCell: 20,
       castShadow: false,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('crew-mechanic-standing') ?? [
+      lods: o.propKit?.lodsFor('crew-mechanic-standing', crewLevels) ?? [
         { geometry: mechGeo, material: crewMat, maxDistance: far * 0.7 },
       ],
     });
@@ -1163,8 +1170,11 @@ export class CircuitWorld {
         o.props.define({
           id: `crowd-near-${v}`,
           castShadow: false,
-          gridCell: 16,
-          lods: lods.map((l) => ({ ...l, maxDistance: Math.min(l.maxDistance, 50) })),
+          // Nobody beyond 32 m draws near (crowdSwapMaterial), so only the finest level, and no
+          // cell whose near edge is further away. Cells as wide as that reach: smaller ones
+          // multiplied draw calls and per-frame chunk work (867 cells at 16 m at Monza).
+          gridCell: 32,
+          lods: [{ ...lods[0]!, maxDistance: Math.min(lods[0]!.maxDistance, 32) }],
         });
       }
       this.crowdKinds = variants;

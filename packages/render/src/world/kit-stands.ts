@@ -47,7 +47,8 @@ export function placeKitStands(
         lod.geometry.computeBoundingSphere();
       }
     id = `stand-kit-${key}`;
-    props.define({ id, lods, gridCell: 50, castShadow: shadows, shadowMaxDistance: 240 });
+    // Shadows to 100 m: the kit bank's cast shadows cost three times its own triangles at 240 m.
+    props.define({ id, lods, gridCell: 100, castShadow: shadows, shadowMaxDistance: 100 });
     kinds.set(key, id);
     return id;
   };
