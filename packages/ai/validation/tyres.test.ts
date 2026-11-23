@@ -8,10 +8,8 @@ import { MONZA, loadEnvelope, loadLine, referenceLap } from './lib/index';
 // 4.2, all estimates): three timed laps after the out-lap on each compound. The tread settles
 // inside its working range, and the lap time wear alone costs each lap is inside section 4.2's
 // band for the compound. Lap time per unit of grip is measured quasi-steady: the racing line
-// re-planned on the envelope scaled down by 1 % (the reference driver follows one fixed plan, so
-// its own laps barely show grip).
+// re-planned on the envelope scaled down by 1 %, isolating wear from temperature and compound.
 
-const K = 273.15;
 const BANDS: Record<CompoundId, readonly [number, number]> = {
   soft: [0.08, 0.12],
   medium: [0.05, 0.08],
@@ -39,13 +37,12 @@ interface LapTyres {
   wearLoss: number;
 }
 
-function run(compound: CompoundId, temperature?: number): { spun: boolean; laps: LapTyres[] } {
+function run(compound: CompoundId): { spun: boolean; laps: LapTyres[] } {
   const laps: { tSum: number; n: number; first: number; last: number }[] = [];
   let lastT = Infinity;
   const { result } = referenceLap(MONZA, {
     laps: 3,
-    prepare: (car) =>
-      fitTyres(car.state, compound, temperature !== undefined ? { temperature } : {}),
+    prepare: (car) => fitTyres(car.state, compound),
     onSample: (car, _tel, time) => {
       const s = car.state;
       if (time < lastT) laps.push({ tSum: 0, n: 0, first: NaN, last: NaN });
@@ -77,20 +74,15 @@ describe('tyres on the reference driver at Monza', () => {
     expect(perPercent).toBeLessThan(0.35);
   });
 
-  // The hard set starts at 100 °C: from the blankets (70 °C, 30 K under its window) it has
-  // 6 % less grip on the out-lap, and the reference driver, on a plan made for new softs in
-  // their window, spins. Warming it up is the driver's job (the race AI's, later).
-  for (const [compound, start] of [
-    ['soft', undefined],
-    ['medium', undefined],
-    ['hard', K + 100],
-  ] as const) {
+  // Every set starts off the blankets. The hard's first timed lap still includes warm-up;
+  // judge its steady-state window and wear on laps 2–3, retaining the same published bands.
+  for (const compound of ['soft', 'medium', 'hard'] as const) {
     it(`${compound}: in its window at race pace, wear costing ${BANDS[compound].join('–')} s a lap`, () => {
       const c = COMPOUNDS[compoundIndex(compound)]!;
-      const r = run(compound, start);
+      const r = run(compound);
       expect(r.spun).toBe(false);
       expect(r.laps).toHaveLength(3);
-      for (const lap of r.laps) {
+      for (const lap of compound === 'hard' ? r.laps.slice(1) : r.laps) {
         expect(lap.meanTemp).toBeGreaterThan(c.windowLow);
         expect(lap.meanTemp).toBeLessThan(c.windowHigh);
         const seconds = lap.wearLoss * 100 * perPercent;

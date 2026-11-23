@@ -33,13 +33,13 @@ export interface CompoundParams {
 const C = 273.15;
 
 /**
- * The three dry compounds. Working ranges: Pirelli's last published windows (13-inch era,
+ * The three dry compounds. Working ranges: the supplier's last published windows (13-inch era,
  * 2019) shifted 5 °C lower for the 70 °C blanket limit, docs/physics-validation.md 4.2 [38]
  * [17], taking soft, medium and hard as C5, C4 and C3 (Monza's and Singapore's 2025
  * nomination; Spa's hard was C1, see 4.2 and 1.2). Grip steps between compounds and wear
  * rates are **estimates** (section 4.2: no published per-compound figures); `wearRate` is
  * calibrated so the lap-time loss to wear lands in section 4.2's bands at Monza
- * (packages/ai/validation/tyres.test.ts): soft 0.10, medium 0.065, hard 0.04 s a lap, with a
+ * (packages/ai/validation/tyres.test.ts): soft 0.082–0.087, medium 0.056–0.059, hard 0.035 s a lap, with a
  * lap there costing 0.31 s per 1 % of grip (quasi-steady: the racing line re-planned on a
  * scaled envelope). The grip steps cost 0.28 s (medium) and 0.55 s (hard) a lap there.
  */
