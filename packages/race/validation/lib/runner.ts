@@ -39,6 +39,12 @@ export interface RaceRunOptions {
   clock?: () => number;
   /** Grid order (car indices, pole first). */
   grid?: number[];
+  /** Tyre temperature and wear modelled (`RaceSessionOptions.tyres`). */
+  tyres?: boolean;
+  /** Starting compound for every car. Default medium. */
+  compound?: string;
+  /** Start fuel load, kg, burnt with no top-up (`RaceSessionOptions.startFuel`). */
+  startFuel?: number;
 }
 
 export interface CarSummary {
@@ -136,7 +142,10 @@ function load(): Loaded {
 /** Build a session of AI cars. */
 export function aiSession(
   spec: SessionSpec,
-  o: Pick<RaceRunOptions, 'cars' | 'seed' | 'spread' | 'rules' | 'grid' | 'gridNoise'>,
+  o: Pick<
+    RaceRunOptions,
+    'cars' | 'seed' | 'spread' | 'rules' | 'grid' | 'gridNoise' | 'tyres' | 'compound' | 'startFuel'
+  >,
 ): RaceSession {
   const { track, line, envelope } = load();
   const params = createCarParams(MONZA.trim);
@@ -158,12 +167,14 @@ export function aiSession(
     seed: o.seed,
     params,
     cars: field.map((controller, i) => ({
-      entrant: entrants[i]!,
+      entrant: o.compound ? { ...entrants[i]!, compound: o.compound } : entrants[i]!,
       controller,
       ersMode: controller.driver.ersMode,
     })),
     ...(o.rules ? { rules: o.rules } : {}),
     ...(o.grid ? { grid: o.grid } : {}),
+    ...(o.tyres ? { tyres: true } : {}),
+    ...(o.startFuel !== undefined ? { startFuel: o.startFuel } : {}),
   });
 }
 

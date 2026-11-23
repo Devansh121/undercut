@@ -8,6 +8,7 @@ import {
 } from '@undercut/sim';
 import { createPathPoint, type PathPoint } from '@undercut/track';
 import { Phase, type DrivingPlan } from '../profile/plan';
+import { SpeedProfiler, type SpeedProfile } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { lockExcess, spinExcess } from './feel';
 import { fullLoadTorque } from '../envelope/shift';
@@ -108,6 +109,9 @@ function wrapAngle(a: number): number {
   return a - TWO_PI * Math.floor((a + Math.PI) / TWO_PI);
 }
 
+/** Grip steps the speed profile is re-planned in, share of the reference tyre's. */
+const GRIP_BUCKET = 0.005;
+
 export class ReferenceDriver implements Driver {
   readonly name = 'reference';
   readonly ersMode = ErsMode.None;
@@ -133,6 +137,12 @@ export class ReferenceDriver implements Driver {
   private yawIntegral = 0;
   private throttleCap = 1;
   private brakeCap = 1;
+  /**
+   * Speed profiles planned on less grip than the reference tyre's, by grip bucket (see
+   * `profileFor`): derived from the plan, made when first needed, never part of a snapshot.
+   */
+  private readonly gripProfiles = new Map<number, SpeedProfile>();
+  private profiler: SpeedProfiler | null = null;
   private shiftHold = 0;
   private crossedLine = false;
   private steerOut = 0;
@@ -271,7 +281,6 @@ export class ReferenceDriver implements Driver {
     const plan = this.plan;
     const track = plan.track;
     const line = plan.line;
-    const prof = plan.profile;
     const g = this.gains;
     const p = this.params;
     const n = line.count;
@@ -363,17 +372,21 @@ export class ReferenceDriver implements Driver {
     // ---- Speed ----
     // Feedforward read a little ahead covers the time the car takes to build deceleration or
     // drive; the feedback holds the speed the profile wants here.
-    const vTarget = prof.v[i]! + (prof.v[j]! - prof.v[i]!) * f;
-    const aHere = prof.ax[i]! + (prof.ax[j]! - prof.ax[i]!) * f;
-    const aAhead = this.sampleAhead(prof.ax, s, v * g.speedPreview);
+    // On tyres with less grip than the reference tyre the plan was made for (worn, cold or hot),
+    // the profile planned on that grip: slower where the plan is grip-limited, the same where
+    // the engine sets the speed. The plan itself on the reference tyre.
+    const speeds = this.profileFor(tel.tyreGrip);
+    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f;
+    const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
+    const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
     // Already under the speed the profile wants a moment ahead: no reason to brake early for
     // it. (Compared with the target ahead, not here: braking early by design leaves the car
     // under the target here at every braking onset.)
-    const vAhead = this.sampleAhead(prof.v, s, v * g.speedPreview);
+    const vAhead = this.sampleAhead(speeds.v, s, v * g.speedPreview);
     const aFf = v < vAhead - 1 ? Math.max(aHere, aAhead) : aAhead;
     const aDemand = Math.min(aFf + g.speedGain * (vTarget - v), this.accelLimit);
-    const drsHere = plan.drsZone[i] === 1 && prof.phase[i] !== Phase.Brake;
-    const deployHere = prof.deploying[i] === 1 && (this.crossedLine || this.deployBeforeLine);
+    const drsHere = plan.drsZone[i] === 1 && speeds.phase[i] !== Phase.Brake;
+    const deployHere = speeds.deploying[i] === 1 && (this.crossedLine || this.deployBeforeLine);
     const model = plan.model;
     const drag = model.drag(v, tel.drs > 0.5);
     const full = model.drive(v, tel.drs > 0.5, deployHere);
@@ -468,8 +481,33 @@ export class ReferenceDriver implements Driver {
     last.throttleCap = this.throttleCap;
     last.lockExcess = lockOver;
     last.targetSpeed = vTarget;
-    last.phase = prof.phase[i]!;
+    last.phase = speeds.phase[i]!;
     return out;
+  }
+
+  /**
+   * The speed profile for tyres with `grip` of the reference tyre's: the plan's on the reference
+   * tyre (or better), else the line re-planned on the envelope scaled down by the grip, rounded
+   * down to `GRIP_BUCKET` (a car does not drive on grip it does not have). Computed once
+   * per bucket and kept; engine force and aerodynamic drag are not scaled.
+   */
+  private profileFor(grip: number): SpeedProfile {
+    const plan = this.plan;
+    if (!(grip < 1)) return plan.profile;
+    const k = Math.max(0, Math.floor(grip / GRIP_BUCKET));
+    let p = this.gripProfiles.get(k);
+    if (!p) {
+      const f = k * GRIP_BUCKET;
+      const sc = plan.scale;
+      this.profiler ??= new SpeedProfiler(plan.line, plan.model);
+      p = this.profiler.compute({
+        scale: { lateral: sc.lateral * f, brake: sc.brake * f, traction: sc.traction * f },
+        drs: plan.drsZone,
+        ers: plan.deployMask,
+      });
+      this.gripProfiles.set(k, p);
+    }
+    return p;
   }
 
   /** Value of a per-sample array at centreline s + ahead (linear interpolation, wraps). */

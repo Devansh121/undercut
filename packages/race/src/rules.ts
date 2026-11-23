@@ -169,6 +169,23 @@ export const SERVICE_TIMES: Readonly<Record<string, number>> = Object.freeze({
   tyres: 2.4,
 });
 
-/** Dry tyre compounds the "change tyres" action can fit. Wear and temperature arrive in M4. */
+/**
+ * Fuel a full-distance race starts with, kg (doc 4.3: about 105 kg, so 1.9 kg a lap at Monza,
+ * 2.3 at Spa, 1.6 at Singapore). There is no refuelling in the modelled era.
+ */
+export const FULL_RACE_FUEL = 105;
+/** Fuel tank capacity, kg (the car's `fuelCapacity`, doc 1.1). */
+const TANK = 110;
+
+/**
+ * A race's start load, kg: the full-distance load scaled to `laps` of a circuit whose full
+ * distance is `raceLaps`, plus one lap in hand, at most a full tank. The game's start-load
+ * choice; strategy may pick another later.
+ */
+export function raceStartFuel(laps: number, raceLaps: number): number {
+  return Math.min(TANK, (FULL_RACE_FUEL * (laps + 1)) / Math.max(1, raceLaps));
+}
+
+/** Dry tyre compounds the "change tyres" action can fit; temperature and wear in `@undercut/sim`. */
 export const COMPOUNDS = ['soft', 'medium', 'hard'] as const;
 export type Compound = (typeof COMPOUNDS)[number];

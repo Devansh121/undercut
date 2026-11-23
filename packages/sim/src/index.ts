@@ -125,6 +125,20 @@ export {
   type TyreForce,
 } from './tyre';
 export {
+  COMPOUNDS,
+  TYRE_THERMAL,
+  compoundIndex,
+  fitTyres,
+  temperatureGrip,
+  tyreGrip,
+  updateTyres,
+  wearGrip,
+  type CompoundId,
+  type CompoundParams,
+  type FitOptions,
+  type TyreThermalParams,
+} from './tyre-condition';
+export {
   createCarPose,
   createCarTelemetry,
   interpolateCarPose,

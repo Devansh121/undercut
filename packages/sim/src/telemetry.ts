@@ -48,6 +48,17 @@ export interface CarTelemetry {
   /** DRS flap position, 0 closed to 1 open. */
   drs: number;
   fuelMass: number;
+  /**
+   * Tyres (`tyre-condition.ts`): the compound fitted (index into `COMPOUNDS`, −1 none), each
+   * tread's temperature, K, and wear (0 new, 1 the tread gone), and the grip factor of the
+   * weaker axle, the mean of its two tyres (1: the reference tyre, new and in its window; also
+   * with none fitted). An axle's tyres share its work: the least of the four (Monza's front
+   * right, cool all lap) understated the car.
+   */
+  tyreCompound: number;
+  readonly tyreTemp: Float64Array;
+  readonly tyreWear: Float64Array;
+  tyreGrip: number;
   downforce: number;
   drag: number;
   /** World position and heading. */
@@ -99,6 +110,10 @@ export function createCarTelemetry(): CarTelemetry {
     ersMode: 0,
     drs: 0,
     fuelMass: 0,
+    tyreCompound: -1,
+    tyreTemp: new Float64Array(4),
+    tyreWear: new Float64Array(4),
+    tyreGrip: 1,
     downforce: 0,
     drag: 0,
     x: 0,
@@ -150,6 +165,11 @@ export function readCarTelemetry(
   out.ersMode = state.ersMode;
   out.drs = state.drsPosition;
   out.fuelMass = state.fuelMass;
+  out.tyreCompound = state.tyreCompound;
+  out.tyreTemp.set(state.tyreTemp);
+  out.tyreWear.set(state.tyreWear);
+  const g = state.gripScale;
+  out.tyreGrip = Math.min(0.5 * (g[0]! + g[1]!), 0.5 * (g[2]! + g[3]!));
   out.downforce = state.downforceFront + state.downforceRear;
   out.drag = state.dragForce;
   out.x = state.x;

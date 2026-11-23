@@ -6,6 +6,16 @@ import { Text, el, icon, setClass, setData, svg } from './dom';
 import { glyph, refreshGlyphs } from './kit/glyph';
 import { S } from './strings';
 import { TimingTower, type TowerRow } from './hud/tower';
+import {
+  compoundMark,
+  formatFuel,
+  formatTyreTemp,
+  tyreBand,
+  type CompoundMark,
+  type HudTyres,
+} from './hud/tyres';
+
+export type { HudTyres } from './hud/tyres';
 
 export type SectorState = DeltaClass | 'run' | 'none';
 export type DrsState = 'off' | 'available' | 'open';
@@ -66,6 +76,10 @@ export interface HudState {
   wrongWay: boolean;
   stopped: boolean;
   message: HudMessage | null;
+  /** Tyre temperatures and wear, when the session models them (else the panel says no data). */
+  tyres?: HudTyres | null;
+  /** Fuel on board, kg, when the session burns a start load (else not shown). */
+  fuel?: number | null;
   /** Other cars on the map (online): world position, team colour and opacity. Optional. */
   others?: readonly { x: number; z: number; colour: string; opacity: number }[];
 }
@@ -121,6 +135,14 @@ export class Hud {
   /** Reused for every map projection: update() allocates no arrays. */
   private readonly xy: [number, number] = [0, 0];
   private staticSet = false;
+  /** Tyre panel (desktop) and the compact tyre strip (phone). */
+  private readonly tyreCells: { cell: HTMLElement; temp: Text; wear: HTMLElement; pct: number }[] =
+    [];
+  private readonly miniCells: HTMLElement[] = [];
+  private readonly tyreNote: Text;
+  private readonly miniFuel: Text;
+  private readonly compoundEls: { root: HTMLElement; code: Text; ticks: HTMLElement[] }[] = [];
+  private compoundShown = '';
 
   /** `mode`: the tower's session label ("Time trial", "Online race"). */
   constructor(plan: MinimapPlan, identity?: HudIdentity, mode: string = S.hud.timeTrial) {
@@ -299,29 +321,33 @@ export class Hud {
     // Driver cluster (bottom right): tyre panel (desktop) + drive panel.
     const cluster = el('div', 'hud-cluster');
 
+    // The compound the session starts on (identity), until the tyres say otherwise.
+    const startMark: CompoundMark = identity
+      ? {
+          code: identity.compoundCode,
+          colour: identity.compoundColour,
+          slots: identity.compoundSlots,
+        }
+      : compoundMark('medium');
     const tyres = el('section', 'hud-tyres panel');
     tyres.setAttribute('aria-label', S.hud.tyres);
-    tyres.title = S.hud.tyreModel;
+    tyres.dataset.testid = 'hud-tyres';
     const tHead = el('div', 'hud-tyres__head');
-    const compound = el('span', 'hud-compound');
-    const cCode = el('b', '', identity?.compoundCode ?? 'M');
-    const cColour = identity?.compoundColour ?? '#F2902F';
-    const cSlots = identity?.compoundSlots ?? [-1, 1];
-    compound.style.setProperty('--compound', cColour);
-    const ticks = el('span', 'hud-compound__ticks');
-    for (const slot of [-1, 0, 1]) {
-      const tick = el('i', cSlots.includes(slot) ? 'is-on' : '');
-      ticks.append(tick);
-    }
-    compound.append(cCode, ticks);
-    tHead.append(el('span', 'label', S.hud.tyres), compound);
+    tHead.append(el('span', 'label', S.hud.tyres), this.compoundMark(startMark));
     const tGrid = el('div', 'hud-tyres__grid');
     for (const pos of WHEEL_POSITIONS) {
       const w = el('div', 'hud-tyre');
-      w.append(el('span', 'hud-tyre__pos', pos), el('b', 'num is-empty', '—'));
+      const temp = el('b', 'num is-empty', '—');
+      const bar = el('span', 'hud-tyre__wear');
+      const wear = el('i');
+      bar.append(wear);
+      w.append(el('span', 'hud-tyre__pos', pos), temp, bar);
       tGrid.append(w);
+      this.tyreCells.push({ cell: w, temp: new Text(temp), wear, pct: -1 });
     }
-    tyres.append(tHead, tGrid, el('span', 'hud-tyres__note', S.hud.noData));
+    const note = el('span', 'hud-tyres__note', S.hud.noData);
+    this.tyreNote = new Text(note);
+    tyres.append(tHead, tGrid, note);
 
     const drive = el('section', 'hud-drive panel');
     drive.setAttribute('aria-label', S.hud.car);
@@ -358,13 +384,83 @@ export class Hud {
     this.drsEl = el('div', 'hud-drs', S.hud.drs);
     this.drsEl.dataset.testid = 'drs';
     ers.append(ersLeft, this.drsEl);
-    drive.append(revs, sg, ers);
+    // Phone: the tyre panel is hidden; a compact strip in the drive panel instead.
+    const mini = el('div', 'hud-mini-tyres');
+    mini.dataset.testid = 'hud-mini-tyres';
+    const cells = el('span', 'hud-mini-tyres__cells');
+    cells.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 4; i++) {
+      const c = el('i');
+      cells.append(c);
+      this.miniCells.push(c);
+    }
+    const miniFuel = el('b', 'num');
+    this.miniFuel = new Text(miniFuel);
+    mini.append(this.compoundMark(startMark), cells, miniFuel);
+    drive.append(revs, sg, ers, mini);
     cluster.append(tyres, drive);
 
     const right = el('div', 'hud-right');
     right.append(timing, map);
     root.append(session, control, right, cluster);
     refreshGlyphs(root);
+  }
+
+  /** A compound mark (code letter and ticks), kept to follow the compound fitted. */
+  private compoundMark(m: CompoundMark): HTMLElement {
+    const root = el('span', 'hud-compound');
+    const code = el('b', '', m.code);
+    const ticks = el('span', 'hud-compound__ticks');
+    const tickEls: HTMLElement[] = [];
+    for (const slot of [-1, 0, 1]) {
+      const tick = el('i', m.slots.includes(slot) ? 'is-on' : '');
+      ticks.append(tick);
+      tickEls.push(tick);
+    }
+    root.style.setProperty('--compound', m.colour);
+    root.append(code, ticks);
+    this.compoundEls.push({ root, code: new Text(code), ticks: tickEls });
+    return root;
+  }
+
+  /** The tyre panel, the phone strip and fuel. Writes only what changed. */
+  private updateTyres(h: HudState): void {
+    const t = h.tyres ?? null;
+    if (t && t.compound !== this.compoundShown) {
+      this.compoundShown = t.compound;
+      const m = compoundMark(t.compound);
+      for (const c of this.compoundEls) {
+        c.code.set(m.code);
+        c.root.style.setProperty('--compound', m.colour);
+        c.ticks.forEach((tick, k) => setClass(tick, 'is-on', m.slots.includes(k - 1)));
+      }
+    }
+    for (let i = 0; i < 4; i++) {
+      const cell = this.tyreCells[i]!;
+      const mini = this.miniCells[i]!;
+      if (!t) {
+        cell.temp.set('—');
+        setClass(cell.temp.node, 'is-empty', true);
+        setData(cell.cell, 'band', '');
+        setData(mini, 'band', '');
+        continue;
+      }
+      const band = tyreBand(t.temp[i]!, t.low, t.high);
+      cell.temp.set(formatTyreTemp(t.temp[i]!));
+      setClass(cell.temp.node, 'is-empty', false);
+      setData(cell.cell, 'band', band);
+      setData(mini, 'band', band);
+      // Tread left, whole per cent: a style write only when it changes.
+      const pct = Math.round(100 * (1 - Math.min(1, Math.max(0, t.wear[i]!))));
+      if (pct !== cell.pct) {
+        cell.pct = pct;
+        cell.wear.style.setProperty('--left', `${pct}%`);
+        cell.wear.title = S.hud.treadLeft(pct);
+      }
+    }
+    const fuel = h.fuel ?? null;
+    this.tyreNote.set(fuel !== null ? S.hud.fuelOnBoard(formatFuel(fuel)) : t ? '' : S.hud.noData);
+    this.miniFuel.set(fuel !== null ? formatFuel(fuel) : '');
   }
 
   /** Show or hide the HUD layer (used for HUD-on vs HUD-off frame-time measurement). */
@@ -378,6 +474,7 @@ export class Hud {
   }
 
   update(h: HudState): void {
+    this.updateTyres(h);
     const t = this.t;
     if (!this.staticSet) {
       // Circuit name and length do not change during a session: written once.

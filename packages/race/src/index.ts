@@ -44,6 +44,8 @@ export {
   type SessionResult,
 } from './results';
 export {
+  FULL_RACE_FUEL,
+  raceStartFuel,
   COMPOUNDS,
   DEFAULT_RULES,
   POINTS_TABLE,
