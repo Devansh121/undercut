@@ -1080,8 +1080,13 @@ export class RaceDriver implements Driver {
     }
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
-    const target = this.mirrorTarget(view, s0, myO, Math.max(lo, Math.min(hi, base)));
     const yielding = yieldTo !== null;
+    const clamped = Math.max(lo, Math.min(hi, base));
+    // Round a stopped car, giving way, or at crawling pace in a queue, the queue rules place it.
+    const target =
+      yielding || this.passBypass || v < LAUNCHED
+        ? clamped
+        : this.mirrorTarget(view, s0, myO, clamped);
     // Launching, the car holds its grid lane while traction is limited.
     // A queue forming behind a car standing in the road ahead (`QUEUE_BRAKE`, `QUEUE_GAP`,
     // `CAUTION_DECEL`, the lane and steering at walking pace below). Not off the grid: there
@@ -1317,25 +1322,35 @@ export class RaceDriver implements Driver {
     return this.defendSide * Math.min(2.4, this.defendSide > 0 ? hi : -lo);
   }
 
-  /** Hold a voluntary lane change while a faster car will reach that side during the move. */
+  /**
+   * A voluntary lane change at racing speed stops short of the lane of a faster car that will be
+   * there during the move: the car goes as far as side-by-side room from it allows, never across.
+   */
   private mirrorTarget(view: TrafficView, s0: number, current: number, target: number): number {
     const direction = Math.sign(target - current);
     if (direction === 0) return target;
     const ld = this.at(this.plan.line.d, s0);
+    let out = target;
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       const ds = this.ahead(s0, c.s);
       const closing = c.speed - view.self.speed;
-      if (ds >= 0 || ds < -SEE_BEHIND || closing <= 0) continue;
-      const across = c.d - ld - current;
+      // A car already alongside is kept clear by the side-by-side limits.
+      if (ds >= -CAR_LENGTH || ds < -SEE_BEHIND || closing <= 0) continue;
+      const od = c.d - ld;
+      const across = od - current;
       // A car on the side we are leaving is no reason to hold the move.
       if (direction * across <= 0) continue;
-      const clearance = SIDE_BY_SIDE + c.halfWidth - BODY_HALF_WIDTH;
-      if (Math.abs(c.d - ld - target) >= clearance + PASS_CLEARANCE) continue;
+      const room = SIDE_BY_SIDE + c.halfWidth - BODY_HALF_WIDTH + PASS_CLEARANCE;
+      if (Math.abs(od - target) >= room) continue;
       const time = Math.min(2, Math.abs(across) / LATERAL_RATE) + SEE_DELAY + this.skill.reaction;
-      if (-ds - CAR_LENGTH < closing * time) return current;
+      if (-ds - CAR_LENGTH >= closing * time) continue;
+      // As far toward the target as leaves that car its room, and no move back the other way.
+      const edge = od - direction * room;
+      const stop = direction > 0 ? Math.max(current, edge) : Math.min(current, edge);
+      out = direction > 0 ? Math.min(out, stop) : Math.max(out, stop);
     }
-    return target;
+    return out;
   }
 
   /**

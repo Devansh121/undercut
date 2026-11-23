@@ -490,15 +490,19 @@ describe('race driver: stopped cars on the road', () => {
 
 describe('race driver: mirrors before changing lane', () => {
   for (const side of [-1, 1]) {
-    it(`holds its lane when returning across a car closing from behind on side ${side}`, () => {
-      const dr = driver();
-      const ld = lineD(dr, STRAIGHT);
-      const me = { id: 0, s: STRAIGHT, d: ld + side * 3.5, speed: 50 };
-      dr['o'] = side * 3.5;
-      dr['wasActive'] = true;
-      const rear = { id: 1, s: STRAIGHT - 12, d: ld, speed: 65 };
-      tick(dr, me, [rear]);
-      expect(side * dr.last.target).toBeGreaterThanOrEqual(3.5);
+    it(`stops short of the lane of a car closing from behind on side ${side}`, () => {
+      // Side by side room from the closing car on the line, plus the 0.3 m passing margin.
+      const room = SIDE_BY_SIDE + 0.3;
+      for (const from of [3.5, 6]) {
+        const dr = driver();
+        const ld = lineD(dr, STRAIGHT);
+        const me = { id: 0, s: STRAIGHT, d: ld + side * from, speed: 50 };
+        dr['o'] = side * from;
+        dr['wasActive'] = true;
+        const rear = { id: 1, s: STRAIGHT - 12, d: ld, speed: 65 };
+        tick(dr, me, [rear]);
+        expect(side * dr.last.target).toBeCloseTo(room, 6);
+      }
     });
   }
 
