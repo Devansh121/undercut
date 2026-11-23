@@ -168,7 +168,10 @@ describe('power unit', () => {
     expect(car.gear).toBe(4);
     expect(car.shiftTimer).toBe(0);
     const carrier = (car.wheelSpeed[2]! + car.wheelSpeed[3]!) / 2;
-    expect(radToRpm(car.engineSpeed)).toBeCloseTo(radToRpm(params.gearbox.ratios[3]! * carrier), -2);
+    expect(radToRpm(car.engineSpeed)).toBeCloseTo(
+      radToRpm(params.gearbox.ratios[3]! * carrier),
+      -2,
+    );
     // Drive torque through the shift: never cut, as a timed shift's is.
     for (let i = 0; i < 10; i++) {
       stepCar(car, input({ throttle: 1 }), FLAT_SURFACE, DT, env);
