@@ -15,6 +15,10 @@ import { LEFT, RIGHT, createGround, type Track } from './track';
  * for the renderer stands this far out.
  */
 export const GARAGE_WALL_GAP = 0.5;
+/** Spacing of the check for wall between a body corner and the car's centre, m. */
+const WALL_SCAN_STEP = 0.25;
+/** Barrier depth past which a warm-started query is checked with a fresh projection, m. */
+const WALL_RECHECK_DEPTH = 0.3;
 
 /** Friction, rolling drag and texture of a surface. */
 export interface SurfaceProperties {
@@ -61,6 +65,19 @@ export class TrackSurface implements SurfaceSampler {
   private readonly g = createGround();
   private readonly t = createVec3();
   private readonly pt = createVec3();
+  // Barrier query scratch: the last `wallAt` result's lap face and which frame resolved it.
+  private lapDepth = 0;
+  private lapNx = 0;
+  private lapNz = 0;
+  private wallSide = 0;
+  private wallNear = -1;
+  private pitFace = false;
+  private readonly refHint = { index: -1 };
+  private readonly scanHint = { index: -1 };
+  private readonly scanOut: WallSample = { depth: 0, normalX: 0, normalZ: 0 };
+  private refX = NaN;
+  private refZ = NaN;
+  private refBehind = false;
 
   /**
    * `breakables: false` leaves the lightweight objects out of the contact: for validation runs
@@ -142,7 +159,106 @@ export class TrackSurface implements SurfaceSampler {
    * from both sides. Depth is the distance past the nearer region's edge, so a car on either
    * side of the pit wall is pushed back to its own side.
    */
-  wall(x: number, z: number, hint: SurfaceHint, out: WallSample): void {
+  /**
+   * Barrier depth and inward normal at (x, z). With a reference point inside the same body (the
+   * car's centre), a pit wall, the one barrier with a far side, is resolved toward the side the
+   * reference is on whenever wall lies between them or holds the corner: it never comes out of the far
+   * side, however deep it got in. At the pit lane's mouths nothing lies between, so cars drive
+   * in and out as before.
+   */
+  wall(x: number, z: number, hint: SurfaceHint, out: WallSample, refX = NaN, refZ = NaN): void {
+    const warm = hint.index >= 0;
+    this.wallAt(x, z, hint, out);
+    out.thin = this.wallNear >= 0 && this.wallSide === this.track.pitSide;
+    if (warm && out.depth > WALL_RECHECK_DEPTH) {
+      // A warm-started projection can settle on another stretch of the centreline (on the
+      // inside of a tight bend, far from it) and report a deep, false penetration: one substep
+      // moves a body point only centimetres. Project afresh and keep the shallower answer.
+      const depth = out.depth;
+      const nx = out.normalX;
+      const nz = out.normalZ;
+      const index = hint.index;
+      hint.index = -1;
+      this.wallAt(x, z, hint, out);
+      if (out.depth > depth) {
+        out.depth = depth;
+        out.normalX = nx;
+        out.normalZ = nz;
+        hint.index = index;
+        this.wallAt(x, z, hint, this.scanOut);
+      }
+    }
+    if (!(refX === refX) || this.wallNear < 0 || this.wallSide !== this.track.pitSide) return;
+    const behind = this.behindBarrier(refX, refZ);
+    if (!behind) {
+      // The car is on the track: a corner sent out to the pit lane came through the wall.
+      if (!this.pitFace) return;
+      const depth = this.lapDepth;
+      const nx = this.lapNx;
+      const nz = this.lapNz;
+      if (!this.wallBetween(refX, refZ, x, z)) return;
+      out.depth = depth;
+      out.normalX = nx;
+      out.normalZ = nz;
+    } else {
+      // The car is in the pit lane: a corner sent out to the track came through the wall.
+      if (this.pitFace || !this.pitTrackFace(x, z)) return;
+      const depth = this.scanOut.depth;
+      const nx = this.scanOut.normalX;
+      const nz = this.scanOut.normalZ;
+      if (!this.wallBetween(refX, refZ, x, z)) return;
+      out.depth = depth;
+      out.normalX = nx;
+      out.normalZ = nz;
+    }
+  }
+
+  /** Whether a point lies beyond the lap's barrier line on the pit side (in the pit complex). */
+  private behindBarrier(x: number, z: number): boolean {
+    if (x === this.refX && z === this.refZ) return this.refBehind;
+    const track = this.track;
+    const q = track.project(x, z, this.refHint, this.q);
+    const side = q.d >= 0 ? LEFT : RIGHT;
+    this.refX = x;
+    this.refZ = z;
+    this.refBehind =
+      side === track.pitSide && (side === LEFT ? q.d : -q.d) > track.barrierAt(q.s, side);
+    return this.refBehind;
+  }
+
+  /**
+   * Whether wall lies on the way from (ax, az) to (bx, bz), the end included, checked 0.25 m
+   * apart: the body point is inside the wall or beyond it from the reference.
+   */
+  private wallBetween(ax: number, az: number, bx: number, bz: number): boolean {
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / WALL_SCAN_STEP));
+    this.scanHint.index = -1;
+    for (let k = 1; k <= n; k++) {
+      const f = k / n;
+      this.wallAt(ax + (bx - ax) * f, az + (bz - az) * f, this.scanHint, this.scanOut);
+      if (this.scanOut.depth > 0) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The pit lane's track-side face at (x, z), in `scanOut`: how far the point is beyond the lane
+   * toward the track, and the normal back into the lane. False outside the lane's length.
+   */
+  private pitTrackFace(x: number, z: number): boolean {
+    const pit = this.track.pit;
+    this.pitHint.index = -1;
+    const pq = pit.path.project(x, z, this.pitHint, this.pq);
+    if (pq.s < 0 || pq.s > pit.length) return false;
+    const gs = pit.side === 'left' ? 1 : -1;
+    const pn = pit.path.normal(pq.s, this.t);
+    this.scanOut.depth = -gs * pq.d - pit.halfWidth(pq.s, gs > 0 ? RIGHT : LEFT);
+    this.scanOut.normalX = gs * pn.x;
+    this.scanOut.normalZ = gs * pn.z;
+    return true;
+  }
+
+  private wallAt(x: number, z: number, hint: SurfaceHint, out: WallSample): void {
     const track = this.track;
     const lap = track.lap;
     const segs = lap.segments;
@@ -177,8 +293,14 @@ export class TrackSurface implements SurfaceSampler {
     let depth = (sign * d - b) / gl;
     let nx = -gx / gl;
     let nz = -gz / gl;
+    this.lapDepth = depth;
+    this.lapNx = nx;
+    this.lapNz = nz;
+    this.wallSide = side;
+    this.pitFace = false;
 
-    const near = track.pitNear[lap.sampleIndex(s)]!;
+    const near = track.pitWallNear[lap.sampleIndex(s)]!;
+    this.wallNear = near;
     if (depth > 0 && near >= 0 && side === track.pitSide) {
       const pit = track.pit;
       this.pitHint.index = pitIndex >= 0 ? pitIndex : Math.min(near, pit.path.segments - 1);
@@ -199,6 +321,7 @@ export class TrackSurface implements SurfaceSampler {
           depth = pitDepth;
           nx = toward * pn.x;
           nz = toward * pn.z;
+          this.pitFace = true;
         }
       }
     }
