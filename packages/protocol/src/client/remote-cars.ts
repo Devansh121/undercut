@@ -9,7 +9,7 @@
  * or a jump its velocities cannot explain) is never interpolated across: the car stays
  * where it was until the reset's timestamp, then appears at the new place.
  */
-import type { CarSnapshot } from '../snapshot';
+import { BROKEN_SET_WORDS, type CarSnapshot } from '../snapshot';
 
 export interface RemoteCarOptions {
   /** Longest extrapolation past the newest snapshot, ms. */
@@ -89,6 +89,13 @@ function interpolate(a: CarSnapshot, b: CarSnapshot, t: number): CarSnapshot {
   const dt = (b.t - a.t) / 1000;
   return {
     ...near,
+    ...(near.breakableHits
+      ? {
+          breakableHits: near.breakableHits.map((v, i) =>
+            i % 4 === 1 ? Math.max(0, v + (lerp(a.t, b.t, t) - near.t) / 1000) : v,
+          ),
+        }
+      : {}),
     t: lerp(a.t, b.t, t),
     x: hermite(a.x, a.vx, b.x, b.vx, t, dt),
     y: hermite(a.y, a.vy, b.y, b.vy, t, dt),
@@ -133,6 +140,9 @@ function extrapolate(c: CarSnapshot, ms: number): CarSnapshot {
   const dt = ms / 1000;
   return {
     ...c,
+    ...(c.breakableHits
+      ? { breakableHits: c.breakableHits.map((v, i) => (i % 4 === 1 ? v + dt : v)) }
+      : {}),
     t: c.t + ms,
     x: c.x + c.vx * dt,
     y: c.y + c.vy * dt,
@@ -143,6 +153,11 @@ function extrapolate(c: CarSnapshot, ms: number): CarSnapshot {
 
 export class RemoteCarBuffer {
   private readonly seats = new Map<number, SeatBuffer>();
+  /**
+   * Every lightweight object the other cars' senders have seen broken, gathered from the word of
+   * the set each record carries (`CarSnapshot.brokenIndex`), duplicates and late records too.
+   */
+  readonly brokenSet = new Uint32Array(BROKEN_SET_WORDS);
   private readonly options: RemoteCarOptions;
   private delay: number | null = null;
   /** Snapshots accepted, and dropped as duplicates or too old. */
@@ -155,6 +170,9 @@ export class RemoteCarBuffer {
 
   /** Add a snapshot that arrived at server time `arrivedAt` (the local clock estimate). */
   push(car: CarSnapshot, arrivedAt: number): void {
+    const word = car.brokenIndex ?? 0;
+    if (word >= 0 && word < BROKEN_SET_WORDS)
+      this.brokenSet[word] = (this.brokenSet[word]! | (car.brokenWord ?? 0)) >>> 0;
     let buf = this.seats.get(car.seat);
     if (!buf) {
       buf = { history: [], transit: arrivedAt - car.t, jitter: 0, samples: 0 };
@@ -191,6 +209,7 @@ export class RemoteCarBuffer {
   }
 
   clear(): void {
+    this.brokenSet.fill(0);
     this.seats.clear();
     this.delay = null;
   }

@@ -153,7 +153,10 @@ export class GameLoop {
       }
       result.events.push(...session.tick(frame.control, frame.device));
       result.steps++;
-      const impact = session.car.state.wallImpactSpeed;
+      const impact = Math.max(
+        session.car.state.wallImpactSpeed,
+        session.car.state.breakableImpactSpeed,
+      );
       if (impact > result.wallImpact) result.wallImpact = impact;
       if (stop) {
         this.pause();

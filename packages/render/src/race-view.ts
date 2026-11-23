@@ -38,6 +38,7 @@ import { FramePacer, webglFences } from './pipeline/frame-pacer';
 import { GpuTimer } from './pipeline/gpu-timer';
 import { RenderPipeline, type GradeFrame, type ToneMap } from './pipeline/post';
 import { PropRegistry } from './props/registry';
+import { placeLightweightFallback } from './props/lightweight';
 import {
   QUALITY,
   effectiveQuality,
@@ -168,6 +169,8 @@ export interface ViewFrame {
   dt: number;
   /** Running time for camera shake, s. */
   time: number;
+  /** Simulation time for contact debris, s. */
+  simulationTime?: number;
   lookBack: boolean;
   /** For the steering-wheel display: gear and rev lights lit (0–15, 16 at the limiter). */
   gear: number;
@@ -232,6 +235,7 @@ export class RaceView {
   readonly rig = new CameraRig();
   readonly quality: Quality;
   readonly props: PropRegistry;
+  private disposeLightweight: (() => void) | null = null;
   readonly environment: Environment;
   private readonly canvas: HTMLCanvasElement;
   private readonly trackView: TrackView;
@@ -447,8 +451,11 @@ export class RaceView {
       terrain: assets.dressing === null,
     });
     this.scene.add(this.trackView.group);
-    this.props = new PropRegistry(options.track.length, 200, (root) =>
-      this.environment.register(root),
+    this.props = new PropRegistry(
+      options.track.length,
+      200,
+      (root) => this.environment.register(root),
+      (x, z) => options.track.groundHeightAt(x, z),
     );
     const tw = performance.now();
     if (!deferWorld && assets.dressing) {
@@ -532,6 +539,7 @@ export class RaceView {
     // the stand-in plan.
     const lamps = this.world?.localLights ?? [];
     if (this.world && lamps.length > 0) this.environment.setLocalLights(lamps);
+    if (!this.world) this.disposeLightweight = placeLightweightFallback(this.track, this.props);
     this.props.build();
     this.scene.add(this.props.group);
     // At night the banks beyond the pooled lights' reach light the scenery from a baked map.
@@ -947,6 +955,13 @@ export class RaceView {
       this.lampMap.update(this.pooledLamps);
     }
     this.fleet.update(this.camera.position, this.camera.fov, this.height, dt);
+    const debrisTime = frame.simulationTime ?? frame.time;
+    this.props.observeCar(frame.pose, debrisTime);
+    for (let i = 0; i < this.fleet.size; i++) {
+      const p = this.fleet.poseAt(i);
+      if (p && this.fleet.opacityAt(i) >= 0.5) this.props.observeCar(p, debrisTime);
+    }
+    this.props.updateDebris(debrisTime);
     this.props.update(this.camera.position);
     this.world?.update(frame.time, this.camera.position);
     if (this.contact) {
@@ -1151,6 +1166,7 @@ export class RaceView {
     this.fleet.dispose();
     this.contact?.dispose();
     this.props.dispose();
+    this.disposeLightweight?.();
     this.world?.dispose();
     this.lampMap?.dispose();
     this.environment.dispose();

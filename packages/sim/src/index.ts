@@ -159,3 +159,16 @@ export {
   type AssistSettings,
   type AssistState,
 } from './assists';
+
+export {
+  BreakableIndex,
+  BROKEN_OBJECT_WORDS,
+  breakableContact,
+  touchesBreakable,
+  createDebrisPose,
+  debrisPose,
+  settledHit,
+  type DebrisPose,
+  type BreakableObject,
+  type BreakableHit,
+} from './breakables';

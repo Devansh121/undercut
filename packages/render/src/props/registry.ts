@@ -1,4 +1,12 @@
 import {
+  createDebrisPose,
+  debrisPose,
+  settledHit,
+  type BreakableObject,
+  type BreakableHit,
+  type CarPose,
+} from '@undercut/sim';
+import {
   CanvasTexture,
   Color,
   Group,
@@ -7,6 +15,7 @@ import {
   MeshDepthMaterial,
   MeshStandardMaterial,
   Quaternion,
+  Euler,
   SRGBColorSpace,
   Sphere,
   Texture,
@@ -57,6 +66,8 @@ export interface PropKind {
 
 /** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
 export interface PropPlacement {
+  /** Shared lightweight contact footprint; absent for solid supporting structures. */
+  breakable?: BreakableObject;
   x: number;
   y: number;
   z: number;
@@ -131,6 +142,16 @@ export class PropRegistry {
   private readonly placements = new Map<string, PropPlacement[]>();
   private readonly chunks = new Map<string, Chunk[]>();
   private built = false;
+  private readonly breakableObjects = new Map<number, BreakableObject>();
+  private readonly breakableInstances = new Map<number, { mesh: InstancedMesh; index: number }[]>();
+  private readonly broken = new Set<number>();
+  private readonly consumed = new Uint32Array(64);
+  private readonly debris = new Map<number, BreakableHit>();
+  private readonly debrisEuler = new Euler();
+  private readonly debrisPose = createDebrisPose();
+  /** Per object, the local bounds of all its meshes (x and y, m): what rests on the ground. */
+  private readonly debrisBounds = new Map<number, readonly [number, number, number, number]>();
+
   /**
    * The shadow pass's depth material for props without their own: owned here and released with
    * the registry. Left to three.js, the shadow map's own depth material (which lives as long as
@@ -146,6 +167,7 @@ export class PropRegistry {
     private readonly lapLength: number,
     private readonly chunkLength = 200,
     private readonly register: (root: Object3D) => void = () => undefined,
+    private readonly groundHeight?: (x: number, z: number) => number,
   ) {
     this.group.name = 'props';
   }
@@ -166,6 +188,9 @@ export class PropRegistry {
   /** Make the instanced meshes: one per kind, chunk and level. */
   build(): void {
     this.built = true;
+
+    for (const list of this.placements.values())
+      for (const p of list) if (p.breakable) this.breakableObjects.set(p.breakable.id, p.breakable);
     for (const [id, kind] of this.kinds) {
       const list = this.placements.get(id) ?? [];
       const chunks: Chunk[] = [];
@@ -195,10 +220,16 @@ export class PropRegistry {
           if (gs) reach = Math.max(reach, gs.center.length() + gs.radius);
         }
         reach *= maxScale;
+        if (list.some((p) => p.breakable)) reach += 40;
         const meshes = kind.lods.map((lod) => {
           const im = new InstancedMesh(lod.geometry, lod.material, indices.length);
           indices.forEach((i, k) => {
             const p = list[i] as PropPlacement;
+            if (p.breakable) {
+              const refs = this.breakableInstances.get(p.breakable.id) ?? [];
+              refs.push({ mesh: im, index: k });
+              this.breakableInstances.set(p.breakable.id, refs);
+            }
             q.setFromAxisAngle(UP, p.yaw ?? 0);
             const s = p.scale ?? 1;
             im.setMatrixAt(k, m.compose(pos.set(p.x, p.y, p.z), q, scl.set(s, s, s)));
@@ -242,6 +273,97 @@ export class PropRegistry {
         }
       }
     }
+  }
+
+  /** Local, AI and remote cars carry the same canonical hit events; never infer hits from frames. */
+  observeCar(pose: CarPose, time: number): void {
+    const hits = pose.breakableHits;
+    if (!hits) return;
+    for (let k = 0; k < hits.length; k += 4) {
+      const id = hits[k]!;
+      const o = this.breakableObjects.get(id);
+      if (!o || this.broken.has(id)) continue;
+      this.broken.add(id);
+      const hit = { object: o, time: time - hits[k + 1]!, vx: hits[k + 2]!, vz: hits[k + 3]! };
+      this.debris.set(id, hit);
+      if (this.debris.size > 32) {
+        const first = this.debris.keys().next().value!;
+        const oldest = this.debris.get(first)!;
+        this.writeDebris(first, oldest, oldest.time + 6);
+        this.debris.delete(first);
+      }
+    }
+    if (pose.brokenObjects)
+      for (let i = 0; i < this.consumed.length; i++)
+        this.consumed[i] = this.consumed[i]! | pose.brokenObjects[i]!;
+  }
+
+  /** Animate existing instances, including frame and posts: no extra meshes or draw calls. */
+  updateDebris(time: number): void {
+    // Consume flags only after every car's events: the player may carry an opponent's flag.
+    // A rebuilt view also keeps older panels gone after their four-event history expired.
+    for (const id of this.breakableObjects.keys()) {
+      if (this.broken.has(id) || !(this.consumed[id >>> 5]! & (1 << (id & 31)))) continue;
+      this.broken.add(id);
+      this.writeDebris(id, null, time);
+    }
+    for (const [id, hit] of this.debris) {
+      this.writeDebris(id, hit, time);
+      if (time - hit.time >= 6) this.debris.delete(id);
+    }
+  }
+
+  /**
+   * Pose an object's instances as debris: replaying `hit`, or knocked flat where it stood when
+   * only its broken flag is known. The lowest point of its real geometry meets the ground.
+   */
+  private writeDebris(id: number, hit: BreakableHit | null, time: number): void {
+    const o = this.breakableObjects.get(id);
+    const refs = this.breakableInstances.get(id);
+    if (!o || !refs) return;
+    const pose = debrisPose(hit ?? settledHit(o), time, this.debrisPose);
+    const [minX, maxX, minY, maxY] = this.boundsOf(id, refs);
+    // Rolled about its width (local z), a local point (x, y) rises to x·sin + y·cos.
+    const sr = Math.sin(pose.roll),
+      cr = Math.cos(pose.roll);
+    const lowest = (sr >= 0 ? minX : maxX) * sr + (cr >= 0 ? minY : maxY) * cr;
+    const ground = this.groundHeight ? this.groundHeight(pose.x, pose.z) : o.y;
+    this.debrisEuler.set(0, pose.yaw, pose.roll, 'YXZ');
+    q.setFromEuler(this.debrisEuler);
+    m.compose(pos.set(pose.x, ground + pose.lift - lowest, pose.z), q, scl.setScalar(1));
+    for (const ref of refs) {
+      ref.mesh.setMatrixAt(ref.index, m);
+      ref.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  private boundsOf(
+    id: number,
+    refs: readonly { mesh: InstancedMesh }[],
+  ): readonly [number, number, number, number] {
+    let b = this.debrisBounds.get(id);
+    if (!b) {
+      let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
+      for (const { mesh } of refs) {
+        const g = mesh.geometry;
+        if (!g.boundingBox) g.computeBoundingBox();
+        const box = g.boundingBox!;
+        minX = Math.min(minX, box.min.x);
+        maxX = Math.max(maxX, box.max.x);
+        minY = Math.min(minY, box.min.y);
+        maxY = Math.max(maxY, box.max.y);
+      }
+      b = [minX, maxX, minY, maxY];
+      this.debrisBounds.set(id, b);
+    }
+    return b;
+  }
+
+  get movingDebrisCount(): number {
+    return this.debris.size;
   }
 
   /** Instances placed of one kind (0 when the kind is unknown). */

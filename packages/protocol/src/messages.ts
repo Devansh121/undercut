@@ -11,7 +11,7 @@ import type { CarSnapshot } from './snapshot';
 import { arrayOf, bool, int, isPlainObject, num, object, oneOf, str, type Check } from './validate';
 
 /** Bumped on any incompatible change to messages or frames. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Longest client text frame accepted, in UTF-16 units, checked before parsing. */
 export const MAX_MESSAGE_LENGTH = 1024;

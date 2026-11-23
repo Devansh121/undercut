@@ -1,4 +1,6 @@
+import { tracksideObjects } from './objects';
 import {
+  BreakableIndex,
   SurfaceKind,
   type SurfaceHint,
   type SurfaceSample,
@@ -50,6 +52,8 @@ export const HIGH_KERB: SurfaceProperties = Object.freeze({
  */
 export class TrackSurface implements SurfaceSampler {
   readonly track: Track;
+  /** Lightweight objects the cars break; absent when built without them (validation only). */
+  readonly breakables?: BreakableIndex;
   private readonly lapHint = { index: -1 };
   private readonly pitHint = { index: -1 };
   private readonly q = createPathPoint();
@@ -58,8 +62,13 @@ export class TrackSurface implements SurfaceSampler {
   private readonly t = createVec3();
   private readonly pt = createVec3();
 
-  constructor(track: Track) {
+  /**
+   * `breakables: false` leaves the lightweight objects out of the contact: for validation runs
+   * that must keep measuring the ground and barriers alone, as recorded before the objects.
+   */
+  constructor(track: Track, options: { breakables?: boolean } = {}) {
     this.track = track;
+    if (options.breakables !== false) this.breakables = new BreakableIndex(tracksideObjects(track));
   }
 
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void {

@@ -116,3 +116,17 @@ describe('barrier contact', () => {
     expect(r.car.z).toBeLessThan(WALL);
   });
 });
+
+describe('leaving a solid barrier', () => {
+  it('can reverse away after a head-on stop without a reset', () => {
+    const { car } = hit(Math.PI / 2, 25, { brake: 1 });
+    const start = car.z;
+    car.gear = -1;
+    car.shiftTarget = -1;
+    const input = { ...NEUTRAL_INPUT, throttle: 0.6 };
+    for (let i = 0; i < 480; i++) stepCar(car, input, walled, STEP, env);
+    expect(car.z).toBeLessThan(start - 2);
+    expect(car.vx).toBeLessThan(-2);
+    expect(car.wallContact).toBe(0);
+  });
+});

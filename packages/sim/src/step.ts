@@ -1,3 +1,4 @@
+import { breakableContact } from './breakables';
 import type { ControlInput, SurfaceHint, SurfaceSampler } from './contracts';
 import { createWallSample } from './contracts';
 import { PATCH_HINTS, createPatchSample, samplePatch, tyreVerticalForce } from './contact';
@@ -12,6 +13,8 @@ import {
   GROUND_STEP_RISE,
   STOP_RATE,
   WALL_FRICTION,
+  WALL_RELEASE_INTO,
+  WALL_RELEASE_SPEED,
   WALL_RESTITUTION,
   tyreBottomDeflection,
 } from './model';
@@ -90,6 +93,7 @@ export function stepCar(
   const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-9));
   const h = dt / n;
   applyDriverRequests(state, input);
+  state.breakableImpactSpeed = 0;
   state.wallImpactSpeed = 0;
   state.wallContact = 0;
   samplePatchesAhead(state, surface, dt);
@@ -100,7 +104,9 @@ export function stepCar(
     for (let i = 0; i < 4; i++) {
       patchHeight[i] = patchStart[i]! + (patchEnd[i]! - patchStart[i]!) * f;
     }
+    state.contactTime += h;
     substep(state, input, surface, h, n, env);
+    if (surface.breakables) breakableContact(state, surface.breakables);
   }
   // Tyre temperature and wear from this step, the grip for the next (no compound: nothing).
   if (state.tyreCompound >= 0) updateTyres(state, dt);
@@ -595,7 +601,7 @@ function wallContact(
     const rt = rz * tx - rx * tz;
     const jn = (-(1 + WALL_RESTITUTION) * vn) / (1 / m + (rn * rn) / inertia);
     let jt = -vt / (1 / m + (rt * rt) / inertia);
-    const jmax = WALL_FRICTION * jn;
+    const jmax = wallRelease(s, nx, nz, vn) ? 0 : WALL_FRICTION * jn;
     if (jt > jmax) jt = jmax;
     else if (jt < -jmax) jt = -jmax;
     const jx = jn * nx + jt * tx;
@@ -605,6 +611,17 @@ function wallContact(
     s.vy += (-jx * sn - jz * c) / m;
     s.yawRate += (rz * jx - rx * jz) / inertia;
   }
+}
+
+/** Whether a corner resting on a barrier lets the car drive off along or away from it. */
+function wallRelease(s: CarState, nx: number, nz: number, vn: number): boolean {
+  if (-vn > WALL_RELEASE_SPEED || s.throttleApplied <= 0 || s.gear === 0) return false;
+  if (s.vx * s.vx + s.vy * s.vy > WALL_RELEASE_SPEED * WALL_RELEASE_SPEED) return false;
+  // The front wheels' heading in the world, forward in a forward gear and back in reverse.
+  const heading = s.yaw + s.steerAngle;
+  const dir = s.gear < 0 ? -1 : 1;
+  const into = -(Math.cos(heading) * nx - Math.sin(heading) * nz) * dir;
+  return into <= WALL_RELEASE_INTO;
 }
 
 /**

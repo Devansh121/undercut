@@ -99,7 +99,7 @@ token, 4011 bad name, 4012 busy (too many sockets opening; try again). All but 4
 
 ### Car snapshots (binary)
 
-Fixed 56-byte little-endian records, chosen field by field (`snapshot.ts` has the table):
+Protocol 3 uses fixed 94-byte little-endian records, chosen field by field (`snapshot.ts` has the table):
 
 | Field | Wire | Resolution | Worst error |
 | --- | --- | --- | --- |
@@ -117,6 +117,8 @@ Fixed 56-byte little-endian records, chosen field by field (`snapshot.ts` has th
 | rpm | u16 | 1 rpm | 0.5 rpm |
 | wheel spin x 4 | i16 | 0.05 rad/s | 0.025 rad/s |
 | lap (completed), s | u16, u32 | 1 mm | 0.5 mm |
+| four recent board hits | i16 id, u16 age ms, i16 vx/vz cm/s | 8 bytes each | exact canonical hit |
+| one word of the broken-object set | u16 index (0 to 63), u32 bits | 6 bytes | exact |
 
 Angles round to the nearest step and wrap in 16-bit space, so an angle just below +pi
 encodes as -32768 (the same direction) instead of clamping to 32767; the bound holds
@@ -135,11 +137,21 @@ Frames: client to server `[1, count, records...]` (a guest sends its own car, th
 also its AI cars); server to client `[2, count, receivedAt u32, records...]`, stamped with
 the server receive time.
 
-**Size and bandwidth.** 56 bytes a car. At 30 Hz with 20 cars a client receives the
-other 19: 19 x 56 x 30 = 31.9 kB/s of records, plus 6 bytes a frame of header (about
-33 kB/s, 270 kbit/s). A guest sends 62 bytes a tick (1.9 kB/s); the host with 12 AI
-sends 13 cars, 734 bytes a tick (22 kB/s). The soak measures 31.1 KiB/s down per client
-and 24.3 / 2.0 KiB/s up for host and guest, including control traffic and simulated loss.
+**Size and bandwidth.** 94 bytes a car, including four recent lightweight-object hits and one
+word of the broken-object set. At 30 Hz with 20 cars, the other 19 cost 53,580 bytes/s of
+records plus frame headers. A guest sends 96 bytes a tick; the host with 12 other cars sends
+1,224 bytes a tick.
+The four-event history repeats hits across packets so isolated lost snapshots do not lose a
+board break. Each hit carries its object id, age in milliseconds and world velocity in cm/s;
+local and remote rendering use those same canonical values and the same analytic trajectory.
+The protocol version changes with the record layout, so old clients receive a version mismatch.
+A received remote hit also consumes the board in the local sim. Simultaneous hits before the
+remote event arrives can each transfer momentum locally, as other online contact is local.
+Debris itself never participates in contact. Each record also carries one 32-bit word of the
+sender's broken-object set, the index stepping once per record, and every client gathers the
+words from all records it receives (`RemoteCarBuffer.brokenSet`). A client that joins late,
+reconnects, or misses more than four hits in a row has the whole set within 64 records (about
+2 s): those objects are consumed in its sim and drawn knocked flat where they stood.
 
 **Relay.** The service relays each frame as it arrives to everyone else in the room. It
 drops a snapshot whose tick is not newer than the last one it relayed for that seat
@@ -314,7 +326,7 @@ penalties, then grid position; retired cars after them, ordered the same way. Th
 | Limit | Value |
 | --- | --- |
 | Text frame size | 1024 chars before parsing, then the per-type maximum above |
-| Snapshot frame size | 2 + 20 x 56 bytes |
+| Snapshot frame size | 2 + 20 x 94 bytes |
 | Control messages | token bucket per socket: 20 burst, 10/s |
 | Pings | 10 burst, 5/s |
 | Snapshot frames | 45 burst, 36/s |

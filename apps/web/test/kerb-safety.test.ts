@@ -1,4 +1,5 @@
 import { NEUTRAL_INPUT } from '@undercut/sim';
+import { TrackSurface } from '@undercut/track';
 import { describe, expect, it } from 'vitest';
 import { DriveSession } from '../src/game/session';
 import { loadMonza } from './fixtures';
@@ -87,21 +88,54 @@ const FIXED = new Set([
  */
 export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
 
+/**
+ * The review's runs use the circuit without its lightweight objects, as when they were
+ * recorded. With them, these open cases clip a verge panel on the way into the run-off, arrive
+ * slower on another line and never need the safety net: the panel's doing, not a fix of the
+ * fault, so they also run with the panels as cases of their own.
+ */
+const WITH_PANELS = [
+  '0,8,0,0',
+  '0,8,0,2',
+  '300,-8,0,0',
+  '300,-8,0,2',
+  '300,8,0,0',
+  '300,8,0,2',
+  '540,-8,0,0',
+  '5600,8,0,2',
+];
+
+function run(s: number, d: number, steer: number, tc: 0 | 2, panels: boolean): DriveSession {
+  const session = new DriveSession({ track, seed: 77123 });
+  session.start();
+  if (!panels) session.world.surface = new TrackSurface(track, { breakables: false });
+  session.teleport(s, d, 300 / 3.6);
+  session.setAssist('tractionControl', tc);
+  // The physics under test, not the stability assist: with it on, its wheel braking keeps
+  // some of these runs out of the chicane's folded run-off and they would pass for that reason.
+  session.setAssist('stability', 0);
+  const input = { ...NEUTRAL_INPUT, throttle: 1, steer };
+  for (let k = 0; k < 240 * 15 && session.safetyResets === 0; k++) session.tick(input, 'keyboard');
+  return session;
+}
+
 describe('flat-out kerb strikes in the game never need the safety net (review of PR 19)', () => {
   for (const [s, d, steer, tc, tick] of CASES) {
     const test = FIXED.has(`${s},${d},${steer},${tc}`) ? it : it.fails;
     test(`teleport(${s}, ${d}, 300 km/h), steer ${steer}, TC ${tc} (reset at tick ${tick} before)`, () => {
-      const session = new DriveSession({ track, seed: 77123 });
-      session.start();
-      session.teleport(s, d, 300 / 3.6);
-      session.setAssist('tractionControl', tc);
-      // The physics under test, not the stability assist: with it on, its wheel braking keeps
-      // some of these runs out of the chicane's folded run-off and they would pass for that reason.
-      session.setAssist('stability', 0);
-      const input = { ...NEUTRAL_INPUT, throttle: 1, steer };
-      for (let k = 0; k < 240 * 15 && session.safetyResets === 0; k++)
-        session.tick(input, 'keyboard');
+      const session = run(s, d, steer, tc, false);
       expect(session.safetyResets).toBe(0);
+    });
+  }
+});
+
+describe('the same strikes with the verge panels in place', () => {
+  for (const key of WITH_PANELS) {
+    const [s, d, steer, tc] = key.split(',').map(Number) as [number, number, number, 0 | 2];
+    it(`teleport(${s}, ${d}, 300 km/h), steer ${steer}, TC ${tc}: no safety reset`, () => {
+      const session = run(s, d, steer, tc, true);
+      expect(session.safetyResets).toBe(0);
+      expect(session.car.state.breakableHitCount).toBeGreaterThan(0);
     });
   }
 });

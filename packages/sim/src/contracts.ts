@@ -1,3 +1,7 @@
+import type { BreakableIndex } from './breakables';
+
+/** 2048 stable dressing ids, packed into the saved car state. */
+export const BROKEN_OBJECT_WORDS = 64;
 /**
  * Contracts between the simulation and its neighbours. Types and constants only.
  *
@@ -155,6 +159,8 @@ export interface PatchSample {
 
 /** Ground query used by the vehicle model: called per wheel per tick, so it must not allocate. */
 export interface SurfaceSampler {
+  /** Lightweight scenery, separate from solid wall faces. */
+  readonly breakables?: BreakableIndex;
   /** Fills `out` for the world point (x, z). `hint` belongs to this query point. */
   sample(x: number, z: number, hint: SurfaceHint, out: SurfaceSample): void;
   /**

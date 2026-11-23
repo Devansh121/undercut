@@ -33,6 +33,8 @@ export interface ReviewRun {
   /** Highest the body's floor reference got above the ground under the car's centre, m. */
   maxBodyAboveGround: number;
   snapshot: number[];
+  /** Lightweight objects the car broke. */
+  panelsBroken: number;
 }
 
 /**
@@ -50,9 +52,12 @@ export function reviewRun(
   s: number,
   mode: ReviewMode,
   seconds = 18,
+  breakables = false,
 ): ReviewRun {
   const rng = createRng(seed);
-  const surface = new TrackSurface(track);
+  // The review's cases measure the ground and the barriers: without the lightweight objects
+  // unless asked, as when they were recorded.
+  const surface = new TrackSurface(track, { breakables });
   const world = createWorld({ step: 1 / 240, seed, surface });
   let d = 0;
   let angle = 0;
@@ -84,6 +89,7 @@ export function reviewRun(
     maxRoll: 0,
     maxBodyAboveGround: 0,
     snapshot: [],
+    panelsBroken: 0,
   };
   const fail = (k: number, why: string): void => {
     r.failure ??= `tick ${k + 1}: ${why}`;
@@ -113,6 +119,7 @@ export function reviewRun(
     r.maxBodyAboveGround = Math.max(r.maxBodyAboveGround, above);
   }
   r.snapshot = Array.from(snapshotCar(st));
+  r.panelsBroken = st.breakableHitCount;
   return r;
 }
 

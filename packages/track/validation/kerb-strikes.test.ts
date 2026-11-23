@@ -11,6 +11,10 @@ import { REVIEW_SIM_CASES, reviewRun } from './review-cases';
 // see apps/web/test/kerb-safety.test.ts and docs/track-data.md 5.6) and run as expected failures, so each one turns this
 // suite red the moment it passes and must then move into this list.
 const FIXED = new Set([97513]);
+// The review's runs use the circuit without its lightweight objects (`reviewRun`). With them,
+// these two clip a verge panel on the way into the barrier, arrive slower on another line and
+// stay in bounds: that is the panel's doing, not a fix of the fault, so they run here as well.
+const WITH_PANELS = new Set([91149, 91593]);
 
 describe('flat-out kerb strikes at Monza (review of PR 19)', () => {
   const track = Track.fromJSON(monza);
@@ -19,6 +23,14 @@ describe('flat-out kerb strikes at Monza (review of PR 19)', () => {
     test(`seed ${seed}, s ${s}, ${mode}: pose in bounds for 18 s`, () => {
       const r = reviewRun(track, seed, s, mode);
       expect(r.failure).toBeNull();
+    });
+  }
+
+  for (const [seed, s, mode] of REVIEW_SIM_CASES.filter(([seed]) => WITH_PANELS.has(seed))) {
+    it(`seed ${seed}, s ${s}, ${mode}, with the verge panels: pose in bounds for 18 s`, () => {
+      const r = reviewRun(track, seed, s, mode, 18, true);
+      expect(r.failure).toBeNull();
+      expect(r.panelsBroken).toBeGreaterThan(0);
     });
   }
 

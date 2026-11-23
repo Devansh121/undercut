@@ -93,14 +93,22 @@ export function addCar(world: World, params: CarParams, start: CarStartOptions =
  */
 export function stepWorld(world: World): void {
   const cars = world.cars;
+  const broken = cars[0]?.state.brokenObjects;
+  if (broken)
+    for (let i = 1; i < cars.length; i++)
+      for (let k = 0; k < broken.length; k++)
+        broken[k] = broken[k]! | cars[i]!.state.brokenObjects[k]!;
   for (let i = 0; i < cars.length; i++) {
     const car = cars[i] as WorldCar;
+    if (broken) car.state.brokenObjects.set(broken);
     readCarPose(car.state, car.previousPose);
     stepCar(car.state, car.input, world.surface, world.step, world.environment);
+    if (broken) broken.set(car.state.brokenObjects);
   }
   if (world.carContact) resolveCarContacts(cars, world.contacts);
   for (let i = 0; i < cars.length; i++) {
     const car = cars[i] as WorldCar;
+    if (broken) car.state.brokenObjects.set(broken);
     readCarPose(car.state, car.pose);
   }
   world.tick += 1;
