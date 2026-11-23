@@ -327,6 +327,21 @@ const CIRCUIT_STATIONS = {
     chase('marina', 3300, 230, 3460, 'chase-far'),
     tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
     chase('promenade', 4400, 200, 4560),
+    // From the bay's edge by the pit straight across the water to the towers beyond the river
+    // mouth: waves, the reflection of sky and city (its lit windows at night). World points:
+    // the view is across open water, away from the lap.
+    {
+      name: 'bay-tv',
+      camera: 'tv',
+      run: async (page) => {
+        await page.evaluate(() => {
+          const u = globalThis.__undercut;
+          u.teleport(4700, 0, 0);
+          u.setTimeScale(0);
+          u.tvCamera(560, 8, 260, 45, { x: -700, y: 70, z: 760 });
+        });
+      },
+    },
   ],
 };
 const STATIONS = circuit === 'monza' ? MONZA_STATIONS : CIRCUIT_STATIONS[circuit];
