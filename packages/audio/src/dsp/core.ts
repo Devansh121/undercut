@@ -1,4 +1,5 @@
 import { createRng } from '@undercut/core';
+import { SceneSound, type AudioScene, type AudioCue } from './scene';
 import { Biquad, onePoleCoefficient } from './biquad';
 import { CarControls, CHUNK } from './controls';
 import { Ducker } from './ducking';
@@ -62,6 +63,7 @@ const DEFAULT_GAIN = 1;
  */
 export class AudioCore {
   readonly sampleRate: number;
+  readonly scene: SceneSound;
   readonly meters = new LayerMeters();
   readonly limiter: SoftLimiter;
   readonly ducker: Ducker;
@@ -92,6 +94,7 @@ export class AudioCore {
       );
     }
     this.sampleRate = sampleRate;
+    this.scene = new SceneSound(sampleRate, options.seed ?? 1);
     const rng = createRng(options.seed ?? 1);
     const seeds = () => rng.nextUint32();
     const controls = new CarControls(sampleRate);
@@ -112,6 +115,16 @@ export class AudioCore {
     this.ducker = new Ducker(sampleRate);
     this.kGain = onePoleCoefficient(0.03, sampleRate);
     this.kPause = onePoleCoefficient(0.008, sampleRate);
+  }
+
+  /** Other cars, ambience and start lights (struct or packed). Cheap; call per frame. */
+  setScene(scene: Readonly<AudioScene> | ArrayLike<number>): void {
+    this.scene.set(scene);
+  }
+
+  /** Play a menu or start-light cue on the UI bus. */
+  cue(cue: AudioCue): void {
+    this.scene.cue(cue);
   }
 
   /** Latest state of the player's car (struct or packed form). Cheap; call per sim step. */
@@ -136,8 +149,16 @@ export class AudioCore {
     this.gainTarget[index] = Number.isFinite(value) ? Math.max(0, Math.min(2, value)) : 0;
   }
 
-  /** Fade everything out (about 10 ms) and stop computing, or fade back in. */
+  /**
+   * Fade everything out (about 10 ms) and stop computing, or fade back in. Gains do not glide
+   * while the output is silent, so on the way back in they jump to their targets first: a
+   * gain changed during the pause (the car buses closed for a menu cue) must not glide over
+   * the fade-in, which is faster, and let the old mix through. The output is exactly zero at
+   * that moment, so the jump cannot click.
+   */
   setPaused(paused: boolean): void {
+    if (!paused && this.pauseTarget === 0 && this.pauseEnv === 0)
+      this.gainValue.set(this.gainTarget);
     this.pauseTarget = paused ? 0 : 1;
   }
 
@@ -219,6 +240,15 @@ export class AudioCore {
       this.mixInto(1, source, n);
       source.view.end(n);
     }
+    this.scene.render(
+      this.busLeft[0]!,
+      this.busRight[0]!,
+      this.busLeft[3]!,
+      this.busRight[3]!,
+      this.busLeft[2]!,
+      this.busRight[2]!,
+      n,
+    );
     this.meters.frames += n;
     const duck = this.ducker;
     duck.impact = this.player.road.impacts.envelope;

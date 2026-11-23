@@ -4,6 +4,8 @@
  * the same interface, and the game runs without sound instead of crashing.
  */
 import { MIN_SAMPLE_RATE } from '../dsp/core';
+import type { AudioCue } from '../dsp/cues';
+import { packScene, SCENE_LENGTH, type AudioScene } from '../dsp/scene';
 import { CAR_STATE_LENGTH, packCarState, type AudioCarState } from '../dsp/state';
 import type { AudioView } from '../dsp/view';
 import type { GainId } from '../dsp/voice';
@@ -29,6 +31,10 @@ export interface AudioEngine {
   suspend(): Promise<void>;
   /** Latest state of the player's car. Cheap; call every sim step (60–240 Hz). */
   setCarState(state: AudioCarState): void;
+  /** Other cars, circuit ambience and start lights. Cheap; call every frame. */
+  setScene(scene: Readonly<AudioScene>): void;
+  /** Play a menu or start-light cue on the UI bus (a cue asked for while loading plays once loaded). */
+  cue(cue: AudioCue): void;
   /** Bus volume, 0–1 (up to 2 is accepted): master, engine, effects, ui or ambience. */
   setVolume(id: GainId, value: number): void;
   /** Where the listener is (follows the camera): changes the car's balance, gliding. */
@@ -50,7 +56,10 @@ export interface AudioContextLike {
 
 /** The parts of an AudioWorkletNode this facade uses. */
 export interface AudioNodeLike {
-  readonly port: { postMessage(message: ToProcessor): void };
+  readonly port: {
+    postMessage(message: ToProcessor): void;
+    onmessage?: ((event: { data: unknown }) => void) | null;
+  };
   connect(destination: never): unknown;
   disconnect(): void;
 }
@@ -81,6 +90,11 @@ export interface AudioEngineOptions {
   visibility?: VisibilitySource | null;
   /** Called once if audio cannot start, with the reason. Defaults to `console.warn`. */
   onFallback?: (reason: string) => void;
+  /**
+   * Measure the worklet's processing time (a diagnostic, off in normal play): the processor
+   * reports every 4096 blocks to `onProfile`.
+   */
+  onProfile?: (report: Readonly<Record<string, unknown>>) => void;
 }
 
 /** Null object: the same interface, no sound. */
@@ -92,6 +106,8 @@ export class SilentAudioEngine implements AudioEngine {
   suspend(): Promise<void> {
     return Promise.resolve();
   }
+  setScene(): void {}
+  cue(): void {}
   setCarState(): void {}
   setVolume(): void {}
   setView(): void {}
@@ -122,6 +138,9 @@ class WorkletAudioEngine implements AudioEngine {
   private chain: Promise<void> = Promise.resolve();
   private readonly packed = new Float64Array(CAR_STATE_LENGTH);
   private hasState = false;
+  private readonly packedScene = new Float64Array(SCENE_LENGTH);
+  private hasScene = false;
+  private pendingCue: AudioCue | undefined;
   private readonly gains = new Map<GainId, number>();
   private view: AudioView | undefined;
   private readonly onVisibility = () => void this.reconcile();
@@ -161,6 +180,20 @@ class WorkletAudioEngine implements AudioEngine {
   suspend(): Promise<void> {
     this.wanted = false;
     return this.reconcile();
+  }
+
+  setScene(scene: Readonly<AudioScene>): void {
+    if (this.status === 'silent') return;
+    packScene(scene, this.packedScene);
+    this.hasScene = true;
+    // Copied by postMessage, like the car state.
+    if (this.node) this.post({ type: 'scene', packed: this.packedScene });
+  }
+
+  cue(cue: AudioCue): void {
+    if (this.status === 'silent') return;
+    if (!this.node) this.pendingCue = cue;
+    else this.post({ type: 'cue', cue });
   }
 
   setCarState(state: AudioCarState): void {
@@ -251,7 +284,12 @@ class WorkletAudioEngine implements AudioEngine {
       await context.audioWorklet.addModule(this.options.workletUrl);
       // Disposed (or failed) while loading: never create the node.
       if (this.disposed || !this.isNot('silent')) return;
-      const processorOptions: ProcessorOptions = { seed: this.options.seed, startPaused: true };
+      const onProfile = this.options.onProfile;
+      const processorOptions: ProcessorOptions = {
+        seed: this.options.seed,
+        startPaused: true,
+        ...(onProfile ? { profile: true } : {}),
+      };
       const node = this.options.createNode(context, PROCESSOR_NAME, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
@@ -259,6 +297,17 @@ class WorkletAudioEngine implements AudioEngine {
         processorOptions,
       });
       this.node = node;
+      if (onProfile) {
+        node.port.onmessage = (event) => {
+          const data = event.data as { type?: string } | null;
+          if (data?.type === 'profile') onProfile(data as Record<string, unknown>);
+        };
+      }
+      if (this.hasScene) this.post({ type: 'scene', packed: this.packedScene });
+      if (this.pendingCue) {
+        this.post({ type: 'cue', cue: this.pendingCue });
+        this.pendingCue = undefined;
+      }
       for (const [id, value] of this.gains) this.post({ type: 'gain', id, value });
       if (this.view) this.post({ type: 'view', view: this.view });
       if (this.hasState) this.post({ type: 'state', packed: this.packed });
@@ -359,5 +408,6 @@ export function createAudioEngine(
     createNode,
     visibility: options.visibility === undefined ? (g.document ?? null) : options.visibility,
     ...(options.onFallback ? { onFallback: options.onFallback } : {}),
+    ...(options.onProfile ? { onProfile: options.onProfile } : {}),
   });
 }

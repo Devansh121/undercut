@@ -1,4 +1,4 @@
-import type { AudioView, AudioCarState } from '@undercut/audio';
+import type { AudioScene, AudioView, AudioCarState } from '@undercut/audio';
 
 /**
  * The seam between the drive screen and engine audio. Every frame the drive screen maps the
@@ -10,6 +10,7 @@ export type CarAudioSink = (
   state: Readonly<AudioCarState>,
   paused: boolean,
   view?: AudioView,
+  scene?: AudioScene,
 ) => void;
 
 /** The default sink: no sound. */

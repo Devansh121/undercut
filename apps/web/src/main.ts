@@ -309,6 +309,8 @@ if (debugEnabled()) {
 
 if (debugEnabled()) {
   Object.assign(window.__undercut!, {
+    /** The worklet's processing-time report with `&audioProfile=1`, or null. */
+    audioProfile: () => audio.profile,
     online: () => ({
       state: online?.session.state ?? null,
       race: online?.race?.snapshot() ?? null,

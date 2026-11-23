@@ -62,6 +62,8 @@ declare global {
     audioCapability(): { supported: boolean; fallback: string | null };
     /** Audio engine status, or 'none' before it is created. */
     audioStatus(): string;
+    /** The worklet's processing-time report (with `&audioProfile=1`), or null. */
+    audioProfile(): Record<string, number | string> | null;
     /** What the steering-wheel display last drew, or null before the cockpit was shown. */
     dashboard(): { gear: string; speed: string; revs: number; unit: string } | null;
 
