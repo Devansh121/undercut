@@ -55,13 +55,19 @@ export interface PropKind {
   chunkLength?: number | undefined;
 }
 
-/** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
+/**
+ * World placement: position of the prop's origin (m), yaw about +Y (rad), pitch about the prop's
+ * own +X axis (rad, applied before yaw: positive tips local +Z down), uniform scale and an
+ * optional per-axis stretch in the prop's own frame (applied before pitch and yaw).
+ */
 export interface PropPlacement {
   x: number;
   y: number;
   z: number;
   yaw?: number;
+  pitch?: number;
   scale?: number;
+  stretch?: readonly [number, number, number];
   /** Lap distance of the place, m; decides the chunk. */
   s: number;
   /** Per-instance colour multiplier (linear), e.g. leaf tint. */
@@ -104,9 +110,26 @@ interface Chunk {
 
 const m = new Matrix4();
 const q = new Quaternion();
+const qPitch = new Quaternion();
 const pos = new Vector3();
 const scl = new Vector3();
 const UP = new Vector3(0, 1, 0);
+const RIGHT = new Vector3(1, 0, 0);
+
+/** Instance matrix of a placement: translate · yaw · pitch · scale (pure; tested). */
+export function placementMatrix(p: PropPlacement, out = new Matrix4()): Matrix4 {
+  q.setFromAxisAngle(UP, p.yaw ?? 0);
+  if (p.pitch) q.multiply(qPitch.setFromAxisAngle(RIGHT, p.pitch));
+  const s = p.scale ?? 1;
+  const k = p.stretch ?? ([1, 1, 1] as const);
+  return out.compose(pos.set(p.x, p.y, p.z), q, scl.set(s * k[0], s * k[1], s * k[2]));
+}
+
+/** Largest axis scale of a placement. */
+function placementReach(p: PropPlacement): number {
+  const k = p.stretch ?? ([1, 1, 1] as const);
+  return (p.scale ?? 1) * Math.max(k[0], k[1], k[2]);
+}
 
 /** Group placements by a square world grid: cell key → placement indices (pure; tested). */
 export function bucketByGrid(
@@ -184,7 +207,7 @@ export class PropRegistry {
         for (const i of indices) {
           const p = list[i] as PropPlacement;
           radius = Math.max(radius, centre.distanceTo(pos.set(p.x, p.y, p.z)));
-          if (p.scale !== undefined && p.scale > maxScale) maxScale = p.scale;
+          maxScale = Math.max(maxScale, placementReach(p));
         }
         // How far any level's geometry reaches from the prop's origin (its bounding sphere is
         // not centred on the origin: towers and boards reach up), scaled.
@@ -199,9 +222,7 @@ export class PropRegistry {
           const im = new InstancedMesh(lod.geometry, lod.material, indices.length);
           indices.forEach((i, k) => {
             const p = list[i] as PropPlacement;
-            q.setFromAxisAngle(UP, p.yaw ?? 0);
-            const s = p.scale ?? 1;
-            im.setMatrixAt(k, m.compose(pos.set(p.x, p.y, p.z), q, scl.set(s, s, s)));
+            im.setMatrixAt(k, placementMatrix(p, m));
             if (p.colour) im.setColorAt(k, tint.setRGB(p.colour[0], p.colour[1], p.colour[2]));
           });
           im.customDepthMaterial = lod.depthMaterial ?? this.shadowDepth;

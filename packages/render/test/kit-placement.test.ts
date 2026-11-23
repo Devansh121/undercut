@@ -1,5 +1,7 @@
 import { Track } from '@undercut/track';
 import monza from '@undercut/track/data/monza.json';
+import spa from '@undercut/track/data/spa.json';
+import singapore from '@undercut/track/data/singapore.json';
 import dressing from '../data/monza.dressing.json';
 import catalog from '../data/props.catalog.json';
 import type { PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
@@ -31,7 +33,7 @@ import {
   Scene,
   type WebGLRenderer,
 } from 'three';
-import { PropRegistry } from '../src/props/registry';
+import { PropRegistry, placementMatrix, type PropPlacement } from '../src/props/registry';
 import { warmPropLevels } from '../src/world/warm-props';
 import { crowdMaterial, crowdSwapMaterial } from '../src/world/crowd';
 import { Vector3, type WebGLProgramParametersWithUniforms } from 'three';
@@ -179,6 +181,71 @@ describe('kit barrier pitch', () => {
     expect(place.mock.calls.map(([, p]) => p.x)).toEqual([2, 6, 10, 14, 18]);
     expect(place.mock.calls.every(([, p]) => p.y === 4 && Number.isFinite(p.yaw))).toBe(true);
     props.dispose();
+  });
+});
+
+describe('kit barrier slope', () => {
+  // Height of a run's polyline at the point nearest (x, z) in plan, and that distance.
+  function baseAt(points: ArrayLike<number>, x: number, z: number): { y: number; d: number } {
+    let best = Infinity;
+    let y = 0;
+    for (let i = 3; i < points.length; i += 3) {
+      const dx = points[i]! - points[i - 3]!;
+      const dz = points[i + 2]! - points[i - 1]!;
+      const l2 = dx * dx + dz * dz;
+      if (l2 === 0) continue;
+      const u = Math.max(
+        0,
+        Math.min(1, ((x - points[i - 3]!) * dx + (z - points[i - 1]!) * dz) / l2),
+      );
+      const d = Math.hypot(x - points[i - 3]! - u * dx, z - points[i - 1]! - u * dz);
+      if (d < best) {
+        best = d;
+        y = points[i - 2]! + u * (points[i + 1]! - points[i - 2]!);
+      }
+    }
+    return { y, d: best };
+  }
+
+  it.each([
+    ['monza', monza, false],
+    ['spa', spa, false],
+    ['singapore', singapore, true],
+  ])('keeps both ends of every module within 3 cm of its run at %s', (_, data, street) => {
+    const track = Track.fromJSON(data as never);
+    const lap = new LapIndex(track);
+    const kit = fakeKit();
+    // Every barrier kit module is 4 m long and centred on its origin along +Z; the run it sleeves
+    // lies along local x = face − 3 cm (its track face stands 3 cm proud of the base mesh).
+    const half = 2;
+    const kitOf = { armco: 'armco-three', tyres: 'tyre-wall', concrete: 'concrete-wall' } as const;
+    const end = new Vector3();
+    const matrix = placementMatrix({ x: 0, y: 0, z: 0, s: 0 });
+    let modules = 0;
+    let sloped = 0;
+    let worst = 0;
+    for (const bar of track.barriers) {
+      const props = new PropRegistry(track.length);
+      const placed: PropPlacement[] = [];
+      vi.spyOn(props, 'place').mockImplementation((_id, p) => void placed.push(p));
+      placeKitBarriers({ ...track, barriers: [bar] } as unknown as Track, lap, kit, props, street);
+      const kitId = kitOf[bar.type as keyof typeof kitOf];
+      const line = kitId ? kit.entries.get(kitId)!.bounds!.max[0] - 0.03 : 0;
+      for (const p of placed) {
+        placementMatrix(p, matrix);
+        if (p.pitch) sloped++;
+        for (const e of [-half, half]) {
+          end.set(line, 0, e).applyMatrix4(matrix);
+          const base = baseAt(bar.points, end.x, end.z);
+          expect(base.d).toBeLessThan(0.05);
+          worst = Math.max(worst, Math.abs(end.y - base.y));
+        }
+        modules++;
+      }
+    }
+    expect(modules).toBeGreaterThan(300);
+    expect(sloped).toBeGreaterThan(0);
+    expect(worst).toBeLessThan(0.03);
   });
 });
 
