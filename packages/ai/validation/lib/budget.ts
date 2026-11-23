@@ -1,12 +1,8 @@
-import {
-  EnvelopeModel,
-  FULL_ENVELOPE,
-  type Envelope,
-  type EnvelopeScale,
-} from '../../src/envelope/envelope';
+import { FULL_ENVELOPE, type Envelope, type EnvelopeScale } from '../../src/envelope/envelope';
 import { REFERENCE_SKILL } from '../../src/driver/reference';
 import { racingLineOffsets } from '../../src/export/racing-line';
-import { Phase, buildPlan, type DrivingPlan } from '../../src/profile/plan';
+import { buildPlan, type DrivingPlan } from '../../src/profile/plan';
+import { SpeedProfiler } from '../../src/profile/speed-profile';
 import { LATERAL_CASES, measureLateral } from '../../../sim/validation/lib/index';
 import { loadEnvelope, loadLine } from './artefacts';
 import type { CircuitSetup } from './circuits';
@@ -17,20 +13,48 @@ import { CIRCUIT_REFERENCE } from './targets';
  * Where a reference lap's time goes (docs/physics-validation.md 7.10). Three laps on the same
  * committed racing line: the reference driver's driven lap, the speed profile it plans at its
  * skill (`REFERENCE_SKILL`), and the full-envelope profile (every measured limit used). Each is
- * split by sector and by phase of the full-envelope profile:
+ * split by sector and by the constraint that binds the full-envelope profile on each segment
+ * (`BUDGET_PHASES`):
  *
- * - braking: at the braking limit;
- * - corners: held at the corner limit;
- * - traction exits: full throttle, but held below what the engine gives on that grade by the
- *   tyres (wheelspin, or grip shared with cornering);
- * - straights: full throttle at what the engine gives (power, drag, DRS, the MGU-K).
+ * - corner limit: the lateral demand uses the lateral grip (within `AT_LIMIT`);
+ * - braking limit: decelerating at the deceleration the tyres, drag and grade give there;
+ * - grip-limited exit: accelerating at what the tyres give while they also corner (grip shared
+ *   along the combined limit), less than the car's straight-line full-throttle run would;
+ * - full-throttle run: accelerating at the car's measured straight-line full-throttle
+ *   acceleration on that grade (the envelope's drive table: power, drag, DRS, the MGU-K, the
+ *   gear shifts and, at low speed, wheelspin held at the tyre's peak);
+ * - transition: none of those binds within `AT_LIMIT` (the step from one limit to another, a
+ *   speed held below a limit by the passes that meet there).
  *
  * Driven − plan is the driver's cost; plan − full is the planning margin; full − published is
  * the car, the line and the track as modelled. Sensitivities re-plan the full envelope with one
  * term changed, so each says what that term is worth on this line; "need" scales one term until
  * a sector reaches its published time.
+ *
+ * The published sectors are the pole lap's own where they were published (Monza) and otherwise
+ * the session's best sectors, set on different laps (Spa, Singapore). Session-best sectors add up
+ * to an ideal lap faster than the pole lap, so sector gaps add up to the gap to that ideal lap;
+ * the pole lap's difference from it is reported on its own (`published.poleOverIdeal`).
  */
-export const BUDGET_PHASES = ['braking', 'corners', 'traction exits', 'straights'] as const;
+export const BUDGET_PHASES = [
+  'corner limit',
+  'braking limit',
+  'grip-limited exit',
+  'full-throttle run',
+  'transition',
+] as const;
+
+/** Index into `BUDGET_PHASES`. */
+export const BudgetPhase = {
+  Corner: 0,
+  Braking: 1,
+  Traction: 2,
+  Power: 3,
+  Transition: 4,
+} as const;
+
+/** How close to a limit a segment must be to count as held by it (3 %). */
+export const AT_LIMIT = 0.03;
 
 export interface Sensitivity {
   term: string;
@@ -42,12 +66,26 @@ export interface Sensitivity {
 
 export interface LapBudget {
   circuit: string;
-  /** Published sector times (pole lap or session bests, `CIRCUIT_REFERENCE`) and the lap. */
-  published: { lap: number; sectors: readonly number[] };
+  published: {
+    /** The pole lap, s. */
+    lap: number;
+    /** The published sectors and which they are (`CIRCUIT_REFERENCE`). */
+    sectors: readonly number[];
+    sectorsAre: 'pole lap' | 'session best';
+    /** Their sum: the pole lap itself, or the ideal lap of the session-best sectors. */
+    ideal: number;
+    /** Pole lap − ideal lap, s (0 when the sectors are the pole lap's). */
+    poleOverIdeal: number;
+  };
   lap: { driven: number; plan: number; full: number };
   sectors: { driven: number[]; plan: number[]; full: number[] };
   /** Seconds per [sector][phase]. */
   phases: { driven: number[][]; plan: number[][]; full: number[][] };
+  /** Per centreline sample: its sector (0–2, from the timing line) and its phase. */
+  sectorAt: Uint8Array;
+  phaseAt: Uint8Array;
+  /** The full-envelope plan the phases are read from. */
+  full: DrivingPlan;
   sensitivities: Sensitivity[];
   /** Factor on one term alone that brings each sector to its published time (full envelope). */
   need: { lateral: number[]; propulsion: number[] };
@@ -57,8 +95,6 @@ export interface LapBudget {
    */
   pouhon: { factor: number; lap: number; sectors: number[] };
 }
-
-const G0 = 9.80665;
 
 function segmentTimes(time: Float64Array, lapTime: number): Float64Array {
   const n = time.length;
@@ -109,6 +145,37 @@ function lessDrag(fraction: number): Mutator {
   };
 }
 
+/**
+ * The constraint that binds each segment of a full-envelope profile (`BudgetPhase`), read from
+ * the profile's own limits at the segment's entry speed: the lateral grip used, the braking
+ * deceleration, and the full-throttle acceleration with whether the engine or the tyres set it.
+ */
+export function classifyPhases(plan: DrivingPlan): Uint8Array {
+  const profiler = new SpeedProfiler(plan.line, plan.model);
+  const p = plan.profile;
+  const n = plan.line.count;
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = p.v[i]!;
+    const ax = p.ax[i]!;
+    const drs = p.drsOpen[i] === 1;
+    // At the corner limit: the lateral demand uses the lateral grip there (on a straight the
+    // profile's "limit" is only the top speed, which is not a corner).
+    if (profiler.lateralUse(i, v, FULL_ENVELOPE) >= 1 - AT_LIMIT) out[i] = BudgetPhase.Corner;
+    else if (ax < 0 && -ax >= (1 - AT_LIMIT) * profiler.brakeDecel(i, v, FULL_ENVELOPE)) {
+      out[i] = BudgetPhase.Braking;
+    } else if (
+      ax > 0 &&
+      ax >= (1 - AT_LIMIT) * profiler.driveAccel(i, v, drs, p.deploying[i] === 1, FULL_ENVELOPE)
+    ) {
+      out[i] = profiler.engineLimited(i, v, drs, FULL_ENVELOPE)
+        ? BudgetPhase.Power
+        : BudgetPhase.Traction;
+    } else out[i] = BudgetPhase.Transition;
+  }
+  return out;
+}
+
 /** Pouhon's published lateral acceleration, g (doc 2.5 [43]). */
 export const POUHON_PUBLISHED_G = 5.7;
 
@@ -129,8 +196,13 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
   const timing = setup.controlLine;
   const ref = CIRCUIT_REFERENCE[setup.id];
   if (!ref) throw new Error(`no published reference for ${setup.id}`);
+  const ideal = ref.sectors.reduce((a, b) => a + b, 0);
 
-  const plan = (e: Envelope, scale: EnvelopeScale, opts: { drs?: boolean; budget?: number } = {}) =>
+  const plan = (
+    e: Envelope,
+    scale: EnvelopeScale,
+    opts: { drs?: boolean; budget?: number } = {},
+  ): DrivingPlan =>
     buildPlan(track, offsets, e, {
       scale,
       ...(opts.drs === undefined ? {} : { drs: opts.drs }),
@@ -138,22 +210,9 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
     });
   const skill = plan(envelope, REFERENCE_SKILL.envelope);
   const full = plan(envelope, FULL_ENVELOPE);
-  const model = new EnvelopeModel(envelope);
+  const phase = classifyPhases(full);
+  const phases = BUDGET_PHASES.length;
 
-  // Phase of each segment, from the full-envelope profile.
-  const phase = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    const ph = full.profile.phase[i]!;
-    if (ph === Phase.Brake) phase[i] = 0;
-    else if (ph === Phase.Corner) phase[i] = 1;
-    else {
-      const v = full.profile.v[i]!;
-      const engine = model.drive(v, full.profile.drsOpen[i] === 1, full.profile.deploying[i] === 1);
-      const grade = full.line.grade[i]!;
-      const onGrade = engine - (G0 * grade) / Math.sqrt(1 + grade * grade);
-      phase[i] = full.profile.ax[i]! < 0.97 * onGrade ? 2 : 3;
-    }
-  }
   // Sector of each sample, counted from the timing line.
   const marks = Array.from(track.sectors)
     .slice(1)
@@ -165,7 +224,7 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
     sectorOf[i] = fd < marks[0]! ? 0 : fd < marks[1]! ? 1 : 2;
   }
   const split = (seg: Float64Array): number[][] => {
-    const rows = [0, 1, 2].map(() => [0, 0, 0, 0]);
+    const rows = [0, 1, 2].map(() => new Array<number>(phases).fill(0));
     for (let i = 0; i < n; i++) rows[sectorOf[i]!]![phase[i]!]! += seg[i]!;
     return rows;
   };
@@ -213,7 +272,7 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
       term,
       lap: p.profile.lapTime - full.profile.lapTime,
       sectors: sum(rows2).map((x, k) => x - sum(fullSplit)[k]!),
-      phases: [0, 1, 2, 3].map((ph) =>
+      phases: BUDGET_PHASES.map((_, ph) =>
         rows2.reduce((a, r, k) => a + r[ph]! - fullSplit[k]![ph]!, 0),
       ),
     };
@@ -253,7 +312,13 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
   const pouhon = scaled((e) => (e.lateral = scaleRows(e.lateral, factor)));
   return {
     circuit: setup.id,
-    published: { lap: ref.reference, sectors: ref.sectors },
+    published: {
+      lap: ref.reference,
+      sectors: ref.sectors,
+      sectorsAre: ref.sectorsAre,
+      ideal,
+      poleOverIdeal: ref.reference - ideal,
+    },
     lap: { driven: lapRecord.time, plan: skill.profile.lapTime, full: full.profile.lapTime },
     sectors: {
       driven: sum(split(driven)),
@@ -261,6 +326,9 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
       full: sum(fullSplit),
     },
     phases: { driven: split(driven), plan: profileSplit(skill), full: fullSplit },
+    sectorAt: sectorOf,
+    phaseAt: phase,
+    full,
     sensitivities,
     need: {
       lateral: needFor((k) => scaled((e) => (e.lateral = scaleRows(e.lateral, k))), 2),
@@ -276,30 +344,60 @@ const signed = (x: number): string => (x >= 0 ? '+' : '') + x.toFixed(3);
 /** The budget as Markdown tables, as `npm run telemetry -- budget` prints it. */
 export function formatBudget(b: LapBudget): string {
   const lines: string[] = [];
+  const pub = b.published;
+  const base = pub.sectorsAre === 'pole lap' ? 'pole-lap sectors' : 'session-best sectors';
   lines.push(
     `${b.circuit}: driven ${f3(b.lap.driven)} s, plan ${f3(b.lap.plan)} s, full envelope ` +
-      `${f3(b.lap.full)} s, published ${f3(b.published.lap)} s`,
+      `${f3(b.lap.full)} s; pole lap ${f3(pub.lap)} s`,
   );
   lines.push('');
   lines.push(
-    '| Sector | Published | Driven | Driver (driven − plan) | Margin (plan − full) | Full − published |',
+    `Sectors are measured against the ${base}` +
+      (pub.sectorsAre === 'pole lap'
+        ? `, which add up to the pole lap.`
+        : ` (set on different laps). They add up to an ideal lap of ${f3(pub.ideal)} s, ` +
+          `${f3(pub.poleOverIdeal)} s faster than the pole lap, so the sector gaps add up to the ` +
+          `gap to that ideal lap, ${signed(b.lap.driven - pub.ideal)} s; the gap to the pole lap ` +
+          `is that less ${f3(pub.poleOverIdeal)} s, ${signed(b.lap.driven - pub.lap)} s.`),
+  );
+  lines.push('');
+  lines.push(
+    `| Sector | Published (${base}) | Driven | Driver (driven − plan) | Margin (plan − full) | ` +
+      `Full − published |`,
   );
   lines.push('| --- | --- | --- | --- | --- | --- |');
   for (let s = 0; s < 3; s++) {
     lines.push(
-      `| S${s + 1} | ${f3(b.published.sectors[s]!)} | ${f3(b.sectors.driven[s]!)} | ` +
+      `| S${s + 1} | ${f3(pub.sectors[s]!)} | ${f3(b.sectors.driven[s]!)} | ` +
         `${signed(b.sectors.driven[s]! - b.sectors.plan[s]!)} | ` +
         `${signed(b.sectors.plan[s]! - b.sectors.full[s]!)} | ` +
-        `${signed(b.sectors.full[s]! - b.published.sectors[s]!)} |`,
+        `${signed(b.sectors.full[s]! - pub.sectors[s]!)} |`,
+    );
+  }
+  const total = (k: 'driven' | 'plan' | 'full'): number => b.sectors[k].reduce((a, x) => a + x, 0);
+  lines.push(
+    `| Sum (${pub.sectorsAre === 'pole lap' ? 'pole lap' : 'ideal lap'}) | ${f3(pub.ideal)} | ` +
+      `${f3(total('driven'))} | ${signed(total('driven') - total('plan'))} | ` +
+      `${signed(total('plan') - total('full'))} | ${signed(total('full') - pub.ideal)} |`,
+  );
+  if (pub.sectorsAre !== 'pole lap') {
+    lines.push(
+      `| Pole lap − ideal lap | ${signed(pub.poleOverIdeal)} | | | | ` +
+        `${signed(-pub.poleOverIdeal)} |`,
+    );
+    lines.push(
+      `| Against the pole lap | ${f3(pub.lap)} | ${f3(b.lap.driven)} | | | ` +
+        `${signed(b.lap.full - pub.lap)} |`,
     );
   }
   lines.push('');
-  lines.push('| Phase (full envelope) | Full, s | Driver, s | Margin, s |');
+  lines.push('| Phase (binding constraint, full envelope) | Full, s | Driver, s | Margin, s |');
   lines.push('| --- | --- | --- | --- |');
   BUDGET_PHASES.forEach((name, p) => {
     const tot = (rows: number[][]): number => rows.reduce((a, r) => a + r[p]!, 0);
     lines.push(
-      `| ${name} | ${f3(tot(b.phases.full))} | ${signed(tot(b.phases.driven) - tot(b.phases.plan))} | ` +
+      `| ${name} | ${f3(tot(b.phases.full))} | ` +
+        `${signed(tot(b.phases.driven) - tot(b.phases.plan))} | ` +
         `${signed(tot(b.phases.plan) - tot(b.phases.full))} |`,
     );
   });
@@ -310,18 +408,20 @@ export function formatBudget(b: LapBudget): string {
   lines.push('| --- | --- | --- | --- |');
   for (const x of b.sensitivities) {
     lines.push(
-      `| ${x.term} | ${signed(x.lap)} | ${x.sectors.map(signed).join(' / ')} | ${x.phases.map(signed).join(' / ')} |`,
+      `| ${x.term} | ${signed(x.lap)} | ${x.sectors.map(signed).join(' / ')} | ` +
+        `${x.phases.map(signed).join(' / ')} |`,
     );
   }
   lines.push('');
   lines.push(
-    `To reach the published sectors on one term alone: lateral ×${b.need.lateral.map((x) => x.toFixed(3)).join(' / ×')}; ` +
-      `propulsion ×${b.need.propulsion.map((x) => x.toFixed(3)).join(' / ×')} (×3 is the search limit).`,
+    `To reach the ${base} on one term alone: lateral ` +
+      `×${b.need.lateral.map((x) => x.toFixed(3)).join(' / ×')}; propulsion ` +
+      `×${b.need.propulsion.map((x) => x.toFixed(3)).join(' / ×')} (×3 is the search limit).`,
   );
   lines.push(
     `Lateral ×${b.pouhon.factor.toFixed(3)} (Pouhon published / measured): full envelope ` +
-      `${f3(b.pouhon.lap)} s, sectors ${b.pouhon.sectors.map(f3).join(' / ')} against ` +
-      `${b.published.sectors.map(f3).join(' / ')}.`,
+      `${f3(b.pouhon.lap)} s (pole lap ${f3(pub.lap)} s), sectors ` +
+      `${b.pouhon.sectors.map(f3).join(' / ')} against ${pub.sectors.map(f3).join(' / ')}.`,
   );
   return lines.join('\n');
 }
