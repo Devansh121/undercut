@@ -87,11 +87,7 @@ interface PitLaneState {
 
 /** Half a car's length, m (5.6 m nose to tail). */
 const CAR_HALF_LENGTH = 2.8;
-/**
- * Seconds after its start reaction that a car stops launching however slow it is, s; and, with
- * a car standing still just ahead of it in its lane, s.
- */
-const LAUNCH_GIVE_UP = 4;
+/** Seconds after its start reaction that a car boxed in behind a stalled one stops launching, s. */
 const LAUNCH_BOXED_IN = 1.5;
 
 /** A car standing still within 30 m ahead of this one, in its lane (a car stalled on the grid). */
@@ -416,13 +412,12 @@ export class AiController implements CarController {
       const slip = Math.max(tel.slipRatio[2] ?? 0, tel.slipRatio[3] ?? 0);
       if (slip > 0.12) this.launchCap = Math.max(0.1, this.launchCap - 4 * ctx.dt);
       else this.launchCap = Math.min(1, this.launchCap + 1.5 * ctx.dt);
-      // Launched once at speed; or, boxed in behind a car that never got away (a player who
-      // stalled on the grid), a few seconds after the lights all the same: the racing driver
-      // then goes round it as round any stopped car. (Still launching, the cars behind a stalled
+      // Launched once at speed; or, boxed in behind a car standing still just ahead (a player
+      // who stalled on the grid), soon after the lights all the same: the racing driver then
+      // goes round it as round any stopped car. (Still launching, the cars behind a stalled
       // player sat on the grid behind it for good.)
       const since = out0 !== null ? ctx.time - out0 - this.reaction : 0;
-      const boxedIn =
-        out0 !== null && (since > LAUNCH_GIVE_UP || (since > LAUNCH_BOXED_IN && stalledAhead(ctx)));
+      const boxedIn = out0 !== null && since > LAUNCH_BOXED_IN && stalledAhead(ctx);
       if (
         boxedIn ||
         (tel.speed > this.launchSpeed && (this.race.throttle > 0.9 || this.race.brake > 0))
