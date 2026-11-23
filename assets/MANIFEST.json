@@ -76,8 +76,8 @@
     "source_url": "https://www.openstreetmap.org (Overpass query via https://overpass.private.coffee/api/interpreter, fetched 2026-11-21T12:36:09Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E009_00_DEM/Copernicus_DSM_COG_10_N45_00_E009_00_DEM.tif",
     "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
     "licence": "ODbL-1.0",
-    "changes": "Derived database built by tools/dressing/build.py monza: OSM woods, tree rows, individual trees, meadows, service roads, grandstands, paddock buildings, bridges and historic banking projected into the circuit frame; canopy-filtered Copernicus GLO-30 terrain heights on a 50 m grid out to 6 km (400 m opening, 150 m average); authored bridge and big-screen placements from tools/dressing/circuits/monza.json. Notices in packages/render/data/LICENSE-DATA.md",
-    "sha256": "d2d6a1921aa2f38f5101c2b6a3b4312d5512afe331bb4b855d5c7a480c3531b1"
+    "changes": "Derived database built by tools/dressing/build.py monza: OSM woods, tree rows, individual trees, meadows, service roads, grandstands, paddock buildings, bridges and historic banking projected into the circuit frame; canopy-filtered Copernicus GLO-30 terrain heights on a 50 m grid out to 6 km (400 m opening, 150 m average); authored bridge and big-screen placements from tools/dressing/circuits/monza.json; OpenStreetMap names dropped except those the renderer reads. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "d3e238ccc2257ac05f4326fbef6483f6c572e37ba090c08fd1c94f5d1c71c1cc"
   },
   {
     "file": "apps/web/public/assets/env/monza_afternoon/sky_2048.webp",
@@ -485,7 +485,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Licence and attribution notices for the dressing databases (ODbL, Copernicus) written for this repository; the notice text it quotes is the data providers'",
-    "sha256": "a7f59b0010922a2ad71df7b5a04aa52157cf913ee0d61555074f1e60caa26a13"
+    "sha256": "1ea424caa5437623b41c2c1c4a52066f5a5d9b5e7eea5ef925eab391e63233e8"
   },
   {
     "file": "packages/render/data/props.catalog.json",
@@ -1812,15 +1812,15 @@
     "source_url": "https://www.openstreetmap.org (Overpass query via https://overpass-api.de/api/interpreter, fetched 2026-11-22T15:33:43Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E005_00_DEM/Copernicus_DSM_COG_10_N50_00_E005_00_DEM.tif",
     "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
     "licence": "ODbL-1.0",
-    "changes": "Derived database built by tools/dressing/build.py spa: OSM woods, tree rows, single trees, buildings, grandstands, bridges, roads, paths, water and car parks within 600 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 6 km with the forest roof (22 m) taken off inside mapped woods, a 150 m opening and a 100 m average. Notices in packages/render/data/LICENSE-DATA.md",
-    "sha256": "c16e4668334d8aaf93c24c0c7d83873ab0c95ab4ac0c28cac856d42f04736761"
+    "changes": "Derived database built by tools/dressing/build.py spa: OSM woods, tree rows, single trees, buildings, grandstands, bridges, roads, paths, water and car parks within 600 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 6 km with the forest roof (22 m) taken off inside mapped woods, a 150 m opening and a 100 m average; OpenStreetMap names dropped except those the renderer reads. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "ad5017e60fababce57a4066706f3120fba6e00cf71cd8ec35c35188e3113233f"
   },
   {
     "file": "packages/render/data/singapore.dressing.json",
     "source_url": "https://www.openstreetmap.org (Overpass query via https://overpass-api.de/api/interpreter, fetched 2026-11-22T16:25:50Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N01_00_E103_00_DEM/Copernicus_DSM_COG_10_N01_00_E103_00_DEM.tif",
     "author": "OpenStreetMap contributors; heights produced using Copernicus WorldDEM-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
     "licence": "ODbL-1.0",
-    "changes": "Derived database built by tools/dressing/build.py singapore: OSM buildings (with their mapped heights and levels), parks, single trees, tree rows, bridges, roads, paths, water and car parks within 500 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 5 km with a 300 m opening (the city's roofs off) and a 150 m average. Notices in packages/render/data/LICENSE-DATA.md",
-    "sha256": "521e0dcdc90bb0ed6d1123e83f03c343a8433d73d97939105be40cd0f10bd61d"
+    "changes": "Derived database built by tools/dressing/build.py singapore: OSM buildings (with their mapped heights and levels), parks, single trees, tree rows, bridges, roads, paths, water and car parks within 500 m of the centreline projected into the circuit frame; Copernicus GLO-30 terrain on a 50 m grid to 5 km with a 300 m opening (the city's roofs off) and a 150 m average; OpenStreetMap names dropped except those the renderer reads. Notices in packages/render/data/LICENSE-DATA.md",
+    "sha256": "0ff13f90a354a7d1559610f1347768a7e17a910e3b11b8a3067b8e473cb58ea7"
   }
 ]
