@@ -149,8 +149,16 @@ export class AudioCore {
     this.gainTarget[index] = Number.isFinite(value) ? Math.max(0, Math.min(2, value)) : 0;
   }
 
-  /** Fade everything out (about 10 ms) and stop computing, or fade back in. */
+  /**
+   * Fade everything out (about 10 ms) and stop computing, or fade back in. Gains do not glide
+   * while the output is silent, so on the way back in they jump to their targets first: a
+   * gain changed during the pause (the car buses closed for a menu cue) must not glide over
+   * the fade-in, which is faster, and let the old mix through. The output is exactly zero at
+   * that moment, so the jump cannot click.
+   */
   setPaused(paused: boolean): void {
+    if (!paused && this.pauseTarget === 0 && this.pauseEnv === 0)
+      this.gainValue.set(this.gainTarget);
     this.pauseTarget = paused ? 0 : 1;
   }
 

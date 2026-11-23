@@ -103,6 +103,9 @@ export class PageAudio {
     if (active) {
       if (this.gestured) this.play();
     } else {
+      // Close the car and circuit buses while fading out, so a later menu cue starts from them
+      // closed (the core also snaps gains on the way back in).
+      this.applyVolumes();
       void this.engine?.suspend();
     }
   }
