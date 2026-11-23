@@ -272,6 +272,9 @@ export const S = {
     blockingGhostOn: 'Cars held up behind you pass through your car',
     blockingGhostOff: 'Your car is solid again',
     recordKept: 'Record kept until the page closes',
+    graphics: 'Graphics',
+    offlinePreset: (chosen: string, running: string) =>
+      `${chosen} needs a connection: running on ${running}`,
     camera: 'Camera',
     ersModes: { off: 'Off', balanced: 'Balanced', overtake: 'Overtake' },
     wrongWay: 'Wrong way',

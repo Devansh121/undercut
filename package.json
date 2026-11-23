@@ -14,7 +14,7 @@
   "scripts": {
     "start": "./start.sh",
     "dev": "node tools/serve/dev.mjs",
-    "lint": "eslint . && prettier --check . && node tools/ci/check-names.mjs",
+    "lint": "eslint . && prettier --check . && node tools/ci/check-names.mjs && node tools/ci/check-trademarks.mjs",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tools/audio/tsconfig.json && tsc --noEmit -p tools/audio/browser-check/tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run --project unit",
@@ -34,6 +34,7 @@
     "audio:render": "node tools/audio/render.mjs",
     "audio:browser-check": "node tools/audio/browser-check/run.mjs",
     "check:assets": "node tools/assets/check-licences.mjs",
+    "check:credits": "node tools/ci/check-credits.mjs",
     "assets:build": "python3 tools/assets/build_textures.py",
     "check:secrets": "bash tools/ci/gitleaks.sh",
     "telemetry": "node tools/telemetry/cli.mjs",

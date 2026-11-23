@@ -414,7 +414,7 @@ section 5.7 records the first version). The model:
 - **Where.** Beside a lap sample whose bend folds before its barrier (the frame's stretch at the
   barrier, 1 − κd, below 0.6) and whose own edge is compressed by it (the stretch at the kerb's
   outer edge below 0.8): a pocket the bend wraps around, such as Monza's first chicane, Spa's La
-  Source and Bus Stop or Singapore's turns 1–3. A wide run-off inside a gentle bend (Ascari, Spa
+  Source and Bus Stop or Singapore's turns 1–3. A wide run-off inside a gentle bend (Vialone, Spa
   near s 3210), where the fold lies far out, keeps its ground. The kerb and 1 m beyond it keep
   their ground exactly (a kerb is laid along the track edge and follows it): no grid node within
   a cell's diagonal of that strip is filled, so no query in it reads one. The fill grows in over

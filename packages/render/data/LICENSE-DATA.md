@@ -21,6 +21,11 @@ open under the ODbL, and keep the Copernicus notices with it.
 roads, paths, water and park boundaries around each circuit come from OpenStreetMap. That data is
 available under the Open Database License, see https://www.openstreetmap.org/copyright.
 
+OpenStreetMap feature names are not kept: many streets, stands and buildings are named after real
+drivers, teams, sponsors or shops, and the game names none of them. The only names left are the
+two the renderer recognises (the Monza podium bridge and the historic banking), see
+`tools/dressing/build.py`.
+
 ## Copernicus WorldDEM-30
 
 The terrain heights are produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus
