@@ -9,6 +9,8 @@ test('installable shell survives a redirecting host, updates on reload, and driv
   baseURL,
 }, info) => {
   test.skip(info.project.name !== 'phone', 'one shell check on the phone');
+  // Two offline session starts and an unload on software WebGL: 41 s on a CI runner.
+  test.setTimeout(90_000);
   let updated = false;
   let networkInfoHits = 0;
   const workerSource = fs.readFileSync('apps/web/dist/sw.js', 'utf8');
