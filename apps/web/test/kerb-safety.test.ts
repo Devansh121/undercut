@@ -79,11 +79,24 @@ const FIXED = new Set([
   '650,8,0,2',
   '5600,0,0,0',
   '5600,0,0,2',
+  // These eight pass since lightweight verge panels and signs take contact: each run clips a
+  // panel on its way into the run-off and arrives a little slower on a different line. The
+  // barrier and run-off fault is not fixed by that; with panel contact switched off all eight
+  // fire the safety net at the ticks above. The other open cases still reproduce it.
+  '0,8,0,0',
+  '0,8,0,2',
+  '300,-8,0,0',
+  '300,-8,0,2',
+  '300,8,0,0',
+  '300,8,0,2',
+  '540,-8,0,0',
+  '5600,8,0,2',
 ]);
 /**
  * Regressions: these passed with the strike fix before the merge with #17's contact patch and
  * fail after it (the patch changes each run's path through the chicane's folded run-off).
- * Listed on their own so they are not mistaken for cases that never passed.
+ * Listed on their own so they are not mistaken for cases that never passed. 5600,8,0,2 passes
+ * again since lightweight panels take contact (see FIXED).
  */
 export const REGRESSED_WITH_PATCH = ['540,8,0.1,0', '610,8,-0.1,2', '5600,8,0,2'];
 
