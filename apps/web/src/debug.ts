@@ -166,6 +166,13 @@ export function installDebugApi(
       racePhase: s.race.control.phase,
       cars: s.race.world.cars.length,
       raceResult: s.result,
+      sessionKind: s.race.control.strategy.kind,
+      raceGrid: s.race.control.order.slice(),
+      pitPhase: s.race.control.pitPhase(0),
+      pitStops: s.race.control.cars[0]!.pitStops,
+      compounds: s.race.control.cars[0]!.compounds.slice(),
+      pitRequested: s.race.control.pitRequested(0),
+      twoCompoundRule: s.race.control.strategy.twoCompoundRule,
       // The player has the flag and the field is still finishing (standings provisional).
       provisional: s.playerFinished && s.result === null,
       standings: s.race.control.standings(),

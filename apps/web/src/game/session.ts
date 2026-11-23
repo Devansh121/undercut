@@ -7,6 +7,7 @@ import {
   RaceSession,
   circuitInfo,
   raceStartFuel,
+  type SessionSpec,
   type LapResult,
   type LapTimer,
   type RaceEvent,
@@ -95,6 +96,11 @@ export interface QuickRaceOptions {
   fieldStartDelay?: number;
   /** Compound every car starts on. Default medium. */
   compound?: 'soft' | 'medium' | 'hard';
+  /** Weekend session and qualifying grid; omitted for Quick Race. */
+  session?: SessionSpec;
+  grid?: readonly number[];
+  pitStrategy?: boolean;
+  automaticPitLimiter?: boolean;
 }
 
 /**
@@ -160,6 +166,8 @@ export function raceTrim(name: string): AeroTrim {
  */
 export class DriveSession {
   readonly quickRace: boolean;
+  nextCompound: 'soft' | 'medium' | 'hard' = 'hard';
+  private playerController!: InputController;
   private playerPilot: AiController | null = null;
   scriptedRaceDriver = false;
   /**
@@ -275,13 +283,15 @@ export class DriveSession {
     const aiField = this.quickRace
       ? [...field.slice(0, gridSlot), ...field.slice(gridSlot + 1)]
       : [];
-    const grid = this.quickRace
-      ? [
-          ...Array.from({ length: gridSlot }, (_, i) => i + 1),
-          0,
-          ...Array.from({ length: 19 - gridSlot }, (_, i) => gridSlot + 1 + i),
-        ]
-      : undefined;
+    const grid =
+      options.quickRace?.grid ??
+      (this.quickRace
+        ? [
+            ...Array.from({ length: gridSlot }, (_, i) => i + 1),
+            0,
+            ...Array.from({ length: 19 - gridSlot }, (_, i) => gridSlot + 1 + i),
+          ]
+        : undefined);
     // Timed from the control line the track file carries (format 3), for every circuit.
     const circuit = circuitInfo(this.track, { timingLine: this.track.timingLine });
     const startCompound = options.quickRace?.compound
@@ -291,14 +301,22 @@ export class DriveSession {
     this.race = new RaceSession({
       track: this.track,
       circuit,
-      session: this.quickRace ? { kind: 'race', laps } : { kind: 'timeTrial' },
+      session:
+        options.quickRace?.session ??
+        (this.quickRace ? { kind: 'race', laps } : { kind: 'timeTrial' }),
+      pitStrategy: options.quickRace?.pitStrategy ?? false,
       seed: options.seed,
       params: this.params,
       // A race: tyre temperature and wear for every car, and the start load for the distance
       // and a lap in hand, burnt with no top-up. Time trial: reference tyres and a light load
       // topped up at the line, as its records were set.
       ...(this.quickRace
-        ? { tyres: true, startFuel: raceStartFuel(laps, circuit.raceLaps) }
+        ? {
+            tyres: true,
+            ...(options.quickRace?.session && options.quickRace.session.kind !== 'race'
+              ? { fuel: 10 }
+              : { startFuel: raceStartFuel(laps, circuit.raceLaps) }),
+          }
         : { fuel: TIME_TRIAL_FUEL }),
       step: SIM_STEP,
       rollingStart: { before: ROLLING_START_RUN_UP, speed: ROLLING_START_SPEED },
@@ -312,11 +330,14 @@ export class DriveSession {
             team: 0,
             ...startCompound,
           },
-          controller: new InputController((ctx, out) => {
-            if ((this.scriptedRaceDriver || this.playerFinished) && this.playerPilot) {
-              this.playerPilot.control(ctx, out);
-            } else this.drive(out);
-          }),
+          controller: (this.playerController = new InputController(
+            (ctx, out) => {
+              if ((this.scriptedRaceDriver || this.playerFinished) && this.playerPilot) {
+                this.playerPilot.control(ctx, out);
+              } else this.drive(out);
+            },
+            { params: this.params, assistedPitLane: true, manualPitEntry: true },
+          )),
         },
         ...aiField.map((controller, i) => ({
           entrant: {
@@ -333,11 +354,38 @@ export class DriveSession {
       ...(record ? { record: { lap: record.lap, sectors: record.bestSectors } } : {}),
       ...(limits ? { limits: () => limits } : {}),
     });
+    this.playerController.autoLimiter = options.quickRace?.automaticPitLimiter ?? true;
     this.world = this.race.world;
     this.car = this.race.worldCar(0);
     this.timer = this.race.control.timer(0);
     this.ghostValue = record?.ghost ? decodeGhost(record.ghost) : null;
     this.poseLimits = invariantLimits(this.car.state.model);
+  }
+
+  /** A cancellable crew request. Entry remains under the player's steering. */
+  boxThisLap(): boolean {
+    const c = this.race.control;
+    if (!this.quickRace || !c.racing(0) || c.held(0)) return false;
+    if (c.pitRequested(0)) {
+      c.cancelPit(0);
+      return false;
+    }
+    this.race.requestPit(0, [{ kind: 'tyres', compound: this.nextCompound }]);
+    return true;
+  }
+
+  cycleCompound(): void {
+    const choices = ['hard', 'medium', 'soft'] as const;
+    this.nextCompound = choices[(choices.indexOf(this.nextCompound) + 1) % choices.length]!;
+    if (this.race.control.pitRequested(0) && !this.race.control.held(0))
+      this.race.requestPit(0, [{ kind: 'tyres', compound: this.nextCompound }]);
+  }
+
+  get automaticLimiter(): boolean {
+    return this.playerController.autoLimiter;
+  }
+  set automaticLimiter(value: boolean) {
+    this.playerController.autoLimiter = value;
   }
 
   /**

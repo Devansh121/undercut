@@ -1,3 +1,6 @@
+import { WeekendProgress } from './game/weekend';
+import { WeekendScreen } from './ui/screens/weekend';
+import type { SessionResult } from '@undercut/race';
 import { registerOffline } from './pwa/register';
 import { showHomeScreenHint } from './pwa/home-screen-hint';
 import '../../../design/mock/tokens.css';
@@ -112,7 +115,8 @@ const hub: HubScreen = new HubScreen({
   onStart: (choice) => {
     // The Start press is the gesture that may start audio.
     audio.gesture();
-    start(choice).catch(() => undefined);
+    if (choice.mode === 'weekend' || choice.mode === 'championship') void showWeekend(choice);
+    else start(choice).catch(() => undefined);
   },
   onOnline: () => {
     audio.gesture();
@@ -138,6 +142,40 @@ function showMenus(screen: 'launch' | 'hub'): void {
   }
   hub.setLoading(false);
   menuInput.start();
+}
+
+let season: WeekendProgress | null = await WeekendProgress.load(webStorage);
+async function showWeekend(choice: SessionChoice): Promise<void> {
+  const progress =
+    choice.mode === 'championship'
+      ? (season ??= new WeekendProgress(choice, choice.laps ?? 5))
+      : new WeekendProgress(choice, choice.laps ?? 5);
+  // Browser flow fixture: the real timed-session rules with a short clock.
+  const testDuration = debugEnabled() ? Number(params.get('weekendDuration')) : NaN;
+  if (testDuration > 0 && testDuration <= 1080) progress.weekend.plan.qualifying = testDuration;
+  await progress.save(webStorage);
+  const screen = new WeekendScreen(
+    progress,
+    webStorage,
+    (nextChoice, options, complete) => {
+      audio.gesture();
+      start(
+        nextChoice,
+        undefined,
+        () => {
+          shell.mount();
+          screen.enter();
+          menuInput.start();
+        },
+        options,
+        complete,
+      ).catch(() => undefined);
+    },
+    () => {
+      shell.pop();
+    },
+  );
+  shell.push(screen);
 }
 
 /** The choice on the main menu now (the debug API starts with it). */
@@ -196,7 +234,12 @@ function showOnline(code: string | null): void {
 }
 
 /** A Quick Race to start again as soon as the current one has quit (Restart race). */
-let restartWith: { choice: SessionChoice; quickRace: QuickRaceOptions } | null = null;
+let restartWith: {
+  choice: SessionChoice;
+  quickRace: QuickRaceOptions;
+  quit?: () => void;
+  complete?: (result: SessionResult) => void;
+} | null = null;
 
 /**
  * Start a session from the menus' choice: a Quick Race (`choice.mode`, or race options from the
@@ -207,8 +250,10 @@ async function start(
   extension?: DriveExtension,
   quit?: () => void,
   raceOptions?: QuickRaceOptions,
+  onSessionComplete?: (result: SessionResult) => void,
 ): Promise<DriveHandle> {
-  const quickRace = raceOptions ?? (choice.mode === 'quickRace' ? {} : undefined);
+  const quickRace =
+    raceOptions ?? (choice.mode === 'quickRace' ? { laps: choice.laps ?? 5 } : undefined);
   if (drive) return drive;
   if (starting) return starting;
   if (!extension) hub.setLoading(true);
@@ -231,11 +276,28 @@ async function start(
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
-        ...(quickRace ? { quickRace } : {}),
+        ...(quickRace
+          ? {
+              quickRace: {
+                ...quickRace,
+                automaticPitLimiter: prefs.get().race.automaticPitLimiter,
+              },
+            }
+          : {}),
+        onPitLimiter: (value) =>
+          prefs.update((p) => {
+            p.race.automaticPitLimiter = value;
+          }),
+        ...(onSessionComplete ? { onSessionComplete } : {}),
         ...(quickRace
           ? {
               onRestartRace: () => {
-                restartWith = { choice, quickRace };
+                restartWith = {
+                  choice,
+                  quickRace,
+                  ...(quit ? { quit } : {}),
+                  ...(onSessionComplete ? { complete: onSessionComplete } : {}),
+                };
                 drive?.quit();
               },
             }
@@ -255,7 +317,9 @@ async function start(
           if (restartWith) {
             const again = restartWith;
             restartWith = null;
-            start(again.choice, undefined, undefined, again.quickRace).catch(() => undefined);
+            start(again.choice, undefined, again.quit, again.quickRace, again.complete).catch(
+              () => undefined,
+            );
           } else if (quit) {
             // Back to the online screens, on the menu input.
             menuInput.start();

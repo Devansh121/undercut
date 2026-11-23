@@ -28,6 +28,7 @@ import {
 /** What Start hands to the game. */
 export interface SessionChoice {
   mode: ModeId;
+  laps?: number;
   circuit: string;
   team: string;
   driver: 0 | 1;
@@ -56,7 +57,13 @@ const MODE_ICON: Record<ModeId, IconKey> = {
 };
 
 /** Modes that start a session in this build. */
-const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>(['timeTrial', 'quickRace', 'online']);
+const PLAYABLE: ReadonlySet<ModeId> = new Set<ModeId>([
+  'timeTrial',
+  'quickRace',
+  'weekend',
+  'championship',
+  'online',
+]);
 /** Circuits a Quick Race runs on in this build (its AI field and grid are set up for these). */
 
 const kmText = (m: number): string => (m / 1000).toFixed(3);
@@ -304,6 +311,7 @@ export class HubScreen implements Screen {
     const c = this.circuit();
     this.o.onStart({
       mode: p.mode,
+      laps: Math.max(5, Math.min(c.raceLaps, p.race.laps)),
       circuit: c.id,
       team: p.team,
       driver: p.driver,
@@ -455,7 +463,7 @@ export class HubScreen implements Screen {
     // Session settings (time of day and assists) for the modes that start a session here; a
     // note for the rest: what online rooms offer (their own settings are in the lobby), that a
     // circuit without a racing line has no races, or that race sessions are not in this build.
-    const race = mode === 'quickRace';
+    const race = mode === 'quickRace' || mode === 'weekend' || mode === 'championship';
     const settings = mode === 'timeTrial' || (race && c.raceReady);
     this.settingsCard.hidden = !settings;
     this.summaryCard.hidden = !settings;
@@ -554,7 +562,11 @@ export class HubScreen implements Screen {
   private canStart(mode: ModeId, circuit: string): boolean {
     if (!PLAYABLE.has(mode)) return false;
     // A race needs the AI field's racing line at the circuit.
-    return mode !== 'quickRace' || this.o.circuits.some((c) => c.id === circuit && c.raceReady);
+    return (
+      mode === 'timeTrial' ||
+      mode === 'online' ||
+      this.o.circuits.some((c) => c.id === circuit && c.raceReady)
+    );
   }
 
   private summaryPart(a: string, b: string): HTMLElement {

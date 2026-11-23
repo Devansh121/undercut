@@ -93,6 +93,40 @@ export class SettingsPanel {
     this.syncers.push(() => tod.set(timeOfDayOf(prefs.get(), circuit)));
     rows.push(settingRow(S.timeOfDay.label ?? '', tod.root));
 
+    if (ctx.mode() !== 'timeTrial' && ctx.mode() !== 'online') {
+      const laps = segmented({
+        label: 'Race distance',
+        id: 'raceLaps',
+        choices: [5, 15, circuit.raceLaps].map((n) => ({ value: n, label: `${n} laps` })),
+        value: prefs.get().race.laps,
+        onChange: (v) => {
+          prefs.update((p) => {
+            p.race.laps = v;
+          });
+          ctx.changed();
+        },
+      });
+      const limiter = toggle({
+        label: 'Automatic pit limiter',
+        id: 'automaticPitLimiter',
+        value: prefs.get().race.automaticPitLimiter,
+        onChange: (v) => {
+          prefs.update((p) => {
+            p.race.automaticPitLimiter = v;
+          });
+          ctx.changed();
+        },
+      });
+      this.syncers.push(() => {
+        laps.set(prefs.get().race.laps);
+        limiter.set(prefs.get().race.automaticPitLimiter);
+      });
+      rows.push(
+        settingRow('Race distance', laps.root),
+        settingRow('Automatic pit limiter', limiter.root),
+      );
+    }
+
     const setAssist = <K extends keyof AssistChoice>(key: K, v: AssistChoice[K]): void => {
       prefs.update((p) => {
         p.assists[device] = { ...(p.assists[device] ?? {}), [key]: v };
@@ -149,7 +183,7 @@ export class SettingsPanel {
     // Braking help follows a driving line built for the player's car: in a race every car runs
     // the trim of the circuit's racing line, so wherever there is one; in time trial the
     // low-drag car, so only where the line was built for it.
-    const brakingHelp = ctx.mode() === 'quickRace' ? circuit.raceReady : circuit.brakingHelp;
+    const brakingHelp = ctx.mode() !== 'timeTrial' ? circuit.raceReady : circuit.brakingHelp;
     braking.setDisabled(!brakingHelp);
     const controls: [Control<unknown>, () => unknown][] = [
       [tc as Control<unknown>, () => a().tractionControl],

@@ -27,6 +27,8 @@ describe('controls list', () => {
       'Gear down',
       'DRS',
       'Overtake',
+      'Box this lap / cancel',
+      'Next tyre compound',
       'Pit limiter',
       'Camera',
       'Look back',
@@ -41,7 +43,7 @@ describe('controls list', () => {
     const touch = controlRows(defaultBindings(), 'touch');
     expect(row(touch, 'brake')?.input).toBe('Brake pedal');
     expect(row(touch, 'steer')?.input).toBe('Stick');
-    expect(row(touch, 'pitLimiter')?.input).toBe('Not bound');
+    expect(row(touch, 'pitLimiter')?.input).toBe('Limiter button');
   });
 
   it('points to the pause menu for reset on touch, which has no reset button', () => {

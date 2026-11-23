@@ -1,3 +1,4 @@
+import type { SessionResult } from '@undercut/race';
 /**
  * The drive screen: a time trial or a Quick Race at any circuit in the browser. Loaded on demand from the
  * launch screen so the first paint does not wait for three.js and the track. Wires the pure
@@ -199,6 +200,8 @@ export interface DriveOptions {
   seed: number;
   today: string;
   quickRace?: QuickRaceOptions;
+  onSessionComplete?: (result: SessionResult) => void;
+  onPitLimiter?: (automatic: boolean) => void;
   onQuit(): void;
   /** Quick Race: start the same race again from the grid (the page rebuilds the session). */
   onRestartRace?(): void;
@@ -589,7 +592,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const hud = new Hud(
     plan,
     hudIdentity,
-    ext?.label ?? (session.quickRace ? S.hud.quickRace : S.hud.timeTrial),
+    ext?.label ??
+      (session.quickRace ? (o.quickRace?.session?.kind ?? S.hud.quickRace) : S.hud.timeTrial),
   );
   const results = new ResultsStrip();
   let quitting = false;
@@ -602,7 +606,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   // In a Quick Race the restart is the whole race, from the grid; a lap restart would teleport
   // the player out of the race.
   const restartRace = (): void => {
-    if (o.onRestartRace) o.onRestartRace();
+    if (session.result && o.onSessionComplete) quit();
+    else if (o.onRestartRace) o.onRestartRace();
     else quit();
   };
   const intro = new Onboarding(
@@ -999,9 +1004,47 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.timeScale = MAX_TIME_SCALE;
     skipResults.hidden = true;
   });
+  const pitPanel = document.createElement('div');
+  pitPanel.className = 'pit-panel panel';
+  pitPanel.dataset.testid = 'pit-panel';
+  const pitMessage = document.createElement('div');
+  pitMessage.setAttribute('role', 'status');
+  const boxButton = document.createElement('button');
+  boxButton.className = 'button';
+  boxButton.dataset.testid = 'box-this-lap';
+  boxButton.addEventListener('click', () => callBox());
+  const compoundButton = document.createElement('button');
+  compoundButton.className = 'button';
+  compoundButton.dataset.testid = 'next-compound';
+  compoundButton.addEventListener('click', () => session.cycleCompound());
+  const limiterButton = document.createElement('button');
+  limiterButton.className = 'button';
+  limiterButton.addEventListener('click', () => {
+    session.automaticLimiter = !session.automaticLimiter;
+    o.onPitLimiter?.(session.automaticLimiter);
+  });
+  const continueButton = document.createElement('button');
+  continueButton.className = 'button';
+  continueButton.textContent = 'Continue weekend';
+  continueButton.dataset.testid = 'continue-weekend';
+  continueButton.hidden = true;
+  continueButton.addEventListener('click', () => quit());
+  pitPanel.append(pitMessage, boxButton, compoundButton, limiterButton, continueButton);
+  function callBox(): void {
+    const requested = session.boxThisLap();
+    say(
+      {
+        tag: 'Pit crew',
+        text: requested ? `Box this lap · ${session.nextCompound} tyres` : 'Pit call cancelled',
+        tone: 'info',
+      },
+      4,
+    );
+  }
+  let resultDelivered = false;
   if (session.quickRace) {
     const control = hud.root.querySelector('.hud-control') ?? o.host;
-    control.append(raceStatus, skipResults);
+    control.append(raceStatus, skipResults, pitPanel);
     hud.root.dataset.mode = 'race';
   }
 
@@ -1122,7 +1165,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const entries = session.result.entries;
       return {
         lines: [
-          'Race result',
+          o.quickRace?.session?.kind === 'qualifying'
+            ? 'Qualifying result'
+            : o.quickRace?.session?.kind === 'practice'
+              ? 'Practice result'
+              : 'Race result',
           ...entries.map((e) => {
             const g =
               e.gap === null
@@ -1132,7 +1179,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
                   : `  +${e.gap.time.toFixed(3)}s`;
             const name = session.race.entrants[e.car]?.name ?? e.code;
             const status = formatRaceStatus(e.status);
-            return `${e.position}  ${name}${status ? `  ${status}` : ''}${g}`;
+            return `${e.position}  ${name}${status ? `  ${status}` : ''}${g} · ${e.pitStops} stops · ${e.compounds.join(' / ')}`;
           }),
         ],
         player: 1 + entries.findIndex((e) => e.car === 0),
@@ -1183,6 +1230,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       onEvents(r.events);
       lookBack = r.lookBack;
       for (const action of r.actions) {
+        if (action === 'boxThisLap') callBox();
+        if (action === 'nextCompound') session.cycleCompound();
         if (action === 'nextCamera') {
           const name = view.nextCamera();
           say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
@@ -1200,6 +1249,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         if (e.action === 'pause' || e.action === 'menuBack') resume();
       }
       lookBack = false;
+    } else if (session.phase === 'ended' && o.onSessionComplete) {
+      const frame = input.sample(dt, 0);
+      const native = frame.device === 'keyboard' && document.activeElement === continueButton;
+      if (
+        frame.events.some(
+          (e) =>
+            e.type === 'action' &&
+            (e.action === 'menuBack' || (e.action === 'menuAccept' && !native)),
+        )
+      )
+        quit();
     }
 
     if (input.activeDevice !== lastHudDevice) {
@@ -1279,6 +1339,27 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           },
           3,
         );
+      }
+      const pitControl = session.race.control;
+      const pitPhase = pitControl.pitPhase(0);
+      const pitCar = pitControl.cars[0]!;
+      boxButton.textContent = pitControl.pitRequested(0) ? 'Cancel pit call' : 'Box this lap';
+      boxButton.disabled = pitControl.held(0) || session.result !== null;
+      compoundButton.textContent = `Next tyres: ${session.nextCompound}`;
+      compoundButton.disabled = pitControl.held(0);
+      limiterButton.textContent = `Pit limiter: ${session.automaticLimiter ? 'automatic' : 'manual'}`;
+      const remaining = pitControl.pitRemaining(0);
+      pitMessage.textContent = pitControl.held(0)
+        ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
+        : `${pitControl.pitRequested(0) ? 'Box confirmed · drive into pit lane' : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : 'Pit crew ready'} · ${pitCar.pitStops} stops · ${pitCar.compounds.join(' / ')}`;
+      continueButton.hidden = !session.result || !o.onSessionComplete;
+      if (session.result && !resultDelivered) {
+        resultDelivered = true;
+        o.onSessionComplete?.(session.result);
+        if (o.onSessionComplete) {
+          input.setContext('menu');
+          continueButton.focus({ preventScroll: true });
+        }
       }
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
       // After the player's flag, or any final result (a retirement too), the standings take the

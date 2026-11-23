@@ -19,3 +19,6 @@ apps/web/public/assets/index.json
 # Generated car assets and their stats are written byte for byte by tools/car.
 apps/web/public/assets/car/
 docs/evidence/m2-car/stats.json
+
+# Local review index and its transient database journals.
+.code-review-graph/

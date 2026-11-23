@@ -26,6 +26,8 @@ const ROWS: { id: string; label: string; actions: ActionId[] }[] = [
   { id: 'gearDown', label: R.gearDown, actions: ['gearDown'] },
   { id: 'drs', label: R.drs, actions: ['drs'] },
   { id: 'overtake', label: R.overtake, actions: ['overtake'] },
+  { id: 'boxThisLap', label: 'Box this lap / cancel', actions: ['boxThisLap'] },
+  { id: 'nextCompound', label: 'Next tyre compound', actions: ['nextCompound'] },
   { id: 'pitLimiter', label: R.pitLimiter, actions: ['pitLimiter'] },
   { id: 'camera', label: R.camera, actions: ['nextCamera'] },
   { id: 'lookBack', label: R.lookBack, actions: ['lookBack'] },

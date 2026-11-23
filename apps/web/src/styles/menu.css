@@ -1465,3 +1465,74 @@
     padding: 1px 4px;
   }
 }
+
+.weekend-screen {
+  padding: 24px;
+  max-width: 1100px;
+  margin: auto;
+  overflow: auto;
+  height: 100%;
+}
+.weekend-schedule,
+.weekend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.weekend-schedule .card {
+  padding: 16px;
+  border-left: 3px solid var(--c-border);
+}
+.weekend-schedule .is-current {
+  border-left-color: var(--c-accent);
+}
+.weekend-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-variant-numeric: tabular-nums;
+}
+.weekend-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--c-border);
+}
+.weekend-table .is-player {
+  color: var(--c-accent);
+}
+.pit-panel {
+  pointer-events: auto;
+  position: absolute;
+  right: 16px;
+  top: 140px;
+  max-width: 300px;
+  padding: 10px;
+  font-size: 12px;
+}
+.pit-panel .button {
+  min-height: 32px;
+  padding: 5px 8px;
+  margin: 3px;
+  font-size: 11px;
+}
+@media (max-height: 500px) {
+  .weekend-screen {
+    padding: 12px 20px;
+  }
+  .weekend-schedule,
+  .weekend-actions {
+    margin: 8px 0;
+    gap: 6px;
+  }
+  .pit-panel {
+    top: 95px;
+    right: 8px;
+    max-width: 220px;
+    font-size: 10px;
+  }
+  .pit-panel .button {
+    min-height: 28px;
+    font-size: 10px;
+    padding: 3px 5px;
+  }
+}
