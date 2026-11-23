@@ -14,7 +14,7 @@
   "scripts": {
     "start": "./start.sh",
     "dev": "node tools/serve/dev.mjs",
-    "lint": "eslint . && prettier --check . && node tools/ci/check-names.mjs",
+    "lint": "eslint . && prettier --check . && node tools/ci/check-names.mjs && node tools/ci/check-trademarks.mjs",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tools/audio/tsconfig.json && tsc --noEmit -p tools/audio/browser-check/tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run --project unit",

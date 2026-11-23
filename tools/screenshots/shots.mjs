@@ -247,7 +247,7 @@ const MONZA_STATIONS = [
     },
   },
   {
-    // Outside Curva Alboreto (Parabolica): sweeping corner, gravel, stands, bridge, distant treeline.
+    // Outside the Parabolica: sweeping corner, gravel, stands, bridge, distant treeline.
     name: 'parabolica-outside',
     camera: 'tv',
     run: async (page) => {
