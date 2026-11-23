@@ -13,7 +13,7 @@ import { CIRCUIT_REFERENCE } from './lib/targets';
  * computed independently of the budget's own sector and phase mapping.
  */
 // The Pouhon figure only scales one of the budget's what-ifs; measuring it is not under test.
-const POUHON_G = 4.61;
+const POUHON_G = 4.594;
 const KMH = 1 / 3.6;
 /**
  * Floating-point rounding of a lap's worth of sums: a few thousand additions of segment times

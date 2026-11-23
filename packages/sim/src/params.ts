@@ -347,11 +347,7 @@ export const AERO_LOW_DRAG: Readonly<AeroParams> = Object.freeze({
 export const AERO_MEDIUM: Readonly<AeroParams> = Object.freeze({
   ...AERO_LOW_DRAG,
   name: 'medium',
-  // Doc 1.4: 1.30 (1.15–1.45). Its own Spa derivation (I1 340–345 km/h [13], DRS open, CdA
-  // 0.90–1.13) gives 1.06–1.33 with the flap shut. 1.25: below it the reference driver, on a
-  // plan made for qualifying fuel, puts tyres on the grass at Bruxelles in the ten-lap soak's
-  // heavy first laps (doc 7.12).
-  cdA: 1.25,
+  cdA: 1.3, // doc 1.4: 1.30 (1.15–1.45), Spa
   clA: 4.6, // doc 1.4: 4.6 (4.0–5.2)
   balance: 0.44,
   drsDrag: -0.15,

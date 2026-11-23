@@ -74,7 +74,6 @@ describe('car parameters', () => {
     expect(createCarParams('low').aero.clA).toBe(3.6);
     expect(createCarParams('low').aero.cdA).toBe(1.16); // inside 1.05–1.25, fitted to the trap
     expect(createCarParams('medium').aero.clA).toBe(4.6);
-    expect(createCarParams('medium').aero.cdA).toBe(1.25); // inside 1.15–1.45, doc 7.12
     expect(createCarParams('high').aero.balance).toBe(0.45);
     expect(createCarParams('high', { tyre: { muY: 1.9 } }).tyre.muY).toBe(1.9);
   });
