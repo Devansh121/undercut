@@ -37,7 +37,7 @@
     "park": 6,
     "tree": 484
   },
-  "stats": { "elements": 5006, "outside": 1866, "unclassified": 5 },
+  "stats": { "elements": 5006, "outside": 1866, "unclassified": 5, "unnamed": 298 },
   "mapped": {
     "raceway": [
       {
@@ -68,12 +68,12 @@
       {
         "id": "w/1443867790",
         "p": [-247.5, -447.5, -279.2, -143.6],
-        "t": { "name": "Ex Circuito Pirelli", "highway": "raceway" }
+        "t": { "highway": "raceway" }
       },
       {
         "id": "w/1443867791",
         "p": [-245.0, -470.8, -247.5, -447.5],
-        "t": { "name": "Ex Circuito Pirelli", "covered": "yes", "highway": "raceway" }
+        "t": { "covered": "yes", "highway": "raceway" }
       },
       {
         "id": "w/1443867792",
@@ -93,7 +93,7 @@
           -406.9, -839.3, -390.4, -851.9, -360.1, -871.8, -338.0, -883.7, -307.6, -897.4, -281.9,
           -906.0, -238.0, -917.3, -212.5, -921.9, -175.3, -926.4
         ],
-        "t": { "name": "Curva Biassono", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968226",
@@ -101,12 +101,12 @@
           -215.7, -133.6, -223.0, -126.1, -227.2, -119.6, -228.1, -117.0, -228.9, -108.5, -228.2,
           -99.3
         ],
-        "t": { "name": "Curva Vialone", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968228",
         "p": [312.6, -582.3, 280.7, -561.6, 257.8, -545.0, 237.4, -528.8, 204.0, -499.6],
-        "t": { "name": "Curva del Serraglio", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968229",
@@ -115,12 +115,12 @@
           -1079.0, 571.3, -1074.1, 577.7, -1069.8, 583.9, -1064.3, 590.7, -1056.8, 599.1, -1043.3,
           604.5, -1028.4, 607.2, -1009.3
         ],
-        "t": { "name": "Lesmo 1", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968230",
         "p": [627.9, -785.7, 627.7, -772.6, 624.7, -762.5, 619.7, -755.4, 608.4, -747.1],
-        "t": { "name": "Lesmo 2", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968234",
@@ -131,7 +131,7 @@
           1020.1, -601.6, 995.7, -607.8, 982.8, -613.9, 966.9, -623.2, 934.7, -627.2, 910.6, -629.8,
           885.3, -632.5, 705.6, -631.6, 662.7, -626.4, 600.9
         ],
-        "t": { "name": "Curva Alboreto", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968239",
@@ -140,7 +140,7 @@
           -252.3, 12.4, -266.6, 25.3, -283.6, 38.2, -287.9, 42.9, -291.6, 49.0, -294.1, 55.2,
           -297.0, 72.1
         ],
-        "t": { "name": "Variante Ascari", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968242",
@@ -149,7 +149,7 @@
           -324.3, -502.6, -325.0, -498.3, -327.6, -495.2, -332.0, -493.6, -337.6, -494.2, -345.7,
           -496.6, -356.2
         ],
-        "t": { "name": "Variante del Rettifilo", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968245",
@@ -157,7 +157,7 @@
           191.8, -951.2, 201.6, -953.3, 206.3, -957.8, 209.7, -965.3, 215.5, -985.0, 219.7, -992.6,
           224.4, -995.8, 234.1, -998.0
         ],
-        "t": { "name": "Variante della Roggia", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/179968249",
@@ -214,12 +214,12 @@
           -745.4, -305.9, -844.6, -284.9, -854.9, -263.7, -856.9, -247.4, -853.8, -231.3, -844.8,
           -221.4, -832.4, -216.5, -816.1, -231.7, -609.1, -237.2, -543.7, -245.0, -470.8
         ],
-        "t": { "name": "Ex Circuito Pirelli", "highway": "raceway" }
+        "t": { "highway": "raceway" }
       },
       {
         "id": "w/19842206",
         "p": [-626.4, 600.9, -594.9, 293.0, -586.6, 225.4, -538.6, -316.7],
-        "t": { "name": "Rettifilo di partenza", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/19982933",
@@ -243,11 +243,7 @@
       {
         "id": "w/231256008",
         "p": [109.1, -73.6, 102.4, 11.5, 25.1, 648.8, -7.6, 928.5, -11.7, 951.1],
-        "t": {
-          "name": "Rettilineo anello alta velocit\u00e0",
-          "surface": "asphalt",
-          "highway": "raceway"
-        }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/231256009",
@@ -262,7 +258,7 @@
         "p": [
           -279.2, -143.6, -283.6, -91.5, -288.2, -55.6, -294.3, 20.2, -294.2, 27.9, -289.8, 45.4
         ],
-        "t": { "name": "Ex Circuito Pirelli", "highway": "raceway" }
+        "t": { "highway": "raceway" }
       },
       {
         "id": "w/34404638",
@@ -282,17 +278,12 @@
           -445.8, 100.0, -437.7, 106.1, -426.2, 110.9, -417.4, 112.9, -350.0, 120.1, -343.3, 121.8,
           -336.6, 125.3, -332.1, 129.7, -328.1, 135.3, -325.2, 141.5, -323.8, 147.7, -321.2, 268.0
         ],
-        "t": { "name": "Raccordo Junior", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/34404729",
         "p": [25.8, -363.4, 39.6, -347.1],
-        "t": {
-          "name": "Autodromo nazionale di Monza - anello alta velocit\u00e0",
-          "surface": "concrete",
-          "layer": "1",
-          "highway": "raceway"
-        }
+        "t": { "surface": "concrete", "layer": "1", "highway": "raceway" }
       },
       {
         "id": "w/34404730",
@@ -305,7 +296,7 @@
           -3.5, 890.4, -28.5, 890.3, -34.2, 891.8, -38.5, 896.6, -41.5, 923.8, -39.7, 928.7, -36.1,
           935.0, -11.7, 951.1
         ],
-        "t": { "name": "Tondo", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/38168747",
@@ -313,12 +304,12 @@
           -630.4, 848.6, -624.9, 796.3, -622.5, 758.4, -614.5, 689.6, -610.1, 622.2, -574.8, 273.5,
           -574.4, 257.4, -575.7, 229.3, -575.3, 150.0, -576.4, 109.9
         ],
-        "t": { "name": "Pit Lane", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/38168756",
         "p": [-535.6, -326.0, -502.0, -352.0, -498.5, -357.2, -498.3, -362.9],
-        "t": { "name": "Variante del Rettifilo", "surface": "asphalt", "highway": "raceway" }
+        "t": { "surface": "asphalt", "highway": "raceway" }
       },
       {
         "id": "w/725687994",
@@ -349,192 +340,192 @@
       {
         "id": "w/179794158",
         "p": [-372.8, 1027.7, -381.0, 1109.2, -394.9, 1107.8, -386.6, 1026.3, -372.8, 1027.7],
-        "t": { "name": "Tribuna Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/193647795",
         "p": [-625.3, 167.2, -603.6, 169.6, -611.5, 242.8, -633.2, 240.4, -625.3, 167.2],
-        "t": { "name": "Tribuna Laterale Sinistra", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/193647796",
         "p": [-639.6, 253.8, -616.2, 256.6, -624.3, 323.4, -647.7, 320.6, -639.6, 253.8],
-        "t": { "name": "Tribuna Centrale", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457664",
         "p": [-593.8, 947.5, -589.1, 961.9, -592.0, 962.8, -596.6, 948.4, -593.8, 947.5],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457666",
         "p": [-615.7, 847.4, -612.8, 847.3, -612.5, 866.2, -615.4, 866.2, -615.7, 847.4],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457667",
         "p": [-362.4, 843.0, -350.4, 844.2, -355.6, 895.7, -367.6, 894.5, -362.4, 843.0],
-        "t": { "name": "Tribuna Laterale Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457668",
         "p": [-612.4, 910.0, -607.5, 909.2, -604.5, 926.5, -609.4, 927.4, -612.4, 910.0],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457670",
         "p": [-608.5, 929.8, -604.3, 928.7, -599.8, 946.9, -604.0, 948.0, -608.5, 929.8],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457671",
         "p": [-615.5, 868.3, -610.2, 868.1, -609.4, 886.4, -614.7, 886.6, -615.5, 868.3],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457672",
         "p": [-372.2, 939.1, -360.3, 940.2, -363.5, 974.4, -375.5, 973.3, -372.2, 939.1],
-        "t": { "name": "Tribuna Laterale Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457674",
         "p": [-306.1, -64.9, -300.7, -63.9, -306.2, -33.3, -311.7, -34.3, -306.1, -64.9],
-        "t": { "name": "Tribuna Ascari Due", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457675",
         "p": [-368.3, 898.7, -355.5, 900.0, -359.1, 934.2, -371.9, 932.9, -368.3, 898.7],
-        "t": { "name": "Tribuna Laterale Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457677",
         "p": [-320.2, -27.5, -310.7, -25.7, -314.7, -5.2, -324.1, -7.0, -320.2, -27.5],
-        "t": { "name": "Tribuna Amici Autodromo", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457679",
         "p": [-354.9, 766.1, -342.4, 767.5, -350.3, 838.2, -362.7, 836.8, -354.9, 766.1],
-        "t": { "name": "Tribuna Laterale Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457680",
         "p": [-353.2, 232.9, -343.8, 233.7, -346.5, 264.1, -356.0, 263.3, -353.2, 232.9],
-        "t": { "name": "Tribuna Uscita Ascari B", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457681",
         "p": [-613.1, 785.1, -602.8, 785.8, -606.4, 844.6, -616.8, 843.9, -613.1, 785.1],
-        "t": { "name": "Tribuna Parabolica interna", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457682",
         "p": [-602.1, 907.9, -599.1, 924.6, -602.2, 925.2, -605.2, 908.5, -602.1, 907.9],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457684",
         "p": [-598.6, 927.6, -594.2, 944.7, -597.3, 945.4, -601.7, 928.4, -598.6, 927.6],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457685",
         "p": [-324.8, -0.8, -316.5, 0.0, -318.5, 19.9, -326.7, 19.1, -324.8, -0.8],
-        "t": { "name": "Tribuna Ascari Uno", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457686",
         "p": [-356.2, 269.3, -347.1, 270.4, -349.6, 290.9, -358.8, 289.8, -356.2, 269.3],
-        "t": { "name": "Tribuna Museo", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457687",
         "p": [-603.8, 950.1, -599.6, 948.8, -594.3, 965.7, -598.5, 967.0, -603.8, 950.1],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457688",
         "p": [-350.0, 174.9, -340.5, 175.7, -344.9, 223.6, -354.4, 222.8, -350.0, 174.9],
-        "t": { "name": "Tribuna Uscita Ascari A", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457689",
         "p": [-603.8, 887.8, -602.2, 905.3, -605.3, 905.6, -606.9, 888.1, -603.8, 887.8],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457690",
         "p": [-614.4, 888.6, -610.5, 888.2, -608.7, 906.7, -612.6, 907.1, -614.4, 888.6],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457691",
         "p": [-608.4, 742.3, -599.9, 743.0, -602.8, 781.1, -611.4, 780.5, -608.4, 742.3],
-        "t": { "name": "Tribuna Parabolica interna", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457692",
         "p": [-376.8, 978.8, -364.5, 979.8, -367.4, 1016.3, -379.7, 1015.3, -376.8, 978.8],
-        "t": { "name": "Tribuna Laterale Parabolica", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194457693",
         "p": [-609.0, 848.3, -608.7, 861.1, -611.1, 861.1, -611.4, 848.3, -609.0, 848.3],
-        "t": { "name": "Tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/194742580",
         "p": [-561.3, 166.7, -550.2, 167.8, -557.5, 239.2, -568.5, 238.1, -561.3, 166.7],
-        "t": { "name": "tribune", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026018",
         "p": [-532.3, -141.8, -520.7, -140.5, -530.5, -49.8, -542.1, -51.0, -532.3, -141.8],
-        "t": { "name": "Tribuna Alta Velocit\u00e0", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026019",
         "p": [-583.3, -338.5, -556.5, -336.4, -544.9, -481.8, -571.7, -483.9, -583.3, -338.5],
-        "t": { "name": "Tribuna Prima Variante Esterna", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026020",
         "p": [-685.8, 797.7, -671.0, 799.4, -654.3, 655.2, -669.0, 653.5, -685.8, 797.7],
-        "t": { "name": "Tribuna Vedano", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026024",
         "p": [-507.6, -235.1, -496.4, -232.1, -519.7, -145.4, -531.0, -148.4, -507.6, -235.1],
-        "t": { "name": "Tribuna Alta Velocit\u00e0", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026025",
         "p": [-505.8, -240.3, -495.1, -235.6, -474.7, -282.5, -485.4, -287.2, -505.8, -240.3],
-        "t": { "name": "Tribuna Alta Velocit\u00e0", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231026027",
         "p": [-252.6, -136.9, -246.7, -130.3, -222.4, -151.9, -228.3, -158.5, -252.6, -136.9],
-        "t": { "name": "Tribuna Ascari Tre", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231257063",
         "p": [-608.8, 132.1, -597.9, 133.0, -591.1, 50.7, -601.9, 49.8, -608.8, 132.1],
-        "t": { "name": "Tribuna Piscina", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231260684",
         "p": [-327.3, 23.4, -317.9, 24.4, -323.9, 84.0, -333.2, 83.1, -327.3, 23.4],
-        "t": { "name": "Tribuna Ascari", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231265139",
         "p": [292.7, -948.8, 301.2, -945.4, 311.8, -971.5, 303.3, -974.9, 292.7, -948.8],
-        "t": { "name": "Tribuna Seconda Variante", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/231265140",
         "p": [310.1, -980.8, 314.6, -973.0, 338.3, -986.5, 333.8, -994.3, 310.1, -980.8],
-        "t": { "name": "Tribuna Roggia", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/233132517",
@@ -554,7 +545,7 @@
       {
         "id": "w/34404645",
         "p": [-666.0, 556.6, -641.1, 558.8, -621.8, 339.8, -646.6, 337.6, -666.0, 556.6],
-        "t": { "name": "Tribuna Laterale Destra", "building": "grandstand" }
+        "t": { "building": "grandstand" }
       },
       {
         "id": "w/561721691",
@@ -606,35 +597,21 @@
         "p": [-603.6, 568.1, -596.1, 568.6],
         "t": { "surface": "concrete", "layer": "1", "highway": "footway" }
       },
-      {
-        "id": "w/258134362",
-        "p": [866.2, -511.7, 859.3, -526.3],
-        "t": { "name": "Ferrovia Monza-Molteno", "layer": "1" }
-      },
+      { "id": "w/258134362", "p": [866.2, -511.7, 859.3, -526.3], "t": { "layer": "1" } },
       {
         "id": "w/261674750",
         "p": [796.3, -1499.8, 804.9, -1500.4, 814.0, -1499.2, 821.5, -1496.2],
-        "t": {
-          "name": "Via Risorgimento",
-          "surface": "asphalt",
-          "layer": "1",
-          "highway": "residential"
-        }
+        "t": { "surface": "asphalt", "layer": "1", "highway": "residential" }
       },
       {
         "id": "w/37955027",
         "p": [788.5, -1498.0, 796.3, -1499.8],
-        "t": {
-          "name": "Via Risorgimento",
-          "surface": "asphalt",
-          "layer": "1",
-          "highway": "residential"
-        }
+        "t": { "surface": "asphalt", "layer": "1", "highway": "residential" }
       },
       {
         "id": "w/37955029",
         "p": [757.3, -1556.3, 763.8, -1592.0],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "layer": "1", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "layer": "1", "highway": "tertiary" }
       },
       {
         "id": "w/51791412",
@@ -698,12 +675,7 @@
       {
         "id": "w/48492195",
         "p": [-712.5, -116.7, -713.5, -125.9],
-        "t": {
-          "name": "Viale per Biassono",
-          "surface": "sett",
-          "layer": "-1",
-          "highway": "service"
-        }
+        "t": { "surface": "sett", "layer": "-1", "highway": "service" }
       }
     ],
     "building": [
@@ -716,7 +688,7 @@
           -1058.7, -1007.7, -1066.1, -1005.8, -1065.1, -1001.8, -1079.6, -998.1, -1081.1, -1003.8,
           -1093.0, -1000.7, -1086.7, -976.3, -1092.9, -974.7
         ],
-        "t": { "name": "Villa Verri", "building": "villa" }
+        "t": { "building": "villa" }
       },
       {
         "id": "r/5289108",
@@ -724,7 +696,7 @@
           -974.2, -962.5, -972.9, -953.0, -1032.2, -938.1, -1036.6, -940.9, -1040.6, -964.0, -985.1,
           -978.0, -982.1, -968.2, -978.7, -968.9, -978.0, -965.8, -975.4, -966.5, -974.2, -962.5
         ],
-        "t": { "name": "Ca' de Bossi", "building": "apartments" }
+        "t": { "building": "apartments" }
       },
       {
         "id": "r/5320779",
@@ -737,7 +709,7 @@
       {
         "id": "w/1190109083",
         "p": [-1105.4, -589.7, -1092.0, -594.3, -1080.8, -564.4, -1094.4, -560.2, -1105.4, -589.7],
-        "t": { "name": "McDonald's", "building": "commercial", "building:levels": "1" }
+        "t": { "building": "commercial", "building:levels": "1" }
       },
       {
         "id": "w/1201509472",
@@ -1116,7 +1088,7 @@
       {
         "id": "w/193475026",
         "p": [168.2, -532.7, 178.4, -530.9, 176.3, -518.6, 166.0, -520.4, 168.2, -532.7],
-        "t": { "name": "Serraglio dei cervi", "building": "farm" }
+        "t": { "building": "farm" }
       },
       {
         "id": "w/193475028",
@@ -1131,7 +1103,7 @@
       {
         "id": "w/193475031",
         "p": [-746.4, -522.9, -749.9, -536.7, -730.7, -541.6, -727.2, -527.7, -746.4, -522.9],
-        "t": { "name": "Cascina Costa Alta", "building": "farm" }
+        "t": { "building": "farm" }
       },
       {
         "id": "w/193475052",
@@ -1141,17 +1113,12 @@
       {
         "id": "w/193478365",
         "p": [-996.3, 993.8, -953.4, 1002.4, -958.0, 1025.6, -1001.0, 1017.0, -996.3, 993.8],
-        "t": { "name": "Villa Litta", "building": "villa" }
+        "t": { "building": "villa" }
       },
       {
         "id": "w/193503304",
         "p": [-102.2, -1054.2, -60.1, -1053.4, -61.3, -995.3, -103.4, -996.1, -102.2, -1054.2],
-        "t": {
-          "name": "PalaRovagnati",
-          "building": "stadium",
-          "building:levels": "1",
-          "covered": "yes"
-        }
+        "t": { "building": "stadium", "building:levels": "1", "covered": "yes" }
       },
       {
         "id": "w/193507574",
@@ -1480,12 +1447,12 @@
       {
         "id": "w/193647797",
         "p": [-523.3, 237.6, -458.6, 244.0, -459.8, 256.4, -524.6, 250.0, -523.3, 237.6],
-        "t": { "name": "Vecchie rimesse", "building": "service" }
+        "t": { "building": "service" }
       },
       {
         "id": "w/193647798",
         "p": [-396.9, 276.7, -377.7, 250.4, -363.0, 280.1, -381.9, 306.7, -396.9, 276.7],
-        "t": { "name": "Padiglione Esposizioni", "building": "public" }
+        "t": { "building": "public" }
       },
       {
         "id": "w/193647799",
@@ -1512,7 +1479,7 @@
           -924.5, 111.5, -924.1, 115.9, -943.0, 117.8, -943.5, 112.3, -948.2, 112.8, -949.0, 104.0,
           -936.2, 102.8
         ],
-        "t": { "name": "Oratorio di Santa Maria delle Selve", "building": "chapel" }
+        "t": { "building": "chapel" }
       },
       {
         "id": "w/194448514",
@@ -1543,7 +1510,7 @@
           -737.7, -765.1, -738.6, -785.5, -724.1, -786.0, -723.8, -779.0, -718.3, -779.2, -717.8,
           -765.9, -737.7, -765.1
         ],
-        "t": { "name": "Cascina Costa Bassa", "building": "farm" }
+        "t": { "building": "farm" }
       },
       {
         "id": "w/194448523",
@@ -1556,7 +1523,7 @@
       {
         "id": "w/194458105",
         "p": [-568.8, 261.8, -539.7, 264.5, -548.2, 354.4, -577.3, 351.6, -568.8, 261.8],
-        "t": { "name": "Hospitality Building", "building": "commercial" }
+        "t": { "building": "commercial" }
       },
       {
         "id": "w/194458106",
@@ -1569,7 +1536,7 @@
           -572.5, 617.7, -534.6, 619.5, -535.1, 630.7, -557.4, 629.7, -557.6, 633.6, -573.2, 632.9,
           -572.5, 617.7
         ],
-        "t": { "name": "Centro Medico", "building": "hospital" }
+        "t": { "building": "hospital" }
       },
       {
         "id": "w/194739930",
@@ -2478,12 +2445,12 @@
           1142.2, -996.1, 1139.9, -1004.5, 1139.9, -1005.9, 1135.5, -1009.0, 1133.8, -1012.3,
           1133.6, -1015.7, 1134.9, -1017.5, 1137.6, -1037.3, 1137.2
         ],
-        "t": { "name": "Chiesa di Santo Stefano", "building": "church" }
+        "t": { "building": "church" }
       },
       {
         "id": "w/233133796",
         "p": [-1039.0, 1331.0, -1040.2, 1343.9, -1017.1, 1346.0, -1016.0, 1333.2, -1039.0, 1331.0],
-        "t": { "name": "Villa Zendali", "building": "villa" }
+        "t": { "building": "villa" }
       },
       {
         "id": "w/237106981",
@@ -2501,11 +2468,7 @@
           -1023.9, 1128.1, -1033.6, 1128.1, -1033.6, 1120.9, -1035.6, 1120.9, -1035.6, 1114.5,
           -1037.5, 1114.5, -1037.6, 1108.0, -1035.7, 1108.0, -1035.7, 1100.1, -1024.4, 1100.1
         ],
-        "t": {
-          "name": "Asilo infantile Litta Modigliani",
-          "building": "kindergarten",
-          "building:levels": "2"
-        }
+        "t": { "building": "kindergarten", "building:levels": "2" }
       },
       {
         "id": "w/237106984",
@@ -3369,7 +3332,7 @@
           -1148.2, 950.9, -1131.7, 934.7, -1095.6, 944.1, -1088.6, 959.3, -1073.4, 955.0, -1080.4,
           928.7, -1140.1, 915.5, -1159.7, 939.0, -1148.2, 950.9
         ],
-        "t": { "name": "Scuderie di Villa Litta", "building": "stable" }
+        "t": { "building": "stable" }
       },
       {
         "id": "w/309722396",
@@ -3648,7 +3611,7 @@
       {
         "id": "w/34404652",
         "p": [-598.9, 594.3, -573.7, 597.0, -549.4, 368.3, -574.2, 365.6, -598.9, 594.3],
-        "t": { "name": "Palazzina Box", "building": "commercial" }
+        "t": { "building": "commercial" }
       },
       {
         "id": "w/354013220",
@@ -3858,7 +3821,7 @@
           -880.8, -1020.7, -879.5, -1014.2, -897.8, -1010.7, -898.5, -1015.8, -905.4, -1015.7,
           -905.2, -1036.0, -933.0, -1037.6, -932.2, -1049.9
         ],
-        "t": { "name": "Villa Segramora", "building": "villa" }
+        "t": { "building": "villa" }
       },
       {
         "id": "w/356500625",
@@ -4366,7 +4329,7 @@
           -921.4, -962.5, -918.7, -961.5, -915.4, -964.5, -914.5, -964.1, -913.3, -984.7, -906.8,
           -985.1, -907.9, -996.5, -904.3
         ],
-        "t": { "name": "Oratorio San Luigi", "building": "yes" }
+        "t": { "building": "yes" }
       },
       {
         "id": "w/391884245",
@@ -7356,8 +7319,7 @@
           -476.6, -251.4, -474.1, -282.3, -468.2, -317.3, -459.1, -352.6, -446.4, -377.9, -433.6,
           -406.1, -414.5, -436.9, -387.6, -451.3, -371.3, -454.2, -363.2, -478.6, -369.5, -481.1,
           -370.9
-        ],
-        "t": { "name": "Bosco Bello" }
+        ]
       },
       {
         "id": "w/34405186",
@@ -7665,8 +7627,7 @@
         "p": [
           214.9, -2057.8, 257.4, -2020.3, 288.8, -1981.0, 329.0, -1893.6, 336.8, -1874.9, 460.8,
           -1732.2, 492.9, -1680.8, 513.4, -1651.6, 533.1, -1628.2
-        ],
-        "t": { "name": "Lambro" }
+        ]
       },
       {
         "id": "w/150933715",
@@ -7675,16 +7636,14 @@
           -1588.8, 730.5, -1584.8, 761.3, -1572.8, 788.8, -1536.8, 805.5, -1486.1, 824.6, -1417.5,
           853.0, -1342.0, 884.6, -1293.0, 911.3, -1240.7, 918.0, -1217.3, 921.3, -1185.3, 916.6,
           -1151.3, 904.9, -1126.3, 898.9, -1120.4
-        ],
-        "t": { "name": "Lambro" }
+        ]
       },
       {
         "id": "w/193514977",
         "p": [
           815.3, -990.5, 813.0, -969.8, 814.7, -953.4, 823.4, -933.0, 840.6, -902.8, 844.1, -890.1,
           845.1, -877.3, 835.4, -840.0, 826.1, -814.2, 819.4, -762.8, 807.7, -729.2, 804.8, -711.7
-        ],
-        "t": { "name": "Lambro" }
+        ]
       },
       {
         "id": "w/193514978",
@@ -7716,16 +7675,14 @@
           -942.7, 4402.9, -1006.0, 4470.8, -1018.2, 4489.5, -1027.5, 4511.2, -1036.0, 4547.9,
           -1037.2, 4563.2, -1036.6, 4576.5, -1032.9, 4601.8, -1025.9, 4623.7, -1007.0, 4663.2,
           -994.6, 4696.5, -988.4, 4731.9, -1000.4, 4756.8
-        ],
-        "t": { "name": "Lambro" }
+        ]
       },
       {
         "id": "w/193514979",
         "p": [
           898.9, -1120.4, 885.4, -1107.0, 859.6, -1087.4, 843.7, -1067.2, 827.0, -1035.9, 818.4,
           -1012.5, 815.3, -990.5
-        ],
-        "t": { "name": "Lambro" }
+        ]
       },
       {
         "id": "w/193514980",
@@ -7733,8 +7690,7 @@
           804.8, -711.7, 807.5, -685.5, 861.4, -569.3, 866.1, -558.1, 869.7, -545.6, 870.0, -538.7,
           869.1, -531.9, 866.7, -524.4, 861.6, -517.3, 842.2, -498.0, 824.8, -477.3, 806.7, -448.6,
           804.7, -443.9
-        ],
-        "t": { "name": "Lambro" }
+        ]
       }
     ],
     "grass": [
@@ -7817,7 +7773,7 @@
           -235.5, -1097.3, -212.1, -1096.7, -214.6, -1060.3, -237.6, -1060.2, -236.8, -1082.7,
           -235.7, -1084.1, -235.5, -1097.3
         ],
-        "t": { "name": "Skate Park Comunale", "surface": "concrete" }
+        "t": { "surface": "concrete" }
       },
       {
         "id": "w/1226263837",
@@ -8104,8 +8060,7 @@
           937.4, -59.9, 952.0, -49.3, 968.7, -46.7, 980.7, -51.8, 995.8, -54.3, 1015.5, -61.9,
           1046.2, -64.9, 1063.8, -70.5, 1078.4, -82.6, 1092.5, -92.2, 1094.1, -111.8, 1087.3,
           -170.4, 1081.0, -260.4, 1064.9, -323.7, 1052.2
-        ],
-        "t": { "name": "Prato della Gerascia" }
+        ]
       },
       {
         "id": "w/244617242",
@@ -8253,7 +8208,7 @@
           -477.1, 587.4, -435.7, 591.3, -399.5, 583.3, -382.3, 576.6, -363.8, 401.2, -453.0, 389.2,
           -477.1, 587.4
         ],
-        "t": { "name": "Paddock 2", "barrier": "fence" }
+        "t": { "barrier": "fence" }
       },
       {
         "id": "w/1268185161",
@@ -8289,8 +8244,7 @@
           -780.5, 1109.9, -773.5, 1104.7, -763.7, 1102.1, -752.3, 1103.7, -745.1, 1108.3, -739.2,
           1114.3, -735.9, 1119.8, -735.3, 1126.4, -751.3, 1255.9, -761.1, 1264.3, -771.7, 1264.9,
           -784.3, 1262.5, -798.9, 1255.5, -801.3, 1248.6, -780.5, 1109.9
-        ],
-        "t": { "name": "Parcheggio di Porta Vedano" }
+        ]
       },
       {
         "id": "w/204315112",
@@ -8311,7 +8265,7 @@
           -550.5, 594.0, -550.7, 600.8, -548.6, 600.8, -549.6, 611.8, -574.9, 610.3, -549.1, 366.4,
           -539.5, 367.6, -537.0, 347.1
         ],
-        "t": { "name": "Paddock 1", "barrier": "fence" }
+        "t": { "barrier": "fence" }
       },
       {
         "id": "w/220534601",
@@ -8339,15 +8293,14 @@
           -57.0, -983.3, -55.2, -1082.2, -9.7, -1081.6, -8.8, -1072.2, -11.8, -1071.9, -11.9,
           -1056.8, -8.0, -1056.1, -8.4, -1016.1, -20.1, -998.8, -27.2, -994.1, -57.0, -983.3
         ],
-        "t": { "name": "Parcheggio Palarovagnati", "surface": "asphalt" }
+        "t": { "surface": "asphalt" }
       },
       {
         "id": "w/231258064",
         "p": [
           -512.5, 907.3, -569.4, 904.8, -577.8, 913.1, -571.9, 974.0, -530.9, 977.7, -509.2, 999.4,
           -500.1, 999.9, -512.5, 907.3
-        ],
-        "t": { "name": "Piazzale Parabolica" }
+        ]
       },
       {
         "id": "w/237106991",
@@ -8500,91 +8453,87 @@
       {
         "id": "w/1122070787",
         "p": [-1251.6, -229.2, -1244.0, -230.0, -1210.4, -239.7, -1127.5, -268.7],
-        "t": { "name": "Via dell'Olmo", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/1225886013",
         "p": [-1037.7, -495.5, -1042.0, -510.1],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1225886014",
         "p": [-1042.0, -510.1, -1047.8, -530.1],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1225886015",
         "p": [-1024.0, -515.5, -950.9, -538.5, -841.3, -570.6],
-        "t": { "name": "Via Macall\u00e8", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/1225886016",
         "p": [-1068.3, -599.6, -1084.0, -653.2, -1114.7, -809.7],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1225886018",
         "p": [-985.4, -332.4, -1012.8, -416.6, -1022.5, -453.8],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1225886019",
         "p": [-973.3, -294.3, -985.4, -332.4],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1225886020",
         "p": [-893.4, -318.9, -822.8, -340.3, -819.6, -350.4],
-        "t": { "name": "Via Martin Luter King", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/124205784",
         "p": [-841.3, -570.6, -842.9, -584.6, -869.3, -659.5],
-        "t": { "name": "Via Costa Alta", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/124205785",
         "p": [-869.3, -659.5, -912.3, -648.1, -1068.3, -599.6],
-        "t": { "name": "Via Gerardo dei Tintori", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/125135722",
         "p": [-602.7, -1133.0, -595.7, -1133.1, -474.3, -1146.9],
-        "t": { "name": "Via Palladio", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/125135723",
         "p": [-732.2, -1107.7, -604.2, -1101.1],
-        "t": { "name": "Via Giuseppe Piermarini", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/125135725",
         "p": [-479.1, -1016.8, -607.1, -1019.8],
-        "t": { "name": "Via Francesco Borromini", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/125135728",
         "p": [-711.5, -1246.4, -820.0, -1273.5],
-        "t": { "name": "Via Sant'Antonio", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/125135729",
         "p": [-633.6, -1237.6, -603.5, -1154.0, -602.7, -1133.0, -610.9, -931.2],
-        "t": { "name": "Via Filippo Brunelleschi", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/125135857",
         "p": [-711.5, -1246.4, -711.3, -1164.2],
-        "t": { "name": "Via Stoppani", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/1281146280",
         "p": [-1005.8, -1047.9, -968.1, -1059.8],
-        "t": {
-          "name": "Piazza San Francesco",
-          "surface": "paving_stones",
-          "highway": "residential"
-        }
+        "t": { "surface": "paving_stones", "highway": "residential" }
       },
       {
         "id": "w/1373464510",
@@ -8592,17 +8541,17 @@
           -965.0, -1143.6, -840.0, -1165.9, -827.6, -1176.4, -823.6, -1178.1, -819.7, -1176.5,
           -818.4, -1174.6, -817.0, -1168.0
         ],
-        "t": { "name": "Via Alessandro Manzoni", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/1374055964",
         "p": [-711.5, -1246.4, -666.7, -1240.6, -633.6, -1237.6],
-        "t": { "name": "Via Sant'Antonio", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/1374057345",
         "p": [-771.4, -912.5, -642.4, -910.4],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1409845273",
@@ -8616,12 +8565,12 @@
       {
         "id": "w/1409845274",
         "p": [-1027.3, -469.2, -1035.0, -486.9, -1037.7, -495.5],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1409845276",
         "p": [-1047.8, -530.1, -1068.3, -599.6],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1422793625",
@@ -8629,52 +8578,52 @@
           -820.0, -1273.5, -836.1, -1253.2, -859.0, -1237.4, -882.6, -1230.4, -905.3, -1226.8,
           -943.8, -1219.3
         ],
-        "t": { "name": "Via Pessina", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/1433768587",
         "p": [-1091.2, 146.2, -1076.8, 167.2],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1433768588",
         "p": [-1107.3, 139.7, -1105.3, 139.8],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1433768589",
         "p": [-1068.5, 137.5, -1061.3, 110.5],
-        "t": { "name": "Via Cesare Battisti", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/1462595731",
         "p": [469.4, -1593.4, 513.6, -1534.8],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1462758054",
         "p": [-259.7, -963.1, -296.2, -962.2, -314.2, -960.8, -373.7, -948.5],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1462758055",
         "p": [-260.3, -955.7, -161.5, -958.4],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1465259112",
         "p": [-462.4, -933.5, -444.4, -936.2],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1465259113",
         "p": [-444.4, -936.2, -373.7, -948.5],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/1497978982",
         "p": [-305.1, -955.3, -260.3, -955.7],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/150927658",
@@ -8682,12 +8631,12 @@
           513.6, -1534.8, 587.3, -1435.1, 610.5, -1401.1, 632.3, -1365.2, 642.2, -1341.2, 646.7,
           -1321.6
         ],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/153195871",
         "p": [758.1, -1485.9, 756.5, -1528.8, 757.3, -1556.3],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/153195873",
@@ -8695,12 +8644,12 @@
           700.7, -1255.1, 704.8, -1257.9, 714.4, -1269.4, 720.0, -1280.7, 721.8, -1287.6, 728.9,
           -1338.0, 758.1, -1485.9
         ],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/153197125",
         "p": [-585.0, -917.0, -601.2, -920.0],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/153772904",
@@ -8708,7 +8657,7 @@
           -985.4, -332.4, -1010.0, -312.5, -1020.5, -305.6, -1031.7, -300.1, -1081.3, -285.4,
           -1127.5, -268.7
         ],
-        "t": { "name": "Via dell'Olmo", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/177535565",
@@ -8716,7 +8665,7 @@
           -1151.4, 144.5, -1175.0, 16.8, -1177.1, 12.6, -1181.1, 9.8, -1185.0, 8.9, -1199.6, 8.5,
           -1204.0, 6.5, -1207.3, 3.7, -1211.2, -5.2, -1214.3, -21.7
         ],
-        "t": { "name": "Via Po", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/177535573",
@@ -8724,27 +8673,27 @@
           -798.1, -1074.9, -798.0, -1072.1, -799.5, -1070.4, -802.8, -1069.4, -831.1, -1072.8,
           -879.6, -1067.4, -879.4, -1059.1, -968.1, -1059.8
         ],
-        "t": { "name": "Via Luigi Segramora", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/177535578",
         "p": [-759.9, -1349.8, -634.9, -1258.4, -629.6, -1249.1, -626.4, -1240.5],
-        "t": { "name": "Via Caravaggio", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/193353924",
         "p": [372.7, -1717.1, 382.9, -1708.2, 469.4, -1593.4],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/193465589",
         "p": [646.8, -1250.5, 654.2, -1230.6],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/193465590",
         "p": [646.7, -1321.6, 650.1, -1288.1, 650.1, -1281.5],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/193465641",
@@ -8752,12 +8701,12 @@
           21.3, -1318.2, 22.7, -1308.2, 23.0, -1293.6, 22.3, -1262.2, 19.2, -1200.6, 17.5, -1187.6,
           14.2, -1178.3, -3.9, -1151.5, -6.1, -1142.0, -1.6, -1008.7, -1.9, -999.4
         ],
-        "t": { "name": "Via Brenno", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/193465649",
         "p": [90.9, -1330.2, 29.1, -1321.6, 24.9, -1320.6, 21.3, -1318.2],
-        "t": { "name": "Via della Sciavatera", "highway": "unclassified" }
+        "t": { "highway": "unclassified" }
       },
       {
         "id": "w/193465653",
@@ -8765,57 +8714,57 @@
           21.3, -1318.2, 17.4, -1319.8, 12.1, -1320.2, 1.7, -1319.5, -25.2, -1315.6, -50.2, -1310.6,
           -66.4, -1306.2
         ],
-        "t": { "name": "Via Sant'Antonio", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/193465657",
         "p": [245.4, -1351.6, 90.9, -1330.2],
-        "t": { "name": "Via della Sciavatera", "highway": "unclassified" }
+        "t": { "highway": "unclassified" }
       },
       {
         "id": "w/193502850",
         "p": [1362.2, -748.0, 1101.4, -730.3],
-        "t": { "name": "Via Sebastiano d'Imm\u00e8", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/193514053",
         "p": [915.9, -361.5, 910.6, -362.2],
-        "t": { "name": "Via Molinetto", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/193514059",
         "p": [652.6, -1086.0, 701.1, -607.4],
-        "t": { "name": "Via Regina Margherita", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/193514981",
         "p": [701.1, -607.4, 710.5, -518.3, 712.2, -508.1, 713.5, -505.4],
-        "t": { "name": "Via Regina Margherita", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/193676423",
         "p": [1027.9, -1440.5, 1121.6, -1400.8, 1124.7, -1398.5, 1128.3, -1393.6],
-        "t": { "name": "Via Risorgimento", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/194311037",
         "p": [825.1, -363.0, 808.9, -359.8, 795.0, -329.4],
-        "t": { "name": "Via Molinetto", "surface": "fine_gravel", "highway": "residential" }
+        "t": { "surface": "fine_gravel", "highway": "residential" }
       },
       {
         "id": "w/196955420",
         "p": [910.6, -362.2, 893.6, -362.7, 863.5, -365.8, 851.5, -366.1, 825.1, -363.0],
-        "t": { "name": "Via Molinetto", "surface": "fine_gravel", "highway": "residential" }
+        "t": { "surface": "fine_gravel", "highway": "residential" }
       },
       {
         "id": "w/198135580",
         "p": [-1380.9, -90.0, -1376.3, -86.9, -1370.1, -86.6, -1282.0, -103.5, -1009.4, -149.2],
-        "t": { "name": "Via Lombardia", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/198135582",
         "p": [-1127.5, -268.7, -1100.4, -133.5],
-        "t": { "name": "Via Brianza", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/198191610",
@@ -8832,7 +8781,7 @@
           1132.5, -1016.5, 1137.3, -938.5, 1135.9, -912.7, 1133.1, -889.1, 1121.1, -812.9, 1116.1,
           -795.8, 1103.0, -767.7, 1101.2, -755.7, 1101.4, -730.3
         ],
-        "t": { "name": "Via Monte Cervino", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/204052924",
@@ -8845,32 +8794,32 @@
       {
         "id": "w/204052925",
         "p": [-985.9, -168.4, -988.9, -153.6, -991.0, -147.3],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/204052991",
         "p": [-1034.3, -144.9, -1043.8, -79.0],
-        "t": { "name": "Via Resegone", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/204052992",
         "p": [-967.6, -250.3, -839.5, -254.1],
-        "t": { "name": "Via Sant'Andrea", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/204052994",
         "p": [-1120.7, -466.3, -1068.1, -289.1],
-        "t": { "name": "Via Giuseppe Verdi", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/204052996",
         "p": [-978.8, -198.4, -973.1, -196.7, -962.2, -195.4, -852.7, -185.5],
-        "t": { "name": "Via Sant'Ambrogio", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/204052997",
         "p": [-1100.4, -133.5, -1091.6, -87.5, -1093.2, -53.3, -1091.8, -42.1, -1084.9, -28.2],
-        "t": { "name": "Via Brianza", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/204052998",
@@ -8878,17 +8827,17 @@
           -841.3, -570.6, -834.3, -518.2, -835.6, -510.6, -839.5, -508.1, -867.5, -500.5, -1015.3,
           -464.5
         ],
-        "t": { "name": "Via Costa Alta", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/207068949",
         "p": [-982.7, -147.2, -985.9, -168.4],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/207068951",
         "p": [-1003.5, -103.0, -996.9, -115.7, -992.5, -122.3, -987.5, -128.0],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/207068954",
@@ -8898,7 +8847,7 @@
       {
         "id": "w/207068957",
         "p": [-979.7, -131.1, -964.1, -135.2],
-        "t": { "name": "Via Santa Maria alle Selve", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/207068962",
@@ -8913,37 +8862,37 @@
       {
         "id": "w/207068964",
         "p": [-996.9, -135.8, -1003.5, -103.0],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/207068965",
         "p": [-964.1, -135.2, -973.4, -138.2, -977.2, -140.6],
-        "t": { "name": "Via Santa Maria alle Selve", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/207068966",
         "p": [-991.0, -147.3, -998.2, -149.8, -1009.4, -149.2],
-        "t": { "name": "Via Lombardia", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/207068970",
         "p": [-1009.4, -149.2, -1002.8, -147.4, -996.0, -142.7],
-        "t": { "name": "Via Lombardia", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/218786051",
         "p": [-1031.4, -876.3, -1124.2, -856.4],
-        "t": { "name": "Via Monte Grappa", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/219029213",
         "p": [-1060.2, -717.5, -977.8, -743.0],
-        "t": { "name": "Via Cattaneo", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/220534521",
         "p": [-585.0, -917.0, -492.8, -928.9, -462.4, -933.5],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/220534589",
@@ -8957,12 +8906,12 @@
       {
         "id": "w/220534595",
         "p": [-610.9, -931.2, -614.6, -920.9],
-        "t": { "name": "Via Filippo Brunelleschi", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/220534596",
         "p": [-604.3, -922.4, -608.1, -926.5, -610.9, -931.2],
-        "t": { "name": "Via Filippo Brunelleschi", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/220775092",
@@ -8972,42 +8921,42 @@
       {
         "id": "w/221128965",
         "p": [-642.4, -910.4, -615.2, -907.8],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/221128966",
         "p": [-616.2, -918.6, -642.4, -910.4],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/221128967",
         "p": [-161.5, -958.4, -99.2, -960.2, -84.6, -963.4, -48.4, -975.5, -9.8, -985.8],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/221128968",
         "p": [-373.7, -948.5, -317.9, -954.6, -305.1, -955.3],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/221128969",
         "p": [-161.5, -958.4, -202.8, -961.2, -259.7, -963.1],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/221129010",
         "p": [-817.0, -1168.0, -798.1, -1074.9],
-        "t": { "name": "Via Don Ettore Passamonti", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/221129018",
         "p": [-599.6, -910.8, -585.0, -917.0],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/231264341",
         "p": [646.8, -1250.5, 644.5, -1241.3, 642.4, -1236.2, 637.8, -1227.7, 630.7, -1218.2],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/231264342",
@@ -9015,7 +8964,7 @@
           -694.4, -127.4, -702.0, -122.0, -731.4, -124.8, -796.0, -134.2, -836.2, -142.0, -856.6,
           -144.5, -877.5, -143.9, -964.1, -135.2
         ],
-        "t": { "name": "Via Santa Maria alle Selve", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/244711959",
@@ -9023,7 +8972,7 @@
           1533.4, -1063.3, 1480.2, -1051.9, 1427.6, -1043.6, 1311.5, -1037.0, 1277.2, -1034.2,
           1180.7, -1020.8, 1132.5, -1016.5
         ],
-        "t": { "name": "Via Ventiquattro Maggio", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/248441388",
@@ -9031,7 +8980,7 @@
           1292.3, -1346.9, 1282.0, -1216.9, 1281.0, -1212.0, 1277.4, -1208.0, 1270.6, -1205.9,
           1121.5, -1198.9
         ],
-        "t": { "name": "Via alla Cava", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/255970948",
@@ -9039,7 +8988,7 @@
           -1084.0, -653.2, -1218.8, -606.4, -1245.8, -597.9, -1376.5, -552.9, -1422.0, -538.0,
           -1478.0, -521.3, -1530.8, -503.2, -1656.8, -456.3
         ],
-        "t": { "name": "Via Antonio Locatelli", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/258134364",
@@ -9047,22 +8996,22 @@
           713.5, -505.4, 718.8, -505.8, 724.2, -504.8, 731.0, -501.0, 737.8, -494.9, 739.8, -490.5,
           742.6, -454.9, 748.0, -437.7, 751.5, -430.7, 755.4, -426.8
         ],
-        "t": { "name": "Cascina Molino", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/261671614",
         "p": [1123.7, -1156.7, 1132.5, -1016.5],
-        "t": { "name": "Via Giuseppe Mazzini", "highway": "tertiary" }
+        "t": { "highway": "tertiary" }
       },
       {
         "id": "w/261671615",
         "p": [1117.2, -1290.6, 1123.7, -1156.7],
-        "t": { "name": "Via Giuseppe Mazzini", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/261674749",
         "p": [763.1, -1488.3, 774.8, -1494.0, 788.5, -1498.0],
-        "t": { "name": "Via Risorgimento", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/26200074",
@@ -9070,37 +9019,37 @@
           1128.3, -1393.6, 1125.8, -1390.8, 1124.2, -1387.3, 1117.9, -1360.2, 1116.7, -1348.0,
           1117.2, -1290.6
         ],
-        "t": { "name": "Via Giuseppe Mazzini", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/26200541",
         "p": [1103.0, -333.6, 1047.6, -342.1, 983.5, -354.4, 961.0, -358.0, 915.9, -361.5],
-        "t": { "name": "Via Molinetto", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/26200547",
         "p": [1135.9, -912.7, 1359.4, -918.0],
-        "t": { "name": "Via Giuseppe Mazzini", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/26200548",
         "p": [808.9, -359.8, 790.8, -369.0],
-        "t": { "name": "Via Molinetto", "surface": "fine_gravel", "highway": "residential" }
+        "t": { "surface": "fine_gravel", "highway": "residential" }
       },
       {
         "id": "w/26254644",
         "p": [638.0, -1221.9, 652.6, -1086.0],
-        "t": { "name": "Via Regina Margherita", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/27950362",
         "p": [-1052.6, 1226.5, -1061.3, 1250.4, -1073.6, 1288.8, -1075.8, 1307.6, -1076.2, 1321.2],
-        "t": { "name": "Via Santo Stefano", "surface": "sett", "highway": "unclassified" }
+        "t": { "surface": "sett", "highway": "unclassified" }
       },
       {
         "id": "w/291524147",
         "p": [-672.9, -1447.1, -600.2, -1395.8],
-        "t": { "name": "Via Rialto", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/296862725",
@@ -9108,17 +9057,17 @@
           -1459.9, 271.2, -1384.6, 247.7, -1377.9, 245.2, -1365.4, 236.9, -1354.2, 224.6, -1324.5,
           178.6, -1311.3, 166.2, -1301.5, 160.2, -1288.2, 157.0, -1151.4, 144.5, -1107.3, 139.7
         ],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/297519826",
         "p": [-1261.6, 892.0, -1076.8, 167.2],
-        "t": { "name": "Via Cesare Battisti", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/297524240",
         "p": [-1040.7, 1231.8, -884.6, 1301.7],
-        "t": { "name": "Via Enzo Ferrari", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/297524241",
@@ -9126,37 +9075,37 @@
           -1076.2, 1321.2, -1078.8, 1381.7, -1078.2, 1407.3, -1071.4, 1441.0, -1070.4, 1452.2,
           -1072.8, 1456.6, -1076.6, 1459.7, -1087.1, 1465.4
         ],
-        "t": { "name": "Via Santo Stefano", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/297887838",
         "p": [-1076.8, 167.2, -1071.9, 150.2],
-        "t": { "name": "Via Cesare Battisti", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/297887839",
         "p": [-1071.9, 150.2, -1068.5, 137.5],
-        "t": { "name": "Via Cesare Battisti", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/297887840",
         "p": [-1091.2, 146.2, -1078.5, 149.9, -1071.9, 150.2],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/297887841",
         "p": [-1068.5, 137.5, -1082.4, 137.5, -1105.3, 139.8],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/297887842",
         "p": [-1105.3, 139.8, -1094.7, 143.7, -1091.2, 146.2],
-        "t": { "name": "Via della Misericordia", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/30927822",
         "p": [-1248.1, 995.9, -1203.4, 980.8],
-        "t": { "name": "Via Venticinque Aprile", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/30927863",
@@ -9164,36 +9113,32 @@
           -786.7, -908.6, -797.8, -895.9, -807.4, -882.6, -822.2, -872.9, -843.4, -863.3, -846.4,
           -860.9, -848.1, -858.7, -850.1, -852.9, -849.7, -846.3
         ],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/30928153",
         "p": [-939.2, -959.9, -963.1, -1026.1, -967.9, -1045.5, -968.1, -1059.8],
-        "t": { "name": "Via Roma", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/309722395",
         "p": [-1042.0, -510.1, -1024.0, -515.5],
-        "t": { "name": "Via Macall\u00e8", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/309722610",
         "p": [-819.6, -350.4, -867.5, -500.5],
-        "t": {
-          "name": "Via John Fitzgerald Kennedy",
-          "surface": "asphalt",
-          "highway": "residential"
-        }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/329499180",
         "p": [-517.8, -1522.7, -506.1, -1391.4],
-        "t": { "name": "Via Niccol\u00f2 Machiavelli", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/34404713",
         "p": [-786.7, -908.6, -771.4, -912.5],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/37898483",
@@ -9203,12 +9148,12 @@
           -1070.8, 424.8, -1085.5, 447.8, -1101.2, 483.4, -1130.6, 503.9, -1145.2, 583.8, -1192.6,
           638.0, -1221.9
         ],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/37955024",
         "p": [758.1, -1485.9, 763.1, -1488.3],
-        "t": { "name": "Via Risorgimento", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/37955026",
@@ -9216,22 +9161,22 @@
           821.5, -1496.2, 835.0, -1482.1, 842.9, -1476.2, 857.1, -1468.9, 937.8, -1434.7, 944.8,
           -1433.8, 948.4, -1434.3, 964.6, -1457.5, 969.7, -1461.3, 978.1, -1461.2, 1027.9, -1440.5
         ],
-        "t": { "name": "Via Risorgimento", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/37955030",
         "p": [763.8, -1592.0, 771.3, -1614.3, 782.6, -1639.7, 823.2, -1705.0, 860.5, -1772.2],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/409030053",
         "p": [-1157.9, 1242.8, -1157.2, 1224.9, -1157.6, 1212.0, -1160.9, 1206.4],
-        "t": { "name": "Via Italia", "surface": "sett", "highway": "residential" }
+        "t": { "surface": "sett", "highway": "residential" }
       },
       {
         "id": "w/46033201",
         "p": [-1061.3, 110.5, -1036.6, 22.1, -1003.5, -103.0],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/46056599",
@@ -9245,17 +9190,17 @@
       {
         "id": "w/462050441",
         "p": [1117.2, -1296.2, 1166.6, -1296.4],
-        "t": { "name": "Via Don Carlo Gnocchi", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/48492201",
         "p": [-1052.6, 1226.5, -1040.7, 1231.8],
-        "t": { "name": "Piazza Marco Bonfanti", "surface": "sett", "highway": "unclassified" }
+        "t": { "surface": "sett", "highway": "unclassified" }
       },
       {
         "id": "w/48492254",
         "p": [-786.7, -908.6, -827.5, -974.7, -831.7, -979.3, -839.2, -981.0, -939.2, -959.9],
-        "t": { "name": "Via Umberto Primo", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/48492255",
@@ -9263,12 +9208,12 @@
           -939.2, -959.9, -926.1, -926.2, -914.8, -905.2, -902.9, -889.6, -872.9, -867.0, -849.1,
           -856.1
         ],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/48505494",
         "p": [704.8, -1257.9, 713.1, -1232.1, 729.7, -1188.6, 739.2, -1153.6],
-        "t": { "name": "Via della Stazione", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/48505496",
@@ -9276,12 +9221,12 @@
           -849.7, -846.3, -848.2, -823.2, -858.7, -766.6, -862.6, -704.0, -865.9, -665.6, -869.3,
           -659.5
         ],
-        "t": { "name": "Via Cristoforo Colombo", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/51218105",
         "p": [-1465.1, 523.4, -1320.6, 476.4, -1243.6, 460.1, -1150.8, 457.5],
-        "t": { "name": "Via Leonardo da Vinci", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/51218107",
@@ -9290,12 +9235,12 @@
           598.0, -1490.2, 610.5, -1612.3, 663.7, -1639.5, 672.9, -1667.7, 680.8, -1678.6, 683.1,
           -1805.9, 726.3
         ],
-        "t": { "name": "Via Vittorio Alfieri", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/51224018",
         "p": [-1119.3, 334.0, -1151.6, 327.6, -1240.3, 338.8, -1289.5, 359.3],
-        "t": { "name": "Via Cesare Battisti", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/51268588",
@@ -9303,22 +9248,22 @@
           -1203.4, 980.8, -1192.1, 980.3, -1075.5, 1001.7, -1061.2, 1006.7, -1051.2, 1016.7,
           -1046.2, 1026.3, -1036.7, 1070.7, -1037.2, 1081.6
         ],
-        "t": { "name": "Via Santo Stefano", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/51268589",
         "p": [-1037.2, 1081.6, -1111.8, 1080.3, -1214.4, 1076.9, -1255.0, 1077.6],
-        "t": { "name": "Via Piave", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/51268590",
         "p": [-1160.9, 1206.4, -1194.3, 1077.4],
-        "t": { "name": "Via Tagliamento", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/51268591",
         "p": [-1111.8, 1080.3, -1110.4, 1165.1],
-        "t": { "name": "Vicolo Isonzo", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/51268595",
@@ -9326,27 +9271,27 @@
           -1203.4, 980.8, -1219.4, 962.9, -1229.6, 949.5, -1249.5, 902.9, -1255.8, 896.3, -1261.6,
           892.0
         ],
-        "t": { "name": "Via Santo Stefano", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/51268596",
         "p": [-1052.6, 1226.5, -1037.2, 1081.6],
-        "t": { "name": "Via Santo Stefano", "surface": "sett", "highway": "unclassified" }
+        "t": { "surface": "sett", "highway": "unclassified" }
       },
       {
         "id": "w/51268597",
         "p": [-1313.9, 1250.2, -1222.4, 1222.9, -1160.9, 1206.4],
-        "t": { "name": "Via Quattro Novembre", "surface": "sett", "highway": "residential" }
+        "t": { "surface": "sett", "highway": "residential" }
       },
       {
         "id": "w/51268598",
         "p": [-1160.9, 1206.4, -1142.7, 1207.1, -1052.6, 1226.5],
-        "t": { "name": "Via Quattro Novembre", "surface": "sett", "highway": "residential" }
+        "t": { "surface": "sett", "highway": "residential" }
       },
       {
         "id": "w/523200813",
         "p": [1101.4, -730.3, 1104.1, -557.6, 1100.3, -395.5, 1103.0, -333.6],
-        "t": { "name": "Via Monte Cervino", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/57382886",
@@ -9354,7 +9299,7 @@
           -562.2, -1505.0, -545.6, -1461.4, -529.1, -1412.7, -527.3, -1402.8, -528.5, -1385.6,
           -531.2, -1376.7
         ],
-        "t": { "name": "Via dei Giardini", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/57382900",
@@ -9362,12 +9307,12 @@
           -648.0, -1505.8, -650.7, -1489.4, -655.6, -1474.2, -662.0, -1461.1, -672.9, -1447.1,
           -723.1, -1394.9, -739.7, -1376.2, -766.7, -1340.4, -820.0, -1273.5
         ],
-        "t": { "name": "Via Pessina", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/60560515",
         "p": [-985.9, -168.4, -968.9, -239.4, -967.6, -250.3, -969.1, -274.1, -973.3, -294.3],
-        "t": { "name": "Via Cesana e Villa", "surface": "asphalt", "highway": "secondary" }
+        "t": { "surface": "asphalt", "highway": "secondary" }
       },
       {
         "id": "w/60560519",
@@ -9375,22 +9320,22 @@
           -1084.0, -653.2, -1074.8, -660.9, -1069.6, -670.2, -1031.4, -862.0, -1031.4, -876.3,
           -1033.1, -910.5, -1036.8, -934.1
         ],
-        "t": { "name": "Via Pietro Verri", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/609675316",
         "p": [638.0, -1221.9, 700.7, -1255.1],
-        "t": { "name": "Via al Parco", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/609675317",
         "p": [650.1, -1281.5, 646.8, -1250.5],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/609675318",
         "p": [662.0, -1234.7, 658.9, -1239.9, 655.6, -1250.1, 650.1, -1281.5],
-        "t": { "name": "Via Madonna delle Nevi", "surface": "asphalt", "highway": "tertiary" }
+        "t": { "surface": "asphalt", "highway": "tertiary" }
       },
       {
         "id": "w/807602405",
@@ -9398,7 +9343,7 @@
           -633.6, -1237.6, -568.4, -1265.7, -531.4, -1269.6, -462.5, -1271.8, -449.4, -1275.0,
           -387.2, -1295.2
         ],
-        "t": { "name": "Via Sant'Antonio", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/807611244",
@@ -9406,38 +9351,34 @@
           713.5, -505.4, 721.5, -494.5, 724.2, -488.6, 726.9, -480.6, 726.3, -469.3, 720.6, -448.2,
           710.4, -419.6, 687.9, -350.7, 680.7, -268.4
         ],
-        "t": { "name": "Via Regina Margherita", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/807611245",
         "p": [680.7, -268.4, 674.7, -168.6, 512.2, 325.4],
-        "t": { "name": "Via Regina Margherita", "surface": "asphalt", "highway": "unclassified" }
+        "t": { "surface": "asphalt", "highway": "unclassified" }
       },
       {
         "id": "w/808545160",
         "p": [
           755.4, -426.8, 770.2, -419.9, 772.3, -417.2, 767.5, -409.3, 764.8, -407.2, 762.7, -403.9
         ],
-        "t": { "name": "Cascina Molino", "surface": "fine_gravel", "highway": "residential" }
+        "t": { "surface": "fine_gravel", "highway": "residential" }
       },
       {
         "id": "w/83376990",
         "p": [-1036.8, -934.1, -939.2, -959.9],
-        "t": { "name": "Via Umberto Primo", "highway": "residential" }
+        "t": { "highway": "residential" }
       },
       {
         "id": "w/84750373",
         "p": [-942.5, -482.2, -893.4, -318.9],
-        "t": {
-          "name": "Via Papa Giovanni Ventitreesimo",
-          "surface": "asphalt",
-          "highway": "residential"
-        }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/84750377",
         "p": [-973.3, -294.3, -893.4, -318.9],
-        "t": { "name": "Via Martin Luther King", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       },
       {
         "id": "w/929619779",
@@ -9445,7 +9386,7 @@
           -968.1, -1059.8, -964.1, -1075.6, -959.3, -1087.6, -958.9, -1108.1, -960.2, -1133.7,
           -962.1, -1139.5, -965.0, -1143.6
         ],
-        "t": { "name": "Via Porta Mugnaia", "surface": "asphalt", "highway": "residential" }
+        "t": { "surface": "asphalt", "highway": "residential" }
       }
     ],
     "service": [
@@ -9508,12 +9449,12 @@
           -863.7, 1306.2, -851.1, 1262.2, -843.3, 1238.3, -834.5, 1197.5, -830.9, 1165.3, -829.9,
           1119.5, -828.0, 1095.1, -816.5, 991.0, -815.4, 968.3, -819.2, 942.6, -828.1, 921.9
         ],
-        "t": { "name": "Viale per Biassono", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/124359965",
         "p": [216.8, -1042.0, 215.7, -1075.6, 218.4, -1139.8],
-        "t": { "name": "Cascina Pirotta", "surface": "gravel", "highway": "track" }
+        "t": { "surface": "gravel", "highway": "track" }
       },
       {
         "id": "w/125135721",
@@ -9522,7 +9463,7 @@
           -312.6, -1268.8, -306.3, -1266.8, -228.8, -1266.0, -211.4, -1267.3, -193.1, -1269.8,
           -152.0, -1276.9, -106.4, -1288.7, -66.4, -1306.2
         ],
-        "t": { "name": "Via Sant'Antonio", "surface": "pebblestone", "highway": "track" }
+        "t": { "surface": "pebblestone", "highway": "track" }
       },
       {
         "id": "w/12648699",
@@ -9537,7 +9478,7 @@
       {
         "id": "w/12648702",
         "p": [-487.6, 595.3, -459.0, 378.1, -450.9, 309.2],
-        "t": { "name": "Viale dei Box", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/12648708",
@@ -9585,12 +9526,12 @@
       {
         "id": "w/1313094831",
         "p": [-713.5, -125.9, -719.0, -152.4],
-        "t": { "name": "Viale per Biassono", "surface": "sett", "highway": "service" }
+        "t": { "surface": "sett", "highway": "service" }
       },
       {
         "id": "w/1313094832",
         "p": [-712.0, -92.8, -712.5, -116.7],
-        "t": { "name": "Viale per Biassono", "surface": "sett", "highway": "service" }
+        "t": { "surface": "sett", "highway": "service" }
       },
       {
         "id": "w/1391815866",
@@ -9717,13 +9658,9 @@
       {
         "id": "w/1531662640",
         "p": [-450.9, 309.2, -363.0, 316.1, -332.9, 320.2],
-        "t": { "name": "Viale degli Uffici", "highway": "service" }
+        "t": { "highway": "service" }
       },
-      {
-        "id": "w/1531662641",
-        "p": [-450.9, 309.2, -428.5, 121.6],
-        "t": { "name": "Viale dei Box", "highway": "service" }
-      },
+      { "id": "w/1531662641", "p": [-450.9, 309.2, -428.5, 121.6], "t": { "highway": "service" } },
       {
         "id": "w/153195891",
         "p": [510.0, -1539.7, 530.2, -1553.8, 523.1, -1563.9],
@@ -9732,7 +9669,7 @@
       {
         "id": "w/154007241",
         "p": [-746.5, -814.7, -753.0, -845.2, -762.0, -870.7, -772.5, -887.9, -786.7, -908.6],
-        "t": { "name": "Viale per Biassono", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/162819669",
@@ -9784,7 +9721,7 @@
           218.4, -1139.8, 210.9, -1144.6, 200.9, -1146.7, 188.7, -1147.0, 177.5, -1146.2, 160.6,
           -1148.4, 141.2, -1152.3, 123.5, -1161.9
         ],
-        "t": { "name": "Cascina Pirotta", "surface": "ground", "highway": "track" }
+        "t": { "surface": "ground", "highway": "track" }
       },
       {
         "id": "w/193465647",
@@ -9806,16 +9743,8 @@
         ],
         "t": { "surface": "asphalt", "highway": "service" }
       },
-      {
-        "id": "w/204315106",
-        "p": [-1158.3, 105.7, -1175.9, 108.5],
-        "t": { "name": "Via Po", "highway": "service" }
-      },
-      {
-        "id": "w/204315109",
-        "p": [-1177.7, 99.2, -1172.2, 127.5],
-        "t": { "name": "Via Po", "highway": "service" }
-      },
+      { "id": "w/204315106", "p": [-1158.3, 105.7, -1175.9, 108.5], "t": { "highway": "service" } },
+      { "id": "w/204315109", "p": [-1177.7, 99.2, -1172.2, 127.5], "t": { "highway": "service" } },
       {
         "id": "w/218795284",
         "p": [-1029.2, -596.6, -1023.7, -577.4, -1021.9, -562.3, -1035.0, -556.2],
@@ -9839,7 +9768,7 @@
       {
         "id": "w/220534592",
         "p": [-720.0, -911.4, -698.6, -1023.2],
-        "t": { "name": "Via Grigna", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/220534594",
@@ -9953,7 +9882,7 @@
           1548.2, -889.4, 1543.1, -882.4, 1535.8, -877.5, 1525.6, -873.2, 1508.8, -868.0, 1469.2,
           -867.0, 1452.1, -864.9, 1318.8, -863.7, 1306.2
         ],
-        "t": { "name": "Viale Montagnetta", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/243215078",
@@ -9993,7 +9922,7 @@
       {
         "id": "w/285013095",
         "p": [-827.0, 1314.7, -863.7, 1306.2],
-        "t": { "name": "Piazzale Vittorio Brambilla", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/295637818",
@@ -10016,7 +9945,7 @@
       {
         "id": "w/297882703",
         "p": [-1046.2, 1162.9, -1023.8, 1164.2],
-        "t": { "name": "Via Parrocchia", "surface": "sett", "highway": "service" }
+        "t": { "surface": "sett", "highway": "service" }
       },
       {
         "id": "w/300711975",
@@ -10077,7 +10006,7 @@
       {
         "id": "w/34405194",
         "p": [-295.8, 615.9, 25.1, 648.8],
-        "t": { "name": "Viale Mulini di San Giorgio", "surface": "concrete", "highway": "service" }
+        "t": { "surface": "concrete", "highway": "service" }
       },
       {
         "id": "w/38168646",
@@ -10170,19 +10099,15 @@
       {
         "id": "w/409030045",
         "p": [-1023.8, 1164.2, -1025.1, 1191.5],
-        "t": { "name": "Piazza Madre Teresa di Calcutta", "surface": "sett", "highway": "service" }
+        "t": { "surface": "sett", "highway": "service" }
       },
       { "id": "w/42834269", "p": [-416.5, 28.6, -424.9, 93.6], "t": { "highway": "service" } },
       {
         "id": "w/42834272",
         "p": [-545.4, 366.8, -538.6, 299.5, -450.9, 309.2],
-        "t": { "name": "Viale degli Uffici", "highway": "service" }
+        "t": { "highway": "service" }
       },
-      {
-        "id": "w/42834273",
-        "p": [-312.2, 322.7, -264.3, 328.0],
-        "t": { "name": "Viale Mirabello", "highway": "service" }
-      },
+      { "id": "w/42834273", "p": [-312.2, 322.7, -264.3, 328.0], "t": { "highway": "service" } },
       {
         "id": "w/43560374",
         "p": [-68.5, 1528.6, -25.0, 1170.1],
@@ -10211,12 +10136,12 @@
       {
         "id": "w/473844506",
         "p": [-381.8, 1440.6, -295.8, 615.9],
-        "t": { "name": "Viale Mirabello", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473844507",
         "p": [-381.8, 1440.6, -827.0, 1314.7],
-        "t": { "name": "Viale Vedano", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473844508",
@@ -10226,7 +10151,7 @@
       {
         "id": "w/473844509",
         "p": [-264.3, 328.0, -294.2, 595.7, -295.8, 615.9],
-        "t": { "name": "Viale Mirabello", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473844513",
@@ -10236,7 +10161,7 @@
       {
         "id": "w/473844514",
         "p": [-68.5, 1528.6, -381.8, 1440.6],
-        "t": { "name": "Viale Vedano", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473844515",
@@ -10244,7 +10169,7 @@
           167.3, 1634.2, 161.1, 1631.5, 151.1, 1621.8, 146.3, 1618.9, 23.5, 1563.6, -59.9, 1531.3,
           -68.5, 1528.6
         ],
-        "t": { "name": "Viale Vedano", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473844675",
@@ -10254,7 +10179,7 @@
       {
         "id": "w/473847066",
         "p": [-863.7, 1306.2, -884.6, 1301.7],
-        "t": { "name": "Piazzale Vittorio Brambilla", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/473847067",
@@ -10272,7 +10197,7 @@
       {
         "id": "w/473847069",
         "p": [-489.7, 2464.2, -432.0, 1922.6, -408.4, 1691.8, -381.8, 1440.6],
-        "t": { "name": "Viale Mirabello", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       { "id": "w/48492193", "p": [-354.1, 178.5, -457.0, 166.6], "t": { "highway": "service" } },
       {
@@ -10283,7 +10208,7 @@
           -626.0, -516.6, -631.6, -543.4, -647.1, -570.9, -669.4, -588.3, -692.2, -611.6, -710.8,
           -637.7, -719.8, -655.5, -726.0, -679.9, -738.0, -745.7, -746.5, -814.7
         ],
-        "t": { "name": "Viale per Biassono", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/48492199",
@@ -10293,7 +10218,7 @@
           -806.8, 547.8, -806.6, 535.2, -803.7, 522.8, -801.1, 496.4, -789.8, 422.0, -783.2, 402.9,
           -732.6, 180.3, -730.8, 167.6, -724.9, 48.8, -716.2, -47.4, -712.8, -74.9, -712.0, -92.8
         ],
-        "t": { "name": "Viale per Biassono", "surface": "asphalt", "highway": "service" }
+        "t": { "surface": "asphalt", "highway": "service" }
       },
       {
         "id": "w/48505495",
@@ -10331,7 +10256,7 @@
       {
         "id": "w/532179857",
         "p": [25.1, 648.8, 252.2, 672.8],
-        "t": { "name": "Viale Mulini di San Giorgio", "surface": "gravel", "highway": "service" }
+        "t": { "surface": "gravel", "highway": "service" }
       },
       {
         "id": "w/609675401",
@@ -10383,15 +10308,11 @@
         "p": [-1123.4, 280.7, -1126.6, 275.8, -1133.4, 270.5, -1150.3, 261.0, -1153.2, 246.8],
         "t": { "highway": "service" }
       },
-      {
-        "id": "w/78312610",
-        "p": [-1107.3, 139.7, -1106.9, 104.0],
-        "t": { "name": "Via Po", "highway": "service" }
-      },
+      { "id": "w/78312610", "p": [-1107.3, 139.7, -1106.9, 104.0], "t": { "highway": "service" } },
       {
         "id": "w/807602404",
         "p": [-387.2, -1295.2, -357.1, -1304.6, -335.2, -1309.7, -328.0, -1310.4],
-        "t": { "name": "Via Sant'Antonio", "surface": "fine_gravel", "highway": "track" }
+        "t": { "surface": "fine_gravel", "highway": "track" }
       },
       {
         "id": "w/807606867",
@@ -10472,11 +10393,7 @@
       {
         "id": "w/129799431",
         "p": [523.8, -1549.3, 527.1, -1543.7, 550.8, -1515.3],
-        "t": {
-          "name": "Ciclopedonale Monza - Erba",
-          "surface": "fine_gravel",
-          "highway": "cycleway"
-        }
+        "t": { "surface": "fine_gravel", "highway": "cycleway" }
       },
       {
         "id": "w/1304526788",
@@ -10652,11 +10569,7 @@
           -1813.0, 369.2, -1784.8, 432.1, -1704.7, 456.9, -1660.3, 466.5, -1646.0, 476.9, -1618.9,
           482.5, -1606.7
         ],
-        "t": {
-          "name": "Ciclopedonale Monza - Erba",
-          "surface": "fine_gravel",
-          "highway": "cycleway"
-        }
+        "t": { "surface": "fine_gravel", "highway": "cycleway" }
       },
       {
         "id": "w/153195885",
@@ -10678,11 +10591,7 @@
       {
         "id": "w/193465650",
         "p": [550.8, -1515.3, 575.9, -1487.9, 582.5, -1478.3, 592.5, -1468.2],
-        "t": {
-          "name": "Ciclopedonale Monza - Erba",
-          "surface": "fine_gravel",
-          "highway": "cycleway"
-        }
+        "t": { "surface": "fine_gravel", "highway": "cycleway" }
       },
       {
         "id": "w/193465652",
@@ -10697,11 +10606,7 @@
       {
         "id": "w/193465655",
         "p": [592.5, -1468.2, 598.9, -1466.3, 655.0, -1476.2, 736.7, -1485.3, 758.1, -1485.9],
-        "t": {
-          "name": "Ciclopedonale Monza - Erba",
-          "surface": "fine_gravel",
-          "highway": "cycleway"
-        }
+        "t": { "surface": "fine_gravel", "highway": "cycleway" }
       },
       {
         "id": "w/193465656",
@@ -10737,11 +10642,7 @@
       {
         "id": "w/196496304",
         "p": [482.5, -1606.7, 523.8, -1549.3],
-        "t": {
-          "name": "Ciclopedonale Monza - Erba",
-          "surface": "fine_gravel",
-          "highway": "cycleway"
-        }
+        "t": { "surface": "fine_gravel", "highway": "cycleway" }
       },
       {
         "id": "w/231023267",
@@ -10770,7 +10671,7 @@
           687.1, -413.3, 696.2, -434.9, 699.1, -455.8, 695.5, -473.0, 687.5, -500.5, 680.4, -532.1,
           679.9, -567.2, 683.4, -639.3, 683.0, -659.0, 681.8, -672.6, 676.4, -692.4, 673.2, -699.0
         ],
-        "t": { "name": "Via per Lesmo", "surface": "asphalt", "highway": "pedestrian" }
+        "t": { "surface": "asphalt", "highway": "pedestrian" }
       },
       {
         "id": "w/231256010",
@@ -11045,17 +10946,17 @@
       {
         "id": "w/409030046",
         "p": [-1074.0, 1171.8, -1047.4, 1173.4],
-        "t": { "name": "Piazzetta Don Enrico Mapelli", "surface": "sett", "highway": "footway" }
+        "t": { "surface": "sett", "highway": "footway" }
       },
       {
         "id": "w/409030047",
         "p": [-1100.0, 1236.3, -1097.8, 1225.1, -1086.7, 1227.3, -1089.2, 1238.7, -1100.0, 1236.3],
-        "t": { "name": "Piazzetta Don Primo Mazzolari", "surface": "sett", "highway": "pedestrian" }
+        "t": { "surface": "sett", "highway": "pedestrian" }
       },
       {
         "id": "w/409030048",
         "p": [-1102.9, 1215.5, -1107.7, 1234.3, -1089.2, 1238.7, -1085.0, 1219.2],
-        "t": { "name": "Piazzetta Don Primo Mazzolari", "surface": "sett", "highway": "footway" }
+        "t": { "surface": "sett", "highway": "footway" }
       },
       {
         "id": "w/409030067",
@@ -11124,7 +11025,7 @@
           -269.1, -182.3, -273.2, -177.8, -278.0, -174.6, -283.7, -172.8, -290.0, -172.6, -296.5,
           -173.9, -302.9, -176.7, -308.8, -180.2, -313.3
         ],
-        "t": { "name": "Rond\u00f2 della Stella", "surface": "ground", "highway": "path" }
+        "t": { "surface": "ground", "highway": "path" }
       },
       {
         "id": "w/43560382",
@@ -11188,7 +11089,7 @@
       {
         "id": "w/463457982",
         "p": [-1061.3, 1250.4, -1052.0, 1248.4, -1046.6, 1243.7, -1040.7, 1231.8],
-        "t": { "name": "Piazza Bonfanti", "highway": "pedestrian" }
+        "t": { "highway": "pedestrian" }
       },
       {
         "id": "w/473844510",
@@ -11303,7 +11204,7 @@
           -570.0, 2385.6, -562.9, 2375.9, -556.5, 2365.7, -551.1, 2355.0, -546.7, 2343.9, -543.2,
           2332.4, -540.7, 2320.6, -466.6, 1647.8
         ],
-        "t": { "name": "Ex Ippodromo del Mirabello", "surface": "unpaved", "highway": "bridleway" }
+        "t": { "surface": "unpaved", "highway": "bridleway" }
       },
       {
         "id": "w/690722569",
@@ -11387,8 +11288,7 @@
           290.0, -1037.2, 308.0, -1038.6, 325.1, -1040.9, 361.7, -1049.6, 401.5, -1065.4, 449.5,
           -1094.7, 501.5, -1133.4, 539.5, -1156.4, 567.7, -1174.6, 581.3, -1180.8, 587.7, -1180.6,
           603.6, -1175.2, 636.9, -1159.5, 641.9, -1156.0, 644.5, -1137.2, 652.2, -1062.3
-        ],
-        "t": { "name": "Parco di Monza" }
+        ]
       },
       {
         "id": "r/3132932",
@@ -11399,8 +11299,7 @@
           971.1, -1208.2, 967.2, -1215.2, 960.2, -1223.4, 948.1, -1235.3, 927.2, -1243.2, 904.7,
           -1247.3, 887.8, -1245.0, 870.4, -1206.9, 709.6, -1177.8, 606.0, -1144.8, 479.4, -1066.2,
           163.9, -1005.9, -56.0, -890.0, -94.2, -840.5, -133.6, -723.3, -117.0
-        ],
-        "t": { "name": "Parco di Villa Litta" }
+        ]
       },
       {
         "id": "w/1374048212",

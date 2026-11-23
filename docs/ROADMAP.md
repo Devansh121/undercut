@@ -36,7 +36,7 @@ After v1: pick the weakest scorecard axis and raise it. Candidates are weather a
 5. Physics pace: the downforce shortfall (Spa +8.5 % against pole, Monza 2.14 s outside its band). An owner choice is open: the Monza first-chicane kerb checks block some gains; the default is to keep them.
 6. Graphics polish: Singapore water by day, crowd figures, mid-distance trees.
 7. Real-phone acceptance (iPhone Safari and home-screen icon, side bars in landscape, haptics, sustained frame rate, audio CPU), then the independent QUALITY.md scoring and the final acceptance run.
-8. Small leftovers: the update bar over the pause card, desktop pause below the fold, no offline fallback for manual presets, results overlay showing raw `D1`/`notClassified`, Singapore day ambience.
+8. Small leftovers: Singapore day ambience, and the phone's first-lap coach card over the HUD message tag (the update bar over the pause card, desktop pause below the fold, the offline fallback for chosen presets and the results overlay's raw codes are fixed).
 
 ### Done-criteria status
 

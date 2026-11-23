@@ -199,5 +199,7 @@ jobs:
           node-version-file: .nvmrc
       - name: Asset licence check
         run: npm run check:assets
+      - name: Credits and dependency licence check
+        run: npm run check:credits
       - name: Secret scan (gitleaks, checksum-verified release binary)
         run: npm run check:secrets

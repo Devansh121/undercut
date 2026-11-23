@@ -351,6 +351,53 @@ test.describe('drive', () => {
     await expect(menu).toBeHidden();
   });
 
+  test('the pause card fits the screen with Quit in view, and clears the update bar', async ({
+    drive: { page },
+  }) => {
+    await page.evaluate(() => window.__undercut?.pause());
+    const menu = page.locator('[data-testid=pause-menu]');
+    await expect(menu).toBeVisible();
+    const quit = menu.locator('[data-action=quit]');
+    const fits = (): Promise<{ card: DOMRect; quit: DOMRect; bar: DOMRect | null; h: number }> =>
+      page.evaluate(() => ({
+        card: document.querySelector('.pause__card')!.getBoundingClientRect().toJSON() as DOMRect,
+        quit: document
+          .querySelector('[data-action=quit]')!
+          .getBoundingClientRect()
+          .toJSON() as DOMRect,
+        bar: (document.querySelector('.update-bar')?.getBoundingClientRect().toJSON() ??
+          null) as DOMRect | null,
+        h: window.innerHeight,
+      }));
+    const before = await fits();
+    expect(before.quit.bottom).toBeLessThanOrEqual(before.card.bottom);
+    expect(before.card.bottom).toBeLessThanOrEqual(before.h);
+    // The "new version" bar as registerOffline (pwa/register.ts) appends it; pwa.spec.ts covers
+    // the real update. It shows over a paused session and must not cover the card.
+    await page.evaluate(() => {
+      const bar = document.createElement('aside');
+      bar.className = 'update-bar';
+      bar.dataset.testid = 'update-ready';
+      const reload = document.createElement('button');
+      reload.className = 'btn btn--primary';
+      reload.textContent = 'Reload';
+      bar.append('A new version is ready.', reload);
+      document.body.append(bar);
+    });
+    try {
+      await expect(page.getByTestId('update-ready')).toBeVisible();
+      const after = await fits();
+      expect(after.bar).not.toBeNull();
+      expect(after.card.bottom).toBeLessThanOrEqual(after.bar!.top);
+      expect(after.quit.bottom).toBeLessThanOrEqual(after.card.bottom);
+      await expect(quit).toBeInViewport({ ratio: 1 });
+    } finally {
+      await page.evaluate(() => document.querySelector('.update-bar')?.remove());
+    }
+    await page.evaluate(() => window.__undercut?.resume());
+    await expect(menu).toBeHidden();
+  });
+
   test('lays out the HUD inside the viewport with nothing overlapping', async ({
     drive: { page },
   }) => {
