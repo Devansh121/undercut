@@ -83,6 +83,8 @@ import {
 import { GameLoop, MAX_TIME_SCALE, type ControlSource } from './game/loop';
 import { buildMinimap } from './game/minimap';
 import type { RecordStore } from './game/records';
+import { formatRaceStatus } from './game/format';
+import { raceLineFile } from './game/race-line';
 import {
   DriveSession,
   TIME_TRIAL_FUEL,
@@ -349,8 +351,8 @@ async function racingLine(
   guide: EnvelopeArtefact | null;
   artefacts: RaceArtefacts | null;
 } | null> {
-  const prefix = `../../../packages/ai/data/${track.id}-`;
-  const key = Object.keys(AI_LINES).find((k) => k.startsWith(prefix));
+  // The rule the menus use too (game/race-line.ts), so the trim the card names is the one raced.
+  const key = raceLineFile(track.id, Object.keys(AI_LINES));
   const load = key ? AI_LINES[key] : undefined;
   if (!key || !load) return null;
   const raw = (await load()) as { count: number; trim: string; offsetTenthMm: number[] };
@@ -426,12 +428,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           buildPlan(track, ai.offsets, decodeEnvelope(ai.guide), { scale: DRIVING_LINE_SCALE }),
         )
       : null;
+  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
+  const all = liveries(teamId, o.driver ?? 0);
+  // The driver in each car, by the livery it wears (car i wears `all[i]`, the player's first).
+  const drivers = all.slice(0, 20).map((l) => {
+    const d = teams.teams.flatMap((t) => t.drivers).find((x) => x.code === l.code);
+    return { name: d ? `${d.first} ${d.last}` : l.code, code: l.code };
+  });
   const session = new DriveSession({
     track,
     seed: o.seed,
     record,
     today: o.today,
-    ...(o.quickRace ? { quickRace: o.quickRace } : {}),
+    ...(o.quickRace ? { quickRace: o.quickRace, drivers } : {}),
     ...(ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
@@ -458,8 +467,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     yawInertia: 0,
   });
   const ext = o.extension;
-  const teamId = teams.teams.some((t) => t.id === o.team) ? (o.team as string) : DEFAULT_TEAM;
-  const all = liveries(teamId, o.driver ?? 0);
   const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -999,7 +1006,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   const trackTangent = { x: 0, y: 0, z: 0 };
   const audioState = defaultCarState();
-  const audioScene = new RaceAudioScene();
+  const audioScene = new RaceAudioScene(tod.id);
   const sink = o.onCarAudioState ?? silentAudio;
   const frameLog: number[] = [];
   /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
@@ -1114,7 +1121,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
                 : 'laps' in e.gap
                   ? `  +${e.gap.laps}L`
                   : `  +${e.gap.time.toFixed(3)}s`;
-            return `${e.position}  ${e.code}  ${e.status}${g}`;
+            const name = session.race.entrants[e.car]?.name ?? e.code;
+            const status = formatRaceStatus(e.status);
+            return `${e.position}  ${name}${status ? `  ${status}` : ''}${g}`;
           }),
         ],
         player: 1 + entries.findIndex((e) => e.car === 0),
@@ -1125,14 +1134,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         lines: [
           `Chequered flag · P${row?.position ?? 20} · provisional`,
           ...standings.map((r) => {
-            const code = session.race.entrants[r.car]?.code ?? '';
+            const name = session.race.entrants[r.car]?.name ?? '';
             const state =
               r.status === 'running'
                 ? `racing, lap ${Math.min(r.lap, totalLaps)}`
                 : r.status === 'finished'
                   ? 'finished'
-                  : r.status;
-            return `${r.position}  ${code}  ${state}`;
+                  : formatRaceStatus(r.status).toLowerCase();
+            return `${r.position}  ${name}  ${state}`;
           }),
         ],
         player: 1 + standings.findIndex((r) => r.car === 0),

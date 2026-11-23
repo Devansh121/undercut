@@ -25,13 +25,13 @@ import type { SettingsPatch } from '@undercut/protocol';
 import type { CameraName, DrivingLineMode, DrivingLineState } from '@undercut/render';
 import { isQuality } from './game/quality-setting';
 import type { QuickRaceOptions } from './game/session';
-
-/** The debug API's Quick Race options: the race's, and the circuit (default Monza). */
-export type QuickRaceDebugOptions = Omit<QuickRaceOptions, 'laps'> & { circuit?: string };
 import type { ControlInput } from '@undercut/sim';
 import type { DriveHandle } from './drive';
 import type { OnlineState } from './online/session';
 import type { OnlineRaceReport } from './online/race';
+
+/** The debug API's Quick Race options: the race's, and the circuit (default Monza). */
+export type QuickRaceDebugOptions = Omit<QuickRaceOptions, 'laps'> & { circuit?: string };
 
 export interface DebugApi {
   online(): {
