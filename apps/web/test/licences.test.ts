@@ -16,9 +16,12 @@ describe('licences.txt', () => {
 
   it('carries the full text of every licence the build ships', () => {
     const text = licenceNotices('Game', read);
-    // The game's own licence and three.js's: both MIT.
-    expect(count(text, 'THE SOFTWARE IS PROVIDED "AS IS"')).toBe(2);
+    // The game's own licence, three.js's and SMAA's (its area and search textures ship inside
+    // three's SMAAPass): all MIT.
+    expect(count(text, 'THE SOFTWARE IS PROVIDED "AS IS"')).toBe(3);
     expect(text).toContain('three.js authors');
+    expect(text).toContain('Copyright (C) 2013 Jorge Jimenez');
+    expect(text).toContain('https://github.com/iryoku/smaa');
     // The Draco decoder: Apache-2.0 in full, with its copyright line.
     expect(text).toContain('Copyright 2016 The Draco Authors');
     expect(text).toContain('TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION');

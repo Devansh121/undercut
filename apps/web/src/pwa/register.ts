@@ -23,6 +23,32 @@ function updateBar(onReload: () => void): HTMLElement {
   return bar;
 }
 
+let shown: { bar: HTMLElement; size: ResizeObserver | null } | null = null;
+
+/**
+ * Show the update bar, replacing one already up, or remove it (`null`). While it is up its
+ * height is published as `--update-bar-h` on the root, so the pause card can stay clear of it
+ * however many lines the bar wraps to.
+ */
+export function showUpdateBar(onReload: (() => void) | null): void {
+  const root = document.documentElement;
+  if (shown) {
+    shown.size?.disconnect();
+    shown.bar.remove();
+    root.style.removeProperty('--update-bar-h');
+    shown = null;
+  }
+  if (!onReload) return;
+  const bar = updateBar(onReload);
+  document.body.append(bar);
+  const publish = (): void =>
+    root.style.setProperty('--update-bar-h', `${bar.getBoundingClientRect().height}px`);
+  publish();
+  const size = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish);
+  size?.observe(bar);
+  shown = { bar, size };
+}
+
 /**
  * Register the offline worker. A new build installs beside the running one and waits; the
  * player accepts the prompt, the new worker takes over (skipWaiting, then clients.claim) and
@@ -35,12 +61,7 @@ export function registerOffline(): void {
   const sw = navigator.serviceWorker;
   const hadController = Boolean(sw.controller);
   let accepted = false;
-  let bar: HTMLElement | null = null;
-  const offer = (onReload: () => void): void => {
-    bar?.remove();
-    bar = updateBar(onReload);
-    document.body.append(bar);
-  };
+  const offer = (onReload: () => void): void => showUpdateBar(onReload);
   sw.addEventListener('controllerchange', () => {
     // The first install claiming this page changes nothing it has loaded.
     if (!hadController) return;
