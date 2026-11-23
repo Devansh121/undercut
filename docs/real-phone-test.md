@@ -12,9 +12,12 @@ ten-minute soak in `tests/browser/phone-soak.spec.ts`; this list is the remainde
   install.
 - Phone charged above 50 %, not in Low Power Mode, brightness at your normal level, ringer on
   (iPhone: the side switch mutes web audio; that is the platform, not a fault).
-- For frame times and heap you need the phone's inspector: Safari > Develop > (the iPhone) on a Mac,
-  or `chrome://inspect` on a desktop Chrome with the Android phone on USB. Add `?debug=1` to the
-  address for those steps only.
+- Frame times and heap (step 6) are read through the phone's inspector. On Android that is
+  `chrome://inspect` in desktop Chrome or Chromium (Linux works) with the phone on USB and USB
+  debugging on. On an iPhone it is Safari > Develop > (the iPhone) on a **Mac**; there is no other
+  way to reach an iPhone page's console. Without a Mac, do the iPhone's step 6 for heat, battery
+  and visible stutter only, and take the numbers from the Android phone. Add `?debug=1` to the
+  address for step 6 only.
 - Note the phone model, OS version and browser version at the top of your results.
 
 ## 1. Home screen (iPhone)
@@ -25,8 +28,12 @@ ten-minute soak in `tests/browser/phone-soak.spec.ts`; this list is the remainde
 3. Open it from the home screen, holding the phone on its side. **Pass:** a near-black launch image
    with the two bars shows while it loads (not white, not stretched); no Safari address bar or
    toolbar; the status bar area is dark.
-4. Rotate to upright and back. **Pass:** the upright screen asks you to turn the phone; nothing is
-   cut off or doubled when you return.
+4. Turn the phone upright in the menus. **Pass:** the top bar (the game's name and the Controls
+   button) sits fully below the Dynamic Island and the status bar, and nothing at the bottom is
+   under the home bar. Turn it back on its side: nothing is cut off or doubled.
+5. Start a Time Trial and turn the phone upright while driving. **Pass:** the session pauses and a
+   prompt at the top asks you to turn the phone, its heading below the Dynamic Island; the pause
+   menu under it reaches the bottom without going under the home bar. Turn it back and resume.
 
 Android (Chrome): menu > Install app or Add to Home screen. **Pass:** the icon is the same mark
 (on a round or squircle mask, with nothing clipped); opened from the home screen it runs full
@@ -77,28 +84,57 @@ Hold the phone on its side, notch or camera on the left, then turn it so it is o
 ## 6. Sustained frame rate, heat, battery (10 minutes)
 
 1. Note the battery percentage. Start a Quick Race at Monza, Graphics: Mobile (Pause > Graphics),
-   full field.
-2. In the inspector console run `__undercut.raceDriver(true)` so the car drives itself (debug page),
-   or drive it yourself.
-3. At minute 1 and minute 10, in the console:
+   full field, on the `?debug=1` page.
+2. In the inspector console, paste this once. It makes the car drive itself and, for ten minutes,
+   keeps each minute's frame times (and the heap on Android), then prints minutes 2 to 4 against
+   minutes 8 to 10: minute 1 is left out because it includes loading and warm-up, as in the
+   emulated soak (`tests/browser/phone-soak.spec.ts`).
 
    ```js
    (() => {
-     const f = __undercut.frameTimes().slice(-1800).sort((a, b) => a - b);
-     const at = (p) => f[Math.floor(p * f.length)].toFixed(1);
-     return { mean: (f.reduce((a, b) => a + b, 0) / f.length).toFixed(1), p50: at(0.5), p95: at(0.95) };
+     const u = __undercut;
+     u.raceDriver(true);
+     u.resetFrameTimes();
+     const rows = [];
+     let minute = 0;
+     const timer = setInterval(() => {
+       const f = u.frameTimes().sort((a, b) => a - b);
+       u.resetFrameTimes();
+       const heap = performance.memory ? performance.memory.usedJSHeapSize / 2 ** 20 : NaN;
+       rows.push({
+         minute: ++minute,
+         frames: f.length,
+         mean: f.reduce((a, b) => a + b, 0) / f.length,
+         p95: f[Math.floor(0.95 * f.length)],
+         heapMB: heap,
+       });
+       if (minute < 10) return;
+       clearInterval(timer);
+       const avg = (from, to, k) =>
+         (rows.slice(from - 1, to).reduce((a, r) => a + r[k], 0) / (to - from + 1)).toFixed(1);
+       console.table(rows);
+       console.log('minutes 2-4 vs 8-10', {
+         mean: [avg(2, 4, 'mean'), avg(8, 10, 'mean')],
+         p95: [avg(2, 4, 'p95'), avg(8, 10, 'p95')],
+         heapMB: [avg(2, 4, 'heapMB'), avg(8, 10, 'heapMB')],
+       });
+     }, 60_000);
    })();
    ```
 
-   and, on Android Chrome only, `performance.memory.usedJSHeapSize / 2 ** 20` (MB).
-4. **Pass:** p95 at minute 10 within 25 % of minute 1 (throttling shows as a steady climb); heap at
-   minute 10 within 15 % of minute 1; no visible stutter pattern; the phone warm but not too hot to
-   hold; battery drop recorded.
+3. Leave the phone in your hand or on the table, screen on, for the ten minutes. Watch for a
+   stutter that repeats, and feel the back of the phone.
+4. **Pass:** each minute has at least 1,800 frames, the 30 fps floor (about 3,600, 60 fps, is the
+   target on a recent mid-range phone; record the count either way, and below 1,800 record a
+   fail); p95 for minutes 8 to 10 within 25 % of minutes 2
+   to 4 (throttling shows as a steady climb); heap (Android) for minutes 8 to 10 within 15 % of
+   minutes 2 to 4; no stutter pattern; the phone warm but not too hot to hold; battery drop
+   recorded.
 5. Audio cost: open the page with `?debug=1&audioProfile=1`, run a lap, then
    `__undercut.audioProfile()`. **Pass:** `processMs / audioMs` under 0.10 (10 % of one core).
 
 ## Recording results
 
 Add a dated section to `docs/STATUS.md` (Try this or Known gaps) with the phone, OS and browser,
-each step's pass or fail, the minute-1 and minute-10 numbers, the battery drop, and screenshots of
+each step's pass or fail, the table step 6 prints, the battery drop, and screenshots of
 anything that failed (`docs/evidence/m6-phone/`).
