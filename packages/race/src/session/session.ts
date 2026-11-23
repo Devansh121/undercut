@@ -420,7 +420,10 @@ export class RaceSession {
       } else if (this.headOfStillQueue(i)) {
         this.blockTime[i]! += dt;
         // (Stalled on the grid, sooner: the cars behind it have not got away at all.)
-        const after = this.atSpeed[i] ? BLOCK_GHOST_AFTER : STALLED_GHOST_AFTER;
+        const after =
+          this.atSpeed[i] || this.cars[i]!.controller.kind === 'human'
+            ? BLOCK_GHOST_AFTER
+            : STALLED_GHOST_AFTER;
         if (this.blockTime[i]! >= after) {
           this.blockGhost[i] = true;
           this.blockTime[i] = 0;
