@@ -1,7 +1,7 @@
 import { FULL_ENVELOPE, type Envelope, type EnvelopeScale } from '../../src/envelope/envelope';
 import { REFERENCE_SKILL } from '../../src/driver/reference';
 import { racingLineOffsets } from '../../src/export/racing-line';
-import { buildPlan, type DrivingPlan } from '../../src/profile/plan';
+import { Phase, buildPlan, type DrivingPlan } from '../../src/profile/plan';
 import { SpeedProfiler } from '../../src/profile/speed-profile';
 import { LATERAL_CASES, measureLateral } from '../../../sim/validation/lib/index';
 import { loadEnvelope, loadLine } from './artefacts';
@@ -14,17 +14,18 @@ import { CIRCUIT_REFERENCE } from './targets';
  * committed racing line: the reference driver's driven lap, the speed profile it plans at its
  * skill (`REFERENCE_SKILL`), and the full-envelope profile (every measured limit used). Each is
  * split by sector and by the constraint that binds the full-envelope profile on each segment
- * (`BUDGET_PHASES`):
+ * (`BUDGET_PHASES`, found by replaying the profile's passes, `classifyPhases`):
  *
- * - corner limit: the lateral demand uses the lateral grip (within `AT_LIMIT`);
- * - braking limit: decelerating at the deceleration the tyres, drag and grade give there;
+ * - corner limit: the speed is held at the corner limit (the lateral grip);
+ * - braking limit: the braking pass sets the speed;
  * - grip-limited exit: accelerating at what the tyres give while they also corner (grip shared
  *   along the combined limit), less than the car's straight-line full-throttle run would;
  * - full-throttle run: accelerating at the car's measured straight-line full-throttle
- *   acceleration on that grade (the envelope's drive table: power, drag, DRS, the MGU-K, the
- *   gear shifts and, at low speed, wheelspin held at the tyre's peak);
- * - transition: none of those binds within `AT_LIMIT` (the step from one limit to another, a
- *   speed held below a limit by the passes that meet there).
+ *   acceleration on that grade with the plan's MGU-K deployment (the envelope's drive table:
+ *   power, drag, DRS, the MGU-K, the gear shifts and, at low speed, wheelspin held at the tyre's
+ *   peak), or held at the top speed;
+ * - transition: where the passes meet (the first segment after a braking zone, or a speed set
+ *   by the braking pass ahead while still rising).
  *
  * Driven − plan is the driver's cost; plan − full is the planning margin; full − published is
  * the car, the line and the track as modelled. Sensitivities re-plan the full envelope with one
@@ -52,9 +53,6 @@ export const BudgetPhase = {
   Power: 3,
   Transition: 4,
 } as const;
-
-/** How close to a limit a segment must be to count as held by it (3 %). */
-export const AT_LIMIT = 0.03;
 
 export interface Sensitivity {
   term: string;
@@ -146,32 +144,88 @@ function lessDrag(fraction: number): Mutator {
 }
 
 /**
- * The constraint that binds each segment of a full-envelope profile (`BudgetPhase`), read from
- * the profile's own limits at the segment's entry speed: the lateral grip used, the braking
- * deceleration, and the full-throttle acceleration with whether the engine or the tyres set it.
+ * The constraint that binds each segment of a full-envelope profile (`BudgetPhase`), found by
+ * replaying the profile's own passes (`SpeedProfiler.compute`) with the inputs it used:
+ *
+ * - braking limit: the backward (braking) pass set the segment's end speed;
+ * - transition: the segment starts below the forward pass's speed (the braking pass set its entry
+ *   speed: a braking zone just ended), or its end speed is neither the free acceleration nor a
+ *   limit (the passes meet);
+ * - otherwise the forward step is replayed from the segment's entry speed with the plan's DRS
+ *   zone and MGU-K deployment there (`deployMask`). If it was clipped by the next sample's
+ *   corner limit, that is the corner limit (or, where that "limit" is only the top speed, the
+ *   full-throttle run). If it accelerated freely, whichever of the engine (with that
+ *   deployment) and the tyres (with the grip left by cornering) gave less binds.
  */
 export function classifyPhases(plan: DrivingPlan): Uint8Array {
   const profiler = new SpeedProfiler(plan.line, plan.model);
+  const m = plan.model;
   const p = plan.profile;
-  const n = plan.line.count;
+  const line = plan.line;
+  const n = line.count;
+  const scale = FULL_ENVELOPE;
   const out = new Uint8Array(n);
+  const step = (i: number, v: number, drs: boolean, dep: boolean): number => {
+    const ds = line.ds[i]!;
+    const a1 = profiler.driveAccel(i, v, drs, dep, scale);
+    const vm = Math.sqrt(Math.max(v * v + a1 * ds, 1));
+    const a2 = profiler.driveAccel(i, vm, drs, dep, scale);
+    return Math.sqrt(Math.max(v * v + 2 * a2 * ds, 1));
+  };
+  // The forward pass, replayed as the profiler runs it (two laps from the slowest corner limit,
+  // so the wrap is settled): the speed at each sample before the braking pass caps it.
+  const forward = new Float64Array(n);
+  let i0 = 0;
+  for (let i = 0; i < n; i++) if (p.limit[i]! < p.limit[i0]!) i0 = i;
+  let v = p.limit[i0]!;
+  for (let k = 0; k < 2 * n; k++) {
+    const i = (i0 + k) % n;
+    v = Math.min(v, p.limit[i]!);
+    forward[i] = v;
+    v = Math.min(
+      step(i, v, plan.drsZone[i] === 1, plan.deployMask[i] === 1),
+      p.limit[(i + 1) % n]!,
+    );
+  }
   for (let i = 0; i < n; i++) {
-    const v = p.v[i]!;
-    const ax = p.ax[i]!;
-    const drs = p.drsOpen[i] === 1;
-    // At the corner limit: the lateral demand uses the lateral grip there (on a straight the
-    // profile's "limit" is only the top speed, which is not a corner).
-    if (profiler.lateralUse(i, v, FULL_ENVELOPE) >= 1 - AT_LIMIT) out[i] = BudgetPhase.Corner;
-    else if (ax < 0 && -ax >= (1 - AT_LIMIT) * profiler.brakeDecel(i, v, FULL_ENVELOPE)) {
+    const j = (i + 1) % n;
+    if (p.phase[i] === Phase.Brake) {
       out[i] = BudgetPhase.Braking;
-    } else if (
-      ax > 0 &&
-      ax >= (1 - AT_LIMIT) * profiler.driveAccel(i, v, drs, p.deploying[i] === 1, FULL_ENVELOPE)
-    ) {
-      out[i] = profiler.engineLimited(i, v, drs, FULL_ENVELOPE)
-        ? BudgetPhase.Power
-        : BudgetPhase.Traction;
-    } else out[i] = BudgetPhase.Transition;
+      continue;
+    }
+    // Starting below the forward pass: the braking pass set the entry speed (a braking zone
+    // just ended), so the segment is where the two passes meet.
+    if (p.v[i]! < forward[i]!) {
+      out[i] = BudgetPhase.Transition;
+      continue;
+    }
+    const drs = plan.drsZone[i] === 1;
+    const dep = plan.deployMask[i] === 1;
+    const v0 = p.v[i]!;
+    const v1 = p.v[j]!;
+    const free = step(i, v0, drs, dep);
+    const tol = 1e-9 * Math.max(1, free);
+    if (v1 < free - tol) {
+      // Clipped: by the next sample's limit if it sits there, else by the braking pass ahead.
+      if (v1 < p.limit[j]! * (1 - 1e-9)) out[i] = BudgetPhase.Transition;
+      else {
+        const top = plan.drsZone[j] === 1 ? m.envelope.topSpeed.open : m.envelope.topSpeed.closed;
+        out[i] = p.limit[j]! < top * (1 - 1e-9) ? BudgetPhase.Corner : BudgetPhase.Power;
+      }
+    } else if (v1 > free + tol) {
+      out[i] = BudgetPhase.Transition;
+    } else {
+      // Free acceleration: compare the two limits where the step reads them (its midpoint).
+      const a1 = profiler.driveAccel(i, v0, drs, dep, scale);
+      const vm = Math.sqrt(Math.max(v0 * v0 + a1 * line.ds[i]!, 1));
+      const engine = m.drive(vm, drs, dep);
+      const tyre =
+        m.traction(vm, profiler.load(i, vm)) *
+          line.grip[i]! *
+          m.remaining(profiler.lateralUse(i, vm, scale)) -
+        m.drag(vm, drs);
+      out[i] = engine <= tyre ? BudgetPhase.Power : BudgetPhase.Traction;
+    }
   }
   return out;
 }
@@ -213,57 +267,88 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
   const phase = classifyPhases(full);
   const phases = BUDGET_PHASES.length;
 
-  // Sector of each sample, counted from the timing line.
+  // Every segment's centreline extent, as distance from the timing line, cut at the timing and
+  // sector lines: a segment that a line crosses is split between the two sectors by distance,
+  // so the sectors begin and end exactly on their lines, as the lap report times them.
+  const L = track.length;
   const marks = Array.from(track.sectors)
     .slice(1)
     .map((s) => track.forwardDistance(timing, s))
     .sort((a, b) => a - b);
+  const bounds = [0, marks[0]!, marks[1]!, L];
+  interface Part {
+    i: number;
+    sector: number;
+    x0: number;
+    x1: number;
+    frac: number;
+  }
+  const parts: Part[] = [];
   const sectorOf = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
-    const fd = track.forwardDistance(timing, i * step);
-    sectorOf[i] = fd < marks[0]! ? 0 : fd < marks[1]! ? 1 : 2;
+    const len = (i + 1 < n ? (i + 1) * step : L) - i * step;
+    const a = track.forwardDistance(timing, i * step);
+    const pieces =
+      a + len <= L
+        ? [[a, a + len]]
+        : [
+            [a, L],
+            [0, a + len - L],
+          ];
+    for (const [p0, p1] of pieces) {
+      for (let k = 0; k < 3; k++) {
+        const x0 = Math.max(p0!, bounds[k]!);
+        const x1 = Math.min(p1!, bounds[k + 1]!);
+        if (x1 > x0) parts.push({ i, sector: k, x0, x1, frac: (x1 - x0) / len });
+      }
+    }
+    sectorOf[i] = a < marks[0]! ? 0 : a < marks[1]! ? 1 : 2;
   }
-  const split = (seg: Float64Array): number[][] => {
-    const rows = [0, 1, 2].map(() => new Array<number>(phases).fill(0));
-    for (let i = 0; i < n; i++) rows[sectorOf[i]!]![phase[i]!]! += seg[i]!;
+  const blank = (): number[][] => [0, 1, 2].map(() => new Array<number>(phases).fill(0));
+  const sum = (rows: number[][]): number[] => rows.map((r) => r.reduce((a, b) => a + b, 0));
+  const profileSplit = (p: DrivingPlan): number[][] => {
+    const seg = segmentTimes(p.profile.time, p.profile.lapTime);
+    const rows = blank();
+    for (const q of parts) rows[q.sector]![phase[q.i]!]! += seg[q.i]! * q.frac;
     return rows;
   };
-  const sum = (rows: number[][]): number[] => rows.map((r) => r.reduce((a, b) => a + b, 0));
-  const profileSplit = (p: DrivingPlan): number[][] =>
-    split(segmentTimes(p.profile.time, p.profile.lapTime));
 
-  // The driven lap: time at which the car first passes each sample after the timing line.
+  // The driven lap: the time the car passes each distance from the timing line, interpolated
+  // between ticks exactly as the lap runner times its crossings (linear in distance), from the
+  // lap's start on the timing line to its end there.
   const { result } = referenceLap(setup, { recordEvery: 1 });
   const trace = result.trace!;
   const lapRecord = result.laps[0]!;
   const col = (k: string): number => trace.columns.indexOf(k);
   const [ct, cl, cs] = [col('t'), col('lap'), col('s')];
-  const rows = trace.rows.filter((r) => r[cl] === 0);
-  const t0 = rows[0]![ct]!;
-  const passed = new Float64Array(n).fill(NaN);
-  let previous = -1;
-  for (const r of rows) {
-    const fd = track.forwardDistance(timing, r[cs]!);
-    if (fd < previous - 100) break;
-    previous = fd;
-    const i = Math.floor(track.wrap(r[cs]!) / step) % n;
-    if (Number.isNaN(passed[i]!)) passed[i] = r[ct]! - t0;
+  const first = trace.rows.findIndex((r) => r[cl] === 0);
+  const before = trace.rows[first - 1]!;
+  const after = trace.rows[first]!;
+  const frac0 =
+    track.forwardDistance(before[cs]!, timing) / track.forwardDistance(before[cs]!, after[cs]!);
+  const lapStart = before[ct]! + (after[ct]! - before[ct]!) * frac0;
+  const xs = [0];
+  const ts = [0];
+  for (const r of trace.rows) {
+    if (r[cl] !== 0) continue;
+    xs.push(track.forwardDistance(timing, r[cs]!));
+    ts.push(r[ct]! - lapStart);
   }
-  const order = Array.from({ length: n }, (_, i) => i).sort(
-    (a, b) => track.forwardDistance(timing, a * step) - track.forwardDistance(timing, b * step),
-  );
-  const driven = new Float64Array(n);
-  let last = 0;
-  for (let k = 0; k < n; k++) {
-    const i = order[k]!;
-    const at = Number.isNaN(passed[i]!) ? last : passed[i]!;
-    const next = k + 1 < n ? passed[order[k + 1]!]! : lapRecord.time;
-    driven[i] = Number.isNaN(next) ? 0 : Math.max(0, next - at);
-    last = at;
-  }
-  // Any rounding left over (a sample the trace stepped across) goes to the last segment.
-  const accounted = driven.reduce((a, b) => a + b, 0);
-  driven[order[n - 1]!] = driven[order[n - 1]!]! + (lapRecord.time - accounted);
+  xs.push(L);
+  ts.push(lapRecord.time);
+  const passed = (x: number): number => {
+    let lo = 0;
+    let hi = xs.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (xs[mid]! <= x) lo = mid;
+      else hi = mid;
+    }
+    const span = xs[hi]! - xs[lo]!;
+    return ts[lo]! + (span > 0 ? ((ts[hi]! - ts[lo]!) * (x - xs[lo]!)) / span : 0);
+  };
+  const drivenRows = blank();
+  for (const q of parts) drivenRows[q.sector]![phase[q.i]!]! += passed(q.x1) - passed(q.x0);
 
   const fullSplit = profileSplit(full);
   const variant = (term: string, p: DrivingPlan): Sensitivity => {
@@ -321,11 +406,11 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
     },
     lap: { driven: lapRecord.time, plan: skill.profile.lapTime, full: full.profile.lapTime },
     sectors: {
-      driven: sum(split(driven)),
+      driven: sum(drivenRows),
       plan: sum(profileSplit(skill)),
       full: sum(fullSplit),
     },
-    phases: { driven: split(driven), plan: profileSplit(skill), full: fullSplit },
+    phases: { driven: drivenRows, plan: profileSplit(skill), full: fullSplit },
     sectorAt: sectorOf,
     phaseAt: phase,
     full,

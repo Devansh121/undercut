@@ -15,6 +15,8 @@ export interface DrivingPlan {
   readonly model: EnvelopeModel;
   /** Per sample: inside a DRS zone (qualifying rules: DRS free there). */
   readonly drsZone: Uint8Array;
+  /** Per sample: the MGU-K may deploy here at full throttle (within the budget). */
+  readonly deployMask: Uint8Array;
   /** Energy the plan draws from the store per lap, J, and the budget it was planned for. */
   readonly deployEnergy: number;
   readonly deployBudget: number;
@@ -74,6 +76,7 @@ export function buildPlan(
     profile,
     model,
     drsZone,
+    deployMask: ers,
     deployEnergy: profile.deployEnergy,
     deployBudget: budget,
   };
