@@ -117,6 +117,77 @@ describe('crowd handover', () => {
   });
 });
 
+describe('crowd handover, evaluated', () => {
+  // The generated shader's own handover lines, run in JS with GLSL's helpers: which of the near
+  // and far representations of a person at `origin` draws for an eye at `eye`.
+  const glsl = {
+    smoothstep: (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    },
+    fract: (x: number) => x - Math.floor(x),
+    sin: Math.sin,
+    dot: (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]!,
+    distance: (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!),
+    vec2: (x: number, y: number) => [x, y],
+  };
+  function drawn(near: boolean): (origin: number[], eye: number[]) => boolean {
+    const material = crowdMaterial({ value: 3 });
+    crowdSwapMaterial(material, { value: new Vector3() }, near);
+    const shader = {
+      uniforms: {},
+      vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
+      fragmentShader: '#include <common>\n#include <alphatest_fragment>',
+    } as WebGLProgramParametersWithUniforms;
+    material.onBeforeCompile(shader, {} as WebGLRenderer);
+    material.dispose();
+    const line = (source: string, name: string) =>
+      new RegExp(`${name} = ([^;]+);`)
+        .exec(source)![1]!
+        .replace(/crowdOrigin\.xz/g, '[crowdOrigin[0], crowdOrigin[2]]');
+    const far = line(shader.vertexShader, 'vCrowdFar');
+    const choice = line(shader.vertexShader, 'vCrowdChoice');
+    const clipVertex = /if \(([^)]+)\) gl_Position/.exec(shader.vertexShader)![1]!;
+    const discard = /if \(([^)]+)\) discard/.exec(shader.fragmentShader)![1]!;
+    const run = new Function(
+      ...Object.keys(glsl),
+      'crowdOrigin',
+      'uCrowdEye',
+      `const vCrowdFar = ${far}; const vCrowdChoice = ${choice}; const crowdNoise = vCrowdChoice;
+       return !(${clipVertex}) && !(${discard});`,
+    );
+    return (origin, eye) => run(...Object.values(glsl), origin, eye) as boolean;
+  }
+
+  it('draws exactly one representation of every person at every distance', () => {
+    const near = drawn(true);
+    const far = drawn(false);
+    let nearDrawn = 0;
+    let farDrawn = 0;
+    for (let k = 0; k < 400; k++) {
+      const origin = [hashish(k, 1) * 2000 - 1000, hashish(k, 2) * 20, hashish(k, 3) * 2000 - 1000];
+      for (const d of [0, 10, 23.9, 24, 26, 28, 30, 31.9, 32, 40, 200]) {
+        const eye = [origin[0]! + d, origin[1]!, origin[2]!];
+        const a = near(origin, eye);
+        const b = far(origin, eye);
+        expect(a !== b, `person ${k} at ${d} m`).toBe(true);
+        if (a) nearDrawn++;
+        else farDrawn++;
+        if (d < 24) expect(a).toBe(true);
+        if (d >= 32) expect(b).toBe(true);
+      }
+    }
+    // Both representations are in use across the band.
+    expect(nearDrawn).toBeGreaterThan(0);
+    expect(farDrawn).toBeGreaterThan(0);
+  });
+});
+
+function hashish(k: number, salt: number): number {
+  const x = Math.sin(k * 127.1 + salt * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 describe('kit structures', () => {
   it('places the gantry facing the grid and keeps five independent light channels', () => {
     const track = Track.fromJSON(monza);
