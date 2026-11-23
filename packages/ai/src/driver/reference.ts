@@ -174,6 +174,12 @@ export class ReferenceDriver implements Driver {
   headingLimit = Number.POSITIVE_INFINITY;
   /** Below this speed, m/s, the yaw-rate integral does not build up (0: always does). */
   integrateFrom = 0;
+  /**
+   * Hold the road wheels within the front tyres' peak slip of where the front axle is going
+   * (true: always, as at the limit). Off at walking pace, where a car turning on full lock with
+   * the rear stepping out had its steering held into the turn and swung a radian off the road.
+   */
+  holdFrontSlip = true;
 
   /** Diagnostics of the last tick: track position, lateral error, target speed. */
   readonly last = {
@@ -345,10 +351,10 @@ export class ReferenceDriver implements Driver {
     const lo = (axleCourse - alphaMax) / maxSteer;
     const hi = (axleCourse + alphaMax) / maxSteer;
     let saturated = false;
-    if (steer > hi) {
+    if (this.holdFrontSlip && steer > hi) {
       steer = hi;
       saturated = yawErr > 0;
-    } else if (steer < lo) {
+    } else if (this.holdFrontSlip && steer < lo) {
       steer = lo;
       saturated = yawErr < 0;
     }

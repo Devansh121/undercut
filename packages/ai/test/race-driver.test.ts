@@ -365,3 +365,38 @@ describe('race driver: two cars level with no room for both', () => {
     expect(dr.last.accelLimit).toBeGreaterThan(0);
   });
 });
+
+describe('race driver: closing on a queue', () => {
+  // The tail of a queue braking to a crawl in the lane behind a car stopped in the road: the car
+  // closing on it must be able to stop behind it with the brakes it really has at the end of the
+  // stop. At walking pace the wheels are light and the pedal is held well short of the plan's
+  // braking (8–9 m/s² below 10 m/s, measured at Spa's Bus Stop, where queues rear-ended at
+  // 5–7 m/s).
+  it('closes on the tail of a crawling queue without touching it when its brakes give 8 m/s² there', () => {
+    const dr = driver();
+    dr['cooldown'] = 1e9;
+    // As at the Bus Stop (seed 1, car 5 behind car 3): 28 m/s, 19.75 m behind a car at 22.6 m/s
+    // that brakes at 12 m/s² to a crawl.
+    const me = { id: 0, s: STRAIGHT - 25.35, d: lineD(dr, STRAIGHT - 25.35), speed: 28 };
+    const tail = { id: 1, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 22.6 };
+    // The car stopped in the road that the queue forms behind, 90 m on (beyond the reach at which
+    // it is an obstacle to stop for itself).
+    const parked = { id: 2, s: STRAIGHT + 90, d: lineD(dr, STRAIGHT + 90), speed: 0 };
+    let closest = Infinity;
+    for (let k = 0; k < 240 * 10; k++) {
+      tick(dr, me, [tail, parked]);
+      // The car's brakes: the plan's braking at speed, no more than 8 m/s² below 10 m/s.
+      const floor = me.speed < 10 ? -8 : -14;
+      const a = Math.max(floor, Math.min(dr.last.accelLimit, 5));
+      me.speed = Math.max(0, me.speed + a * DT);
+      me.s += me.speed * DT;
+      me.d = lineD(dr, me.s) + dr.last.offset;
+      tail.speed = Math.max(1.5, tail.speed - 12 * DT);
+      tail.s += tail.speed * DT;
+      if (me.s < tail.s && Math.abs(tail.d - me.d) < 2 * BODY_HALF_WIDTH) {
+        closest = Math.min(closest, tail.s - me.s - CAR_LENGTH);
+      }
+    }
+    expect(closest).toBeGreaterThan(0.5);
+  });
+});
