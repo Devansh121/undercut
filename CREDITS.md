@@ -7,9 +7,10 @@ Code in this repository is MIT licensed (see `LICENSE`). Third-party code and as
 | Project | Package | Licence | Use |
 | --- | --- | --- | --- |
 | [three.js](https://github.com/mrdoob/three.js) | `three` | MIT | 3D rendering, bundled into the game's scripts |
+| [SMAA](https://github.com/iryoku/smaa) area and search textures (embedded in three.js's `SMAAPass`) | (in `three`) | MIT, Copyright (C) 2013 Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro, Diego Gutierrez | Anti-aliasing in the post-processing pipeline; bundled into the game's scripts |
 | [Draco](https://github.com/google/draco) decoder (`draco_decoder.wasm`, `draco_wasm_wrapper.js`, as shipped in three.js's `examples/jsm/libs/draco/gltf/`) | (in `three`) | Apache-2.0 | Decoding the compressed models; served from the game's own origin at /assets/draco/ |
 
-The build writes `licences.txt` at the site root (`apps/web/licences.ts`) with the full licence text of everything above, the fonts and the circuit data, because minifying drops the licence comments from the bundled code. The Apache-2.0 text it uses is the canonical copy in `apps/web/licences/Apache-2.0.txt`.
+The build writes `licences.txt` at the site root (`apps/web/licences.ts`) with the full licence text of everything above, the fonts and the circuit data, because minifying drops the licence comments from the bundled code. The Apache-2.0 text it uses is the canonical copy in `apps/web/licences/Apache-2.0.txt`; SMAA's MIT text, with its copyright lines, is copied verbatim from upstream into `apps/web/licences/SMAA-MIT.txt`.
 
 The rooms server (`services/rooms`) bundles no third-party code.
 
