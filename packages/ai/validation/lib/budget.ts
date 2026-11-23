@@ -423,6 +423,15 @@ export function lapBudget(setup: CircuitSetup, pouhonG = pouhonMeasuredG()): Lap
   };
 }
 
+/** The budget's figures without the plan (for JSON): everything a report needs. */
+export function budgetReport(b: LapBudget): Omit<LapBudget, 'full' | 'sectorAt' | 'phaseAt'> & {
+  sectorAt: number[];
+  phaseAt: number[];
+} {
+  const { full: _full, sectorAt, phaseAt, ...rest } = b;
+  return { ...rest, sectorAt: Array.from(sectorAt), phaseAt: Array.from(phaseAt) };
+}
+
 const f3 = (x: number): string => x.toFixed(3);
 const signed = (x: number): string => (x >= 0 ? '+' : '') + x.toFixed(3);
 

@@ -125,7 +125,7 @@ async function budget(options) {
     if (!setup)
       throw new Error(`no racing line for ${id}; one of ${Object.keys(setups).join(', ')}`);
     const b = ai.lapBudget(setup, pouhon);
-    out[id] = b;
+    out[id] = ai.budgetReport(b);
     console.log(`\n${ai.formatBudget(b)}`);
   }
   fs.mkdirSync(outDir, { recursive: true });
