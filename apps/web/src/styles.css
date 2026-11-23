@@ -1206,6 +1206,11 @@ body {
      the CONTROLS legend below them. */
   min-height: 0;
   overflow-y: auto;
+  /* A scroll box clips at its padding edge: 4 px of padding, given back by the margin, keeps the
+     4 px focus ring (--focus-ring) inside it, and scrolling to a focused action leaves its ring. */
+  padding: 4px;
+  margin: -4px;
+  scroll-padding-block: 4px;
 }
 
 .pause__action {
