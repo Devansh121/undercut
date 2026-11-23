@@ -411,6 +411,7 @@ All URLs were opened while writing this document (fetched on 2026-11-21).
 56. G. Perantoni and D. J. N. Limebeer, "Optimal control for a Formula One car with variable parameters", Vehicle System Dynamics 52(5), 653–678 (2014), doi:10.1080/00423114.2014.889315; accepted manuscript, Appendix B, Table 3 (tyre friction parameters). https://ora.ox.ac.uk/objects/uuid:ce1a7106-0a2c-41af-8449-41541220809f
 57. Mercedes-AMG Petronas F1 Team, "Downforce in Formula One explained" (feature, undated; the 795 kg minimum weight dates it to 2022): "At around 150 km/h, the car generates as much downforce as it weighs (the minimum weight of the car is 795kg)." At top speed "it is probably three or four times the weight of the car." https://www.mercedesamgf1.com/news/feature-downforce-in-formula-one-explained
 58. Autosport, J. Noble, "The unique wings F1 teams have fitted for high-speed Monza" (2022-10-07): the new cars "produce much more of their downforce from ground effect than wings". https://www.autosport.com/f1/news/the-unique-wings-f1-teams-have-fitted-for-high-speed-monza/10366205/
+59. T. Yoshioka, T. Uchiyama, K. Kubo, R. Matsui, "Development of Seamless Shift for Formula One Car", Honda R&D Technical Review, F1 Special (The Third Era Activities), 2009, pp. 120–125: "Honda's seamless shift realized up-shift with a torque loss time of zero"; "lap time was reduced by 0.4 sec per lap"; by the end of the following season "almost all other teams were adopting systems that offered the same benefits". https://global.honda/en/technical-review/papers/10003657/
 
 `[track-data.md]` refers to measurements in `docs/track-data.md` (OSM centreline lengths, pit lane lengths, DEM profiles).
 
@@ -1091,3 +1092,86 @@ minimum speeds of this era; technical journalism gives only qualitative statemen
 timing-derived telemetry exists (the OpenF1 API), but it is licensed CC BY-NC-SA 4.0, which does
 not fit this repository. It was looked at only privately, to see where the laps lose time; no
 parameter, target or figure here comes from it.
+
+### 7.10 Where the lap time goes (M4 gap budget)
+
+`npm run telemetry -- budget` splits each reference lap three ways on the committed racing line:
+the driven lap, the speed profile the driver plans at its skill (98 / 95 / 98 % of the measured
+lateral, braking and traction limits) and the full-envelope profile (every measured limit used).
+Driven − plan is the driver's cost, plan − full the planning margin, full − published the car,
+the line and the track as modelled. Each is split by sector and by the full profile's phase:
+braking, corners (held at the corner limit), traction exits (full throttle held below what the
+engine gives on that grade by the tyres) and straights (full throttle at what the engine gives).
+Sensitivities re-plan the full envelope with one term changed. Asserted for internal consistency
+by `packages/ai/validation/budget.test.ts`; master 3c60c07.
+
+| Circuit | Published | Driven | Gap | Driver | Planning margin | Full envelope − published |
+|---|---|---|---|---|---|---|
+| Monza (low) | 78.792 | 84.872 | +6.080 | 0.820 | 0.694 | 4.566 |
+| Spa (medium) | 100.562 | 109.072 | +8.510 | 1.347 | 0.969 | 6.194 |
+| Singapore (high) | 89.158 | 91.817 | +2.659 | 0.488 | 1.032 | 1.139 |
+
+| Term, full envelope (s per lap) | Monza | Spa | Singapore |
+|---|---|---|---|
+| Lateral grip +5 % | −1.089 | −1.616 | −1.614 |
+| Braking +5 % | −0.138 | −0.161 | −0.194 |
+| Traction +5 % | −0.177 | −0.202 | −0.274 |
+| Propulsion (drive force) +5 % | −0.645 | −0.735 | −0.468 |
+| Drag −5 % | −0.377 | −0.466 | −0.223 |
+| No DRS | +0.324 | +0.266 | +0.612 |
+| No MGU-K | +2.796 | +3.276 | +2.030 |
+
+**The one published lateral figure closes Monza and Spa, and overshoots Singapore.** Scaling the
+whole lateral envelope by Pouhon's published 5.7 g over the car's measured 4.59 g there (×1.241,
+doc 2.5 [43]) gives full-envelope laps of 78.64 s at Monza (pole 78.792), 100.02 s at Spa (pole
+100.562) and 83.39 s at Singapore (pole 89.158). Alone, lateral grip would have to rise ×1.37 /
+1.21 / 1.21 by sector at Monza, ×1.68 / 1.24 / 1.04 at Spa and ×1.04 / 1.02 / 1.07 at Singapore.
+So the car's shortfall is fast-corner grip in the low and medium trims, not grip as such: the
+high-trim car at Singapore's slow corners is within 2–7 % of the sector times. That is
+downforce: [57] gives three to four times the car's weight at top speed, and the car makes 2.44
+(low) and 2.90 (medium) against 3.25 (high, inside the range) (7.9). Its source-backed fix is
+blocked: low-trim ClA 3.7–3.9 moves the PR 19 game kerb cases on the folded first chicane
+(docs/track-data.md 5.6–5.8), and medium-trim ClA 4.7–4.8 the Spa T5 2025 peak and the Spa
+trap (7.9).
+
+**Ranked losses**, largest first, with the model term each one is in:
+
+| Circuit | Loss | s | Model terms (source or estimate) |
+|---|---|---|---|
+| Monza | Fast corners, S2 and S3 (Lesmo, Ascari, Parabolica) | ≈3.5 | Low-trim downforce (ClA 3.6, estimate, 7.3) and the tyre's lateral μ at load (fitted, 7.4): S2 and S3 need ×1.21 lateral, inside the ×1.17–1.32 the practice speeds at Lesmo 2 and Ascari imply on this line (3.4–4.1 g against 2.9–3.1, 7.6) |
+| Monza | Driver, straights | 0.69 | Two parts. The 30 ms upshift torque cut (doc 1.3, estimate), which the plan does not model: with a seamless upshift the driven lap gains 0.289 s and the plan 0.046 s. And exit speed carried down the straights: T2 left at 64.6 km/h against a planned 72 (0.41 s to Roggia), the Parabolica left with the inside rear at 0–1.6 kN, 8° of sideslip and the slide recovery cutting the throttle (311 km/h at the control line against 316 planned) |
+| Monza | Planning margin | 0.69 | 0.29 of it braking (95 %) |
+| Monza | S1 beyond grip | ≈0.34 | With Pouhon-scaled grip S1 is still 0.34 s over: the chicane (T1 run in at 77 km/h against a planned 70, 7.6); the trap (349.0 against 348 ± 6) puts drag and power in band |
+| Spa | Fast corners, S2 (Pouhon to Stavelot) | 4.92 | Medium-trim downforce (ClA 4.6, estimate): S2 needs ×1.236 lateral, and the published Pouhon figure gives ×1.241 (S2 42.44 s against the session best 42.53) |
+| Spa | S1 beyond grip | ≈0.82 | La Source to Kemmel: with Pouhon-scaled grip S1 is still 0.82 s over. Trap 312.9 km/h against 315 ± 6 (pass, 2.1 low); timing line 218.5 against 234.9 published, the Bus Stop exit; drag −5 % is worth 0.19 s in S1, propulsion alone would need ×1.49 |
+| Spa | Driver | 1.35 | Straights 1.21: the upshift cut (seamless: driven −0.305 s, plan −0.033 s) and exits carried (Stavelot to Blanchimont 0.40 s, Eau Rouge and Raidillon 0.38, Pouhon 0.16, Bruxelles 0.15) |
+| Spa | Planning margin | 0.97 | 0.60 of it in S2 |
+| Singapore | Planning margin | 1.03 | Braking 0.41, traction 0.25, straights 0.24 |
+| Singapore | Car, S3 most | 1.14 | S3 needs ×1.07 lateral or ×1.27 propulsion; trap 301.7 km/h against 304 ± 6 (pass, 2.3 low) |
+| Singapore | Driver | 0.49 | Straights 0.77 (the upshift cut: seamless driven −0.402 s, plan −0.052 s), gained back in corners and braking |
+
+**Terms found at their limit.** The MGU-K deploys its 120 kW ([1] Art. 5.3.3) wherever the car
+is power-limited; the store supplies what the MGU-H's direct feed (60 kW, estimate, doc 1.3) does
+not, 3.22 / 3.76 / 2.59 MJ of the 4 MJ a lap allows, so the per-lap limit never binds and there is
+no deployment strategy left to gain. DRS is worth 0.32 / 0.27 / 0.61 s, with zones and activation
+points from the FIA maps (docs/track-data.md 5.4–5.5). Braking is not a loss: the car already
+stops shorter than published at Spa and Singapore (77 and 83 m against 93 and 96 m, 7.1).
+
+**Fixes measured against every passing check** (the laps of the three reference circuits; ten
+laps on soak fuel where the plan changes):
+
+| Candidate | Monza / Spa / Singapore lap | Passing check it moves | Kept |
+|---|---|---|---|
+| Seamless upshift, no torque cut (Honda R&D 2009 [59]: an up-shift "with a torque loss time of zero"; almost every team had one a season later) | −0.289 / −0.305 / −0.402 s | Game kerb case teleport(540, 8, 300 km/h) steer 0, TC 0 needs the safety reset (folded first chicane) | No; the car keeps 30 ms. The sim takes `upshiftTime: 0` as a seamless shift (`stepCar`, tested), so the change is one parameter once the kerb cases allow it |
+| Plan at 99 % lateral (traction 100 %) | −0.208 / −0.177 / −0.342 s | Spa ten-lap soak on soak fuel: four wheels off, 374 tyre samples on grass | No: the margin covers the heavier car the plan does not see |
+| Plan at 99 % lateral (traction 98 %) | −0.179 / −0.157 / −0.282 s | The same Spa soak (372 samples) | No |
+| Plan at 97–99 % braking | −0.13 to −0.16 / +0.44 to +0.58 / −0.15 to −0.29 s | Spa: four wheels off on a single lap | No |
+| Plan at 100 % traction | −0.025 / −0.005 / −0.062 s | None in the soak | No: worth at most 0.06 s, and the skill is part of every line's fingerprint, so all three lines and every check that reads them would move for it |
+| Controller gains (slide limit, slide and spin gains, spin recovery, lock gain and recovery, understeer lift, speed preview and gain), one at a time | −0.19 to +0.37 s, mixed sign by circuit | — | No: no robust gain; the controller sits at its own optimum |
+| Envelope measured at load factors 0.3–2.4 (the lines reach 0.63–1.37 at Monza, 0.37–2.30 at Spa, 0.64–1.38 at Singapore; the grid stops at 0.8–1.2 and extrapolates) | 0.000 / −0.002 to −0.031 / +0.001 s | — | No: the planned lift at Raidillon (7.8) is not where Eau Rouge's time goes |
+
+**What remains.** Every second the budget can source is in the low- and medium-trim downforce,
+and it is blocked by checks that pass: the folded run-off at Monza's first chicane for low trim,
+and the Spa T5 braking peak and trap for medium. The next step is the one 7.9 names: the folded
+run-off's elevation (docs/track-data.md 5.6–5.8) so that the kerb cases stop depending on the
+exact path, then the seamless upshift (0.29–0.40 s) and the low-trim downforce [57] together.
