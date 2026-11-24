@@ -7,6 +7,7 @@
 #
 # `timeout` signals the whole process group, so `npx` -> `node` -> `sudo apt-get` all stop
 # (sudo relays the signal to apt-get, which releases the dpkg lock before the next attempt).
+# RETRY_HOOK, if set, is run (by bash) before each retry, e.g. to switch apt mirrors.
 set -uo pipefail
 
 attempts=${ATTEMPTS:-3}
@@ -38,6 +39,9 @@ for ((attempt = 1; attempt <= attempts; attempt++)); do
     wait_s=$((backoff * (1 << (attempt - 1))))
     echo "::warning::Attempt $attempt of $attempts $reason; retrying in ${wait_s} s: $*"
     sleep "$wait_s"
+    if [ -n "${RETRY_HOOK:-}" ]; then
+      bash -c "$RETRY_HOOK" || echo "::warning::RETRY_HOOK failed: $RETRY_HOOK"
+    fi
   else
     echo "::error::Attempt $attempt of $attempts $reason; giving up: $*"
   fi

@@ -117,11 +117,14 @@ jobs:
         id: pw
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
       # Browser system libraries come from the Ubuntu mirror, which has stalled for whole jobs
-      # (118 MB for WebKit at a few kB/s). apt downloads into a cached directory: restored from the
-      # newest cache for this Playwright version, saved again only when the package set changes.
-      # Each install is bounded and retried (tools/ci/with-retries.sh); what an attempt finished
-      # downloading stays for the next one. apt itself gives up on a dead connection after 20 s.
+      # (118 MB for WebKit at a few kB/s). apt downloads into a cached directory, keyed on the
+      # runner image and the Playwright version and saved again only when the package set changes.
+      # Each install is bounded and retried (tools/ci/with-retries.sh); a retry first moves the
+      # stalled mirror to the end of the runner's mirror list (tools/ci/apt-next-mirror.sh, with
+      # azure and archive.ubuntu.com as fallbacks), and what an attempt finished downloading stays
+      # for the next one. apt itself gives up on a dead connection after 20 s.
       - name: Point apt at the package cache
+        id: apt
         run: |
           sudo install -d -o "$USER" /var/cache/undercut-apt
           sudo install -d /var/cache/undercut-apt/partial
@@ -133,13 +136,19 @@ jobs:
           Acquire::https::Timeout "20";
           DPkg::Lock::Timeout "60";
           APT
+          tools/ci/apt-next-mirror.sh --setup
+          echo "prefix=apt-$ImageOS-$ImageVersion-pw${{ steps.pw.outputs.version }}-" >> "$GITHUB_OUTPUT"
+          echo "fallback=apt-$ImageOS-" >> "$GITHUB_OUTPUT"
       - name: Restore apt packages
         id: apt-cache
         uses: actions/cache/restore@v6
         with:
           path: /var/cache/undercut-apt/*.deb
-          key: apt-${{ runner.os }}-pw${{ steps.pw.outputs.version }}-${{ github.run_id }}
-          restore-keys: apt-${{ runner.os }}-pw${{ steps.pw.outputs.version }}-
+          key: ${{ steps.apt.outputs.prefix }}${{ github.run_id }}
+          # An older image's packages still save every download whose version is unchanged.
+          restore-keys: |
+            ${{ steps.apt.outputs.prefix }}
+            ${{ steps.apt.outputs.fallback }}
       - name: Cache Playwright browser
         id: pw-cache
         uses: actions/cache@v6
@@ -154,6 +163,7 @@ jobs:
         timeout-minutes: 4
         env:
           ATTEMPT_TIMEOUT: '60'
+          RETRY_HOOK: tools/ci/apt-next-mirror.sh
         run: tools/ci/with-retries.sh npx playwright install-deps chromium
       - run: npm run test:browser:lifecycle
       # The phone menu sweep on WebKit, the engine of every iPhone browser (DOM only, quick).
@@ -184,24 +194,27 @@ jobs:
         timeout-minutes: 6
         env:
           ATTEMPT_TIMEOUT: '90'
+          RETRY_HOOK: tools/ci/apt-next-mirror.sh
         run: tools/ci/with-retries.sh npx playwright install-deps webkit
+      - run: npm run test:browser:webkit
+      # Cache bookkeeping never fails the job, and runs even when the WebKit tests failed.
       - name: Name the apt package set
         id: apt-set
-        if: steps.wk-deps.outcome == 'success'
+        if: always() && steps.wk-deps.outcome == 'success'
+        continue-on-error: true
         run: |
           sudo apt-get autoclean -qq
-          ls /var/cache/undercut-apt/*.deb | wc -l
-          du -sh /var/cache/undercut-apt
+          echo "$(ls /var/cache/undercut-apt/*.deb | wc -l) packages, $(du -ch /var/cache/undercut-apt/*.deb | tail -1 | cut -f1)"
           echo "hash=$(ls /var/cache/undercut-apt/*.deb | xargs -n1 basename | sort | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
       - name: Save apt packages
         if: >-
-          steps.apt-set.outputs.hash &&
-          steps.apt-cache.outputs.cache-matched-key != format('apt-{0}-pw{1}-{2}', runner.os, steps.pw.outputs.version, steps.apt-set.outputs.hash)
+          always() && steps.apt-set.outputs.hash &&
+          steps.apt-cache.outputs.cache-matched-key != format('{0}{1}', steps.apt.outputs.prefix, steps.apt-set.outputs.hash)
+        continue-on-error: true
         uses: actions/cache/save@v6
         with:
           path: /var/cache/undercut-apt/*.deb
-          key: apt-${{ runner.os }}-pw${{ steps.pw.outputs.version }}-${{ steps.apt-set.outputs.hash }}
-      - run: npm run test:browser:webkit
+          key: ${{ steps.apt.outputs.prefix }}${{ steps.apt-set.outputs.hash }}
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
