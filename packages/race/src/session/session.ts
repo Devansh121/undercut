@@ -1,3 +1,4 @@
+import { choosePitStop, type PitDecision } from '../strategy';
 import type { RngState } from '@undercut/core';
 import {
   CAR_SNAPSHOT_LENGTH,
@@ -88,6 +89,8 @@ export interface RaceSessionOptions {
    * fresh set. Off by default: grip as the reference tyre all race.
    */
   tyres?: boolean;
+  /** Deterministic pit wall for AI cars; player requests remain manual. */
+  pitStrategy?: boolean;
   step?: number;
   /** Race: grid order, car indices pole first. Default car order. */
   grid?: readonly number[];
@@ -99,8 +102,18 @@ export interface RaceSessionOptions {
   limits?: (car: number) => WheelsOffCounter;
 }
 
+/** One call of the automatic pit wall: a stop, or staying out a lap longer (`extend`). */
+export interface PitCall {
+  t: number;
+  car: number;
+  lap: number;
+  reason: PitDecision['reason'];
+}
+
 export interface RaceSessionSnapshot {
   version: 3;
+  pitStrategy?: boolean;
+  pitCalls?: PitCall[];
   control: RaceControlSnapshot;
   world: { tick: number; time: number; rng: RngState; cars: number[][] };
   /** Each car's driver (AI memory, pit-lane follower). */
@@ -191,6 +204,9 @@ export class RaceSession {
   readonly fuel: number | null;
   /** Tyre temperature and wear are modelled (`RaceSessionOptions.tyres`). */
   readonly tyres: boolean;
+  pitStrategy: boolean;
+  /** The pit wall's calls so far, in order (`pitStrategy`). */
+  readonly pitCalls: PitCall[] = [];
   private readonly facts: CarFacts[];
   private readonly telemetry: CarTelemetry[];
   private readonly contexts: ControlContext[];
@@ -218,6 +234,7 @@ export class RaceSession {
     this.seed = o.seed;
     this.fuel = o.startFuel !== undefined ? null : o.fuel === undefined ? SESSION_FUEL : o.fuel;
     this.tyres = o.tyres ?? false;
+    this.pitStrategy = o.pitStrategy ?? false;
     this.cars = o.cars;
     this.entrants = o.cars.map((c) => c.entrant);
     const surface = new TrackSurface(this.track);
@@ -342,6 +359,7 @@ export class RaceSession {
     const world = this.world;
     const control = this.control;
     this.updateGhosts();
+    if (this.pitStrategy) this.planStops();
     this.updateWakes();
     for (let i = 0; i < this.cars.length; i++) {
       const wc = world.cars[i]!;
@@ -414,6 +432,66 @@ export class RaceSession {
       }
       // Estimate: at most 18 % drag relief. Wakes do not stack; grip stays on its plan.
       state.dragScale = 1 - 0.18 * exposure;
+    }
+  }
+
+  private planStops(): void {
+    const c = this.control;
+    if (c.strategy.kind !== 'race') return;
+    const laps = c.strategy.laps!;
+    const lapTime = this.circuit.length / 50;
+    const pitLoss = this.track.pit.length / this.circuit.pit.speedLimit + 5;
+    for (let i = 0; i < this.cars.length; i++) {
+      if (
+        this.cars[i]!.controller.kind !== 'ai' ||
+        !c.racing(i) ||
+        c.pitRequested(i) ||
+        c.pitPhase(i) !== 'none'
+      )
+        continue;
+      const f = this.facts[i]!;
+      const toEntry = (this.circuit.pit.entryS - f.s + this.circuit.length) % this.circuit.length;
+      if (toEntry > 600 || toEntry < 130) continue;
+      const car = c.cars[i]!;
+      let gapAhead: number | null = null;
+      let aheadPitting = false;
+      let rejoinGap = Infinity;
+      for (let j = 0; j < this.cars.length; j++) {
+        if (i === j || !c.racing(j)) continue;
+        const gap = (c.cars[j]!.dist - car.dist) / Math.max(10, f.speed);
+        if (gap > 0 && (gapAhead === null || gap < gapAhead)) {
+          gapAhead = gap;
+          aheadPitting = c.pitRequested(j) || c.pitPhase(j) !== 'none';
+        }
+        if (gap < 0) rejoinGap = Math.min(rejoinGap, Math.abs(gap + pitLoss));
+      }
+      const state = this.world.cars[i]!.state;
+      const stop = choosePitStop({
+        laps,
+        lap: c.timer(i).lap,
+        car: i,
+        stops: car.pitStops,
+        compound: car.compound,
+        wear: Math.max(...state.tyreWear),
+        lapTime,
+        pitLoss,
+        gapAhead,
+        aheadPitting,
+        rejoinGap,
+      });
+      if (!stop) continue;
+      const lap = c.timer(i).lap;
+      if (stop.compound === null) {
+        // Staying out: logged once for the lap.
+        let k = this.pitCalls.length - 1;
+        while (k >= 0 && this.pitCalls[k]!.car !== i) k--;
+        const last = k >= 0 ? this.pitCalls[k] : undefined;
+        if (!last || last.lap !== lap || last.reason !== 'extend')
+          this.pitCalls.push({ t: this.time, car: i, lap, reason: 'extend' });
+        continue;
+      }
+      this.pitCalls.push({ t: this.time, car: i, lap, reason: stop.reason });
+      this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
     }
   }
 
@@ -640,9 +718,26 @@ export class RaceSession {
     return this.control.reposition(car, this.facts[car]!, revive);
   }
 
+  /**
+   * Practice or qualifying: put the car in its box, at rest, held there to the end of the
+   * session (`RaceControl.returnToGarage`). The lap in progress is abandoned; best laps stand.
+   */
+  returnToGarage(car: number): RaceEvent[] {
+    const box = this.control.pitBox(car);
+    if (!box || this.control.strategy.duration === null) return [];
+    const path = this.track.pit.path;
+    const at = path.pointAt(box.s, box.d, createVec3());
+    const t = path.tangent(box.s, createVec3());
+    const events = this.placeCar(car, at.x, at.z, Math.atan2(-t.z, t.x), 0);
+    this.control.returnToGarage(car);
+    return events;
+  }
+
   snapshot(): RaceSessionSnapshot {
     return {
       version: 3,
+      pitStrategy: this.pitStrategy,
+      pitCalls: this.pitCalls.map((p) => ({ ...p })),
       control: this.control.snapshot(),
       world: {
         tick: this.world.tick,
@@ -675,6 +770,9 @@ export class RaceSession {
    * session continues exactly as the original would have.
    */
   restore(snap: RaceSessionSnapshot): void {
+    this.pitStrategy = snap.pitStrategy ?? false;
+    this.pitCalls.length = 0;
+    for (const p of snap.pitCalls ?? []) this.pitCalls.push({ ...p });
     if (snap.version !== 3)
       throw new Error(`unknown session snapshot version ${String(snap.version)}`);
     if (

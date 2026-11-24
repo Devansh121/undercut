@@ -12,6 +12,7 @@ import {
   DEFAULT_RACE_SKILL,
   createRaceDriver,
   createTrafficView,
+  pitCarInPath,
   type RaceDriver,
   type RaceSkill,
   type RacingLineData,
@@ -79,6 +80,7 @@ interface Car {
   s: number;
   d: number;
   speed: number;
+  pitApproach?: boolean;
 }
 
 /** A traffic view of `self` with `others`, the race running. */
@@ -518,4 +520,33 @@ it('uses straight-line speed headroom in a move while retaining the corner braki
   dr['passId'] = 1;
   expect(dr['offLineLimit'](s, v)).toBe(Number.POSITIVE_INFINITY);
   expect(dr['offLineLimit'](450, v)).toBeLessThan(0);
+});
+
+describe('race driver: a car slowing for the pit entry', () => {
+  it('counts the entrant against the road the follower reaches there, not only where it is now', () => {
+    const half = BODY_HALF_WIDTH;
+    // On the follower's path at the entrant's s, though more than a car width from its own d.
+    expect(pitCarInPath(0, 3.8, 3.5, half, half)).toBe(true);
+    // Beside the follower now, wherever the path goes.
+    expect(pitCarInPath(0, 1.5, -6, half, half)).toBe(true);
+    // Clear of both: already across toward the lane.
+    expect(pitCarInPath(0, 6, 3, half, half)).toBe(false);
+    expect(pitCarInPath(0, -4, 1, half, half)).toBe(false);
+    // A car turned across the road takes more of it.
+    expect(pitCarInPath(0, 3.6, 0, half, half)).toBe(false);
+    expect(pitCarInPath(0, 3.6, 0, half, half + 1.5)).toBe(true);
+  });
+
+  it('follows an entrant 35 m ahead on its path before the lane, which it would not for a car not stopping', () => {
+    const entry = track.pit.entryS;
+    const leaderOf = (pitApproach: boolean) => {
+      const dr = driver();
+      const me = { id: 0, s: entry - 40, d: lineD(dr, entry - 40), speed: 70 };
+      const s = entry - 5;
+      tick(dr, me, [{ id: 1, s, d: lineD(dr, s) + 2, speed: 35, pitApproach }]);
+      return dr.last.leader;
+    };
+    expect(leaderOf(false)).not.toBe(1);
+    expect(leaderOf(true)).toBe(1);
+  });
 });

@@ -1,4 +1,11 @@
-import { defaultBindings, keyControl, padAxis, padButton, rebind } from '@undercut/input';
+import {
+  defaultBindings,
+  keyControl,
+  padAxis,
+  padButton,
+  rebind,
+  touchControl,
+} from '@undercut/input';
 import {
   FLAT_SURFACE,
   NEUTRAL_INPUT,
@@ -27,6 +34,8 @@ describe('controls list', () => {
       'Gear down',
       'DRS',
       'Overtake',
+      'Box this lap / cancel',
+      'Next tyre compound',
       'Pit limiter',
       'Camera',
       'Look back',
@@ -41,7 +50,7 @@ describe('controls list', () => {
     const touch = controlRows(defaultBindings(), 'touch');
     expect(row(touch, 'brake')?.input).toBe('Brake pedal');
     expect(row(touch, 'steer')?.input).toBe('Stick');
-    expect(row(touch, 'pitLimiter')?.input).toBe('Not bound');
+    expect(row(touch, 'pitLimiter')?.input).toBe('Limiter button');
   });
 
   it('lists the bound controls of each device, one slot per alternative', () => {
@@ -59,7 +68,8 @@ describe('controls list', () => {
     ]);
     // Nothing bound: no slots, and the text says where it is instead.
     const touch = controlRows(map, 'touch');
-    expect(row(touch, 'pitLimiter')?.slots).toEqual([]);
+    expect(row(touch, 'pitLimiter')?.slots).toEqual([[touchControl('pitLimiter')]]);
+    expect(row(touch, 'lookBack')?.slots).toEqual([]);
     expect(row(touch, 'resetToTrack')?.slots).toEqual([]);
     // Every row of every device has a text form, for the accessible name.
     for (const d of ['keyboard', 'gamepad', 'touch'] as const)

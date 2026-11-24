@@ -20,4 +20,11 @@ describe('the stopped-car prompt', () => {
     expect(carStopped({ ...base, time: 1 })).toBe(false);
     expect(carStopped({ ...base, playing: false })).toBe(false);
   });
+
+  it('stays off in the pit lane and while the crew holds the car', () => {
+    // The pit box is not lap asphalt: a car stopped for service is not stopped off the road.
+    expect(carStopped({ ...base, surface: SurfaceKind.PitLane, inPit: true })).toBe(false);
+    expect(carStopped({ ...base, inPit: true })).toBe(false);
+    expect(carStopped({ ...base, inPit: false })).toBe(true);
+  });
 });

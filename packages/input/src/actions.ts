@@ -21,6 +21,8 @@ export type DrivingButton =
   | 'gearDown'
   | 'drs'
   | 'overtake'
+  | 'boxThisLap'
+  | 'nextCompound'
   | 'pitLimiter'
   | 'lookBack'
   | 'nextCamera'
@@ -31,6 +33,8 @@ export const DRIVING_BUTTONS: readonly DrivingButton[] = [
   'gearDown',
   'drs',
   'overtake',
+  'boxThisLap',
+  'nextCompound',
   'pitLimiter',
   'lookBack',
   'nextCamera',
@@ -94,6 +98,8 @@ export const ACTION_LABELS: Readonly<Record<ActionId, string>> = Object.freeze({
   gearDown: 'Gear down',
   drs: 'DRS',
   overtake: 'Overtake',
+  boxThisLap: 'Box this lap / cancel',
+  nextCompound: 'Next tyre compound',
   pitLimiter: 'Pit limiter',
   lookBack: 'Look back',
   nextCamera: 'Next camera',
