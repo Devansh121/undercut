@@ -4,11 +4,7 @@ import spa from '@undercut/track/data/spa.json';
 import singapore from '@undercut/track/data/singapore.json';
 import dressing from '../data/monza.dressing.json';
 import catalog from '../data/props.catalog.json';
-import {
-  createPropKitMaterial,
-  type PropCatalogEntry,
-  type PropKitAssets,
-} from '../src/props/catalog';
+import { createPropKitMaterial, type PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
 import type { DressingFile } from '../src/world/dressing';
 import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
@@ -413,6 +409,46 @@ describe('kit barrier slope', () => {
 });
 
 describe('permanent stand banks', () => {
+  it('limits the detailed stand levels to 8 m and 25 m after catalogue scaling', () => {
+    const levels = [80, 200, 1200].map((maxDistance) => ({
+      scene: new Mesh(new BoxGeometry(), new MeshStandardMaterial()),
+      maxDistance,
+    }));
+    const kit = PropKitAssets.fromScenes(catalog as never, new Map([['grandstand', levels]]));
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    placeKitStands(
+      [
+        {
+          id: 'stand',
+          ox: 0,
+          oz: 0,
+          ax: 0,
+          az: 1,
+          bx: -1,
+          bz: 0,
+          base: 0,
+          roof: false,
+          s: 100,
+          seat: [0.1, 0.2, 0.3],
+          length: 20,
+          depth: 9.47,
+          rows: 10,
+        },
+      ],
+      kit,
+      props,
+      () => 0,
+      false,
+      () => undefined,
+    );
+    const distances = define.mock.calls[0]![0].lods.map((lod) => lod.maxDistance);
+    for (const [i, distance] of [8, 25, 3240].entries())
+      expect(distances[i]).toBeCloseTo(distance, 10);
+    props.dispose();
+    kit.dispose();
+  });
+
   it('shares one geometry per kit model and bank height across stands of any size', () => {
     const props = new PropRegistry(1000);
     const define = vi.spyOn(props, 'define');

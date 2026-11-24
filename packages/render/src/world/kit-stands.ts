@@ -38,7 +38,8 @@ export function placeKitStands(
       maxDistanceScale: 2.7,
       // The middle level (4,900 to 5,100 triangles a module) only within 25 m, the far level
       // (1,100 to 1,300) beyond: at 80 m the middle level cost 0.3 ms at Monza's grid on High.
-      distanceCaps: [8, 25, 1200],
+      // Caps are scaled with the catalogue distances; keep the near thresholds in metres.
+      distanceCaps: [8 / 2.7, 25 / 2.7, 1200],
       slotColors: { seat: [1, 1, 1] },
     })!;
     const rise = bank * 4.2;
