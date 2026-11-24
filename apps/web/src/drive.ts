@@ -103,6 +103,7 @@ import { PauseMenu, type PauseCommand } from './ui/pause';
 import { ResultsStrip } from './ui/results';
 import { classificationTable, sessionName, stopsText } from './ui/classification';
 import { el } from './ui/dom';
+import { button, setButtonLabel } from './ui/kit/components';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import {
@@ -131,6 +132,9 @@ const ERS_MODE_LABEL: Record<number, string> = {
   [ErsMode.Overtake]: S.hud.ersModes.overtake,
 };
 const FRAME_LOG = 7200;
+/** Simulating the rest of a session: sim time per frame, ms, and the 3D view every Nth frame. */
+const SIMULATE_BUDGET_MS = 40;
+const SIMULATE_DRAW_EVERY = 10;
 /** A retired car fades out of the scene and off the map over this long, s. */
 const RETIRED_FADE_S = 3;
 /** A car that is a ghost for holding up traffic is drawn at this opacity. */
@@ -1071,11 +1075,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   raceStatus.dataset.testid = 'race-status';
   // After the player's flag: the field is still finishing; skip runs the race to its end at
   // the fastest time scale.
-  const skipResults = document.createElement('button');
-  skipResults.type = 'button';
-  skipResults.className = 'button';
+  const skipResults = button({ label: S.pause.skipToResults });
+  skipResults.classList.add('hud-action');
   skipResults.dataset.testid = 'skip-results';
-  skipResults.textContent = S.pause.skipToResults;
   skipResults.hidden = true;
   skipResults.style.pointerEvents = 'auto';
   let skippingToResults = false;
@@ -1091,22 +1093,52 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   });
   // Practice and qualifying: once the player has a time (any time in practice), the car can go
   // back to its box and the rest of the session runs on as fast as the machine allows.
-  const simulateSession = document.createElement('button');
-  simulateSession.type = 'button';
-  simulateSession.className = 'button';
+  const simulateSession = button({ label: 'Simulate to end of session' });
+  simulateSession.classList.add('hud-action');
   simulateSession.dataset.testid = 'simulate-session';
-  simulateSession.textContent = 'Simulate to end of session';
   simulateSession.hidden = true;
   simulateSession.style.pointerEvents = 'auto';
   let simulating = false;
+  let simulateFrames = 0;
+  // While simulating: a progress module in place of the button (the session's clock, then the
+  // last laps after the flag).
+  const simulateProgress = el('div', 'panel sim-progress');
+  simulateProgress.dataset.testid = 'simulate-progress';
+  simulateProgress.hidden = true;
+  const simulateLabel = el('span', 'label', 'Simulating to the flag');
+  const simulateLeft = el('b', 'num sim-progress__left');
+  const simulateBar = el('div', 'sim-progress__bar');
+  const simulateFill = el('i');
+  simulateBar.append(simulateFill);
+  simulateBar.setAttribute('role', 'progressbar');
+  simulateBar.setAttribute('aria-valuemin', '0');
+  simulateBar.setAttribute('aria-valuemax', '100');
+  const simulateHead = el('div', 'sim-progress__head');
+  simulateHead.append(simulateLabel, simulateLeft);
+  simulateProgress.append(simulateHead, simulateBar);
   simulateSession.addEventListener('click', () => {
     const events = session.returnToGarage();
     if (!events) return;
     onEvents(events);
     simulating = true;
+    simulateFrames = 0;
     loop.timeScale = MAX_TIME_SCALE;
     simulateSession.hidden = true;
+    simulateProgress.hidden = false;
   });
+  function showSimulateProgress(): void {
+    const c = session.race.control;
+    const duration = c.strategy.duration ?? 0;
+    const left = Math.max(0, duration - (session.world.time - (c.greenTime ?? 0)));
+    const done = duration > 0 ? Math.min(1, 1 - left / duration) : 1;
+    const pct = Math.round(done * 100);
+    simulateFill.style.width = `${pct}%`;
+    simulateBar.setAttribute('aria-valuenow', String(pct));
+    simulateLeft.textContent =
+      left > 0
+        ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left`
+        : 'Last laps';
+  }
   function canSimulateSession(): boolean {
     const kind = session.race.control.strategy.kind;
     if (simulating || session.result || !session.race.control.racing(0)) return false;
@@ -1118,27 +1150,27 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   pitPanel.dataset.testid = 'pit-panel';
   const pitMessage = document.createElement('div');
   pitMessage.setAttribute('role', 'status');
-  const boxButton = document.createElement('button');
-  boxButton.className = 'button';
+  const boxButton = button({ label: 'Box this lap', glyph: 'boxThisLap' });
   boxButton.dataset.testid = 'box-this-lap';
   boxButton.addEventListener('click', () => callBox());
-  const compoundButton = document.createElement('button');
-  compoundButton.className = 'button';
+  const compoundButton = button({ label: 'Next tyres', glyph: 'nextCompound' });
   compoundButton.dataset.testid = 'next-compound';
   compoundButton.addEventListener('click', () => session.cycleCompound());
-  const limiterButton = document.createElement('button');
-  limiterButton.className = 'button';
+  const limiterButton = button({ label: 'Pit limiter', glyph: 'pitLimiter' });
+  limiterButton.dataset.testid = 'pit-limiter';
   limiterButton.addEventListener('click', () => {
     session.automaticLimiter = !session.automaticLimiter;
     o.onPitLimiter?.(session.automaticLimiter);
   });
-  const continueButton = document.createElement('button');
-  continueButton.className = 'button';
-  continueButton.textContent = 'Continue weekend';
+  const continueButton = button({ label: 'Continue weekend', variant: 'primary' });
   continueButton.dataset.testid = 'continue-weekend';
   continueButton.hidden = true;
   continueButton.addEventListener('click', () => quit());
-  pitPanel.append(pitMessage, boxButton, compoundButton, limiterButton, continueButton);
+  const pitHead = el('div', 'pit-panel__head');
+  pitHead.append(el('span', 'label', 'Pit wall'), pitMessage);
+  const pitActions = el('div', 'pit-panel__actions');
+  pitActions.append(boxButton, compoundButton, limiterButton, continueButton);
+  pitPanel.append(pitHead, pitActions);
   /** The flag is out (or the session over) for the player: no pit call to make. */
   function pitCallsClosed(): boolean {
     const phase = session.race.control.phase;
@@ -1164,7 +1196,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let resultDelivered = false;
   if (session.quickRace) {
     const control = hud.root.querySelector('.hud-control') ?? o.host;
-    control.append(raceStatus, skipResults, simulateSession);
+    control.append(raceStatus, skipResults, simulateSession, simulateProgress);
     // Desktop: in the right-hand column under the map, 8 px apart like the other modules.
     (hud.root.querySelector('.hud-right') ?? hud.root).append(pitPanel);
     hud.root.dataset.mode = 'race';
@@ -1375,9 +1407,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       // Simulating the rest of a timed session: more steps in this frame, within a budget that
       // keeps the page responsive.
       if (simulating && !session.result) {
-        const until = performance.now() + 20;
+        // The car is in its box and the view is mostly skipped (below), so most of the frame
+        // goes to the simulation; 40 ms keeps the page answering input.
+        const until = performance.now() + SIMULATE_BUDGET_MS;
         while (performance.now() < until && session.phase === 'running' && !session.result)
           onEvents(loop.frame(1 / 30).events);
+        showSimulateProgress();
       }
       lookBack = r.lookBack;
       for (const action of r.actions) {
@@ -1494,12 +1529,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       boxButton.hidden = flagOut;
       compoundButton.hidden = flagOut;
       limiterButton.hidden = flagOut;
-      pitMessage.hidden = flagOut;
-      boxButton.textContent = pitControl.pitRequested(0) ? 'Cancel pit call' : 'Box this lap';
+      pitHead.hidden = flagOut;
+      setButtonLabel(boxButton, pitControl.pitRequested(0) ? 'Cancel pit call' : 'Box this lap');
       boxButton.disabled = pitControl.held(0) || session.result !== null;
-      compoundButton.textContent = `Next tyres: ${session.nextCompound}`;
+      setButtonLabel(compoundButton, `Next tyres: ${session.nextCompound}`);
       compoundButton.disabled = pitControl.held(0);
-      limiterButton.textContent = `Pit limiter: ${session.automaticLimiter ? 'automatic' : 'manual'}`;
+      setButtonLabel(
+        limiterButton,
+        `Pit limiter: ${session.automaticLimiter ? 'automatic' : 'manual'}`,
+      );
       const remaining = pitControl.pitRemaining(0);
       pitMessage.textContent = pitControl.held(0)
         ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
@@ -1520,6 +1558,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (session.result && simulating) {
         simulating = false;
         loop.timeScale = 1;
+        simulateProgress.hidden = true;
       }
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
@@ -1538,24 +1577,27 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       }
     }
     view.setDrivingLine(session.assists.racingLine ?? 'off');
-    view.render({
-      pose,
-      ghost: ghostOn ? ghostPose : null,
-      drs: t.drs,
-      speed: t.speed,
-      longG: t.longG,
-      latG: t.latG,
-      brake: t.brake,
-      // Real time, not the capped physics step: frame pacing and dynamic resolution count it.
-      frameMs: elapsedMs,
-      dt: realDt,
-      time: clock,
-      simulationTime: session.world.time,
-      lookBack,
-      gear: t.gear,
-      revLights,
-      speedUnit: speedUnit(),
-    });
+    // While simulating, the 3D view is drawn every SIMULATE_DRAW_EVERY frames: drawing was most
+    // of each frame on a weak device, and the player's car stands in its box.
+    if (!simulating || simulateFrames++ % SIMULATE_DRAW_EVERY === 0)
+      view.render({
+        pose,
+        ghost: ghostOn ? ghostPose : null,
+        drs: t.drs,
+        speed: t.speed,
+        longG: t.longG,
+        latG: t.latG,
+        brake: t.brake,
+        // Real time, not the capped physics step: frame pacing and dynamic resolution count it.
+        frameMs: elapsedMs,
+        dt: realDt,
+        time: clock,
+        simulationTime: session.world.time,
+        lookBack,
+        gear: t.gear,
+        revLights,
+        speedUnit: speedUnit(),
+      });
     const drawnNow = view.drawnCount;
     if (drawnNow !== drawnSeen) {
       // A new view (another preset) starts its count again; its first interval is not a frame.

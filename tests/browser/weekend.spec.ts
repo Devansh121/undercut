@@ -19,7 +19,10 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
     await page.locator('[data-action=weekend-start]').click();
     await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
     await page.getByTestId('simulate-session').click({ timeout: 30_000 });
+    // The button gives way to the progress module (unless the session is already over).
+    await expect(page.getByTestId('simulate-session')).toBeHidden();
     await expect(page.getByTestId('continue-weekend')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('simulate-progress')).toBeHidden();
     await expect(page.getByTestId('race-status')).toContainText('Practice result');
     await expect(page.getByTestId('race-status').locator('th')).toHaveText([
       'Pos',
@@ -64,10 +67,12 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
     await page.evaluate(() => window.__undercut!.setTimeScale(1));
     await page.locator('.ut-touch__btn--boxThisLap').tap();
   } else await page.getByTestId('box-this-lap').click();
-  await expect(page.getByTestId('box-this-lap')).toHaveText('Cancel pit call');
+  await expect(page.getByTestId('box-this-lap').locator('.btn__label')).toHaveText(
+    'Cancel pit call',
+  );
   if (info.project.name === 'phone') await page.locator('.ut-touch__btn--boxThisLap').tap();
   else await page.getByTestId('box-this-lap').click();
-  await expect(page.getByTestId('box-this-lap')).toHaveText('Box this lap');
+  await expect(page.getByTestId('box-this-lap').locator('.btn__label')).toHaveText('Box this lap');
   await page.evaluate(() => {
     window.__undercut!.setTimeScale(0);
     window.__undercut!.teleport(5125.675, 0, 108);
