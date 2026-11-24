@@ -227,11 +227,11 @@ seed 3141, the field retired at the green, a stop with a 3.07 s service against 
 without one (`apps/web/validation/player-pit.test.ts`, which bounds each at the measured loss
 plus 1 s):
 
-| Circuit | Limited zone | Loss before | Loss now | Commonly quoted |
-| --- | --- | --- | --- | --- |
-| Monza | 418.5 m | 34.0 s | 31.6 s | about 22 to 25 s |
-| Spa-Francorchamps | 386.2 m | 24.3 s | 23.2 s | not checked |
-| Singapore | 403.7 m | 32.1 s | 29.1 s | about 21 to 22 s at 80 km/h (2025); 28 to 30 s at the old 60 km/h |
+| Circuit | Limited zone | Before this PR | Reviewed head | After review fixes | Commonly quoted |
+| --- | --- | --- | --- | --- | --- |
+| Monza | 418.5 m | 34.0 s | 31.6 s | 29.50 s | about 22 to 25 s |
+| Spa-Francorchamps | 386.2 m | 24.3 s | 23.2 s | 21.41 s | not checked |
+| Singapore | 403.7 m | 32.1 s | 29.1 s | 29.58 s | about 21 to 22 s at 80 km/h (2025); 28 to 30 s at the old 60 km/h |
 
 What changed, measured one step at a time (Monza / Spa / Singapore, s):
 
@@ -253,8 +253,10 @@ What changed, measured one step at a time (Monza / Spa / Singapore, s):
   it). The exit keeps the plain blend everywhere: leaving on the lane's heading sent cars across
   Monza's straight at once, into a car at 90 m/s (quick-race seed 211, 20 m/s contact). That
   costs about 2 s at Monza and Spa against the version with both joins matched.
-- Pulling away from the box (27.1 at Monza): the follower's wheelspin guard dropped the throttle
-  to 0.05 and recovered slowly; its floor is now 0.2 with twice the recovery.
+- The experiment raising the wheelspin throttle floor to 0.2 and recovery to 4/s saved about
+  0.2 s at Monza, but spun cars in Spa's pit lane (seed 17: seven stuck cars). It is reverted:
+  the floor remains 0.05 and recovery 2/s. The exit road now has curvature-based speed caps,
+  with straight sections free; the plain merge onto the racing surface stays.
 - The lane speed (26.6 / 20.0 / 25.9): the paths aim 0.3 m/s under the limit (was 0.8); cars hold
   21.5 m/s against 22.2 and the speeding tolerance (0.3 m/s over) is unchanged.
 - No faster than 25 m/s on the entry road, before braking for the first line (final: 31.6 / 23.2
@@ -262,13 +264,33 @@ What changed, measured one step at a time (Monza / Spa / Singapore, s):
   called in at racing speed reached Monza's lane at 55 m/s and met its wall (two-car probes, seven of seven clean with a cap);
   at 30 m/s the player's assisted stop could not take the bend 140 m into Singapore's lane (it
   passes at 28 m/s; 25 leaves a margin), and 38 m/s cost Spa 5 s.
-- The drivers' plan for the fuel on board (next section) changes the no-stop baseline by 0.3 s at
-  Monza.
+- The fuel-mass correction below leaves the five-lap no-stop baseline unchanged: its load is
+  inside the 3 % band. The earlier 0.3 s difference was from an intermediate run, not the final
+  mass correction.
 
-Monza stays about 6.5 to 9.5 s above the quoted range and Singapore about 7 to 8 s above the 2025
-figure. What is left is mostly the 3.07 s service (2 to 2.5 s in the quoted races), the rejoin at
-lane speed onto Monza's main straight, and Singapore's lane geometry, which this game takes from
-OpenStreetMap (820 m against the published 404 m).
+The player now regains control when the car leaves the pit surface, as the racing driver
+already does, rather than remaining on the low-speed follower for another 60 m. This removes
+an unnecessary slow merge without changing the lane geometry, limiter or traction control.
+The approach and the plain merge path are unchanged.
+
+The trace in `player-pit.test.ts` compares the stop's entry and exit distances with the same
+points in the no-stop run. Times below are seconds; rounding is for display only. The test
+reconciles approach loss + lane loss + rejoin loss with total loss to 1e-9 s.
+
+| Circuit | Approach loss | Entry to box | Stationary service/release | Release to exit | No-stop entry to exit | Lane loss | Rejoin loss | Total loss |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Monza | 2.37 | 11.19 | 3.08 | 18.36 | 7.42 | 25.20 | 1.94 | 29.50 |
+| Spa-Francorchamps | 1.51 | 11.89 | 3.08 | 19.50 | 15.95 | 18.51 | 1.38 | 21.41 |
+| Singapore | 2.20 | 12.08 | 3.08 | 22.80 | 12.65 | 25.30 | 2.08 | 29.58 |
+
+Most remaining loss is inside the entry/exit boundaries, not the final merge. Release-to-exit
+alone is 18.36 s at Monza and 22.80 s at Singapore: the authored lanes include substantial
+travel outside the published limited zones, plus box acceleration and exit bends. The slower
+traction-control floor is retained for stability; no global throttle increase is used to
+shorten these segments. The stop also includes 3.08 s stationary, against the 2–2.5 s often
+quoted. Monza remains 4.5–7.5 s above its quoted range and Singapore about 8–9 s above the
+2025 figure. Those are recorded gaps, not changed targets. The existing per-circuit ceilings
+32.6 / 24.2 / 30.1 s and the geometry-derived floors remain unchanged.
 
 ### Fuel load and the drivers' targets
 

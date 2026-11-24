@@ -1535,6 +1535,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       // In the garage (practice and qualifying, or back in the box to simulate) there is no stop
       // to call: the pit-call controls go.
       const inGarage = pitPhase === 'garage';
+      document.documentElement.toggleAttribute('data-pit-garage', inGarage);
       boxButton.hidden = flagOut || inGarage;
       compoundButton.hidden = flagOut || inGarage;
       limiterButton.hidden = flagOut || inGarage;
@@ -1888,6 +1889,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     ext?.detach?.();
     overlay?.destroy();
     document.documentElement.removeAttribute('data-race-finished');
+    document.documentElement.removeAttribute('data-pit-garage');
     phone?.destroy();
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     view.dispose();

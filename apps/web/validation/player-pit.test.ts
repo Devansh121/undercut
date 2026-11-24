@@ -104,7 +104,17 @@ for (const setup of [MONZA, SPA, SINGAPORE]) {
  * at the wheel, with a stop (called before the run) and without. The field is retired at the
  * green, so neither run meets traffic.
  */
-function stintTime(setup: typeof MONZA, stop: boolean): { time: number; stops: number } {
+function stintTime(
+  setup: typeof MONZA,
+  stop: boolean,
+  cuts: readonly number[] = [],
+): {
+  time: number;
+  stops: number;
+  marks: Record<string, number>;
+  distances: Record<string, number>;
+  crossings: number[];
+} {
   const track = setup.track();
   const session = new DriveSession({
     track,
@@ -124,9 +134,21 @@ function stintTime(setup: typeof MONZA, stop: boolean): { time: number; stops: n
   const car = session.race.control.cars[0]!;
   const from = car.dist;
   const begin = session.world.time;
-  while (car.dist - from < distance && session.world.time - begin < 200)
+  const marks: Record<string, number> = {};
+  const distances: Record<string, number> = {};
+  const crossings: number[] = [];
+  while (car.dist - from < distance && session.world.time - begin < 200) {
     session.tick({ ...NEUTRAL_INPUT }, 'keyboard');
-  return { time: session.world.time - begin, stops: car.pitStops };
+    for (const e of session.raceEvents.splice(0)) {
+      if (e.type !== 'pit' || e.car !== 0 || marks[e.stage] !== undefined) continue;
+      marks[e.stage] = session.world.time - begin;
+      distances[e.stage] = car.dist - from;
+    }
+    while (crossings.length < cuts.length && car.dist - from >= cuts[crossings.length]!)
+      crossings.push(session.world.time - begin);
+  }
+  expect(car.dist - from).toBeGreaterThanOrEqual(distance);
+  return { time: session.world.time - begin, stops: car.pitStops, marks, distances, crossings };
 }
 
 // Time lost to a stop (with a 3.07 s service), s. The ceiling is the measured loss with 1 s of
@@ -143,9 +165,26 @@ function pitLossFloor(setup: typeof MONZA): number {
 for (const setup of [MONZA, SPA, SINGAPORE]) {
   it(`${setup.id}: a stop costs the time the pit lane's geometry sets, against a lap without one`, () => {
     const withStop = stintTime(setup, true);
-    const without = stintTime(setup, false);
+    const without = stintTime(setup, false, [withStop.distances.entry!, withStop.distances.exit!]);
     const lost = withStop.time - without.time;
-    console.warn(setup.id, { lost, withStop: withStop.time, without: without.time });
+    const m = withStop.marks;
+    const baselineLane = without.crossings[1]! - without.crossings[0]!;
+    const approachLoss = m.entry! - without.crossings[0]!;
+    const laneLoss = m.exit! - m.entry! - baselineLane;
+    const rejoinLoss = withStop.time - m.exit! - (without.time - without.crossings[1]!);
+    expect(Math.abs(approachLoss + laneLoss + rejoinLoss - lost)).toBeLessThan(1e-9);
+    console.warn(setup.id, {
+      lost,
+      withStop: withStop.time,
+      without: without.time,
+      approachLoss,
+      laneToBox: m.stop! - m.entry!,
+      service: m.release! - m.stop!,
+      releaseToExit: m.exit! - m.release!,
+      baselineLane,
+      laneLoss,
+      rejoinLoss,
+    });
     expect(withStop.stops).toBe(1);
     expect(without.stops).toBe(0);
     expect(lost).toBeGreaterThan(pitLossFloor(setup));

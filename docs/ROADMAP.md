@@ -23,7 +23,7 @@ boards), v0.7.0 (phone readiness, fairer starts, polish), v0.8.0 (Race Weekend, 
 pit stops), v0.9.0 (Settings and Credits), v0.10.0 (Singapore water and fuller trees).
 
 Merged since the 23 Nov pause: #52, #54, #55, #58 to #75 and #78, plus #79 (CI cache and
-retry).
+retry, merged as `d5766fe`).
 
 ### In progress (open PRs)
 
