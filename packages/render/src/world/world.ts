@@ -43,7 +43,8 @@ import {
 } from './grandstands';
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
-import { placeKitStands } from './kit-stands';
+import { placeKitStands, STAND_NEAR_REACH } from './kit-stands';
+import { instanceHandover } from './handover';
 import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
@@ -1097,8 +1098,11 @@ export class CircuitWorld {
       const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
       return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
     };
+    const standNear = createPropKitMaterial({ key: 'stand-kit-near' });
     const standFar = createPropKitMaterial({ key: 'stand-kit-far', grain: false });
-    this.materials.push(standFar);
+    instanceHandover(standNear, this.crowdEye, STAND_NEAR_REACH, true);
+    instanceHandover(standFar, this.crowdEye, STAND_NEAR_REACH, false);
+    this.materials.push(standNear, standFar);
     const kitStands = placeKitStands(
       this.stands,
       o.propKit,
@@ -1106,7 +1110,7 @@ export class CircuitWorld {
       occupancy,
       o.quality.sceneryShadows,
       spectator,
-      standFar,
+      { near: standNear, far: standFar },
     );
     const { fallback } = kitStands;
     this.counts.kitStandModules = kitStands.modules;

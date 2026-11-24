@@ -11,7 +11,8 @@ import {
 } from '../src/props/catalog';
 import type { DressingFile } from '../src/world/dressing';
 import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
-import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
+import { placeKitStands, STAND_NEAR_REACH, type KitSpectator } from '../src/world/kit-stands';
+import { instanceHandover } from '../src/world/handover';
 import { placeKitBarriers } from '../src/world/kit-barriers';
 import { LapIndex } from '../src/world/lap-index';
 import { DataTexture } from 'three';
@@ -531,5 +532,85 @@ describe('kit material grain', () => {
     expect(smooth.match(/propGrain\(vPropWorld/g)).toBeNull();
     // Distinct programs, so the two never share a compiled variant.
     expect(grained.split('\n')[0]).not.toBe(smooth.split('\n')[0]);
+  });
+});
+
+describe('stand banks split near and far', () => {
+  const frame = {
+    id: 'stand',
+    ox: 0,
+    oz: 0,
+    ax: 0,
+    az: 1,
+    bx: -1,
+    bz: 0,
+    base: 0,
+    roof: false,
+    s: 100,
+    seat: [0.1, 0.2, 0.3] as [number, number, number],
+    length: 40,
+    depth: 9,
+    rows: 10,
+  };
+
+  it('places every module in a near kind (small cells) and a far kind (large cells)', () => {
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    const place = vi.spyOn(props, 'place');
+    const near = new MeshStandardMaterial();
+    const far = new MeshStandardMaterial();
+    placeKitStands(
+      [frame],
+      fakeKit(),
+      props,
+      () => 0,
+      true,
+      () => undefined,
+      { near, far },
+    );
+    const kinds = new Map(define.mock.calls.map(([k]) => [k.id, k]));
+    const n = kinds.get('stand-kit-grandstand-0-near')!;
+    const f = kinds.get('stand-kit-grandstand-0')!;
+    expect([n.gridCell, n.castShadow, n.lods.length, n.lods[0]!.maxDistance]).toEqual([
+      40,
+      false,
+      1,
+      STAND_NEAR_REACH,
+    ]);
+    expect(n.lods[0]!.material).toBe(near);
+    // The far kind draws far, casts every module's shadow from its own (only) level.
+    expect([f.gridCell, f.castShadow, f.shadowLevel, f.lods.length]).toEqual([200, true, 0, 1]);
+    expect(f.lods[0]!.material).toBe(far);
+    const at = (id: string) =>
+      place.mock.calls.filter(([k]) => k === id).map(([, p]) => [p.x, p.z, p.yaw]);
+    expect(at(n.id)).toHaveLength(4);
+    expect(at(n.id)).toEqual(at(f.id));
+    props.dispose();
+  });
+
+  it('hands each module to exactly one of the two by its distance', () => {
+    const eye = { value: new Vector3() };
+    const clip = (near: boolean): string => {
+      const m = new MeshStandardMaterial();
+      instanceHandover(m, eye, STAND_NEAR_REACH, near);
+      const shader = {
+        uniforms: {},
+        vertexShader: '#include <common>\n#include <project_vertex>',
+        fragmentShader: '',
+      } as WebGLProgramParametersWithUniforms;
+      m.onBeforeCompile(shader, {} as WebGLRenderer);
+      expect(shader.uniforms.uHandoverEye).toBe(eye);
+      expect(shader.fragmentShader).not.toContain('discard');
+      m.dispose();
+      return /if \(([^)]+)\) gl_Position/.exec(shader.vertexShader)![1]!;
+    };
+    const run = (cond: string, d: number): boolean =>
+      !new Function('handoverNear', `return ${cond};`)(d < STAND_NEAR_REACH);
+    for (const d of [0, 10, 24.99, 25, 25.01, 80, 600]) {
+      const drawnNear = run(clip(true), d);
+      const drawnFar = run(clip(false), d);
+      expect(drawnNear !== drawnFar, `${d} m`).toBe(true);
+      expect(drawnNear).toBe(d < STAND_NEAR_REACH);
+    }
   });
 });
