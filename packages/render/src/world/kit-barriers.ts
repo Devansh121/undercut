@@ -28,7 +28,7 @@ export function placeKitBarriers(
     if (!id) {
       // The middle level within 100 m of a chunk (2,900 triangles a tyre-wall module, 84 an armco
       // one), the far level beyond; the finest (7,200 and 332) is not drawn: by a chunk's near
-      // edge every module in it takes the level, and it cost 0.4 to 0.5 ms at Ascari on High.
+      // edge every module in it takes the level, and it cost 0.4 to 0.5 ms at Monza s 4300 to 4900 on High.
       const all = kit.lodsFor(kitId, { distanceCaps: [0, 100, 1200] });
       if (!all) continue;
       const lods = all.length > 1 ? all.slice(1) : all;
