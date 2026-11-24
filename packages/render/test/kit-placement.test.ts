@@ -274,6 +274,64 @@ describe('kit barrier pitch', () => {
     expect(place.mock.calls.every(([, p]) => p.y === 4 && Number.isFinite(p.yaw))).toBe(true);
     props.dispose();
   });
+
+  it('covers a run to its end with equal modules, no bare remainder', () => {
+    const track = Track.fromJSON(monza);
+    // 21.5 m: five modules of 4.3 m (four of 4 m left 5.5 m bare before).
+    const run = {
+      ...track,
+      barriers: [
+        { type: 'armco', side: 'left', points: Float64Array.from([0, 4, 50, 21.5, 4, 50]) },
+      ],
+    } as unknown as Track;
+    const props = new PropRegistry(track.length);
+    const place = vi.spyOn(props, 'place');
+    expect(placeKitBarriers(run, new LapIndex(track), fakeKit(), props, false)).toBe(5);
+    const xs = place.mock.calls.map(([, p]) => p.x);
+    xs.forEach((x, i) => expect(x).toBeCloseTo(2.15 + 4.3 * i, 9));
+    expect(place.mock.calls.every(([, p]) => Math.abs(p.stretch![2] - 4.3 / 4) < 1e-9)).toBe(true);
+    props.dispose();
+  });
+
+  it.each([
+    ['monza', monza, false],
+    ['spa', spa, false],
+    ['singapore', singapore, true],
+  ])('sleeves every sleeved run over its whole length at %s', (_, data, street) => {
+    const track = Track.fromJSON(data as never);
+    const lap = new LapIndex(track);
+    const kit = fakeKit();
+    const kitOf = { armco: 'armco-three', tyres: 'tyre-wall', concrete: 'concrete-wall' } as const;
+    const matrix = placementMatrix({ x: 0, y: 0, z: 0, s: 0 });
+    // Both ends of a module on its run's line (modules are 4 m along +Z, centred on the origin).
+    const ends = (p: PropPlacement, line: number): Vector3[] => {
+      placementMatrix(p, matrix);
+      return [-2, 2].map((e) => new Vector3(line, 0, e).applyMatrix4(matrix).setY(0));
+    };
+    const gap = (a: Vector3[], b: Vector3[]): number =>
+      Math.min(...a.flatMap((u) => b.map((v) => u.distanceTo(v))));
+    let runs = 0;
+    for (const bar of track.barriers) {
+      const props = new PropRegistry(track.length);
+      const placed: PropPlacement[] = [];
+      vi.spyOn(props, 'place').mockImplementation((_id, p) => void placed.push(p));
+      placeKitBarriers({ ...track, barriers: [bar] } as unknown as Track, lap, kit, props, street);
+      if (placed.length === 0) continue;
+      const line = kit.entries.get(kitOf[bar.type as keyof typeof kitOf])!.bounds!.max[0] - 0.03;
+      const pts = bar.points;
+      const first = [new Vector3(pts[0]!, 0, pts[2]!)];
+      const last = [new Vector3(pts[pts.length - 3]!, 0, pts[pts.length - 1]!)];
+      const chain = placed.map((p) => ends(p, line));
+      // The first module starts on the run's first point, each next one where the last ended,
+      // and the last ends on the run's last point: nothing of the run is left bare.
+      expect(gap(first, chain[0]!)).toBeLessThan(0.03);
+      for (let i = 1; i < chain.length; i++)
+        expect(gap(chain[i - 1]!, chain[i]!)).toBeLessThan(0.03);
+      expect(gap(last, chain.at(-1)!)).toBeLessThan(0.03);
+      runs++;
+    }
+    expect(runs).toBeGreaterThan(5);
+  });
 });
 
 describe('kit barrier slope', () => {

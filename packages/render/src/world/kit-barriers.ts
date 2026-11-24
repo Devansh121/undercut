@@ -102,8 +102,13 @@ export function placeKitBarriers(
       });
       count++;
     };
-    // Continuous pitch across vertices, including runs sampled more finely than a module.
-    for (let at = 0; at + pitch <= arc[vertices - 1]!; at += pitch) place(at, at + pitch);
+    // Equal modules end to end over the whole run, each stretched to the run's length over the
+    // nearest whole count (a run 21 m long takes five of 4.2 m), continuous across vertices,
+    // including runs sampled more finely than a module; no bare remainder at a run's end.
+    const total = arc[vertices - 1]!;
+    if (total <= 0) continue;
+    const modules = Math.max(1, Math.round(total / pitch));
+    for (let i = 0; i < modules; i++) place((total * i) / modules, (total * (i + 1)) / modules);
   }
   return count;
 }
