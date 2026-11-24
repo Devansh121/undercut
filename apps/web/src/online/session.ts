@@ -23,6 +23,7 @@ import {
   type Timers,
   type Transport,
 } from '@undercut/protocol';
+import { findOnlineCircuit } from './circuits';
 import { seatLivery, type SeatLivery } from './liveries';
 import { ending, endedBy, roomNotices, stageOf, type Ended, type Stage } from './view';
 
@@ -355,6 +356,16 @@ export class OnlineSession {
     const c = this.clientValue;
     if (!c?.isHost || !Number.isInteger(laps)) return false;
     return c.changeSettings({ laps: Math.max(1, Math.min(99, laps)) });
+  }
+
+  /** Host only, in the lobby: choose which circuit the room races. */
+  setCircuit(id: string): boolean {
+    const c = this.clientValue;
+    const room = c?.room;
+    if (!c?.isHost || room?.phase !== 'lobby') return false;
+    const circuit = findOnlineCircuit(id);
+    if (!circuit) return false;
+    return c.changeSettings({ circuit: circuit.info });
   }
 
   /** Host only, in the lobby: which assists players may use. */

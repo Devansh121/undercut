@@ -1,5 +1,7 @@
 import { el } from '../ui/dom';
+import { ONLINE_CIRCUITS, onlineCircuit } from './circuits';
 import { displayCode, inviteLink, networkOrigin } from './invite';
+import { onlineDriverName } from './race-rules';
 import type { OnlineSession } from './session';
 
 /** Room screens share the game's typography and buttons; all data comes from the session. */
@@ -121,7 +123,7 @@ export class RoomScreens {
             el(
               'li',
               '',
-              r.name +
+              onlineDriverName(r.name, r.aiIndex, r.seat) +
                 ' · ' +
                 r.laps +
                 ' laps · ' +
@@ -139,6 +141,26 @@ export class RoomScreens {
           );
         else content.append(el('p', '', 'Waiting for the host to choose rematch'));
       } else {
+        const currentCircuit = onlineCircuit(s.room.settings.circuit.id);
+        const circuitRow = el('div', 'pause__setting online-circuit');
+        circuitRow.append(el('span', 'pause__key', 'Circuit'));
+        const circuitChoices = el('div', 'seg');
+        circuitChoices.setAttribute('role', 'radiogroup');
+        circuitChoices.setAttribute('aria-label', 'Circuit');
+        for (const c of ONLINE_CIRCUITS) {
+          const b = el('button', 'seg__opt', c.name);
+          b.type = 'button';
+          b.id = 'online-circuit-' + c.id;
+          b.setAttribute('role', 'radio');
+          const selected = currentCircuit.id === c.id;
+          b.setAttribute('aria-checked', String(selected));
+          b.classList.toggle('is-on', selected);
+          b.disabled = !s.isHost || s.stage !== 'lobby';
+          b.onclick = () => this.session.setCircuit(c.id);
+          circuitChoices.append(b);
+        }
+        circuitRow.append(circuitChoices);
+
         const laps = field('Laps', String(s.room.settings.laps), (v) =>
           this.session.setLaps(Number(v)),
         );
@@ -147,8 +169,11 @@ export class RoomScreens {
         i.min = '1';
         i.max = '99';
         i.disabled = !s.isHost || s.stage !== 'lobby';
+        const aiText =
+          s.room.settings.aiCount > 0 ? `AI fill: ${s.room.settings.aiCount}` : 'AI fill off';
         content.append(
-          el('p', '', 'Monza · Equal cars · Team assigned by seat · AI fill off'),
+          el('p', '', `${currentCircuit.name} · Equal cars · Team assigned by seat · ${aiText}`),
+          circuitRow,
           laps,
         );
         for (const key of Object.keys(

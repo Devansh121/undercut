@@ -115,6 +115,25 @@ describe('OnlineSession', () => {
     expect(guest.s.setLaps(9)).toBe(false);
   });
 
+  it('lets the host pick Monza, Spa or Singapore; a guest cannot', async () => {
+    const { rooms, make } = setup();
+    const host = make();
+    void host.s.create('Ana');
+    await settle(rooms);
+    const guest = make();
+    void guest.s.join('BCDFGH', 'Ben');
+    await settle(rooms);
+    expect(host.s.setCircuit('spa')).toBe(true);
+    await settle(rooms);
+    expect(guest.s.state.room?.settings.circuit.id).toBe('spa');
+    expect(guest.s.state.room?.settings.circuit.lengthM).toBe(7004);
+    expect(host.s.setCircuit('singapore')).toBe(true);
+    await settle(rooms);
+    expect(guest.s.state.room?.settings.circuit.id).toBe('singapore');
+    expect(guest.s.setCircuit('monza')).toBe(false);
+    expect(host.s.setCircuit('unknown')).toBe(false);
+  });
+
   it('a guest who leaves is gone for the host, and its seat token is dropped', async () => {
     const { rooms, make } = setup();
     const host = make();

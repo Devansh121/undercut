@@ -457,3 +457,40 @@ state later. When a clamped stall spans lights-out, stationary pre-start time is
 first so the surviving interval retains the release tick at the boundary. Physics still
 runs at most 250 ms of catch-up; excess race time is lost as on any other stall. The
 report keeps the wall-clock observation separately from the released simulation tick.
+
+### Car-to-car contact online
+
+Online play uses **symmetric local contact resolution against latency-compensated remote
+proxies** (`packages/sim/src/remote-contact.ts`), matching the state-sync architecture where each
+browser runs its own 240 Hz physics and the rooms service relays snapshots without simulating cars.
+
+- **Owned vs owned cars** (host human car vs host-simulated AI cars, and AI vs AI on the host):
+  resolved with full two-way rigid-body contact (`resolveCarContacts`), identical to solo Quick
+  Race, followed by barrier clamping.
+- **Owned vs remote cars**: colliding against the delayed render pose (`serverNow - delayMs`,
+  ~140–190 ms behind) would place a side-by-side car 7–15 m behind at racing speed and cause
+  pass-through on both clients. Instead, before each frame's fixed steps, every active non-ghost
+  remote car is sampled at current server time `serverNow` via `RemoteCarBuffer.sampleSeat`,
+  extrapolated forward from its newest snapshot along a constant-yaw-rate circular arc up to
+  `MAX_CONTACT_EXTRAPOLATION_S` (250 ms, matching the buffer's extrapolation window), and stepped
+  in lockstep at 240 Hz across the frame's substeps.
+- **Fairness and stability under 50–150 ms latency and 1–2 % loss**:
+  - Narrow-phase geometry reuses the exact oriented-box SAT (`collideFootprints`) and planar
+    restitution/friction constants (`CAR_RESTITUTION = 0.1`, `CAR_FRICTION = 0.3`) from
+    `car-contact.ts`.
+  - Normal and Coulomb friction impulses use the combined equal-mass two-car denominator
+    (`wa + wb + ran²/ia + rbn²/ib`), applying only the local car's symmetric share. Both browsers
+    independently apply their own half when their cars touch.
+  - Closing speed entering a remote impulse is capped (`MAX_REMOTE_CLOSING_SPEED = 40 m/s`) and
+    positional separation is capped per 240 Hz step (`MAX_REMOTE_PUSH_PER_STEP = 0.06 m`, taking
+    half the overlap above `CONTACT_SLOP`), so a sudden latency-induced overlap separates smoothly
+    over a few ticks instead of teleporting or oscillating.
+  - Contact is strictly planar (`x, z, vx, vy, yawRate` only): zero vertical impulse, so cars can
+    never be launched into the air.
+  - **Barrier safety**: immediately after any remote contact modifies an owned car,
+    `resolveWallContact` runs against the track barriers. A car pinned between a remote peer and a
+    barrier can never be pushed through the wall.
+- **Ghosting**: remote contact is disabled before lights out, for cars that are `held` or fading
+  (`opacity < 1`, i.e., silent past 250 ms), retired or in the pit lane (`CAR_FLAG.retired` /
+  `CAR_FLAG.pitLane`), finished, or within a 2 s reset grace window after either car teleports onto
+  the track.

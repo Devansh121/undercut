@@ -146,6 +146,8 @@ export interface DriveSessionOptions {
   limits?: WheelsOffCounter;
   /** Initial active input device (defaults to keyboard). */
   device?: DeviceKind;
+  /** Aero trim when not running Quick Race (e.g. online races match the circuit's race trim). */
+  trim?: AeroTrim;
   /** Advised speeds round the circuit (the driving line), for the braking help. */
   guide?: SpeedGuide;
 }
@@ -235,7 +237,7 @@ export class DriveSession {
     }
     // A race: every car in the trim the field's line and envelope were measured for (Monza low,
     // Spa medium, Singapore high). Time trial: the low-drag car, as its records were set in.
-    this.trim = line ? raceTrim(line.trim) : 'low';
+    this.trim = line ? raceTrim(line.trim) : (options.trim ?? 'low');
     this.params = options.params ?? createCarParams(this.trim);
     this.today = options.today ?? '';
     this.initialDevice = options.device ?? 'keyboard';

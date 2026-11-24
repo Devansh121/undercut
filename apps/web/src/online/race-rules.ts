@@ -56,8 +56,54 @@ export interface Runner {
   seat: number;
   lap: number;
   s: number;
+  /** Continuous race distance from the timing line, m (overrides lap * lapLength + s when set). */
+  progress?: number;
   /** Server time it took the flag, or null while running. */
   finishedAt: number | null;
+}
+
+/**
+ * Continuous distance from the timing line for a locally simulated car, m. A car that started
+ * behind the timing line (e.g. back-row grid slots on Spa or Singapore) sits at negative progress
+ * until its first forward crossing clears the debt.
+ */
+export function localProgress(
+  length: number,
+  laps: number,
+  lineS: number,
+  behindLine: boolean,
+): number {
+  const baseLap = behindLine && laps === 0 && lineS > length / 2 ? -1 : laps;
+  return baseLap * length + lineS;
+}
+
+/**
+ * Continuous distance from the timing line for a remote car whose drawn pose projected to
+ * `projLineS`, anchored to the snapshot's `(snapLap, snapS)` so wrapping across the timing line
+ * stays continuous and live running order always agrees with what is drawn on track.
+ */
+export function remoteProgress(
+  length: number,
+  snapLap: number,
+  snapS: number,
+  projLineS: number,
+  behindLine: boolean,
+): number {
+  const baseLap = behindLine && snapLap === 0 && snapS > length / 2 ? -1 : snapLap;
+  let delta = projLineS - snapS;
+  if (delta > length / 2) delta -= length;
+  else if (delta < -length / 2) delta += length;
+  return baseLap * length + snapS + delta;
+}
+
+/** Display name for a human member or AI car in the online HUD and results. */
+export function onlineDriverName(
+  name: string | null | undefined,
+  aiIndex: number | null | undefined,
+  seat: number,
+): string {
+  if (name && name.trim().length > 0) return name;
+  return `AI ${(aiIndex ?? seat) + 1}`;
 }
 
 /** Seats in running order: finishers by when they finished, then by distance run. */
@@ -69,7 +115,9 @@ export function liveOrder(lapLength: number, cars: readonly Runner[]): number[] 
         if (b.finishedAt === null) return -1;
         return a.finishedAt - b.finishedAt;
       }
-      return b.lap * lapLength + b.s - (a.lap * lapLength + a.s);
+      const pa = a.progress ?? a.lap * lapLength + a.s;
+      const pb = b.progress ?? b.lap * lapLength + b.s;
+      return pb - pa;
     })
     .map((c) => c.seat);
 }
