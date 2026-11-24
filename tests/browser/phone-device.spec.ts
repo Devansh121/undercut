@@ -226,6 +226,87 @@ test('no double-tap zoom, selection, callout or tap flash on the interface', asy
   if (style.callout !== 'unsupported') expect(style.callout).toBe('none');
 });
 
+/**
+ * Turn a driving phone upright: the session pauses under a prompt asking for landscape, and the
+ * settings stay usable. The prompt and the pause card keep clear of the Dynamic Island and the
+ * home bar, and the card starts below the prompt. The HUD under them keeps its landscape layout
+ * and is not driven upright, so it is not checked. Back on its side, the session resumes.
+ */
+async function checkUpright(page: Page, upright: { width: number; height: number }): Promise<void> {
+  await page.setViewportSize(upright);
+  await setInsets(page, PORTRAIT_INSETS);
+  await expect(page.getByTestId('pause-menu')).toBeVisible();
+  await expect(page.getByTestId('rotate-prompt')).toBeVisible();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+  expect(
+    await underBars(
+      page,
+      '[data-testid=rotate-prompt] *, [data-testid=pause-menu] *',
+      PORTRAIT_INSETS,
+    ),
+  ).toEqual([]);
+  const [prompt, card] = await page.evaluate(() =>
+    ['[data-testid=rotate-prompt]', '[data-testid=pause-menu] .pause__card'].map((s) => {
+      const r = document.querySelector(s)!.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    }),
+  );
+  expect(prompt!.bottom, 'the pause card starts below the rotate prompt').toBeLessThanOrEqual(
+    card!.top + 0.5,
+  );
+  await page.setViewportSize({ width: upright.height, height: upright.width });
+  await setInsets(page, { l: 0, r: 0, t: 0, b: 0 });
+  await page.evaluate(() => window.__undercut!.resume());
+  await expect(page.getByTestId('pause-menu')).toBeHidden();
+}
+
+/**
+ * The same upright check on WebKit, the engine of every iPhone browser. Playwright's WebKit here
+ * reports neither a coarse pointer nor touch points, so the game would take it for a desktop;
+ * an init script makes it report what an iPhone does, and the session runs on touch controls,
+ * without sound.
+ */
+test('upright on an iPhone, the rotate prompt and the pause card keep clear of the bars', async ({
+  page,
+}, info) => {
+  test.skip(!webkit(info.project.name), 'WebKit: the Pixel session above covers Chromium');
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    const media = window.matchMedia.bind(window);
+    window.matchMedia = (query: string): MediaQueryList => {
+      const list = media(query);
+      if (!/pointer:\s*coarse/.test(query)) return list;
+      return new Proxy(list, {
+        get: (target, key) => {
+          if (key === 'matches') return true;
+          const value = Reflect.get(target, key) as unknown;
+          return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+        },
+      });
+    };
+    Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 });
+    // Silent: with the audio worklet running, this Linux WebKit build froze the page in one run
+    // of three (as it did when the Online press started audio). Layout is what is tested here;
+    // without worklets the game takes its silent engine, as in any browser that lacks them.
+    Reflect.deleteProperty(window, 'AudioWorkletNode');
+  });
+  const problems = watchProblems(page);
+  const vp = page.viewportSize()!;
+  const [long, short] = [Math.max(vp.width, vp.height), Math.min(vp.width, vp.height)];
+  await page.setViewportSize({ width: long, height: short });
+  await page.goto('/?debug=1&quality=lite&world=lite');
+  await page.locator('[data-action=press-start]').tap();
+  await page.locator('[data-action=mode-timeTrial]').tap();
+  await page.locator('[data-action=start]').tap();
+  await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+  // Touch controls: the overrides took.
+  await expect(page.locator('html')).toHaveAttribute('data-touch', '');
+  await expect(page.locator('.ut-touch')).toBeVisible();
+  await checkUpright(page, { width: short, height: long });
+  await page.evaluate(() => window.__undercut!.quit());
+  expect(problems).toEqual([]);
+});
+
 test('the Start tap creates the audio context inside the gesture', async ({ page }, info) => {
   test.skip(!webkit(info.project.name), 'WebKit: the Pixel session below covers Chromium');
   await page.goto('/?debug=1&quality=lite&world=lite');
@@ -310,24 +391,7 @@ test.describe('on an Android phone, driving', () => {
   });
 
   test('upright, the rotate prompt and the pause card keep clear of the top and bottom bars', async () => {
-    // Turned upright mid-session: the session pauses and asks for landscape, settings usable.
-    await page.setViewportSize({ width: 412, height: 915 });
-    await setInsets(page, PORTRAIT_INSETS);
-    await expect(page.getByTestId('pause-menu')).toBeVisible();
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-    // The rotate prompt and the pause card (the HUD under them is laid out for landscape and is
-    // not driven upright).
-    expect(
-      await underBars(
-        page,
-        '[data-testid=rotate-prompt] *, [data-testid=pause-menu] *',
-        PORTRAIT_INSETS,
-      ),
-    ).toEqual([]);
-    await page.setViewportSize({ width: 915, height: 412 });
-    await setInsets(page, { l: 0, r: 0, t: 0, b: 0 });
-    await page.evaluate(() => window.__undercut!.resume());
-    await expect(page.getByTestId('pause-menu')).toBeHidden();
+    await checkUpright(page, { width: 412, height: 915 });
   });
 
   test('kerbs and button presses vibrate, and the Vibration setting turns it off', async () => {
