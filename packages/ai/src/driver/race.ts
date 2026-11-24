@@ -10,6 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
+import { defensiveLane, mirrorLane } from './racecraft';
 import type { TrafficCar, TrafficView } from './traffic';
 
 /**
@@ -270,6 +271,9 @@ export class RaceDriver implements Driver {
   private passBlocked = 0;
   private cooldown = 0;
   private heldTime = 0;
+  private switchbackId = -1;
+  private switchbackSide = 0;
+  private switchbackTime = 0;
   private recovering = false;
   private rejoinTime = 0;
   private stillTime = 0;
@@ -283,6 +287,7 @@ export class RaceDriver implements Driver {
   private flips = 0;
   private wasActive = false;
   private blueSide = 0;
+  private readonly defence = { lane: 0, used: false };
   /** The car being passed as last seen (speed, m/s; -1 none) and its deceleration, m/s². */
   private passSeenV = -1;
   private passSeenId = -1;
@@ -364,6 +369,9 @@ export class RaceDriver implements Driver {
     this.passBlocked = 0;
     this.cooldown = 0;
     this.heldTime = 0;
+    this.switchbackId = -1;
+    this.switchbackSide = 0;
+    this.switchbackTime = 0;
     this.recovering = false;
     this.rejoinTime = 0;
     this.stillTime = 0;
@@ -375,6 +383,8 @@ export class RaceDriver implements Driver {
     this.flips = 0;
     this.wasActive = false;
     this.blueSide = 0;
+    this.defence.lane = 0;
+    this.defence.used = false;
     this.passSeenV = -1;
     this.passSeenId = -1;
     this.passDecel = 0;
@@ -403,6 +413,9 @@ export class RaceDriver implements Driver {
     out.passBlocked = this.passBlocked;
     out.cooldown = this.cooldown;
     out.heldTime = this.heldTime;
+    out.switchbackId = this.switchbackId;
+    out.switchbackSide = this.switchbackSide;
+    out.switchbackTime = this.switchbackTime;
     out.recovering = this.recovering;
     out.rejoinTime = this.rejoinTime;
     out.stillTime = this.stillTime;
@@ -415,6 +428,8 @@ export class RaceDriver implements Driver {
     out.flips = this.flips;
     out.wasActive = this.wasActive;
     out.blueSide = this.blueSide;
+    out.defenceLane = this.defence.lane;
+    out.defenceUsed = this.defence.used;
     out.passSeenV = this.passSeenV;
     out.passSeenId = this.passSeenId;
     out.aheadPace = this.aheadPace;
@@ -461,6 +476,9 @@ export class RaceDriver implements Driver {
     this.passBlocked = num('passBlocked');
     this.cooldown = num('cooldown');
     this.heldTime = num('heldTime');
+    this.switchbackId = typeof m.switchbackId === 'number' ? m.switchbackId : -1;
+    this.switchbackSide = typeof m.switchbackSide === 'number' ? m.switchbackSide : 0;
+    this.switchbackTime = typeof m.switchbackTime === 'number' ? m.switchbackTime : 0;
     this.recovering = m.recovering === true;
     this.rejoinTime = num('rejoinTime');
     this.stillTime = num('stillTime');
@@ -472,6 +490,8 @@ export class RaceDriver implements Driver {
     this.flips = num('flips');
     this.wasActive = m.wasActive === true;
     this.blueSide = typeof m.blueSide === 'number' ? m.blueSide : 0;
+    this.defence.lane = typeof m.defenceLane === 'number' ? m.defenceLane : 0;
+    this.defence.used = m.defenceUsed === true;
     this.passSeenV = typeof m.passSeenV === 'number' ? m.passSeenV : -1;
     this.passSeenId = typeof m.passSeenId === 'number' ? m.passSeenId : -1;
     this.aheadPace = typeof m.aheadPace === 'number' ? m.aheadPace : 1;
@@ -501,6 +521,7 @@ export class RaceDriver implements Driver {
       this.o = this.approach(this.o, 0, dt);
       inner.offsetSlope = 0;
       inner.accelLimit = Number.POSITIVE_INFINITY;
+      inner.speedAllowance = 0;
       inner.brakeFloor = 0;
       inner.throttleFloor = 0;
       inner.maxCorrection = BASE_CORRECTION;
@@ -806,6 +827,8 @@ export class RaceDriver implements Driver {
     // Passing: start on a straight, carry on, or give up (not alongside by the braking zone,
     // no room, or too long).
     this.cooldown = Math.max(0, this.cooldown - dt);
+    this.switchbackTime = Math.max(0, this.switchbackTime - dt);
+    if (this.switchbackTime === 0) this.switchbackId = -1;
     const profV = plan.profile.v;
     const gapAhead = leader ? leaderDs - CAR_LENGTH : Number.POSITIVE_INFINITY;
     if (leader && gapAhead < 20 + v * 0.5 && v < this.at(profV, s0) - 1) this.heldTime += dt;
@@ -888,6 +911,13 @@ export class RaceDriver implements Driver {
       // (Round an obstacle the car ahead in the gap is followed through it, not a reason to stop.)
       const blockedByOther =
         !this.passBypass && leader !== null && leader.id !== this.passId && gapAhead < 25;
+      if (late && passCar !== null && !this.passBypass && this.passCommitted) {
+        // An inside attack that does not earn overlap falls back. On the exit, try the
+        // opposite lane behind the defender; ordinary lane and gap checks still apply.
+        this.switchbackId = passCar.id;
+        this.switchbackSide = -this.passSide;
+        this.switchbackTime = 12;
+      }
       if (lost || done || late || blockedByOther || movedOff) {
         if (!done && !blockedByOther && !movedOff) this.cooldown = this.passBypass ? 1 : 3;
         this.passId = -1;
@@ -1011,6 +1041,11 @@ export class RaceDriver implements Driver {
           side = k !== 0 ? k : myO >= od ? 1 : -1;
         } else if (left) side = 1;
         else if (right) side = -1;
+        if (!cornering && leader.id === this.switchbackId) {
+          if ((this.switchbackSide > 0 && left) || (this.switchbackSide < 0 && right)) {
+            side = this.switchbackSide;
+          }
+        }
         const lane = od + side * sep;
         // A move started in the braking zone is committed from the start, or not made.
         const sure =
@@ -1034,6 +1069,21 @@ export class RaceDriver implements Driver {
           this.passCommitted = cornering;
           base = lane;
         } else this.cooldown = 1;
+      }
+    }
+    if (this.skill.aggression > 0.65 && !view.launching && v > LAUNCHED) {
+      const lane = defensiveLane(
+        view,
+        this.defence,
+        this.cornerSign(s0, true),
+        cornering || this.passDecel > 2,
+        midCorner,
+        oMin,
+        oMax,
+        plan.track.length,
+      );
+      if (this.passId < 0 && leader === null && !view.blueFlag) {
+        base = cornering && this.defence.used ? this.o : lane;
       }
     }
     // Blue flag: move over to the side away from the car lapping this one, and stay there
@@ -1065,7 +1115,15 @@ export class RaceDriver implements Driver {
     }
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
-    const target = Math.max(lo, Math.min(hi, base));
+    let target = Math.max(lo, Math.min(hi, base));
+    if (v > LAUNCHED && !this.passBypass && !this.recovering && yieldTo === null) {
+      // Check the road lane ahead as well as the offset: the racing line sweeps across
+      // the road while a car returns to it, even when its offset is held constant.
+      const ldNext = this.at(line.d, s0 + v * 0.5);
+      target =
+        mirrorLane(view, ldNext + target, plan.track.length, SEE_DELAY + this.skill.reaction) -
+        ldNext;
+    }
     const yielding = yieldTo !== null;
     // Launching, the car holds its grid lane while traction is limited.
     // A queue forming behind a car standing in the road ahead (`QUEUE_BRAKE`, `QUEUE_GAP`,
@@ -1228,6 +1286,8 @@ export class RaceDriver implements Driver {
     // lock-up feel backs the pedal off further than the demand would have.
     limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
     this.inner.accelLimit = limit;
+    this.inner.speedAllowance =
+      !cornering && this.passId >= 0 && !this.passBypass && v > LAUNCHED ? 4 : 0;
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
     // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays
@@ -1375,12 +1435,14 @@ export class RaceDriver implements Driver {
       const sx = s0 + x;
       const k = this.at(plan.line.curvature, sx);
       const tight = k * o;
-      let f = 0.985;
-      if (tight > 0) f *= Math.sqrt(Math.max(0.4, 1 - 1.2 * tight));
+      const attackStraight =
+        this.passId >= 0 && !this.passBypass && Math.abs(k) <= 0.5 * CORNER_CURVATURE;
+      let f = attackStraight ? 1 : 0.985;
+      if (tight > 0 && !attackStraight) f *= Math.sqrt(Math.max(0.4, 1 - 1.2 * tight));
       if (this.passCommitted) {
         // Committed to a move the car brakes at its own point, as on the line: on its braking curve to
         // the slower corner speed off line (no margin on a straight, where off line is as fast).
-        if (Math.abs(k) <= 0.5 * CORNER_CURVATURE) f /= 0.985;
+        if (Math.abs(k) <= 0.5 * CORNER_CURVATURE) f = 1;
         if (f >= 1) continue;
         const vMax = this.at(plan.profile.v, sx) * f;
         if (v <= vMax) continue;
@@ -1389,6 +1451,9 @@ export class RaceDriver implements Driver {
         if (vAllowed < v) limit = Math.min(limit, SPEED_GAIN * (vAllowed - v));
         continue;
       }
+      // On the straight an attacker uses the tow and DRS to exceed the solo profile.
+      // Corner samples ahead still impose their ordinary braking curve.
+      if (this.passId >= 0 && !this.passBypass && f >= 1) continue;
       const vMax = this.at(plan.profile.v, sx) * f;
       if (v <= vMax) continue;
       const a = x < 1 ? SPEED_GAIN * (vMax - v) : (vMax * vMax - v * v) / (2 * x);

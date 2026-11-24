@@ -487,3 +487,35 @@ describe('race driver: stopped cars on the road', () => {
     expect(dr.last.accelLimit).toBe(Infinity);
   });
 });
+
+describe('race driver: switchback', () => {
+  it('remembers an unsuccessful inside attack for an exit move, including a restore', () => {
+    const dr = driver();
+    const s =
+      Array.from(dr.plan.line.curvature).findIndex((k, i) => i > 150 && Math.abs(k) > 1 / 150) *
+      track.lap.step;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 35 };
+    const ahead = { id: 1, s: s + 10, d: me.d, speed: 35 };
+    dr['passId'] = 1;
+    dr['passSide'] = 1;
+    dr['passCommitted'] = true;
+    tick(dr, me, [ahead]);
+    expect(dr.snapshot().switchbackId).toBe(1);
+    expect(dr.snapshot().switchbackSide).toBe(-1);
+    const restored = driver();
+    restored.restore(JSON.parse(JSON.stringify(dr.snapshot())));
+    expect(restored.snapshot().switchbackId).toBe(1);
+    expect(restored.snapshot().switchbackSide).toBe(-1);
+  });
+});
+
+it('uses straight-line speed headroom in a move while retaining the corner braking limit', () => {
+  const dr = driver();
+  dr['o'] = 3;
+  const s = 0;
+  const v = dr.plan.profile.v[0]! + 2;
+  expect(dr['offLineLimit'](s, v)).toBeLessThan(0);
+  dr['passId'] = 1;
+  expect(dr['offLineLimit'](s, v)).toBe(Number.POSITIVE_INFINITY);
+  expect(dr['offLineLimit'](450, v)).toBeLessThan(0);
+});

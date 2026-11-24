@@ -160,6 +160,8 @@ export class ReferenceDriver implements Driver {
   /** How fast that offset changes along the lap, m/m: steered for, so the car keeps up with it. */
   offsetSlope = 0;
   accelLimit = Number.POSITIVE_INFINITY;
+  /** Straight-line speed headroom for a racing move, m/s. Zero for the reference lap. */
+  speedAllowance = 0;
   /**
    * The least share of the brake pedal kept whatever the lock-up feel says (0 to 1). At walking
    * pace a wheel light on a kerb reads as locked at a touch of brake, and a car that has to stop
@@ -382,7 +384,7 @@ export class ReferenceDriver implements Driver {
     // the profile planned on that grip: slower where the plan is grip-limited, the same where
     // the engine sets the speed. The plan itself on the reference tyre.
     const speeds = this.profileFor(tel.tyreGrip);
-    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f;
+    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + this.speedAllowance;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
     // Already under the speed the profile wants a moment ahead: no reason to brake early for
