@@ -15,11 +15,14 @@ describe('menu prefs', () => {
       p.race.laps = 12;
       p.assists.gamepad = { tractionControl: 0, autoGears: false };
       p.settings.hudScale = 1.1;
+      p.settings.haptics = false;
     });
     await store.flush();
     const again = new PrefsStore(port);
     expect(await again.load()).toEqual(store.get());
     expect(again.get().assists.gamepad).toEqual({ tractionControl: 0, autoGears: false });
+    expect(again.get().settings.haptics).toBe(false);
+    expect(defaultPrefs().settings.haptics).toBe(true);
   });
 
   it('falls back field by field on damaged or foreign data', () => {
@@ -36,7 +39,13 @@ describe('menu prefs', () => {
         timeOfDay: { monza: 'night-floodlit', '<b>': 'x' },
         race: { laps: -3, aiSkill: 'elite', grid: 'set', slot: 21, field: 'equal' },
         assists: { keyboard: { tractionControl: 9, abs: 2, steering: 'max' } },
-        settings: { units: 'mph', hudScale: 3, colourBlind: 'yes', subtitles: false },
+        settings: {
+          units: 'mph',
+          hudScale: 3,
+          colourBlind: 'yes',
+          subtitles: false,
+          haptics: 'off',
+        },
       }),
     );
     expect(p.mode).toBe('timeTrial');

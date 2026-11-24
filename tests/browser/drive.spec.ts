@@ -621,7 +621,7 @@ test.describe('drive', () => {
 
   test('shows every assist with a description in the pause menu and toggles stability', async ({
     drive: { page, problems },
-  }) => {
+  }, info) => {
     await page.keyboard.press('Escape');
     const menu = page.locator('[data-testid=pause-menu]');
     await expect(menu).toBeVisible();
@@ -630,6 +630,13 @@ test.describe('drive', () => {
       await expect(row).toBeVisible();
       await expect(row.locator('.pause__help')).not.toBeEmpty();
     }
+    // Vibration only where it can act: a phone (Chromium has the Vibration API), not a
+    // keyboard-only desktop with no pad connected.
+    const haptics = menu.locator('[data-setting=haptics]');
+    if (info.project.name === 'phone') {
+      await expect(haptics).toBeVisible();
+      await expect(haptics.getByRole('radio', { name: 'On' })).toBeEnabled();
+    } else await expect(haptics).toBeHidden();
     const stab = menu.locator('[data-setting=stability]');
     await stab.getByRole('radio', { name: 'Off' }).click();
     expect(((await state(page)).assists as { stability?: number }).stability).toBe(0);

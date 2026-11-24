@@ -171,6 +171,11 @@ export class InputSystem {
     if (this.arbiter.active === 'gamepad') this.gamepad.rumble(strong, weak, duration);
   }
 
+  /** Stop any rumble playing on the pad. */
+  stopRumble(): void {
+    this.gamepad.stopRumble();
+  }
+
   /** Let go of every held control on every device (window blur, tab hidden). */
   releaseAll(): void {
     for (const source of this.sources) source.releaseAll();

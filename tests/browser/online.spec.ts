@@ -132,9 +132,16 @@ test('two players race, rematch, leave and migrate the host', async ({
       await expect.poll(async () => (await state(page)).race?.remote.length).toBe(1);
     // Host first, so the result order is known. The host's crossing opens the 15 s finish window,
     // so the guest sets off as soon as the host's lap is in, with nothing slow in between.
+    //
+    // Placed 112.5 m before Monza's timing line (s 5472.5), not just short of it: at 180 km/h a
+    // frame clamped to 0.25 s covers 12.5 m, so a car placed 12.5 m short crossed in its first
+    // frame and claimed the lap before sending any snapshot from its new place; the room, still
+    // holding the grid snapshot, rejected it (s_inconsistent, PR 66 CI). From 112.5 m the car
+    // needs at least nine frames to reach the line, and its snapshots (30 Hz slots) from there
+    // are inside the room's distance check (170 m) from the first one.
     for (const page of [host, guest]) {
       await page.evaluate(() => {
-        window.__undercut!.teleport(5460, 0, 180);
+        window.__undercut!.teleport(5360, 0, 180);
         window.__undercut!.drive({ throttle: 0.3 });
       });
       await expect
