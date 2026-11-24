@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mirrorLane } from '../src/driver/racecraft';
+import { mirrorLane, roomLane } from '../src/driver/racecraft';
 import { createTrafficView } from '../src/driver/traffic';
 
 function traffic(s = 100) {
@@ -59,5 +59,40 @@ describe('one defensive move per straight', () => {
     expect(state.used).toBe(true);
     defensiveLane(traffic(), state, 1, true, true, -4, 4);
     expect(state.used).toBe(false);
+  });
+});
+
+describe('racing room for an overlapping car', () => {
+  // Self at d = 3 on the outside of a left-hand sweep; the other car on the inside at d = -1.
+  function pair(ds: number, d = -1) {
+    const view = createTrafficView(1);
+    Object.assign(view.self, { id: 0, s: 500, d: 3, speed: 30 });
+    Object.assign(view.cars[0]!, { id: 1, s: 500 + ds, d, speed: 31, halfWidth: 1 });
+    view.count = 1;
+    return view;
+  }
+  it("leaves a car's width to a car overlapping from behind, front wheels level with the rear wheels", () => {
+    const lane = roomLane(pair(-3.5), -4, 1000);
+    expect(lane).toBeGreaterThanOrEqual(-1 + 2.6);
+    expect(lane).toBeLessThanOrEqual(3);
+  });
+  it('does not cut back across a car it has overlapped from behind, on giving up a move', () => {
+    expect(roomLane(pair(3), -4, 1000)).toBeGreaterThanOrEqual(-1 + 2.6);
+  });
+  it('holds its lane rather than move toward a car already closer than the room', () => {
+    expect(roomLane(pair(-2, 1.5), -4, 1000)).toBe(3);
+  });
+  it('takes its line once the other car has no overlap', () => {
+    expect(roomLane(pair(-3.7), -4, 1000)).toBe(-4);
+    expect(roomLane(pair(3.7), -4, 1000)).toBe(-4);
+  });
+  it('lets a car move away from the overlapping car', () => {
+    expect(roomLane(pair(-2), 6, 1000)).toBe(6);
+  });
+  it('looks across the start line too', () => {
+    const view = pair(0);
+    view.self.s = 1;
+    view.cars[0]!.s = 998.5;
+    expect(roomLane(view, -4, 1000)).toBeGreaterThanOrEqual(1.6);
   });
 });

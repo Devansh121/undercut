@@ -70,3 +70,32 @@ export function defensiveLane(
   }
   return Math.max(lo, Math.min(hi, memory.lane));
 }
+
+/**
+ * Overlap: the cars' centres within a wheelbase, so one car's front wheels are level with the
+ * other's rear wheels or further, m.
+ */
+export const OVERLAP = 3.6;
+
+/**
+ * Racing room: clip a proposed road lane so it leaves a car's width (plus a hand's width) to
+ * every car overlapping this one, whichever is ahead. The car being passed leaves room at the
+ * apex and the exit; a car giving up a move does not cut back across a car it overlapped. A
+ * car never moves toward one already closer than that; moving away is always allowed. SI.
+ */
+export function roomLane(view: TrafficView, target: number, length: number): number {
+  const current = view.self.d;
+  let lane = target;
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (Math.abs(ds) > OVERLAP) continue;
+    const side = Math.sign(c.d - current);
+    if (side === 0) continue;
+    const need = BODY_HALF_WIDTH + c.halfWidth + 0.8;
+    if (side > 0) lane = Math.min(lane, Math.max(current, c.d - need));
+    else lane = Math.max(lane, Math.min(current, c.d + need));
+  }
+  return lane;
+}

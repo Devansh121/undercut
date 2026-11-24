@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import { defensiveLane, mirrorLane } from './racecraft';
+import { defensiveLane, mirrorLane, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
@@ -1153,6 +1153,19 @@ export class RaceDriver implements Driver {
       target =
         mirrorLane(view, ldNext + target, plan.track.length, SEE_DELAY + this.skill.reaction) -
         ldNext;
+    }
+    if (
+      v > HAZARD_SPEED &&
+      !view.launching &&
+      !this.hazard &&
+      this.rejoinTime <= 0 &&
+      !this.passBypass &&
+      !this.recovering
+    ) {
+      // Racing room, on the road where the car will be: through a sweep the line carries a car
+      // held on it across the road into a car overlapping it on the inside.
+      const ldNext = this.at(line.d, s0 + v * 0.5);
+      target = roomLane(view, ldNext + target, plan.track.length) - ldNext;
     }
     const yielding = yieldTo !== null;
     // Launching, the car holds its grid lane while traction is limited.
