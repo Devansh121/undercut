@@ -556,6 +556,18 @@ describe('race driver: the opening lap', () => {
       expect(dr.snapshot().passId).toBe(openingLap ? -1 : 1);
     }
   });
+  it('does not apply the first-corner prohibition to a later braking zone on lap one', () => {
+    const dr = driver();
+    const s = 4500;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 60 };
+    const ahead = { id: 1, s: s + 8, d: lineD(dr, s + 8), speed: 55 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['passCommitted'] = true;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.snapshot().passId).toBe(1);
+  });
   it('keeps a move into the first corner when already alongside', () => {
     const dr = driver();
     const me = { id: 0, s: BRAKING, d: lineD(dr, BRAKING) - 3, speed: 60 };
@@ -566,6 +578,22 @@ describe('race driver: the opening lap', () => {
     dr['o'] = -3;
     tick(dr, me, [ahead], { openingLap: true });
     expect(dr.snapshot().passId).toBe(1);
+  });
+  it('keeps the braking road lane across motion and snapshot restoration', () => {
+    const dr = driver();
+    dr['o'] = -2.5;
+    const other = { id: 1, s: 408, d: lineD(dr, 408) + 3, speed: 60 };
+    tick(dr, { id: 0, s: 420, d: lineD(dr, 420) - 2.5, speed: 60 }, [other], { openingLap: true });
+    const saved = dr.snapshot();
+    expect(saved.brakingHold).toBe(true);
+    const restored = driver();
+    restored.restore(saved);
+    const me = { id: 0, s: 421, d: lineD(dr, 420) - 2.5, speed: 60 };
+    tick(dr, me, [other], { openingLap: true });
+    tick(restored, me, [other], { openingLap: true });
+    expect(dr.snapshot().brakingLane).toBe(saved.brakingLane);
+    expect(restored.snapshot().brakingLane).toBe(saved.brakingLane);
+    expect(restored.snapshot().o).toBeCloseTo(dr.snapshot().o as number, 10);
   });
   it('holds its offset from the line while braking on the opening lap, with a car near', () => {
     const hold = (openingLap: boolean, near: boolean) => {

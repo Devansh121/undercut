@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carNear, mirrorLane, roomLane } from '../src/driver/racecraft';
+import { brakingTraffic, carNear, mirrorLane, roomLane } from '../src/driver/racecraft';
 import { createTrafficView } from '../src/driver/traffic';
 
 function traffic(s = 100) {
@@ -110,4 +110,31 @@ describe('a car near', () => {
     view.cars[0]!.speed = 0;
     expect(carNear(view, 1000, 20)).toBe(false);
   });
+});
+
+describe('traffic that constrains a braking lane', () => {
+  it('holds for a car behind or overlapping, but allows dropping behind a car already ahead', () => {
+    const view = traffic();
+    expect(brakingTraffic(view, 1000)).toBe(true);
+    view.cars[0]!.s = 103;
+    expect(brakingTraffic(view, 1000)).toBe(true);
+    view.cars[0]!.s = 108;
+    expect(brakingTraffic(view, 1000)).toBe(false);
+  });
+  it('ignores a stopped car and wraps at the timing line', () => {
+    const view = traffic(5);
+    view.cars[0]!.s = 991;
+    expect(brakingTraffic(view, 1000)).toBe(true);
+    view.cars[0]!.speed = 0;
+    expect(brakingTraffic(view, 1000)).toBe(false);
+  });
+});
+
+it('allows falling in behind the forward car when another car is also behind', () => {
+  const view = createTrafficView(2);
+  Object.assign(view.self, { id: 0, s: 100, d: -3, speed: 60 });
+  Object.assign(view.cars[0]!, { id: 1, s: 86, d: 0, speed: 60 });
+  Object.assign(view.cars[1]!, { id: 2, s: 108, d: 0, speed: 60 });
+  view.count = 2;
+  expect(brakingTraffic(view, 1000)).toBe(false);
 });

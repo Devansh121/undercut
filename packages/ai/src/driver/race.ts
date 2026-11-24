@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import { OVERLAP, carNear, defensiveLane, mirrorLane, roomLane } from './racecraft';
+import { OVERLAP, brakingTraffic, defensiveLane, mirrorLane, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
@@ -302,6 +302,8 @@ export class RaceDriver implements Driver {
   private flips = 0;
   private wasActive = false;
   private blueSide = 0;
+  private brakingLane = 0;
+  private brakingHold = false;
   private readonly defence = { lane: 0, used: false };
   /** A car stands still in the road ahead this tick (`HAZARD_SEE`): set first in `planTraffic`. */
   private hazard = false;
@@ -400,6 +402,8 @@ export class RaceDriver implements Driver {
     this.flips = 0;
     this.wasActive = false;
     this.blueSide = 0;
+    this.brakingLane = 0;
+    this.brakingHold = false;
     this.defence.lane = 0;
     this.defence.used = false;
     this.hazard = false;
@@ -452,6 +456,8 @@ export class RaceDriver implements Driver {
     out.passSeenId = this.passSeenId;
     out.aheadPace = this.aheadPace;
     out.aheadPaceId = this.aheadPaceId;
+    out.brakingLane = this.brakingLane;
+    out.brakingHold = this.brakingHold;
     out.passDecel = this.passDecel;
     out.passCommitted = this.passCommitted;
     out.passBypass = this.passBypass;
@@ -514,6 +520,8 @@ export class RaceDriver implements Driver {
     this.passSeenId = typeof m.passSeenId === 'number' ? m.passSeenId : -1;
     this.aheadPace = typeof m.aheadPace === 'number' ? m.aheadPace : 1;
     this.aheadPaceId = typeof m.aheadPaceId === 'number' ? m.aheadPaceId : -1;
+    this.brakingLane = typeof m.brakingLane === 'number' ? m.brakingLane : 0;
+    this.brakingHold = m.brakingHold === true;
     this.passDecel = typeof m.passDecel === 'number' ? m.passDecel : 0;
     this.passCommitted = m.passCommitted === true;
     this.passBypass = m.passBypass === true;
@@ -688,7 +696,11 @@ export class RaceDriver implements Driver {
     // is not already alongside (the field arrives there together).
     const opening = view.openingLap === true && !view.launching;
     const firstEnd = plan.track.corners[0]?.end ?? 0;
-    const firstCorner = opening && cornering && (s0 < firstEnd || s0 > plan.track.length / 2);
+    const firstCorner =
+      opening &&
+      cornering &&
+      (s0 < firstEnd ||
+        s0 > (plan.track.corners[plan.track.corners.length - 1]?.end ?? plan.track.length));
     const straightness = Math.max(0, Math.min(1, (toCorner - v) / 150));
 
     // The car ahead in this car's path, and the cars alongside (or about to be). Other cars are
@@ -1157,19 +1169,26 @@ export class RaceDriver implements Driver {
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
     let target = Math.max(lo, Math.min(hi, base));
-    if (
+    // A free lane holds on the road, not against a racing line that sweeps under it.
+    // Active passes and the alongside bands already choose a safe lane; do not freeze their
+    // avoidance or their return after an abandoned move.
+    const hold =
       opening &&
+      v > LAUNCHED &&
       cornering &&
       !midCorner &&
       !this.hazard &&
       !this.passBypass &&
       !this.recovering &&
-      carNear(view, plan.track.length, 20)
-    ) {
-      // Braking on the opening lap among other cars the lane holds (the cars alongside and the
-      // edges still bound it). Alone on the road the car takes its line as planned.
-      target = Math.max(lo, Math.min(hi, this.o));
+      this.passId < 0 &&
+      this.cooldown <= 0 &&
+      ns === 0 &&
+      brakingTraffic(view, plan.track.length);
+    if (hold) {
+      if (!this.brakingHold) this.brakingLane = ldHere + this.o;
+      target = Math.max(lo, Math.min(hi, this.brakingLane - ldHere));
     }
+    this.brakingHold = hold;
     if (
       v > LAUNCHED &&
       !this.hazard &&
@@ -1252,7 +1271,7 @@ export class RaceDriver implements Driver {
     // In a move the lane is held against the line sweeping under it, and the controller
     // underneath steers for the offset's change as well as for the offset (it would trail the
     // lane by a metre or more, into the other car).
-    const slope = this.passId >= 0 && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
+    const slope = (this.passId >= 0 || hold) && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.

@@ -110,3 +110,17 @@ export function carNear(view: TrafficView, length: number, range: number): boole
   }
   return false;
 }
+
+/** Moving traffic behind or overlapping: a braking car cannot move across its approach. */
+export function brakingTraffic(view: TrafficView, length: number): boolean {
+  let behind = false;
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (c.speed < 1) continue;
+    if (ds > OVERLAP && ds < 20) return false;
+    if (ds > -20 && ds <= OVERLAP) behind = true;
+  }
+  return behind;
+}
