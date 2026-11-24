@@ -1097,6 +1097,8 @@ export class CircuitWorld {
       const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
       return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
     };
+    const standFar = createPropKitMaterial({ key: 'stand-kit-far', grain: false });
+    this.materials.push(standFar);
     const kitStands = placeKitStands(
       this.stands,
       o.propKit,
@@ -1104,6 +1106,7 @@ export class CircuitWorld {
       occupancy,
       o.quality.sceneryShadows,
       spectator,
+      standFar,
     );
     const { fallback } = kitStands;
     this.counts.kitStandModules = kitStands.modules;

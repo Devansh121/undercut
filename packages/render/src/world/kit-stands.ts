@@ -1,3 +1,4 @@
+import type { Material } from 'three';
 import type { PropKitAssets } from '../props/catalog';
 import type { PropRegistry } from '../props/registry';
 import { hash01 } from './dressing';
@@ -22,6 +23,8 @@ export function placeKitStands(
   occupancy: (frame: StandFrame, row: number) => number,
   shadows: boolean,
   spectator: (seat: KitSpectator) => void,
+  /** Material for the far level (the kit's without its sub-pixel grain); owned by the caller. */
+  farMaterial?: Material,
 ): { fallback: StandFrame[]; modules: number; crowd: number } {
   const result = { fallback: [] as StandFrame[], modules: 0, crowd: 0 };
   // One kind per kit model and bank height, shared by every stand: the stand's footprint fit is
@@ -49,6 +52,8 @@ export function placeKitStands(
         }
         lod.geometry.computeBoundingSphere();
       }
+    const far = lods[lods.length - 1]!;
+    if (farMaterial && !Array.isArray(far.material)) far.material = farMaterial;
     id = `stand-kit-${key}`;
     // Shadows from the far level (1,100 to 1,300 triangles a module, against 4,900 to 5,100 for
     // the level drawn within 80 m), in the shadow pass only, to 100 m: the cascades draw every

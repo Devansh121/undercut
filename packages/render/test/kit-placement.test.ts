@@ -4,7 +4,11 @@ import spa from '@undercut/track/data/spa.json';
 import singapore from '@undercut/track/data/singapore.json';
 import dressing from '../data/monza.dressing.json';
 import catalog from '../data/props.catalog.json';
-import type { PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
+import {
+  createPropKitMaterial,
+  type PropCatalogEntry,
+  type PropKitAssets,
+} from '../src/props/catalog';
 import type { DressingFile } from '../src/world/dressing';
 import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
@@ -499,5 +503,33 @@ describe('permanent stand banks', () => {
       geometry.dispose();
     }
     props.dispose();
+  });
+});
+
+describe('kit material grain', () => {
+  function compiled(grain?: boolean): string {
+    const material = createPropKitMaterial(grain === undefined ? {} : { grain });
+    const shader = {
+      uniforms: {},
+      vertexShader:
+        '#include <common>\n#include <color_vertex>\n#include <begin_vertex>\n#include <worldpos_vertex>',
+      fragmentShader:
+        '#include <common>\n#include <color_fragment>\n#include <roughnessmap_fragment>\n#include <metalnessmap_fragment>',
+    } as WebGLProgramParametersWithUniforms;
+    material.onBeforeCompile(shader, {} as WebGLRenderer);
+    const key = material.customProgramCacheKey();
+    material.dispose();
+    return `${key}\n${shader.fragmentShader}`;
+  }
+
+  it('hashes the grain without sin, and leaves it out of far-only levels', () => {
+    const grained = compiled();
+    const smooth = compiled(false);
+    // The grain's hash: no trigonometry per fragment (its range reduction was the cost).
+    expect(grained).not.toMatch(/\bsin\(/);
+    expect(grained.match(/propGrain\(vPropWorld/g)).toHaveLength(2);
+    expect(smooth.match(/propGrain\(vPropWorld/g)).toBeNull();
+    // Distinct programs, so the two never share a compiled variant.
+    expect(grained.split('\n')[0]).not.toBe(smooth.split('\n')[0]);
   });
 });

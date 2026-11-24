@@ -236,7 +236,15 @@ function sampleMaterialLinearColor(mat: Material): [number, number, number] {
  * optional gentle idle sway for spectators.
  */
 export function createPropKitMaterial(
-  options: { swayTime?: { value: number }; key?: string } = {},
+  options: {
+    swayTime?: { value: number };
+    key?: string;
+    /**
+     * World-space colour and roughness grain (default on). Off for levels only drawn far away,
+     * where the 7 cm grain is below a pixel and its two hashes a fragment are pure cost.
+     */
+    grain?: boolean;
+  } = {},
 ): MeshStandardMaterial {
   const m = new MeshStandardMaterial({
     vertexColors: true,
@@ -245,6 +253,7 @@ export function createPropKitMaterial(
   });
   m.name = options.key ?? 'prop-kit-unified';
   const sway = options.swayTime;
+  const grain = options.grain ?? true;
   m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     if (sway) shader.uniforms.uCrowdTime = sway;
     shader.vertexShader = shader.vertexShader
@@ -306,23 +315,28 @@ export function createPropKitMaterial(
         `#include <common>
         varying vec2 vPropRM;
         varying vec3 vPropWorld;
+        // Arithmetic hash of the 7 cm cell (no sin: its range reduction on large world
+        // coordinates made the grain the dearest part of every kit fragment).
         float propGrain(vec3 p) {
-          vec3 q = floor(p * 14.0);
-          return fract(sin(dot(q, vec3(12.9898, 78.233, 37.719))) * 43758.5453) - 0.5;
+          vec3 q = fract(floor(p * 14.0) * vec3(0.1031, 0.1030, 0.0973));
+          q += dot(q, q.yzx + 33.33);
+          return fract((q.x + q.y) * q.z) - 0.5;
         }`,
       )
       .replace(
         '#include <color_fragment>',
-        `#include <color_fragment>
+        grain
+          ? `#include <color_fragment>
         {
           float g = propGrain(vPropWorld);
           diffuseColor.rgb *= 1.0 + g * 0.055 * (1.0 - vPropRM.y * 0.5);
-        }`,
+        }`
+          : '#include <color_fragment>',
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-        roughnessFactor = clamp(vPropRM.x + propGrain(vPropWorld * 0.5) * 0.04, 0.06, 1.0);`,
+        roughnessFactor = clamp(vPropRM.x${grain ? ' + propGrain(vPropWorld * 0.5) * 0.04' : ''}, 0.06, 1.0);`,
       )
       .replace(
         '#include <metalnessmap_fragment>',
@@ -330,7 +344,8 @@ export function createPropKitMaterial(
         metalnessFactor = clamp(vPropRM.y, 0.0, 1.0);`,
       );
   };
-  m.customProgramCacheKey = () => `prop-kit-unified-v1-${sway ? 'sway' : 'static'}`;
+  m.customProgramCacheKey = () =>
+    `prop-kit-unified-v1-${sway ? 'sway' : 'static'}${grain ? '' : '-smooth'}`;
   return m;
 }
 
