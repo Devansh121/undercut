@@ -305,7 +305,7 @@ export class RaceDriver implements Driver {
   private brakingLane = 0;
   private brakingHold = false;
   private readonly defence = { lane: 0, used: false };
-  /** A car stands still in the road ahead this tick (`HAZARD_SEE`): set first in `planTraffic`. */
+  /** Stopped/crawling traffic or a slowing pit entrant ahead: set first in `planTraffic`. */
   private hazard = false;
   /** The car being passed as last seen (speed, m/s; -1 none) and its deceleration, m/s². */
   private passSeenV = -1;
@@ -1199,8 +1199,8 @@ export class RaceDriver implements Driver {
       yieldTo === null
     ) {
       // A car can slow below launch speed in moving traffic; only launch/crawl and recovery
-      // exclude the mirror check. Check the road lane ahead as well as the offset: the racing line sweeps across
-      // the road while a car returns to it, even when its offset is held constant.
+      // exclude the mirror check. Check the road lane ahead as well as the offset: the racing
+      // line sweeps across the road while a car returns to it, even with its offset held.
       const ldNext = this.at(line.d, s0 + v * 0.5);
       target =
         mirrorLane(view, ldNext + target, plan.track.length, SEE_DELAY + this.skill.reaction) -
@@ -1739,17 +1739,20 @@ export class RaceDriver implements Driver {
     return this.aheadPaceId === id && this.aheadPace < SLOW_IN_CORNERS;
   }
 
-  /** A move on a moving car with the road ahead clear of stopped cars (tow and DRS speed). */
+  /** A move on a moving car with the road clear of hazards (tow and DRS speed). */
   private attacking(): boolean {
     return this.passId >= 0 && !this.passBypass && !this.hazard;
   }
 
-  /** A car stopped or crawling within `HAZARD_SEE` ahead, anywhere across the road. */
+  /** A stopped/crawling car, or a slower pit entrant, ahead anywhere across the road. */
   private slowAhead(view: TrafficView, s0: number): boolean {
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       const ds = this.ahead(s0, c.s);
-      if (c.speed < HAZARD_SPEED && ds > 0 && ds < HAZARD_SEE) return true;
+      // An entrant can cross the passing lane before the pit wall separates it. Do not race
+      // another car into that approach while the entrant ahead is slowing relative to us.
+      const entering = c.pitApproach === true && c.speed < view.self.speed - 2;
+      if ((c.speed < HAZARD_SPEED || entering) && ds > 0 && ds < HAZARD_SEE) return true;
     }
     return false;
   }

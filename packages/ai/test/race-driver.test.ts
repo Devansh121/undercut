@@ -653,3 +653,18 @@ describe('race driver: mirror clearance below launch speed after the launch', ()
     expect(dr.snapshot().o as number).toBeGreaterThan(2.5);
   });
 });
+
+describe('race driver: a pit entrant beyond the car being passed', () => {
+  it('holds racing moves while an entrant ahead is slowing, before it crosses into the lane', () => {
+    const attempt = (pitApproach: boolean) => {
+      const dr = driver();
+      const me = { id: 0, s: 100, d: lineD(dr, 100), speed: 80 };
+      const leader = { id: 1, s: 125, d: lineD(dr, 125), speed: 70 };
+      const entrant = { id: 2, s: 220, d: lineD(dr, 220) + 4, speed: 40, pitApproach };
+      for (let k = 0; k < 240; k++) tick(dr, me, [leader, entrant]);
+      return dr.snapshot().passId;
+    };
+    expect(attempt(false)).toBe(1);
+    expect(attempt(true)).toBe(-1);
+  });
+});
