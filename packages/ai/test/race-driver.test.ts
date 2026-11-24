@@ -522,6 +522,24 @@ it('uses straight-line speed headroom in a move while retaining the corner braki
   expect(dr['offLineLimit'](450, v)).toBeLessThan(0);
 });
 
+describe('race driver: late braking', () => {
+  it('does not dive into a braking zone from behind a car it does not overlap', () => {
+    const dr = driver();
+    // Held up into the first chicane's braking zone, 10 m behind a car braking earlier.
+    const s = 420;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 70 };
+    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 50 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['heldTime'] = 5;
+    dr['passDecel'] = 8;
+    dr['o'] = -3;
+    tick(dr, me, [ahead]);
+    expect(dr.snapshot().passCommitted).toBe(false);
+    expect(dr.snapshot().passId).toBe(-1);
+  });
+});
+
 describe('race driver: a car slowing for the pit entry', () => {
   it('counts the entrant against the road the follower reaches there, not only where it is now', () => {
     const half = BODY_HALF_WIDTH;

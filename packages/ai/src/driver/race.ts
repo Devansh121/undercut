@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import { defensiveLane, mirrorLane, roomLane } from './racecraft';
+import { OVERLAP, defensiveLane, mirrorLane, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
@@ -897,11 +897,14 @@ export class RaceDriver implements Driver {
       // Into the braking zone, decided once: a car held up behind one that brakes earlier goes
       // on if, braking at its own point, it would be level by the turn-in with room on its side
       // all the way; otherwise the corner is the other car's, as it is for any car not alongside.
+      // Only from a real overlap (front wheels level with the other car's rear wheels): a dive
+      // from further back is not level by the apex, and the car ahead turns in across it.
       if (
         cornering &&
         !this.passCommitted &&
         passCar !== null &&
         passDs >= 0.6 * CAR_LENGTH &&
+        passDs < OVERLAP &&
         this.heldTime > 1.5 - aggression
       ) {
         const lane =
@@ -1034,6 +1037,7 @@ export class RaceDriver implements Driver {
       !midCorner &&
       held &&
       leader !== null &&
+      leaderDs < OVERLAP &&
       v - leader.speed > 2 &&
       this.passDecel > 2 &&
       gapAhead < 25 + v * 0.5;
