@@ -1,6 +1,13 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BLOCKED, groupAssets, inline, parseCredits, type ManifestEntry } from './credits-model';
+import {
+  BLOCKED,
+  groupAssets,
+  inline,
+  parseCredits,
+  sourceHosts,
+  type ManifestEntry,
+} from './credits-model';
 
 const root = new URL('../../../../../', import.meta.url);
 const md = fs.readFileSync(new URL('CREDITS.md', root), 'utf8');
@@ -38,6 +45,24 @@ describe('credits from CREDITS.md and the manifest', () => {
       { text: 'see ' },
       { text: 'LICENSE-DATA.md' },
     ]);
+  });
+
+  it('lists the host of every link in a free-text source, and nothing else', () => {
+    // The circuit dressing's source, as the manifest gives it.
+    expect(
+      sourceHosts(
+        'https://www.openstreetmap.org (Overpass query via https://overpass.private.coffee/api/interpreter, fetched 2026-11-21T12:36:09Z); https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E009_00_DEM/Copernicus_DSM_COG_10_N45_00_E009_00_DEM.tif',
+      ),
+    ).toEqual([
+      'openstreetmap.org',
+      'overpass.private.coffee',
+      'copernicus-dem-30m.s3.amazonaws.com',
+    ]);
+    expect(sourceHosts('tools/car/build.mjs (this repository)')).toEqual([]);
+    const osm = groupAssets(manifest).find((g) => g.licence === 'ODbL-1.0');
+    expect(osm?.sources).toContain('copernicus-dem-30m.s3.amazonaws.com');
+    for (const g of groupAssets(manifest))
+      for (const h of g.sources) expect(h).toMatch(/^[a-z0-9.-]+$/);
   });
 
   it('groups the manifest by author and licence and counts every file', () => {

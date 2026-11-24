@@ -48,6 +48,26 @@ function sweep(page: Page, steps: readonly Step[]): Promise<string[]> {
         target.click();
       }
       if (root.scrollWidth > w) problems.push(`${label}: page is ${root.scrollWidth}px wide`);
+      // The top bar's parts never overlap: wordmark, each breadcrumb, each button on the right.
+      const bar = [
+        ...document.querySelectorAll<HTMLElement>(
+          '.shell__top .wordmark, .shell__top .crumbs > *, .shell__right > *',
+        ),
+      ].filter((el) => el.getClientRects().length > 0 && !el.closest('[hidden]'));
+      const barName = (el: HTMLElement): string =>
+        el.getAttribute('aria-label') ?? (el.textContent?.trim() || el.className);
+      bar.forEach((a, i) => {
+        const ra = a.getBoundingClientRect();
+        for (const b of bar.slice(i + 1)) {
+          const rb = b.getBoundingClientRect();
+          const apart =
+            ra.right <= rb.left + 0.5 ||
+            rb.right <= ra.left + 0.5 ||
+            ra.bottom <= rb.top ||
+            rb.bottom <= ra.top;
+          if (!apart) problems.push(`${label}: top bar ${barName(a)} overlaps ${barName(b)}`);
+        }
+      });
       if (root.scrollHeight > h) problems.push(`${label}: page is ${root.scrollHeight}px tall`);
       for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
         if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
@@ -169,6 +189,28 @@ for (const size of SIZES) {
     expect(await sweep(page, [{ label: 'credits' }])).toEqual([]);
     await press('[data-testid=credits] [data-action=back]');
     await press('[data-testid=settings] [data-action=back]');
+    // The same menus at the largest text size (Settings, Accessibility).
+    await page.evaluate(() => (document.documentElement.dataset.text = 'larger'));
+    expect(
+      await sweep(page, [
+        { label: 'larger text, main menu' },
+        { label: 'larger text, Settings', click: '.shell__top [data-action=settings]' },
+        {
+          label: 'larger text, keyboard bindings',
+          click: '[data-setting=bindDevice] [data-value=keyboard]',
+        },
+        ...['assists', 'accessibility', 'display', 'audio', 'graphics'].map((s) => ({
+          label: `larger text, Settings, ${s}`,
+          click: `.settings-screen__tabs [data-tab=${s}]`,
+        })),
+      ]),
+    ).toEqual([]);
+    await press('[data-testid=settings] [data-action=credits]');
+    await expect(page.locator('[data-testid=credits]')).toBeVisible();
+    expect(await sweep(page, [{ label: 'larger text, credits' }])).toEqual([]);
+    await press('[data-testid=credits] [data-action=back]');
+    await press('[data-testid=settings] [data-action=back]');
+    await page.evaluate(() => delete document.documentElement.dataset.text);
     await expect(page.locator('html')).toHaveAttribute('data-screen', 'hub');
     await page.locator('[data-action=mode-online]').click();
     await page.locator('[data-action=start]').click();

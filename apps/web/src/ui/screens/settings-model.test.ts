@@ -1,6 +1,13 @@
-import { controlsFor, defaultBindings, keyControl, padButton } from '@undercut/input';
+import {
+  ANALOG_ACTIONS,
+  DRIVING_BUTTONS,
+  controlsFor,
+  defaultBindings,
+  keyControl,
+  padButton,
+} from '@undercut/input';
 import { describe, expect, it } from 'vitest';
-import { REBINDABLE, rebindSlot, unboundActions } from './settings-model';
+import { REBINDABLE, actionName, rebindSlot, unboundActions } from './settings-model';
 
 describe('rebinding in Settings', () => {
   it('binds a free key and says so', () => {
@@ -53,8 +60,11 @@ describe('rebinding in Settings', () => {
     expect(rebindSlot(keys.map, 'keyboard', 'pause', 0, null).kind).toBe('refused');
   });
 
-  it('lists every driving action a player can rebind, and the defaults bind them all', () => {
-    expect(REBINDABLE).toHaveLength(13);
+  it('lists every driving action the input layer has, and the defaults bind them all', () => {
+    expect(REBINDABLE).toEqual([...ANALOG_ACTIONS, ...DRIVING_BUTTONS]);
+    for (const a of REBINDABLE) expect(actionName(a)).toMatch(/^[A-Z][A-Za-z ]+$/);
+    // An action without a label of its own still reads as words.
+    expect(actionName('boxThisLap' as never)).toBe('Box this lap');
     expect(unboundActions(defaultBindings(), 'keyboard')).toEqual([]);
     expect(unboundActions(defaultBindings(), 'gamepad')).toEqual([]);
   });

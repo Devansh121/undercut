@@ -378,7 +378,8 @@ export const S = {
     pressKey: 'Press a key',
     pressButton: 'Press a button',
     captureKeys: 'Esc cancels. Delete clears the slot.',
-    captureButtons: 'Press the button or move the stick to use. Waits 5 seconds.',
+    captureButtons:
+      'Press the button or move the stick to use. Esc or a click elsewhere cancels; it waits 5 seconds.',
     captureCancelled: 'No change.',
     cleared: (action: string) => `${action}: slot cleared.`,
     bound: (control: string, action: string) => `${control} now does ${action}.`,
@@ -420,6 +421,7 @@ export const S = {
     reducedMotionHint: 'Turns off menu and HUD animation.',
     motionChoices: { system: 'Follow device', on: 'On' },
     textSize: 'Text size',
+    textSizeHint: 'Menus and dialogs. The driving HUD grows with HUD scale.',
     textChoices: { default: 'Standard', large: 'Large', larger: 'Larger' },
     preview: 'Preview',
     previewItems: {

@@ -6,6 +6,8 @@
  * session to fix the bindings.
  */
 import {
+  ANALOG_ACTIONS,
+  DRIVING_BUTTONS,
   clearBinding,
   controlLabel,
   controlsFor,
@@ -17,22 +19,12 @@ import {
 } from '@undercut/input';
 import { S } from '../strings';
 
-/** The actions a player can rebind, in the order the list shows them (driving context). */
-export const REBINDABLE: readonly ActionId[] = [
-  'steerLeft',
-  'steerRight',
-  'throttle',
-  'brake',
-  'gearUp',
-  'gearDown',
-  'drs',
-  'overtake',
-  'pitLimiter',
-  'nextCamera',
-  'lookBack',
-  'resetToTrack',
-  'pause',
-];
+/**
+ * The actions a player can rebind: every driving action the input layer has (the analog
+ * half-axes, then the driving buttons), so a new one appears here as soon as the input package
+ * gains it.
+ */
+export const REBINDABLE: readonly ActionId[] = [...ANALOG_ACTIONS, ...DRIVING_BUTTONS];
 
 /** Actions that must keep a control. */
 const REQUIRED: ReadonlySet<ActionId> = new Set<ActionId>(['pause']);
@@ -49,7 +41,14 @@ export type RebindOutcome =
     }
   | { kind: 'refused'; action: ActionId; slot: number; message: string };
 
-const name = (a: ActionId): string => S.settings.actions[a] ?? a;
+/** An action's name: its label, or its id in words ("boxThisLap" reads "Box this lap"). */
+export function actionName(a: ActionId): string {
+  const label = S.settings.actions[a];
+  if (label) return label;
+  const words = a.replace(/([A-Z])/g, ' $1').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+const name = actionName;
 
 /** Rebindable actions with no control on `device`. */
 export function unboundActions(map: BindingMap, device: DeviceKind): ActionId[] {

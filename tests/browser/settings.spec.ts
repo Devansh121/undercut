@@ -129,12 +129,32 @@ test('a controller rebinds its own buttons and steps the sections on the shoulde
   await expect(slot(page, 'drs', 0).locator('.glyph')).toHaveText('X');
   await expect(slot(page, 'overtake', 0)).toHaveText('Not bound');
 
-  // RB steps to the next section; LB back.
+  // Esc on the keyboard cancels a controller rebinding (it does not wait out the 5 s), and the
+  // next pad press is not taken as the binding.
+  await slot(page, 'nextCamera', 0).focus();
+  await tap(0);
+  await expect(slot(page, 'nextCamera', 0)).toHaveText('Press a button');
+  await page.keyboard.press('Escape');
+  await expect(slot(page, 'nextCamera', 0).locator('.glyph')).toHaveText('B');
+  await expect(page.locator('.settings__notice')).toHaveText('No change.');
+  await expect(page.locator('html')).toHaveAttribute('data-screen', 'settings');
+  // So does a click outside the slots.
+  await tap(0);
+  await expect(slot(page, 'nextCamera', 0)).toHaveText('Press a button');
+  await page.locator('.settings-screen__body').click({ position: { x: 4, y: 4 } });
+  await expect(slot(page, 'nextCamera', 0).locator('.glyph')).toHaveText('B');
+
+  // RB steps to the next section and puts focus on its first control; LB back.
   await tap(5);
   await expect(page.locator('.settings-screen__tabs [data-tab=assists]')).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  expect(
+    await page.evaluate(
+      () => document.activeElement?.closest('[data-section]')?.getAttribute('data-section') ?? null,
+    ),
+  ).toBe('assists');
   await tap(4);
   await expect(page.locator('.settings-screen__tabs [data-tab=controls]')).toHaveAttribute(
     'aria-selected',
@@ -193,4 +213,87 @@ test('accessibility and display settings apply at once and are kept; credits ope
   await expect(credits).not.toContainText(['F', 'IA'].join(''));
   await credits.locator('[data-action=back]').click();
   await expect(html).toHaveAttribute('data-screen', 'settings');
+});
+
+test('the driving HUD keeps its layout at every text size on a phone', async ({
+  drive: { page },
+}) => {
+  test.skip(test.info().project.name !== 'phone', 'the phone HUD (timing tower columns)');
+  const before = page.viewportSize();
+  try {
+    for (const size of [
+      { width: 844, height: 390 },
+      { width: 932, height: 430 },
+    ]) {
+      await page.setViewportSize(size);
+      for (const text of ['large', 'larger']) {
+        await page.evaluate((t) => (document.documentElement.dataset.text = t), text);
+        const problems = await page.evaluate(() => {
+          const out: string[] = [];
+          const rows = [...document.querySelectorAll<HTMLElement>('.hud-tower__row')].filter(
+            (r) => r.getClientRects().length > 0,
+          );
+          if (rows.length === 0) out.push('no tower rows');
+          for (const row of rows) {
+            // The text's own extent: a grid cell shrinks while its text overflows it.
+            const ink = (sel: string): DOMRect | undefined => {
+              const el = row.querySelector(sel);
+              if (!el) return undefined;
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              return range.getBoundingClientRect();
+            };
+            const code = ink('.hud-tower__code');
+            const time = ink('.hud-tower__time');
+            const box = row.getBoundingClientRect();
+            if (!code || !time) continue;
+            if (code.right > time.left + 0.5) out.push(`${row.textContent}: name runs into time`);
+            if (time.right > box.right + 0.5) out.push(`${row.textContent}: time is cut off`);
+          }
+          return out;
+        });
+        expect(problems, `${size.width} x ${size.height}, ${text} text`).toEqual([]);
+      }
+    }
+  } finally {
+    await page.evaluate(() => delete document.documentElement.dataset.text);
+    if (before) await page.setViewportSize(before);
+  }
+});
+
+test('on a wide screen, Up and Down from the top bar and the action bar reach the section', async ({
+  page,
+}) => {
+  test.skip(test.info().project.name !== 'desktop', 'the wide layout');
+  await page.goto('/?quality=lite');
+  await openMenu(page);
+  await openSettings(page);
+  /** Where focus is: the tab strip, the section pane, or elsewhere. */
+  const where = (): Promise<string> =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      if (a?.closest('.settings-screen__tabs')) return 'tabs';
+      if (a?.closest('[data-section]')) return 'pane';
+      return a?.closest('.shell__top') ? 'top' : 'other';
+    });
+  const inPane = (): Promise<string | null> =>
+    page.evaluate(
+      () => document.activeElement?.closest('[data-section]')?.getAttribute('data-section') ?? null,
+    );
+  for (const section of ['controls', 'assists', 'accessibility', 'display', 'audio', 'graphics']) {
+    await page.locator(`.settings-screen__tabs [data-tab=${section}]`).click();
+    await page.locator('.shell__top [data-action=controls]').focus();
+    // Down from the top bar may stop on the section tabs first (they sit between); the next
+    // Down enters the section. It never skips to the action bar. (The menu loop reads the key on
+    // its next frame: poll.)
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(where, { message: `Down from the top bar, ${section}` })
+      .toMatch(/^(tabs|pane)/);
+    if ((await where()).startsWith('tabs')) await page.keyboard.press('ArrowDown');
+    await expect.poll(inPane, { message: `Down from the top bar, ${section}` }).toBe(section);
+    await page.locator('[data-testid=settings] [data-action=credits]').focus();
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(inPane, { message: `Up from Credits, ${section}` }).toBe(section);
+  }
 });

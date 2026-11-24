@@ -24,6 +24,18 @@
   --fs-20: 22px;
 }
 
+/* The driving HUD and the touch controls keep the design sizes: their modules have fixed
+   footprints (the timing tower's columns, the cluster between the touch buttons), and HUD scale
+   is what makes them larger. */
+:root[data-text] :is(.hud, .online-race, .ut-touch) {
+  --fs-10: 10px;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+}
+
 /* ================= Colour-blind-safe flags ================= */
 
 /* Green and red differ in lightness as well as hue (cyan against vermilion); yellow and blue
@@ -52,6 +64,7 @@
 }
 
 .settings-screen__tabs {
+  justify-content: center;
   padding: var(--sp-5) var(--safe-r) var(--sp-2) var(--safe-l);
   overflow-x: auto;
   scrollbar-width: none;
@@ -65,6 +78,9 @@
 
 .settings-pane {
   width: min(880px, 100%);
+  /* Centred, under the top bar's buttons and over the action bar's, so Up and Down from either
+     meet the section's controls. */
+  margin-inline: auto;
   padding: var(--sp-2) var(--sp-6) var(--sp-5);
 }
 
@@ -414,14 +430,39 @@
   }
 }
 
-/* Upright phones: Settings and Controls in the top bar are icons (named by aria-label). */
-@media (max-width: 600px) and (orientation: portrait) {
+/* Phones: Settings and Controls in the top bar are icons (named by aria-label), so the
+   breadcrumb keeps its room at any text size. */
+@media (max-width: 600px) and (orientation: portrait),
+  (max-height: 500px) and (orientation: landscape) {
   .shell__controls {
     width: 44px;
     justify-content: center;
     padding: 0;
   }
   .shell__controls .btn__label {
+    display: none;
+  }
+}
+
+/* Larger text on a phone: the main menu's fixed columns give way. The circuit card's title and
+   stats take the width they need (the plan shrinks beside them), and the menu scrolls instead of
+   cutting off its last rows. */
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
+  :root[data-text] .circuit__hero,
+  :root[data-text] .hub__col--centre .circuit__hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  :root[data-text] .hub__body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* A narrow landscape phone: the breadcrumb shows only where you are, clear of the top bar's
+   buttons (three levels deep on Credits). */
+@media (max-height: 500px) and (max-width: 720px) and (orientation: landscape) {
+  .crumbs > :not(:last-child) {
     display: none;
   }
 }

@@ -33,7 +33,13 @@ import type { NavAction } from '../kit/nav';
 import type { Screen } from '../shell';
 import { S } from '../strings';
 import { effectiveAssists } from './session-settings';
-import { rebindSlot, unboundActions, REBINDABLE, type RebindOutcome } from './settings-model';
+import {
+  actionName,
+  rebindSlot,
+  unboundActions,
+  REBINDABLE,
+  type RebindOutcome,
+} from './settings-model';
 
 const T = S.settings;
 
@@ -130,7 +136,10 @@ export class SettingsScreen implements Screen {
       label: T.sections,
       tabs: SECTIONS.map((id) => ({ id, label: T.section[id] })),
       value: this.section,
-      onChange: (id) => this.show(id as SectionId),
+      onChange: (id) => {
+        this.show(id as SectionId);
+        this.focusPane();
+      },
     });
     this.tabs.root.classList.add('settings-screen__tabs');
     for (const b of this.tabs.root.querySelectorAll<HTMLElement>('[role=tab]')) {
@@ -285,6 +294,16 @@ export class SettingsScreen implements Screen {
       b.tabIndex = b.dataset.tab === id ? 0 : -1;
   }
 
+  /** Focus the shown section's first control (after a section change by LB/RB or a tab). */
+  private focusPane(): void {
+    const pane = this.panes.get(this.section);
+    const first = pane ? [...pane.querySelectorAll<HTMLElement>('[data-nav]')] : [];
+    const target =
+      first.find((el) => el.getAttribute('aria-checked') === 'true') ??
+      first.find((el) => !(el as HTMLButtonElement).disabled);
+    target?.focus({ preventScroll: true });
+  }
+
   private settings(): Readonly<PlayerSettings> {
     return this.deps.prefs.get().settings;
   }
@@ -351,7 +370,7 @@ export class SettingsScreen implements Screen {
       settingRow(T.colourBlind, cb.root, T.colourBlindHint),
       preview,
       settingRow(T.reducedMotion, motion.root, T.reducedMotionHint),
-      settingRow(T.textSize, text.root),
+      settingRow(T.textSize, text.root, T.textSizeHint),
     );
   }
 
@@ -374,10 +393,8 @@ export class SettingsScreen implements Screen {
         { value: 'mph', label: T.unitChoices.mph },
       ],
       value: this.deps.units(),
-      onChange: (v) => {
-        this.deps.setUnits(v);
-        this.setSetting('units', v);
-      },
+      // One store for units (`settings.units`), which the pause menu and the HUD also use.
+      onChange: (v) => this.deps.setUnits(v),
     });
     this.syncers.push(() => {
       scale.set(this.settings().hudScale);
@@ -532,7 +549,7 @@ export class SettingsScreen implements Screen {
       const row = el('div', 'binds__row');
       row.setAttribute('role', 'row');
       row.dataset.action = action;
-      const name = T.actions[action] ?? action;
+      const name = actionName(action);
       const k = el('span', 'binds__action', name);
       k.setAttribute('role', 'rowheader');
       row.append(k);
@@ -665,9 +682,10 @@ export class SettingsScreen implements Screen {
       this.say(T.captureButtons);
     } else {
       this.say(T.captureKeys);
-      window.addEventListener('keydown', this.onCaptureKey, true);
-      window.addEventListener('pointerdown', this.onCapturePointer, true);
     }
+    // Esc and a click elsewhere cancel whichever device is being bound.
+    window.addEventListener('keydown', this.onCaptureKey, true);
+    window.addEventListener('pointerdown', this.onCapturePointer, true);
     this.renderBinds();
     this.focusSlot(action, slot);
   }
@@ -731,7 +749,7 @@ export class SettingsScreen implements Screen {
     this.focusSlot(c.action, c.slot);
     const parts = [c.message];
     if (c.newlyUnbound.length > 0)
-      parts.push(T.nowUnbound(c.newlyUnbound.map((a) => T.actions[a] ?? a).join(', ')));
+      parts.push(T.nowUnbound(c.newlyUnbound.map((a) => actionName(a)).join(', ')));
     if (!saved) parts.push(T.savedNot);
     this.say(parts.join(' '), c.newlyUnbound.length > 0 || !saved ? 'warn' : 'info');
   }

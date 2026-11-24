@@ -110,12 +110,24 @@ export function parseCredits(md: string): Block[] {
   return blocks;
 }
 
-function host(url: string): string {
-  try {
-    return new URL(url).host.replace(/^www\./, '');
-  } catch {
-    return '';
+/**
+ * The host of every web link in a manifest `source_url`, in order. The field is free text where a
+ * file has several sources ("https://… (Overpass query via https://…, fetched …); https://…"), so
+ * each link is cut out before it is parsed: a whole sentence given to `new URL` comes back with its
+ * spaces percent-encoded into the host in some browsers.
+ */
+export function sourceHosts(source: string): string[] {
+  const hosts: string[] = [];
+  for (const link of source.match(/https?:\/\/[^\s;(),]+/g) ?? []) {
+    let h: string;
+    try {
+      h = new URL(link).host.replace(/^www\./, '');
+    } catch {
+      continue;
+    }
+    if (h && !hosts.includes(h)) hosts.push(h);
   }
+  return hosts;
 }
 
 /** Manifest files grouped by author and licence, largest group first. */
@@ -129,8 +141,7 @@ export function groupAssets(manifest: readonly ManifestEntry[]): AssetGroup[] {
       groups.set(key, g);
     }
     g.files += 1;
-    const h = host(e.source_url);
-    if (h && !g.sources.includes(h)) g.sources.push(h);
+    for (const h of sourceHosts(e.source_url)) if (!g.sources.includes(h)) g.sources.push(h);
   }
   return [...groups.values()]
     .filter((g) => !BLOCKED.test(`${g.author} ${g.sources.join(' ')}`))
