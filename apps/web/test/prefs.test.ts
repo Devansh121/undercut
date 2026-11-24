@@ -45,6 +45,8 @@ describe('menu prefs', () => {
           hudScale: 3,
           colourBlind: 'yes',
           subtitles: false,
+          textSize: 'huge',
+          touchLayout: 'mirrored',
           haptics: 'off',
         },
       }),
@@ -63,7 +65,12 @@ describe('menu prefs', () => {
       field: 'equal',
     });
     expect(p.assists.keyboard).toEqual({ tractionControl: 0, abs: 2 });
-    expect(p.settings).toEqual({ ...defaultPrefs().settings, units: 'mph', subtitles: false });
+    // Units are not kept here (their own store), so a saved copy is dropped.
+    expect(p.settings).toEqual({
+      ...defaultPrefs().settings,
+      subtitles: false,
+      touchLayout: 'mirrored',
+    });
   });
 
   it('keeps working in memory when storage fails', async () => {

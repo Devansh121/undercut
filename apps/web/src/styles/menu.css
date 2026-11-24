@@ -1682,6 +1682,12 @@
     height: 44px;
   }
 }
+/* Upright phones: the pit panel's buttons are touch targets too. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .pit-panel .button {
+    min-height: 44px;
+  }
+}
 
 .settings__aside .race-setup-edit {
   width: 24px;
