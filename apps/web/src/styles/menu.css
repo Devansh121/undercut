@@ -1610,6 +1610,17 @@
 .pit-panel .btn .glyph {
   transform: scale(0.85);
 }
+/* Continue is the screen's action after the flag: a full touch target everywhere. On a touch
+   screen every pit-wall button is one (44 px). */
+.pit-panel [data-testid='continue-weekend'] {
+  height: 44px;
+  font-size: var(--fs-12);
+}
+@media (pointer: coarse) {
+  .pit-panel .btn {
+    height: 44px;
+  }
+}
 /* Simulating the rest of a session: the time left and a bar, in place of the button. */
 .sim-progress {
   pointer-events: auto;
