@@ -22,9 +22,9 @@ export function runFollowupRace(circuit: RaceCircuit, seed: number, laps = 1): R
  * so a fix shows (docs/STATUS.md, open gaps). `start`: fails the Quick Race lap-one acceptance
  * (fewer than 18 clean through turn one). `contact`: passes that but has a hard contact (3 m/s
  * or more), which only the recorded-seed test checks. From the follow-up sweep at seeds 101-120
- * and the recorded starts. The repaired 1022 and 7307 cases run as ordinary regressions.
+ * and the recorded starts. The repaired 101, 1022 and 7307 cases run as ordinary regressions.
  */
-const START_GAPS: Partial<Record<RaceCircuit, readonly number[]>> = { monza: [101] };
+const START_GAPS: Partial<Record<RaceCircuit, readonly number[]>> = {};
 const CONTACT_GAPS: Partial<Record<RaceCircuit, readonly number[]>> = {};
 
 export function followupGap(circuit: RaceCircuit, seed: number, contact = false): boolean {

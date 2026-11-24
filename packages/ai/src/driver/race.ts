@@ -820,6 +820,7 @@ export class RaceDriver implements Driver {
     let hi: number;
     let yieldTo: TrafficCar | null = null;
     let yieldDs = Number.POSITIVE_INFINITY;
+    let yieldLaneHeld = false;
     let skipBelow = Number.NEGATIVE_INFINITY;
     for (;;) {
       lo = oMin;
@@ -859,20 +860,20 @@ export class RaceDriver implements Driver {
     }
     if (lo > hi) {
       if (
-        !cornering &&
         yieldTo !== null &&
+        (!cornering || yieldDs < CAR_LENGTH + 2) &&
         yieldTo.speed >= HAZARD_SPEED &&
         !this.hazard &&
         !this.passBypass &&
         !this.recovering
       ) {
-        // Before the planned braking zone, future road bounds cannot pull a yielding car
-        // through the body beside it. Hold its current lane while braking for room; the
-        // existing path constraints take over in the planned braking zone and bend.
+        // Keep the current lane on approach, and until overlapping bodies are clear under
+        // braking. A future road bound cannot pull this car through the one beside it.
         const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
         const hereLo = -(this.at(plan.track.halfWidth[1], s0) - margin) - ldHere;
         const hereHi = this.at(plan.track.halfWidth[0], s0) - margin - ldHere;
         lo = hi = Math.max(hereLo, Math.min(hereHi, myO));
+        yieldLaneHeld = true;
       } else lo = hi = Math.max(oMin, Math.min(oMax, this.o));
     }
     // (A car level or behind that this one gives way to, followed at a crawl, gave way to this
@@ -1295,7 +1296,8 @@ export class RaceDriver implements Driver {
     // In a move the lane is held against the line sweeping under it, and the controller
     // underneath steers for the offset's change as well as for the offset (it would trail the
     // lane by a metre or more, into the other car).
-    const slope = (this.passId >= 0 || hold) && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
+    const slope =
+      (this.passId >= 0 || hold || yieldLaneHeld) && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.

@@ -12,6 +12,16 @@ export function mirrorLane(
   length: number,
   reaction: number,
 ): number {
+  return closingLane(view, target, length, reaction, true);
+}
+
+function closingLane(
+  view: TrafficView,
+  target: number,
+  length: number,
+  reaction: number,
+  behind: boolean,
+): number {
   const current = view.self.d;
   const direction = Math.sign(target - current);
   let lane = target;
@@ -19,14 +29,15 @@ export function mirrorLane(
     const c = view.cars[k]!;
     let ds = (c.s - view.self.s + length) % length;
     if (ds > length / 2) ds -= length;
-    const closing = c.speed - view.self.speed;
-    if (ds >= -5.6 || ds < -40 || closing <= 0) continue;
+    const gap = behind ? -ds : ds;
+    const closing = behind ? c.speed - view.self.speed : view.self.speed - c.speed;
+    if (gap <= 5.6 || (behind && gap > 40) || closing <= 0) continue;
     const across = direction * (c.d - current);
     if (across <= 0) continue;
     const clearance = BODY_HALF_WIDTH + c.halfWidth + 0.8;
     if (direction * (target - c.d) < -clearance) continue;
     const time = Math.min(2, Math.max(0, across - clearance) / 1.5) + reaction + 0.6;
-    if (-ds - 5.6 > closing * time) continue;
+    if (gap - 5.6 > closing * time) continue;
     const edge = c.d - direction * clearance;
     const stop = direction > 0 ? Math.max(current, edge) : Math.min(current, edge);
     lane = direction > 0 ? Math.min(lane, stop) : Math.max(lane, stop);
@@ -34,7 +45,7 @@ export function mirrorLane(
   return lane;
 }
 
-/** Intersect mirror clearance at the present and previewed road positions, in line offsets. */
+/** Intersect closing-traffic clearance ahead and behind, at the present and previewed lanes. */
 export function mirrorOffset(
   view: TrafficView,
   target: number,
@@ -45,10 +56,10 @@ export function mirrorOffset(
 ): number {
   let lo = -Infinity;
   let hi = Infinity;
-  for (let k = 0; k < 2; k++) {
-    const line = k === 0 ? lineHere : lineNext;
+  for (let k = 0; k < 4; k++) {
+    const line = k % 2 === 0 ? lineHere : lineNext;
     const requested = line + target;
-    const safe = mirrorLane(view, requested, length, reaction);
+    const safe = closingLane(view, requested, length, reaction, k < 2);
     if (safe < requested) hi = Math.min(hi, safe - line);
     else if (safe > requested) lo = Math.max(lo, safe - line);
   }

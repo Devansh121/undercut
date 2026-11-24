@@ -162,3 +162,18 @@ describe('mirror clearance while the racing line sweeps', () => {
     expect(offset).toBeLessThanOrEqual(-2.8);
   });
 });
+
+describe('clearance when returning behind a slower car', () => {
+  it('does not cross the forward car corridor before the closing gap permits it', () => {
+    const view = traffic();
+    Object.assign(view.self, { s: 100, d: 4, speed: 34 });
+    Object.assign(view.cars[0]!, { s: 115, d: 0, speed: 24 });
+    expect(mirrorOffset(view, 0, 1000, 0.2, 0, 0)).toBeGreaterThanOrEqual(2.8);
+  });
+  it('allows falling in behind a car that is pulling away', () => {
+    const view = traffic();
+    Object.assign(view.self, { s: 100, d: 4, speed: 24 });
+    Object.assign(view.cars[0]!, { s: 115, d: 0, speed: 34 });
+    expect(mirrorOffset(view, 0, 1000, 0.2, 0, 0)).toBe(0);
+  });
+});
