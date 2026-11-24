@@ -17,12 +17,15 @@ import {
   Vector4,
   WebGLRenderTarget,
   type Camera,
+  type DirectionalLight,
+  type Light,
   type Mesh,
   type Object3D,
   type Scene,
   type WebGLProgramParametersWithUniforms,
   type WebGLRenderer,
 } from 'three';
+import type { Reflected } from '../props/registry';
 import { hash01 } from './dressing';
 
 /**
@@ -36,13 +39,16 @@ import { hash01 } from './dressing';
  * - **Fresnel**: the physical material's own, from the index of refraction of water (F0 2 %):
  *   dark where you look down into it, the sky and skyline where you look across it.
  * - **Reflection**: a planar reflection of the sky dome and the skyline (buildings, stands,
- *   backdrops, floodlight masts; on High also the circuit, ground and trees) rendered from the
+ *   bridges, backdrops; on High and Ultra also the circuit, ground, trees and the street kit's
+ *   walls, masts and trusses), lit by the scene's own lights (markReflected), rendered from the
  *   mirrored camera into a half-float target at a fraction of the frame's resolution, read
  *   through the wave slopes. It replaces the prefiltered environment map's radiance in the
  *   material's own image-based specular term, so the BRDF weights it. At night the lit windows
  *   and lamps are what it reflects. Without a reflection (a preset with it off, or no float
  *   targets) the environment map stands in.
  */
+
+const UP = new Vector3(0, 1, 0);
 
 /** The reflection draws objects on this layer (the main camera keeps layer 0). */
 export const REFLECT_LAYER = 5;
@@ -252,7 +258,7 @@ export class MirrorCamera {
     this.texture.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
     this.texture.multiply(p).multiply(cam.matrixWorldInverse);
     // Oblique near plane: the water plane in the mirrored camera's view space.
-    this.plane.set(new Vector3(0, 1, 0), -level).applyMatrix4(cam.matrixWorldInverse);
+    this.plane.set(UP, -level).applyMatrix4(cam.matrixWorldInverse);
     const c = this.clip.set(
       this.plane.normal.x,
       this.plane.normal.y,
@@ -275,24 +281,28 @@ export class MirrorCamera {
   }
 }
 
-/** Which objects the reflection draws, by name (see the module comment). */
-export function reflectedByName(
-  name: string,
-  scenery: boolean,
-  skyline: (n: string) => boolean,
-): boolean {
-  if (name === 'sky') return true;
-  if (/^world:(buildings|pit-building|stands|bridges|bridge-struct)/.test(name)) return true;
-  if (skyline(name)) return true;
-  if (!scenery) return false;
-  return (
-    name === 'track' ||
-    name.startsWith('world:ground') ||
-    name.startsWith('prop:tree-') ||
-    name.startsWith('prop:floodlight') ||
-    name.startsWith('prop:lighting-truss') ||
-    name.startsWith('prop:street-')
-  );
+/**
+ * Mark what the reflection draws: every object whose `userData.reflect` is 'skyline' (and, with
+ * `scenery`, 'scenery'), with all it holds, set where each kind is made (the sky dome, buildings,
+ * stands, bridges, backdrops; the circuit, ground, trees and street kit). Every light goes on the
+ * reflection's layer too, with a directional light's target: three.js picks a camera's lights by
+ * its layers, so without them the reflected world would be lit by the environment map alone and
+ * compile a second, unlit program per material. Returns the number of objects marked.
+ */
+export function markReflected(root: Object3D, scenery: boolean): number {
+  let marked = 0;
+  root.traverse((o: Object3D) => {
+    const kind = o.userData.reflect as Reflected | undefined;
+    if (kind === 'skyline' || (scenery && kind === 'scenery')) {
+      o.traverse((c) => c.layers.enable(REFLECT_LAYER));
+      marked++;
+    }
+    if ((o as Light).isLight) {
+      o.layers.enable(REFLECT_LAYER);
+      (o as DirectionalLight).target?.layers.enable(REFLECT_LAYER);
+    }
+  });
+  return marked;
 }
 
 /**
@@ -318,8 +328,6 @@ export class WaterSurface {
   constructor(
     level: number,
     private readonly quality: WaterQuality,
-    /** Kit or other objects named for the skyline the reflection always draws. */
-    private readonly skyline: (name: string) => boolean = () => false,
     floatTargets = true,
   ) {
     this.level = level;
@@ -360,6 +368,8 @@ export class WaterSurface {
     });
     m.name = name;
     const u = this.uniforms;
+    // Textures only the compiled shader holds, for the view's texture-memory count.
+    m.userData.surfaceUniforms = u;
     m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
       Object.assign(shader.uniforms, u);
       if (reflect) shader.defines = { ...(shader.defines ?? {}), WATER_REFLECT: '' };
@@ -389,11 +399,7 @@ export class WaterSurface {
 
   private markScene(scene: Scene): void {
     this.marked = true;
-    scene.traverse((o: Object3D) => {
-      if (reflectedByName(o.name, this.quality.scenery, this.skyline)) {
-        o.traverse((c) => c.layers.enable(REFLECT_LAYER));
-      }
-    });
+    markReflected(scene, this.quality.scenery);
   }
 
   private reflect(renderer: WebGLRenderer, scene: Scene, camera: Camera): void {

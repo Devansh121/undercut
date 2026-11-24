@@ -1,6 +1,28 @@
-import { PerspectiveCamera, Vector3 } from 'three';
+import {
+  AmbientLight,
+  BoxGeometry,
+  DirectionalLight,
+  Group,
+  HemisphereLight,
+  type InstancedMesh,
+  type Light,
+  Mesh,
+  MeshBasicMaterial,
+  type Object3D,
+  PerspectiveCamera,
+  PointLight,
+  Scene,
+  Vector3,
+} from 'three';
 import { describe, expect, it } from 'vitest';
-import { MirrorCamera, reflectedByName, SLOPE_RANGE, waveSlopes } from '../src/world/water';
+import { PropRegistry, type Reflected } from '../src/props/registry';
+import {
+  MirrorCamera,
+  REFLECT_LAYER,
+  SLOPE_RANGE,
+  markReflected,
+  waveSlopes,
+} from '../src/world/water';
 
 describe('water waves', () => {
   const n = 64;
@@ -94,17 +116,111 @@ describe('water reflection', () => {
     expect(depth(new Vector3(0, -3, 80))).toBeLessThan(-1);
   });
 
+  /** A scene as the view builds it: flagged objects, unflagged ones, a prop kind, the lights. */
+  function scene(): { scene: Scene; byName: (n: string) => Object3D; lights: Light[] } {
+    const sc = new Scene();
+    const geo = new BoxGeometry();
+    const mat = new MeshBasicMaterial();
+    const mesh = (name: string, reflect?: Reflected): Mesh => {
+      const m = new Mesh(geo, mat);
+      m.name = name;
+      if (reflect) m.userData.reflect = reflect;
+      return m;
+    };
+    const track = new Group();
+    track.name = 'track';
+    track.userData.reflect = 'scenery';
+    track.add(mesh('track-road'));
+    sc.add(
+      mesh('sky', 'skyline'),
+      mesh('world:buildings', 'skyline'),
+      mesh('world:stands', 'skyline'),
+      mesh('world:bridge-struct-0', 'skyline'),
+      mesh('world:ground', 'scenery'),
+      mesh('world:water-0'),
+      mesh('car'),
+      track,
+    );
+    const props = new PropRegistry(1000, 200);
+    const kinds: [string, Reflected | undefined][] = [
+      ['temporary-stand', 'skyline'],
+      ['backdrop-marina-hotel', 'skyline'],
+      ['tree-wood', 'scenery'],
+      ['floodlight-mast', 'scenery'],
+      ['crowd-0', undefined],
+    ];
+    for (const [id, reflect] of kinds) {
+      props.define({ id, reflect, lods: [{ geometry: geo, material: mat, maxDistance: 400 }] });
+      props.place(id, { x: 0, y: 0, z: 0, s: 10 });
+    }
+    props.build();
+    sc.add(props.group);
+    // The sun (CSM: one directional light per cascade, each with its target), the pooled lamps,
+    // the fill.
+    const lights: Light[] = [];
+    for (let i = 0; i < 3; i++) {
+      const sun = new DirectionalLight();
+      sc.add(sun, sun.target);
+      lights.push(sun);
+    }
+    for (let i = 0; i < 8; i++) lights.push(new PointLight());
+    lights.push(new HemisphereLight(), new AmbientLight());
+    for (const l of lights.slice(3)) sc.add(l);
+    const byName = (n: string): Object3D => {
+      const o = sc.getObjectByName(n);
+      if (!o) throw new Error(`no ${n}`);
+      return o;
+    };
+    return { scene: sc, byName, lights };
+  }
+  const mirror = new PerspectiveCamera();
+  mirror.layers.set(REFLECT_LAYER);
+  const seen = (o: Object3D): boolean => o.layers.test(mirror.layers);
+
   it('reflects the sky and the skyline everywhere, the circuit and trees only with scenery', () => {
-    const kit = (n: string): boolean => n.startsWith('prop:marina-');
-    for (const name of ['sky', 'world:buildings-3', 'world:stands', 'prop:marina-hotel']) {
-      expect(reflectedByName(name, false, kit), name).toBe(true);
+    for (const scenery of [false, true]) {
+      const { scene: sc, byName } = scene();
+      markReflected(sc, scenery);
+      const skyline = ['sky', 'world:buildings', 'world:stands', 'world:bridge-struct-0'];
+      for (const n of [...skyline, 'prop:temporary-stand', 'prop:backdrop-marina-hotel'])
+        expect(seen(byName(n)), n).toBe(true);
+      for (const n of [
+        'world:ground',
+        'track',
+        'track-road',
+        'prop:tree-wood',
+        'prop:floodlight-mast',
+      ])
+        expect(seen(byName(n)), `${n} scenery ${scenery}`).toBe(scenery);
+      for (const n of ['world:water-0', 'car', 'prop:crowd-0'])
+        expect(seen(byName(n)), n).toBe(false);
     }
-    for (const name of ['track', 'world:ground-2', 'prop:tree-wood', 'prop:floodlight-mast']) {
-      expect(reflectedByName(name, false, kit), name).toBe(false);
-      expect(reflectedByName(name, true, kit), name).toBe(true);
+  });
+
+  it('lights the reflection with every light the view itself has', () => {
+    const { scene: sc, lights } = scene();
+    markReflected(sc, false);
+    const main = new PerspectiveCamera();
+    // three.js collects a camera's lights by its layers: both passes must collect the same set,
+    // so a reflected material is lit as it is in the frame and needs no second program.
+    const lit = (cam: PerspectiveCamera): number => {
+      let n = 0;
+      sc.traverse((o) => {
+        if ((o as Light).isLight && o.layers.test(cam.layers)) n++;
+      });
+      return n;
+    };
+    expect(lit(main)).toBe(lights.length);
+    expect(lit(mirror)).toBe(lit(main));
+    for (const l of lights) {
+      const target = (l as DirectionalLight).target;
+      if (target) expect(seen(target)).toBe(true);
     }
-    for (const name of ['world:water-0', 'prop:crowd', 'fleet', 'car']) {
-      expect(reflectedByName(name, true, kit), name).toBe(false);
-    }
+    // Every prop instance mesh of a reflected kind is marked, whatever its chunk or level.
+    const stands = sc.children
+      .flatMap((c) => c.children)
+      .filter((c) => c.name === 'prop:temporary-stand') as InstancedMesh[];
+    expect(stands.length).toBeGreaterThan(0);
+    for (const m of stands) expect(seen(m)).toBe(true);
   });
 });

@@ -488,6 +488,7 @@ export class CircuitWorld {
     terrain.chunks.forEach((cg, ci) => {
       const groundMesh = new Mesh(cg, ground);
       groundMesh.name = ci === 0 ? 'world:ground' : `world:ground-${ci}`;
+      groundMesh.userData.reflect = 'scenery';
       groundMesh.receiveShadow = true;
       groundMesh.matrixAutoUpdate = false;
       this.geometries.push(cg);
@@ -504,13 +505,7 @@ export class CircuitWorld {
     let largest = this.water[0] as WaterBody;
     const area = (b: WaterBody): number => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]);
     for (const b of this.water) if (area(b) > area(largest)) largest = b;
-    const backdrops = (this.theme.street?.backdrops ?? []).map((b) => `prop:${b.id}`);
-    const surface = new WaterSurface(
-      largest.level,
-      quality.world.water,
-      (name) => backdrops.some((id) => name.startsWith(id)),
-      quality.post,
-    );
+    const surface = new WaterSurface(largest.level, quality.world.water, quality.post);
     this.waterSurface = surface;
     this.water.forEach((b, wi) => {
       const g = waterGeometry(b);
@@ -621,6 +616,7 @@ export class CircuitWorld {
         this.geometries.push(ch.geometry);
         const mesh = new Mesh(ch.geometry, mat);
         mesh.name = ci === 0 ? 'world:pit-building' : `world:pit-building-${ci}`;
+        mesh.userData.reflect = 'skyline';
         mesh.castShadow = quality.sceneryShadows;
         mesh.receiveShadow = true;
         mesh.matrixAutoUpdate = false;
@@ -838,6 +834,7 @@ export class CircuitWorld {
           const nearId = `${k.id}-near-${id}`;
           props.define({
             id: nearId,
+            reflect: 'scenery',
             // Small cells: the levels go by a cell's near edge, and each kit conifer is
             // thousands of triangles, so a cell should not reach far past the swap distance.
             gridCell: NEAR_CONIFER_CELL,
@@ -860,6 +857,7 @@ export class CircuitWorld {
         this.materials.push(cm.material, cm.depth);
         props.define({
           id: `${k.id}-near`,
+          reflect: 'scenery',
           gridCell: 120,
           // The cards cast every tree's shadow (see treeMaterials).
           castShadow: false,
@@ -879,6 +877,7 @@ export class CircuitWorld {
       }
       props.define({
         id: k.id,
+        reflect: 'scenery',
         gridCell: 320,
         castShadow: quality.sceneryShadows,
         shadowMaxDistance: 170,
@@ -1046,6 +1045,7 @@ export class CircuitWorld {
         if (!lods) continue;
         o.props.define({
           id: `backdrop-${id}`,
+          reflect: 'skyline',
           castShadow: o.quality.sceneryShadows,
           shadowMaxDistance: 220,
           receiveShadow: true,
@@ -1093,6 +1093,7 @@ export class CircuitWorld {
       this.geometries.push(ch.geometry);
       const mesh = new Mesh(ch.geometry, mat);
       mesh.name = ci === 0 ? 'world:buildings' : `world:buildings-${ci}`;
+      mesh.userData.reflect = 'skyline';
       mesh.castShadow = o.quality.sceneryShadows;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
@@ -1115,6 +1116,7 @@ export class CircuitWorld {
       this.geometries.push(ch.geometry);
       const mesh = new Mesh(ch.geometry, standMat);
       mesh.name = ci === 0 ? 'world:stands' : `world:stands-${ci}`;
+      mesh.userData.reflect = 'skyline';
       mesh.castShadow = o.quality.sceneryShadows;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;

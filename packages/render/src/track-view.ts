@@ -87,6 +87,8 @@ export class TrackView {
   constructor(options: TrackViewOptions) {
     const { track, quality } = options;
     this.group.name = 'track';
+    // In the water's reflection where the preset reflects the circuit (world/water.ts).
+    this.group.userData.reflect = 'scenery';
     const meshes = buildTrackMeshes(track, MESH_LOD[quality.meshLod]);
     const mat = this.buildMaterials(options);
     const add = (data: MeshData, name: string, receive = true, cast = false): void => {

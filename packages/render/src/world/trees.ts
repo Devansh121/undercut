@@ -329,6 +329,8 @@ export function treeMaterials(
     envMapIntensity: 0.8,
   });
   material.name = relief ? `tree-${key}-relief` : `tree-${key}`;
+  // The relief atlas only reaches the compiled shader: listed for the texture-memory count.
+  if (relief) material.userData.surfaceUniforms = { uTreeReliefMap: { value: relief.map } };
   material.onBeforeCompile = colourHook;
   material.customProgramCacheKey = () =>
     `tree-v2-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
