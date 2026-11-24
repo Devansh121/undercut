@@ -252,7 +252,7 @@ export function facadeMaterial(night = false, variety = false): MeshStandardMate
           // Lit window by window at random, a tower read as speckle. The choices go to their
           // expected values as what they decide shrinks below about two pixels (windows first,
           // then blocks), so a distant tower and its reflection never turn into pixel noise.
-          // aaw is twice the windows per pixel: a window spans 4 px at 0.5, 2 px at 1.0.
+          // aaw is twice the grid cells per pixel: a cell spans 4 px at 0.5, 2 px at 1.0.
           float avg = smoothstep(0.5, 1.0, aaw);
           // A block is one floor tall: it goes to the average after its windows, from 3 px tall.
           float avgBlock = smoothstep(0.7, 1.4, aaw);

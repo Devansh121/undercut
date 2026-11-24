@@ -917,7 +917,7 @@ async function lifecycle(browser, report) {
 const TREE_SWAP_TOLERANCE = 0.1;
 /** Frames drawn before the first capture of a pose, and captures averaged per state. */
 const TREE_SWAP_SETTLE = 90;
-const TREE_SWAP_FRAMES = 6;
+const TREE_SWAP_FRAMES = 12;
 /**
  * Per circuit: the lighting each is checked under, its own (the menu's first choice) and one
  * more. Spa is only offered overcast; the afternoon sun is the harder second case there (night
@@ -1009,6 +1009,9 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
     await onCircuit(context);
     const page = await context.newPage();
     page.on('pageerror', (e) => problems.push(e.message));
+    page.on('console', (m) => {
+      if (m.type() === 'error') problems.push(m.text());
+    });
     await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high${tod}`);
     await page.waitForFunction(() => Boolean(globalThis.__undercut));
     await page.evaluate(() => globalThis.__undercut.start());
@@ -1017,6 +1020,15 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
       null,
       { timeout: 120_000 },
     );
+    // A frozen sim still uses real time for camera shake, wind and waves. Hold that
+    // animation clock too: otherwise each state moves the camera and a different tree
+    // silhouette decides the changed-pixel mask on every run. Keep real dt for settling
+    // the camera, lamp pool and exposure, and keep rendering all normal passes.
+    await page.evaluate(() => {
+      const view = globalThis.__undercut.view();
+      const render = view.render.bind(view);
+      view.render = (frame) => render({ ...frame, time: 0 });
+    });
     const poses = SWAP_POSES[circuit];
     const swap = await page.evaluate(() => globalThis.__undercut.treeSwap());
     for (const [name, set] of Object.entries(poses)) {
@@ -1113,7 +1125,15 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
       (c) => c.swap > 0 && (mode === 'relief' || Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE),
     );
   const key = mode === 'swap' ? 'treeSwapCheck' : 'treeReliefCheck';
-  report[key] = { ok, tolerance: mode === 'swap' ? TREE_SWAP_TOLERANCE : null, cases, problems };
+  report[key] = {
+    ok,
+    tolerance: mode === 'swap' ? TREE_SWAP_TOLERANCE : null,
+    settleFrames: TREE_SWAP_SETTLE,
+    framesPerState: TREE_SWAP_FRAMES,
+    animationTime: 0,
+    cases,
+    problems,
+  };
   const [a, b] = mode === 'swap' ? ['near', 'cards'] : ['relief', 'plain'];
   for (const c of cases)
     console.log(

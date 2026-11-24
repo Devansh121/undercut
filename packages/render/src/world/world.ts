@@ -158,10 +158,10 @@ const FAR_DECALS = 900;
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
 const WOOD_DENSITY = 1 / 42;
 /**
- * The kit conifers' colour against the spruce cards they take over from at the swap distance:
- * at 1 they measured 12–15% lighter (by day and under floodlights).
+ * Linear tone calibration of the kit conifers against the spruce cards they replace, measured
+ * with a fixed animation clock and interleaved captures at the swap distance.
  */
-const NEAR_CONIFER_TONE = 0.8;
+const NEAR_CONIFER_TONE = 0.7;
 /** Grid cell of the near kit conifers, m, and the distance (cell near edge) of their finest level. */
 const NEAR_CONIFER_CELL = 60;
 const NEAR_CONIFER_HIGH = 20;
@@ -850,7 +850,7 @@ export class CircuitWorld {
         const cm = treeCloudMaterials(
           atlas,
           k.id,
-          { wind: wq.wind, coverage },
+          { wind: wq.wind, coverage, tiles: k.tiles, clusterTints: atlases.clusterTints },
           mats.time,
           this.treeSwap,
         );
