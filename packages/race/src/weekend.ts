@@ -35,7 +35,7 @@ export class RaceWeekend {
     const out: SessionSpec[] = [];
     if (this.plan.practice !== null) out.push({ kind: 'practice', duration: this.plan.practice });
     out.push({ kind: 'qualifying', duration: this.plan.qualifying });
-    const race: SessionSpec = { kind: 'race', laps: this.plan.raceLaps };
+    const race: SessionSpec = { kind: 'race', laps: this.plan.raceLaps, twoCompoundRule: true };
     if (this.plan.raceTimeLimit !== undefined) race.timeLimit = this.plan.raceTimeLimit;
     out.push(race);
     return out;

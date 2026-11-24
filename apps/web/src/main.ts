@@ -1,3 +1,6 @@
+import { WeekendProgress } from './game/weekend';
+import { WeekendScreen } from './ui/screens/weekend';
+import type { SessionResult } from '@undercut/race';
 import { registerOffline } from './pwa/register';
 import { showHomeScreenHint } from './pwa/home-screen-hint';
 import '../../../design/mock/tokens.css';
@@ -116,7 +119,8 @@ const hub: HubScreen = new HubScreen({
     // The Start press is the gesture that may start audio: the context starts here, silent,
     // so it may play once the session has loaded (iOS Safari allows no later start).
     audio.prime();
-    start(choice).catch(() => undefined);
+    if (choice.mode === 'weekend' || choice.mode === 'championship') void showWeekend(choice);
+    else start(choice).catch(() => undefined);
   },
   onOnline: () => {
     // Not primed here: creating the context on this press stalled WebKit's page (the phone-fit
@@ -145,6 +149,44 @@ function showMenus(screen: 'launch' | 'hub'): void {
   }
   hub.setLoading(false);
   menuInput.start();
+}
+
+let season: WeekendProgress | null = await WeekendProgress.load(webStorage);
+async function showWeekend(choice: SessionChoice): Promise<void> {
+  const progress =
+    choice.mode === 'championship'
+      ? (season ??= new WeekendProgress(choice, choice.laps ?? 5))
+      : new WeekendProgress(choice, choice.laps ?? 5);
+  // Browser flow fixture: the real timed-session rules with a short clock.
+  const testDuration = debugEnabled() ? Number(params.get('weekendDuration')) : NaN;
+  if (testDuration > 0 && testDuration <= 1080) progress.weekend.plan.qualifying = testDuration;
+  const testPractice = debugEnabled() ? Number(params.get('practiceDuration')) : NaN;
+  if (testPractice > 0 && testPractice <= 300 && progress.weekend.plan.practice !== null)
+    progress.weekend.plan.practice = testPractice;
+  await progress.save(webStorage);
+  const screen = new WeekendScreen(
+    progress,
+    webStorage,
+    (nextChoice, options, complete) => {
+      // The weekend screen's Start press is the gesture for this session's sound, as on the hub.
+      audio.prime();
+      start(
+        nextChoice,
+        undefined,
+        () => {
+          shell.mount();
+          screen.enter();
+          menuInput.start();
+        },
+        options,
+        complete,
+      ).catch(() => undefined);
+    },
+    () => {
+      shell.pop();
+    },
+  );
+  shell.push(screen);
 }
 
 /** The choice on the main menu now (the debug API starts with it). */
@@ -203,7 +245,12 @@ function showOnline(code: string | null): void {
 }
 
 /** A Quick Race to start again as soon as the current one has quit (Restart race). */
-let restartWith: { choice: SessionChoice; quickRace: QuickRaceOptions } | null = null;
+let restartWith: {
+  choice: SessionChoice;
+  quickRace: QuickRaceOptions;
+  quit?: () => void;
+  complete?: (result: SessionResult) => void;
+} | null = null;
 
 /**
  * Start a session from the menus' choice: a Quick Race (`choice.mode`, or race options from the
@@ -214,12 +261,19 @@ async function start(
   extension?: DriveExtension,
   quit?: () => void,
   raceOptions?: QuickRaceOptions,
+  onSessionComplete?: (result: SessionResult) => void,
 ): Promise<DriveHandle> {
-  const quickRace = raceOptions ?? (choice.mode === 'quickRace' ? {} : undefined);
-  if (drive) return drive;
-  if (starting) return starting;
+  const quickRace =
+    raceOptions ?? (choice.mode === 'quickRace' ? { laps: choice.laps ?? 5 } : undefined);
+  if (drive && !drive.closed) return drive;
+  drive = null;
+  if (starting) {
+    await starting.catch(() => undefined);
+    return drive ?? start(choice, extension, quit, raceOptions, onSessionComplete);
+  }
   if (!extension) hub.setLoading(true);
   menuInput.stop();
+  let active = true;
   starting = (async () => {
     try {
       driveModule ??= await import('./drive');
@@ -238,11 +292,28 @@ async function start(
         touch,
         seed: crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
         today: today(),
-        ...(quickRace ? { quickRace } : {}),
+        ...(quickRace
+          ? {
+              quickRace: {
+                ...quickRace,
+                automaticPitLimiter: prefs.get().race.automaticPitLimiter,
+              },
+            }
+          : {}),
+        onPitLimiter: (value) =>
+          prefs.update((p) => {
+            p.race.automaticPitLimiter = value;
+          }),
+        ...(onSessionComplete ? { onSessionComplete } : {}),
         ...(quickRace
           ? {
               onRestartRace: () => {
-                restartWith = { choice, quickRace };
+                restartWith = {
+                  choice,
+                  quickRace,
+                  ...(quit ? { quit } : {}),
+                  ...(onSessionComplete ? { complete: onSessionComplete } : {}),
+                };
                 drive?.quit();
               },
             }
@@ -265,11 +336,14 @@ async function start(
             }),
         },
         onQuit: () => {
+          active = false;
           drive = null;
           if (restartWith) {
             const again = restartWith;
             restartWith = null;
-            start(again.choice, undefined, undefined, again.quickRace).catch(() => undefined);
+            start(again.choice, undefined, again.quit, again.quickRace, again.complete).catch(
+              () => undefined,
+            );
           } else if (quit) {
             // Back to the online screens, on the menu input.
             menuInput.start();
@@ -277,7 +351,7 @@ async function start(
           } else showMenus('hub');
         },
       });
-      drive = handle;
+      if (active) drive = handle;
       return handle;
     } catch (error) {
       if (error instanceof Error && error.name === 'LoadCancelled') {

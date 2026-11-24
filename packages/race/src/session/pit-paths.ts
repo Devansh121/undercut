@@ -27,6 +27,7 @@ export function pitInPath(
   fromS: number,
   fromD: number,
   box: { s: number; d: number },
+  fromPitS?: number,
 ): FollowPoint[] {
   const L = track.length;
   const pit = track.pit;
@@ -41,7 +42,7 @@ export function pitInPath(
     { s: 0, d: 0, index: -1 },
   );
   const run = forward(L, fromS, start.s);
-  if (run < L / 2) {
+  if (fromPitS === undefined && run < L / 2) {
     for (let x = 0; x < run; x += STEP) {
       const d = fromD + (start.d - fromD) * smooth(x / run);
       track.lap.pointAt(fromS + x, d, v);
@@ -49,7 +50,7 @@ export function pitInPath(
     }
   }
   const turnIn = Math.max(circuit.pit.limitStart + 5, box.s - 25);
-  for (let sp = 0; sp <= box.s; sp += STEP) {
+  for (let sp = fromPitS ?? 0; sp <= box.s; sp += STEP) {
     const d = sp < turnIn ? 0 : box.d * smooth((sp - turnIn) / (box.s - turnIn));
     pit.path.pointAt(sp, d, v);
     out.push({ x: v.x, z: v.z, v: sp >= circuit.pit.limitStart - 15 ? limit : Infinity });

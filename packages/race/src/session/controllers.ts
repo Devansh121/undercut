@@ -57,7 +57,7 @@ export interface ControlContext {
 export interface CarController {
   readonly kind: 'human' | 'ai';
   /** The session engages the pit limiter for this car in the pit lane. */
-  readonly autoLimiter: boolean;
+  autoLimiter: boolean;
   control(ctx: ControlContext, out: ControlInput): void;
   /** Forget carried state (after a teleport). */
   reset(): void;
@@ -68,6 +68,7 @@ export interface CarController {
 
 /** A controller's carried state, as plain JSON. */
 export interface ControllerState {
+  autoLimiter?: boolean;
   driver?: DriverMemory;
   launching?: boolean;
   launchCap?: number;
@@ -139,6 +140,7 @@ class PitLaneDriving {
 
   /** Hand the car back as soon as it leaves the pit lane (a racing driver that can rejoin). */
   readonly handBackOnExit: boolean;
+  manualEntry = false;
 
   constructor(params: CarParams, takeover = 120, handBackOnExit = false) {
     this.follower = new PathFollower(params);
@@ -190,7 +192,24 @@ class PitLaneDriving {
     // way out of the run-off, and the car stood there until retired.)
     const onRoad =
       Math.abs(f.d) <= ctx.track.halfWidthAt(ctx.track.wrap(f.s), f.d >= 0 ? 0 : 1) + 1;
-    if (this.mode === 'none' && c.pitRequested(i) && phase === 'none' && !f.inPitLane && onRoad) {
+    if (this.mode === 'none' && this.manualEntry && phase === 'lane' && c.pitRequested(i)) {
+      const box = c.pitBox(i);
+      if (box && f.pitS > box.s + ctx.control.rules.boxToleranceS) {
+        c.cancelPit(i);
+      } else if (box) {
+        this.mode = 'in';
+        this.follower.reset();
+        this.follower.setPath(pitInPath(ctx.track, ctx.circuit, f.s, f.d, box, f.pitS), true);
+      }
+    }
+    if (
+      !this.manualEntry &&
+      this.mode === 'none' &&
+      c.pitRequested(i) &&
+      phase === 'none' &&
+      !f.inPitLane &&
+      onRoad
+    ) {
       const toEntry = forward(L, f.s, ctx.circuit.pit.entryS);
       if (toEntry < this.takeover) {
         const box = c.pitBox(i);
@@ -347,6 +366,7 @@ export class AiController implements CarController {
       c.s = f.s;
       c.d = f.d;
       c.speed = f.speed;
+      c.pitApproach = ctx.control.pitRequested(j) && !f.inPitLane;
       // The footprint across the track: half its width aligned, up to half its length across.
       const h = f.heading;
       c.halfWidth =
@@ -442,16 +462,22 @@ export class AiController implements CarController {
  */
 export class InputController implements CarController {
   readonly kind = 'human' as const;
-  readonly autoLimiter: boolean;
+  autoLimiter: boolean;
   private readonly source: (ctx: ControlContext, out: ControlInput) => void;
   private readonly pit: PitLaneDriving | null;
 
   constructor(
     source: (ctx: ControlContext, out: ControlInput) => void,
-    o: { params?: CarParams; assistedPitLane?: boolean; autoLimiter?: boolean } = {},
+    o: {
+      params?: CarParams;
+      assistedPitLane?: boolean;
+      autoLimiter?: boolean;
+      manualPitEntry?: boolean;
+    } = {},
   ) {
     this.source = source;
     this.pit = o.assistedPitLane && o.params ? new PitLaneDriving(o.params) : null;
+    if (this.pit) this.pit.manualEntry = o.manualPitEntry ?? false;
     this.autoLimiter = o.autoLimiter ?? o.assistedPitLane ?? false;
   }
 
@@ -461,17 +487,22 @@ export class InputController implements CarController {
 
   /** The assisted pit lane's state; the player's own input carries nothing here. */
   snapshot(): ControllerState {
-    return { pit: this.pit ? this.pit.getState() : null };
+    return { pit: this.pit ? this.pit.getState() : null, autoLimiter: this.autoLimiter };
   }
 
   restore(s: ControllerState): void {
+    if (s.autoLimiter !== undefined) this.autoLimiter = s.autoLimiter;
     if (this.pit && s.pit) this.pit.setState(s.pit);
   }
 
   control(ctx: ControlContext, out: ControlInput): void {
     // Only the player's assists set a per-wheel brake; the assisted pit lane never does.
     out.wheelBrake = undefined;
-    if (this.pit?.drive(ctx, out)) return;
     this.source(ctx, out);
+    const limiter = out.pitLimiter;
+    if (this.pit?.drive(ctx, out)) {
+      out.wheelBrake = undefined;
+      out.pitLimiter = this.autoLimiter ? ctx.control.limiterZone(ctx.car) : limiter;
+    }
   }
 }
