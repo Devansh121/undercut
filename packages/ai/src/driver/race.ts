@@ -1316,8 +1316,7 @@ export class RaceDriver implements Driver {
     // lock-up feel backs the pedal off further than the demand would have.
     limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
     this.inner.accelLimit = limit;
-    this.inner.speedAllowance =
-      !cornering && this.attacking() && v > LAUNCHED ? 4 : 0;
+    this.inner.speedAllowance = !cornering && this.attacking() && v > LAUNCHED ? 4 : 0;
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
     // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays
