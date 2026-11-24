@@ -245,17 +245,28 @@ export function facadeMaterial(night = false, variety = false): MeshStandardMate
           float rnd = fract(sin(bay * 12.9898 + floorIdx * 78.233) * 43758.5453);
           // Where the window grid is finer than a pixel, show its average instead of nothing:
           // about a fifth of the facade is dark glass and frames.
-          float aaw = fwidth(cell.x) * 2.0;
+          float aaw = max(fwidth(cell.x), fwidth(cell.y)) * 2.0;
           win = mix(win, 0.2 * step(0.0, floorIdx), smoothstep(0.25, 0.6, aaw));
-          // Some shutters closed.
-          float shut = step(0.72, rnd);
+          // At night offices are lit a floor section at a time: blocks of 6 bays along a floor are
+          // mostly on (82 % of their windows) or mostly off (20 %), windows varying within.
+          // Lit window by window at random, a tower read as speckle. The choices go to their
+          // expected values as what they decide shrinks below about two pixels (windows first,
+          // then blocks), so a distant tower and its reflection never turn into pixel noise.
+          // aaw is twice the windows per pixel: a window spans 4 px at 0.5, 2 px at 1.0.
+          float avg = smoothstep(0.5, 1.0, aaw);
+          // A block is one floor tall: it goes to the average after its windows, from 3 px tall.
+          float avgBlock = smoothstep(0.7, 1.4, aaw);
+          float rblk = fract(sin(dot(floor(vec2(bay / 6.0, floorIdx)), vec2(27.13, 61.71))) * 43758.5453);
+          float blockLit = mix(mix(0.2, 0.82, step(0.45, rblk)), 0.54, avgBlock);
+          // Some shutters closed (28 %).
+          float shut = mix(step(0.72, rnd), 0.28, avg);
           vec3 glass = vec3(0.035, 0.04, 0.045);
           vec3 shutter = shutterCol;
           diffuseColor.rgb = mix(diffuseColor.rgb, mix(glass, shutter, shut), win);
           facadeGlass = win * (1.0 - shut);
-          // At night about half the windows are lit, warm; whole floors of some bays dark.
+          // At night about half the windows are lit, warm, by blocks (above).
           float rnd2 = fract(sin(bay * 39.346 + floorIdx * 11.135) * 24634.6345);
-          facadeLit = win * (1.0 - shut) * step(0.48, rnd2);
+          facadeLit = win * (1.0 - shut) * mix(step(rnd2, blockLit), blockLit, avg);
           // Plinth and dirt toward the ground.
           diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.3, 1.0, vFacade.y));
         }`,
@@ -270,7 +281,7 @@ export function facadeMaterial(night = false, variety = false): MeshStandardMate
         '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.8, 0.52) * 1.6 * facadeLit;',
       );
   };
-  m.customProgramCacheKey = () => `facade-v1${night ? '-night' : ''}${variety ? '-varied' : ''}`;
+  m.customProgramCacheKey = () => `facade-v4${night ? '-night' : ''}${variety ? '-varied' : ''}`;
   return m;
 }
 
