@@ -67,6 +67,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 // GPU-backed WebGL in headless Chromium through ANGLE on EGL.
 const GPU_ARGS = [
+  '--mute-audio',
   '--use-gl=angle',
   '--use-angle=gl-egl',
   '--ignore-gpu-blocklist',
