@@ -615,7 +615,7 @@ export class SettingsScreen implements Screen {
     });
     const foot = el('div', 'settings__foot');
     foot.append(reset);
-    this.bindsHost.replaceChildren(table, settingRow(T.drsMode, drs.root), foot);
+    this.bindsHost.replaceChildren(table, settingRow(T.drsMode, drs.root), this.hapticsRow(), foot);
     this.warnUnbound();
   }
 
@@ -655,7 +655,19 @@ export class SettingsScreen implements Screen {
       el('p', 'settings__lede', T.touchFixed),
       settingRow(T.touchLayout, layout.root, T.touchLayoutHint),
       settingRow(T.stickTravel, travel.root, T.stickTravelHint),
+      this.hapticsRow(),
     );
+  }
+
+  /** Rumble and phone vibration, the same setting as the pause menu's. */
+  private hapticsRow(): HTMLElement {
+    const t = toggle({
+      label: S.pause.haptics,
+      id: 'haptics',
+      value: this.settings().haptics,
+      onChange: (v) => this.setSetting('haptics', v),
+    });
+    return settingRow(S.pause.haptics, t.root, S.pause.hapticsHelp);
   }
 
   private say(text: string, tone: 'info' | 'warn' = 'info'): void {

@@ -190,6 +190,10 @@ test('accessibility and display settings apply at once and are kept; credits ope
   await page.keyboard.press('ArrowRight');
   await expect(scale).toHaveAttribute('aria-valuenow', '1.05');
   await page.locator('[data-setting=units] [data-value=mph]').click();
+  // Vibration (the pause menu's setting too) is under Controls.
+  await page.locator('.settings-screen__tabs [data-tab=controls]').click();
+  await page.locator('[data-setting=haptics]').click();
+  await expect(page.locator('[data-setting=haptics]')).toHaveAttribute('aria-checked', 'false');
 
   await page.reload();
   await expect(html).toHaveAttribute('data-cb', 'on');
@@ -202,6 +206,8 @@ test('accessibility and display settings apply at once and are kept; credits ope
   await openSettings(page);
   await page.locator('.settings-screen__tabs [data-tab=display]').click();
   await expect(page.locator('[data-setting=units] [aria-checked=true]')).toHaveText('mph');
+  await page.locator('.settings-screen__tabs [data-tab=controls]').click();
+  await expect(page.locator('[data-setting=haptics]')).toHaveAttribute('aria-checked', 'false');
 
   await page.locator('[data-testid=settings] [data-action=credits]').click();
   const credits = page.locator('[data-testid=credits]');
