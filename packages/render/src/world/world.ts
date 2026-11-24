@@ -57,7 +57,7 @@ import {
 } from './pit-building';
 import { buildSurfaceDecals } from './surface-decals';
 import type { LocalLight } from '../lighting/light-pool';
-import { pickBackdrops, placeStreetCircuit, windowMaterial } from './street';
+import { pickBackdrops, placeBackdrops, placeStreetCircuit, windowMaterial } from './street';
 import {
   buildTerrain,
   TERRAIN_HIGH,
@@ -1035,32 +1035,7 @@ export class CircuitWorld {
     if (kit && backdrops.length > 0) {
       const windows = windowMaterial(o.night ?? false);
       this.materials.push(windows);
-      for (const id of new Set(backdrops.map((b) => b.kitId))) {
-        const lods = kit.lodsFor(id, {
-          materialOverrides: { 'window-emissive-mask': windows },
-          // Seen across the city: as far as the mapped buildings.
-          maxDistanceScale: 3.4,
-          distanceCaps: [80, 300, FAR_BUILDINGS],
-        });
-        if (!lods) continue;
-        o.props.define({
-          id: `backdrop-${id}`,
-          reflect: 'skyline',
-          castShadow: o.quality.sceneryShadows,
-          shadowMaxDistance: 220,
-          receiveShadow: true,
-          lods,
-        });
-      }
-      for (const b of backdrops)
-        o.props.place(`backdrop-${b.kitId}`, {
-          x: b.x,
-          y: b.y,
-          z: b.z,
-          yaw: b.yaw,
-          scale: b.scale,
-          s: b.s,
-        });
+      placeBackdrops(o.props, kit, backdrops, windows, o.quality.sceneryShadows, FAR_BUILDINGS);
       this.counts.backdrops = backdrops.length;
     }
     const { chunks, count } = buildBuildingChunks(
