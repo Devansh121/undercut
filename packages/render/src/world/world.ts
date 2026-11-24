@@ -1220,7 +1220,9 @@ export class CircuitWorld {
           lods: [{ geometry: g, material: mats, maxDistance: 650 }],
         });
       }
-      const nearMat = createPropKitMaterial({ swayTime: this.crowdTime });
+      // Without the kit's grain: clothes are flat-coloured, and the grain's per-fragment hashes were
+      // the near crowd's dearest part.
+      const nearMat = createPropKitMaterial({ swayTime: this.crowdTime, grain: false });
       crowdSwapMaterial(nearMat, this.crowdEye, true);
       this.materials.push(nearMat);
       for (let v = 0; v < variants; v++) {
