@@ -407,7 +407,7 @@ export interface CloudShape {
  * already matched to the cards' painted mean, occlusion included, so this is only the extra
  * depth of the near crown (the tree-swap check: near trees against the cards they replace).
  */
-const CROWN_AO = 0.65;
+const CROWN_AO = 0.8;
 /** Shade on the trunk and limbs under the crown. */
 const TRUNK_AO = 0.6;
 
@@ -418,14 +418,14 @@ export const BROADLEAF_CLOUD: CloudShape = {
   rx: 0.36,
   ry: 0.32,
   cards: 48,
-  card: 0.28,
+  card: 0.26,
 };
 export const COLUMNAR_CLOUD: CloudShape = {
   crownY: 0.58,
   rx: 0.14,
   ry: 0.4,
   cards: 40,
-  card: 0.18,
+  card: 0.17,
 };
 
 /** Atlas uv of a point (tu, tv) in tile `t`, tv = 0 at the tile's bottom (see treeAtlas). */
@@ -526,8 +526,8 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
     const ux = [Math.cos(yaw), 0, Math.sin(yaw)];
     const vx = [-Math.sin(yaw) * Math.sin(tilt), Math.cos(tilt), Math.cos(yaw) * Math.sin(tilt)];
     const h = shape.card * (0.75 + R(i, 15) * 0.5) * 0.5;
-    // Normal: out of the crown, leaning up (sky light on the top).
-    let n = [dx, dy * 0.8 + 0.25, dz];
+    // Normal: out of the crown, leaning up as the cards' normals do (sky light on the top).
+    let n = [dx, dy * 0.8 + 0.35, dz];
     const nl = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
     n = n.map((v) => v / nl);
     const t = CLUSTER_TILE + Math.floor(R(i, 16) * 3);
