@@ -1,5 +1,7 @@
 // Ad hoc render probe: open the built game on the GPU, run a snippet in the page, screenshot.
 //   node tools/screenshots/probe.mjs --quality high --size 1440x900 --out file.png --eval "js"
+//   --circuit singapore picks the circuit (the menu's saved choice), --query "&tod=..." adds
+//   URL parameters.
 // Runs under the GPU lock like shots.mjs. For investigations; stations live in shots.mjs.
 import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
@@ -62,6 +64,12 @@ try {
       console.log(`[${m.type()}] ${m.text().slice(0, 400)}`),
   );
   page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+  const circuit = opt('circuit', '');
+  if (circuit) {
+    await page.addInitScript((id) => {
+      globalThis.localStorage.setItem('menu.prefs', JSON.stringify({ version: 1, circuit: id }));
+    }, circuit);
+  }
   await page.goto(
     `http://127.0.0.1:${PORT}/?debug=1&quality=${opt('quality', 'high')}${opt('query', '')}`,
   );

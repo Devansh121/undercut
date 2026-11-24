@@ -1115,6 +1115,8 @@ export class RaceView {
       const layers = t instanceof DataArrayTexture ? (img?.depth ?? 1) : 1;
       const bpp = t.type === HalfFloatType ? 8 : t.type === FloatType ? 16 : 4;
       bytes += w * h * layers * bpp * (t.generateMipmaps ? 4 / 3 : 1);
+      // A render target's own depth buffer (the water's reflection).
+      if ((t as { isRenderTargetTexture?: boolean }).isRenderTargetTexture) bytes += w * h * 4;
     }
     // Render targets: HDR colour + depth (MSAA multiplies), shadow maps.
     const px = this.renderer.getDrawingBufferSize(new Vector2());
