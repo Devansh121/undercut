@@ -23,9 +23,15 @@ export interface StrategyReading {
   aheadPitting: boolean;
   rejoinGap: number;
 }
-export function choosePitStop(
-  r: StrategyReading,
-): { compound: CompoundId; reason: 'planned' | 'undercut' } | null {
+/**
+ * The pit wall's call for a car this lap: stop now (planned, or an undercut on the car ahead),
+ * stay out one lap longer than planned while the car ahead stops (`extend`, compound null), or
+ * nothing to do (null).
+ */
+export type PitDecision =
+  { compound: CompoundId; reason: 'planned' | 'undercut' } | { compound: null; reason: 'extend' };
+
+export function choosePitStop(r: StrategyReading): PitDecision | null {
   const stops = plannedStops(r.laps, r.lapTime, r.pitLoss);
   if (r.stops >= stops || r.lap < 2 || r.lap >= r.laps) return null;
   const target = Math.min(
@@ -39,6 +45,7 @@ export function choosePitStop(
   if (!deadline && r.lap < target && r.gapAhead !== null && gain > r.gapAhead && r.rejoinGap > 2)
     return { compound, reason: 'undercut' };
   // Stay out one more lap in clean air on a healthy set while the rival services theirs.
-  if (!deadline && r.aheadPitting && r.wear < 0.3 && r.lap <= target) return null;
+  if (!deadline && r.aheadPitting && r.wear < 0.3 && r.lap <= target)
+    return r.lap === target ? { compound: null, reason: 'extend' } : null;
   return r.lap >= target || deadline ? { compound, reason: 'planned' } : null;
 }

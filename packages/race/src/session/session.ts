@@ -1,4 +1,4 @@
-import { choosePitStop } from '../strategy';
+import { choosePitStop, type PitDecision } from '../strategy';
 import type { RngState } from '@undercut/core';
 import {
   CAR_SNAPSHOT_LENGTH,
@@ -101,9 +101,18 @@ export interface RaceSessionOptions {
   limits?: (car: number) => WheelsOffCounter;
 }
 
+/** One call of the automatic pit wall: a stop, or staying out a lap longer (`extend`). */
+export interface PitCall {
+  t: number;
+  car: number;
+  lap: number;
+  reason: PitDecision['reason'];
+}
+
 export interface RaceSessionSnapshot {
   version: 3;
   pitStrategy?: boolean;
+  pitCalls?: PitCall[];
   control: RaceControlSnapshot;
   world: { tick: number; time: number; rng: RngState; cars: number[][] };
   /** Each car's driver (AI memory, pit-lane follower). */
@@ -195,6 +204,8 @@ export class RaceSession {
   /** Tyre temperature and wear are modelled (`RaceSessionOptions.tyres`). */
   readonly tyres: boolean;
   pitStrategy: boolean;
+  /** The pit wall's calls so far, in order (`pitStrategy`). */
+  readonly pitCalls: PitCall[] = [];
   private readonly facts: CarFacts[];
   private readonly telemetry: CarTelemetry[];
   private readonly contexts: ControlContext[];
@@ -425,7 +436,19 @@ export class RaceSession {
         aheadPitting,
         rejoinGap,
       });
-      if (stop) this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
+      if (!stop) continue;
+      const lap = c.timer(i).lap;
+      if (stop.compound === null) {
+        // Staying out: logged once for the lap.
+        let k = this.pitCalls.length - 1;
+        while (k >= 0 && this.pitCalls[k]!.car !== i) k--;
+        const last = k >= 0 ? this.pitCalls[k] : undefined;
+        if (!last || last.lap !== lap || last.reason !== 'extend')
+          this.pitCalls.push({ t: this.time, car: i, lap, reason: 'extend' });
+        continue;
+      }
+      this.pitCalls.push({ t: this.time, car: i, lap, reason: stop.reason });
+      this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
     }
   }
 
@@ -656,6 +679,7 @@ export class RaceSession {
     return {
       version: 3,
       pitStrategy: this.pitStrategy,
+      pitCalls: this.pitCalls.map((p) => ({ ...p })),
       control: this.control.snapshot(),
       world: {
         tick: this.world.tick,
@@ -689,6 +713,8 @@ export class RaceSession {
    */
   restore(snap: RaceSessionSnapshot): void {
     this.pitStrategy = snap.pitStrategy ?? false;
+    this.pitCalls.length = 0;
+    for (const p of snap.pitCalls ?? []) this.pitCalls.push({ ...p });
     if (snap.version !== 3)
       throw new Error(`unknown session snapshot version ${String(snap.version)}`);
     if (

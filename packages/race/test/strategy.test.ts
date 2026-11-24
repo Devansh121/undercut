@@ -32,8 +32,20 @@ it('undercuts a close car on worn tyres only when there is room to rejoin', () =
   expect(choosePitStop({ ...reading, wear: 0.5, gapAhead: 1, rejoinGap: 0.4 })).toBeNull();
 });
 it('extends a good set while a rival pits, without missing the compound change', () => {
-  expect(choosePitStop({ ...reading, lap: 3, aheadPitting: true })).toBeNull();
-  expect(choosePitStop({ ...reading, lap: 4, aheadPitting: true })).not.toBeNull();
+  // Car 1 of a five-lap race plans its stop on lap 3; with the car ahead stopping it stays out.
+  expect(choosePitStop({ ...reading, lap: 3 })).toEqual({ compound: 'hard', reason: 'planned' });
+  expect(choosePitStop({ ...reading, lap: 3, aheadPitting: true })).toEqual({
+    compound: null,
+    reason: 'extend',
+  });
+  expect(choosePitStop({ ...reading, lap: 3, aheadPitting: true, wear: 0.4 })).toEqual({
+    compound: 'hard',
+    reason: 'planned',
+  });
+  expect(choosePitStop({ ...reading, lap: 4, aheadPitting: true })).toEqual({
+    compound: 'hard',
+    reason: 'planned',
+  });
 });
 it('is a pure decision from saved race state', () => {
   expect(choosePitStop(JSON.parse(JSON.stringify(reading)) as StrategyReading)).toEqual(

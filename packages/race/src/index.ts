@@ -70,6 +70,7 @@ export {
   SESSION_FUEL,
   type RaceCar,
   type RaceSessionOptions,
+  type PitCall,
   type RaceSessionSnapshot,
 } from './session/session';
 export type { Anomaly } from './systems/watchdog';
@@ -95,4 +96,4 @@ export {
   type WeekendState,
 } from './weekend';
 
-export { choosePitStop, plannedStops, type StrategyReading } from './strategy';
+export { choosePitStop, plannedStops, type PitDecision, type StrategyReading } from './strategy';
