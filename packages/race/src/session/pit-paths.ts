@@ -5,7 +5,9 @@ import type { CircuitInfo } from '../circuit';
 /** Speed the pit-lane paths aim for under the limit, below the limit, m/s. */
 export const PIT_MARGIN = 0.3;
 const STEP = 2;
-/** Speed allowed in the pit lane before the first limit line's braking, m/s. */
+/** Lateral acceleration a pit-lane bend is taken at on the exit road, m/s² (narrow, walled). */
+const LANE_LATERAL = 6;
+/** Speed allowed in the pit lane outside the limited zone (entry and exit roads), m/s. */
 export const LANE_ENTRY_SPEED = 25;
 /** The steepest lane heading the approach and exit blends match, lateral m per m (about 17°). */
 const MAX_JOIN_SLOPE = 0.3;
@@ -46,6 +48,32 @@ function laneSlope(track: Track, pitS: number, span: number): number {
   // matching its slope, even in part, bent the approach out the other way and folded the path,
   // and cars stopped in the lane where it crossed itself.
   return Math.abs(slope) > MAX_JOIN_SLOPE ? 0 : slope;
+}
+
+/**
+ * The speed a bend in the pit lane allows at `sp` and for the next 40 m (radius from three
+ * points 10 m apart, at `LANE_LATERAL`), never below `floor`; Infinity on a straight.
+ */
+function laneBendSpeed(track: Track, sp: number, floor: number): number {
+  const path = track.pit.path;
+  const a = createVec3();
+  const b = createVec3();
+  const c = createVec3();
+  let v = Infinity;
+  for (let k = 0; k <= 40; k += 5) {
+    const s0 = Math.min(track.pit.length - 20, sp + k);
+    path.pointAt(s0, 0, a);
+    path.pointAt(s0 + 10, 0, b);
+    path.pointAt(s0 + 20, 0, c);
+    const ab = Math.hypot(b.x - a.x, b.z - a.z);
+    const bc = Math.hypot(c.x - b.x, c.z - b.z);
+    const ac = Math.hypot(c.x - a.x, c.z - a.z);
+    const cross = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+    if (cross < 1e-6) continue;
+    const r = (ab * bc * ac) / (2 * cross);
+    v = Math.min(v, Math.max(floor, Math.sqrt(LANE_LATERAL * r)));
+  }
+  return v;
 }
 
 function forward(length: number, from: number, to: number): number {
@@ -125,7 +153,14 @@ export function pitOutPath(
   for (let sp = fromPitS; sp <= pit.length; sp += STEP) {
     const d = fromPitD * (1 - smooth((sp - fromPitS) / merge));
     pit.path.pointAt(sp, d, v);
-    out.push({ x: v.x, z: v.z, v: sp <= circuit.pit.limitEnd ? limit : Infinity });
+    // Past the second line, still in the lane: through its bends at a lane's lateral grip
+    // (`LANE_LATERAL`), free on a straight exit road. Spa's lane bends just after its line and a
+    // car accelerating there met the wall (seed 17).
+    out.push({
+      x: v.x,
+      z: v.z,
+      v: sp <= circuit.pit.limitEnd ? limit : laneBendSpeed(track, sp, LANE_ENTRY_SPEED),
+    });
   }
   const exit = track.project(
     pit.exitPose.x,

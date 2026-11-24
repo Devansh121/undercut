@@ -1130,14 +1130,20 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const c = session.race.control;
     const duration = c.strategy.duration ?? 0;
     const left = Math.max(0, duration - (session.world.time - (c.greenTime ?? 0)));
-    const done = duration > 0 ? Math.min(1, 1 - left / duration) : 1;
+    // The clock fills the bar to 85 %; after the flag the cars taking it fill the rest (the
+    // last laps take a third or more of the wait, and the bar should not stand still).
+    const n = c.cars.length;
+    let home = 0;
+    for (const car of c.cars) if (car.status !== 'running' || car.finishTime !== null) home++;
+    const clock = duration > 0 ? Math.min(1, 1 - left / duration) : 1;
+    const done = 0.85 * clock + 0.15 * (left > 0 ? 0 : home / Math.max(1, n));
     const pct = Math.round(done * 100);
     simulateFill.style.width = `${pct}%`;
     simulateBar.setAttribute('aria-valuenow', String(pct));
     simulateLeft.textContent =
       left > 0
         ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left`
-        : 'Last laps';
+        : `Last laps · ${home} / ${n} in`;
   }
   function canSimulateSession(): boolean {
     const kind = session.race.control.strategy.kind;
@@ -1526,11 +1532,21 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const pitCar = pitControl.cars[0]!;
       // After the flag there is no stop to call: the panel keeps only Continue.
       const flagOut = pitCallsClosed();
-      boxButton.hidden = flagOut;
-      compoundButton.hidden = flagOut;
-      limiterButton.hidden = flagOut;
+      // In the garage (practice and qualifying, or back in the box to simulate) there is no stop
+      // to call: the pit-call controls go.
+      const inGarage = pitPhase === 'garage';
+      boxButton.hidden = flagOut || inGarage;
+      compoundButton.hidden = flagOut || inGarage;
+      limiterButton.hidden = flagOut || inGarage;
       pitHead.hidden = flagOut;
-      setButtonLabel(boxButton, pitControl.pitRequested(0) ? 'Cancel pit call' : 'Box this lap');
+      setButtonLabel(
+        boxButton,
+        pitControl.held(0)
+          ? 'In the box'
+          : pitControl.pitRequested(0)
+            ? 'Cancel pit call'
+            : 'Box this lap',
+      );
       boxButton.disabled = pitControl.held(0) || session.result !== null;
       setButtonLabel(compoundButton, `Next tyres: ${session.nextCompound}`);
       compoundButton.disabled = pitControl.held(0);
