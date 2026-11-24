@@ -13,6 +13,7 @@ describe('menu prefs', () => {
       p.driver = 1;
       p.timeOfDay.monza = 'overcast-day';
       p.race.laps = 12;
+      p.race.automaticPitLimiter = false;
       p.assists.gamepad = { tractionControl: 0, autoGears: false };
       p.settings.hudScale = 1.1;
       p.settings.haptics = false;
@@ -55,7 +56,14 @@ describe('menu prefs', () => {
     expect(p.team).toBe('sable');
     expect(p.driver).toBe(0);
     expect(p.timeOfDay).toEqual({ monza: 'night-floodlit' });
-    expect(p.race).toEqual({ laps: 5, aiSkill: 'elite', grid: 'set', slot: 10, field: 'equal' });
+    expect(p.race).toEqual({
+      automaticPitLimiter: true,
+      laps: 5,
+      aiSkill: 'elite',
+      grid: 'set',
+      slot: 10,
+      field: 'equal',
+    });
     expect(p.assists.keyboard).toEqual({ tractionControl: 0, abs: 2 });
     // Units are not kept here (their own store), so a saved copy is dropped.
     expect(p.settings).toEqual({

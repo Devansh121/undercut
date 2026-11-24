@@ -1494,6 +1494,156 @@
   }
 }
 
+.weekend-screen {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 24px;
+  max-width: 1100px;
+  margin: auto;
+  overflow: auto;
+  height: 100%;
+}
+.weekend-schedule,
+.weekend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.weekend-schedule .card {
+  padding: 16px;
+  border-left: 3px solid var(--c-line);
+}
+.weekend-schedule .is-current {
+  border-left-color: var(--c-brand);
+}
+/* A session classification or standings: labels over left-aligned names, numbers right-aligned
+   in tabular figures, the player's row marked with the kit's selection marker. */
+.classification {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+.classification caption {
+  text-align: left;
+  padding-bottom: var(--sp-2);
+}
+.classification th {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-3);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--c-line-strong);
+}
+.classification td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-2);
+}
+.classification td:nth-child(2) {
+  color: var(--c-text-1);
+}
+.classification .num {
+  text-align: right;
+  font-family: var(--font-num);
+  font-feature-settings: 'tnum';
+}
+.classification tr.is-player td {
+  color: var(--c-text-1);
+  background: var(--c-ink-3);
+}
+.classification tr.is-player td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-brand);
+}
+.weekend-table {
+  margin: 16px 0;
+}
+.weekend-table td {
+  padding: 8px;
+}
+/* The race readout's classification: the heading stays put while the table scrolls. */
+.race-status[data-table] {
+  text-align: left;
+  white-space: normal;
+}
+.race-status[data-table] .race-status__head {
+  text-align: center;
+}
+@media (max-height: 500px) {
+  .race-status[data-table] .classification th,
+  .race-status[data-table] .classification td {
+    padding: 2px 6px;
+  }
+}
+.pit-panel {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 300px;
+  padding: var(--sp-3);
+  font-size: 12px;
+}
+.pit-panel [role='status'] {
+  margin-bottom: var(--sp-2);
+}
+.pit-panel .button {
+  min-height: 32px;
+  padding: 5px 8px;
+  margin: 3px;
+  font-size: 11px;
+}
+@media (max-height: 500px) {
+  .weekend-screen {
+    padding: 12px 20px;
+  }
+  .weekend-schedule,
+  .weekend-actions {
+    margin: 8px 0;
+    gap: 6px;
+  }
+  .pit-panel {
+    position: absolute;
+    top: 95px;
+    right: 8px;
+    width: auto;
+    max-width: 220px;
+    font-size: 10px;
+  }
+  .pit-panel .button {
+    min-height: 28px;
+    font-size: 10px;
+    padding: 3px 5px;
+  }
+}
+
+/* The inline assist card keeps its established height; the edit button opens race options. */
+.settings .race-setting,
+.hub[data-mode='timeTrial'] .race-setup-edit {
+  display: none;
+}
+@media (max-height: 500px) {
+  .pit-panel {
+    max-width: 220px;
+    font-size: 11px;
+  }
+  .pit-panel .button {
+    display: none;
+  }
+  .pit-panel [data-testid='continue-weekend'] {
+    display: inline-flex;
+    min-height: 44px;
+  }
+}
+
+.settings__aside .race-setup-edit {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
 /* The device tabs are touch targets on a phone. */
 @media (pointer: coarse) {
   .controls__tabs .tab {

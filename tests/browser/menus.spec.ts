@@ -294,7 +294,8 @@ test.describe('menus, keyboard only', () => {
     await expect(page.locator('[data-action=start]')).toBeEnabled();
     await expect(page.locator('[data-action=start]')).toContainText('Start race');
     await page.keyboard.press('KeyE');
-    await expect(page.locator('[data-action=start]')).toBeDisabled();
+    await expect(page.locator('[data-action=start]')).toBeEnabled();
+    await expect(page.locator('[data-action=start]')).toContainText('Start weekend');
     await page.keyboard.press('KeyQ');
     await page.keyboard.press('KeyQ');
     await expect(page.locator('[data-action=mode-timeTrial]')).toHaveAttribute(
@@ -435,7 +436,7 @@ test.describe('menus, touch only', () => {
     await expect(page.locator('.settings-summary__vals')).toContainText('Touch assists');
 
     await page.locator('[data-action=mode-weekend]').tap();
-    await expect(page.locator('[data-testid=mode-notice]')).toBeVisible();
+    await expect(page.locator('[data-action=start]')).toBeEnabled();
     await page.locator('[data-action=mode-timeTrial]').tap();
     // A phone steps through the teams one at a time.
     const teamName = page.locator('.team-switch__name b');
