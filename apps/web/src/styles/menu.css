@@ -1578,21 +1578,85 @@
     padding: 2px 6px;
   }
 }
+/* The pit wall: a HUD module under the map (label, the crew's status, the kit's buttons with
+   their bound controls). */
 .pit-panel {
   pointer-events: auto;
   box-sizing: border-box;
   width: 300px;
   padding: var(--sp-3);
-  font-size: 12px;
 }
-.pit-panel [role='status'] {
+.pit-panel__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
   margin-bottom: var(--sp-2);
 }
-.pit-panel .button {
-  min-height: 32px;
-  padding: 5px 8px;
-  margin: 3px;
-  font-size: 11px;
+.pit-panel__head [role='status'] {
+  font-size: var(--fs-12);
+  color: var(--c-text-1);
+}
+.pit-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.pit-panel .btn {
+  height: 32px;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-2);
+  font-size: var(--fs-11);
+}
+.pit-panel .btn .glyph {
+  transform: scale(0.85);
+}
+/* Continue is the screen's action after the flag: a full touch target everywhere. On a touch
+   screen every pit-wall button is one (44 px). */
+.pit-panel [data-testid='continue-weekend'] {
+  height: 44px;
+  font-size: var(--fs-12);
+}
+@media (pointer: coarse) {
+  .pit-panel .btn {
+    height: 44px;
+  }
+}
+/* Simulating the rest of a session: the time left and a bar, in place of the button. */
+.sim-progress {
+  pointer-events: auto;
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  min-width: 260px;
+}
+.sim-progress__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+.sim-progress__left {
+  font-family: var(--font-num);
+  font-feature-settings: 'tnum';
+  color: var(--c-text-1);
+}
+.sim-progress__bar {
+  height: 4px;
+  background: var(--c-ink-3);
+}
+.sim-progress__bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--c-text-1);
+}
+.sim-progress[hidden] {
+  display: none;
+}
+/* Skip to results and Simulate to end of session, under the race readout. */
+.hud-action {
+  pointer-events: auto;
+  margin-top: var(--sp-2);
 }
 @media (max-height: 500px) {
   .weekend-screen {
@@ -1609,12 +1673,9 @@
     right: 8px;
     width: auto;
     max-width: 220px;
-    font-size: 10px;
   }
-  .pit-panel .button {
-    min-height: 28px;
-    font-size: 10px;
-    padding: 3px 5px;
+  .pit-panel__head [role='status'] {
+    font-size: var(--fs-10);
   }
 }
 
@@ -1624,16 +1685,12 @@
   display: none;
 }
 @media (max-height: 500px) {
-  .pit-panel {
-    max-width: 220px;
-    font-size: 11px;
-  }
-  .pit-panel .button {
+  /* On a phone the touch overlay has BOX and TYRE; the panel keeps the status and Continue. */
+  .pit-panel .btn:not([data-testid='continue-weekend']) {
     display: none;
   }
-  .pit-panel [data-testid='continue-weekend'] {
-    display: inline-flex;
-    min-height: 44px;
+  .pit-panel [data-testid='continue-weekend']:not([hidden]) {
+    height: 44px;
   }
 }
 /* Upright phones: the pit panel's buttons are touch targets too. */

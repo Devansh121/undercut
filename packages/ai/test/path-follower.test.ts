@@ -1,4 +1,5 @@
 import {
+  NEUTRAL_INPUT,
   addCar,
   createCarParams,
   createCarTelemetry,
@@ -82,6 +83,46 @@ describe('PathFollower', () => {
     // 30 m radius at 18 m/s² lateral: about 23 m/s at most in the curve.
     expect(maxMiss).toBeLessThan(2);
     expect(car.state.vx).toBeLessThan(25);
+  });
+
+  it('cuts sustained wheelspin at lane speed to 5 percent throttle', () => {
+    const f = new PathFollower(params);
+    f.setPath(
+      [
+        { x: 0, z: 0, v: 40 },
+        { x: 1000, z: 0, v: 40 },
+      ],
+      false,
+    );
+    const tel = createCarTelemetry();
+    tel.speed = 20;
+    tel.gear = 3;
+    tel.slipRatio[2] = 0.5;
+    const out = { ...NEUTRAL_INPUT };
+    for (let k = 0; k < 60; k++) f.drive(tel, 1 / 240, out);
+    expect(out.throttle).toBe(0.05);
+    expect(out.brake).toBe(0);
+  });
+
+  it('restores throttle at 2/s after wheelspin clears, without a step back to full demand', () => {
+    const f = new PathFollower(params);
+    f.setPath(
+      [
+        { x: 0, z: 0, v: 40 },
+        { x: 1000, z: 0, v: 40 },
+      ],
+      false,
+    );
+    const tel = createCarTelemetry();
+    tel.speed = 20;
+    tel.gear = 3;
+    tel.slipRatio[2] = 0.5;
+    const out = { ...NEUTRAL_INPUT };
+    for (let k = 0; k < 60; k++) f.drive(tel, 1 / 240, out);
+    tel.slipRatio[2] = 0;
+    for (let k = 0; k < 24; k++) f.drive(tel, 1 / 240, out);
+    expect(out.throttle).toBeCloseTo(0.25, 12);
+    expect(out.brake).toBe(0);
   });
 
   it('refuses a path with fewer than two points', () => {

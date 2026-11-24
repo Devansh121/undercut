@@ -25,7 +25,13 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
     await page.locator('[data-action=weekend-start]').click();
     await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
     await page.getByTestId('simulate-session').click({ timeout: 30_000 });
+    await expect(page.getByTestId('box-this-lap')).toBeHidden();
+    await expect(page.getByTestId('next-compound')).toBeHidden();
+    await expect(page.getByTestId('pit-limiter')).toBeHidden();
+    // The button gives way to the progress module (unless the session is already over).
+    await expect(page.getByTestId('simulate-session')).toBeHidden();
     await expect(page.getByTestId('continue-weekend')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('simulate-progress')).toBeHidden();
     await expect(page.getByTestId('race-status')).toContainText('Practice result');
     await expect(page.getByTestId('race-status').locator('th')).toHaveText([
       'Pos',
@@ -68,6 +74,9 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
     new MutationObserver(() => {
       if (/Pit service · [0-9]+\.[0-9] s/.test(panel.textContent ?? ''))
         panel.dataset.sawService = 'true';
+      const box = panel.querySelector<HTMLButtonElement>('[data-testid=box-this-lap]');
+      if (box?.disabled && box.textContent?.includes('In the box'))
+        panel.dataset.sawCrewHold = 'true';
     }).observe(panel, { subtree: true, childList: true, characterData: true });
   });
   // The race HUD with its pit panel, the clock stopped while the sizes change.
@@ -81,10 +90,12 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
     await page.evaluate(() => window.__undercut!.setTimeScale(1));
     await page.locator('.ut-touch__btn--boxThisLap').tap();
   } else await page.getByTestId('box-this-lap').click();
-  await expect(page.getByTestId('box-this-lap')).toHaveText('Cancel pit call');
+  await expect(page.getByTestId('box-this-lap').locator('.btn__label')).toHaveText(
+    'Cancel pit call',
+  );
   if (info.project.name === 'phone') await page.locator('.ut-touch__btn--boxThisLap').tap();
   else await page.getByTestId('box-this-lap').click();
-  await expect(page.getByTestId('box-this-lap')).toHaveText('Box this lap');
+  await expect(page.getByTestId('box-this-lap').locator('.btn__label')).toHaveText('Box this lap');
   await page.evaluate(() => {
     window.__undercut!.setTimeScale(0);
     window.__undercut!.teleport(5125.675, 0, 108);
@@ -98,6 +109,7 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
   });
   await expect(page.getByTestId('pit-panel')).toContainText('1 stop');
   await expect(page.getByTestId('pit-panel')).toHaveAttribute('data-saw-service', 'true');
+  await expect(page.getByTestId('pit-panel')).toHaveAttribute('data-saw-crew-hold', 'true');
   await page.waitForFunction(() => window.__undercut!.state().pitPhase === 'none', null, {
     timeout: 30_000,
   });
