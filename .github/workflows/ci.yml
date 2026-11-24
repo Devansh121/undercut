@@ -116,6 +116,39 @@ jobs:
       - name: Playwright version
         id: pw
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Browser system libraries come from the Ubuntu mirror, which has stalled for whole jobs
+      # (118 MB for WebKit at a few kB/s). apt downloads into a cached directory, keyed on the
+      # runner image and the Playwright version and saved again only when the package set changes.
+      # Each install is bounded and retried (tools/ci/with-retries.sh); a retry first moves the
+      # stalled mirror to the end of the runner's mirror list (tools/ci/apt-next-mirror.sh, with
+      # azure and archive.ubuntu.com as fallbacks), and what an attempt finished downloading stays
+      # for the next one. apt itself gives up on a dead connection after 20 s.
+      - name: Point apt at the package cache
+        id: apt
+        run: |
+          sudo install -d -o "$USER" /var/cache/undercut-apt
+          sudo install -d /var/cache/undercut-apt/partial
+          sudo tee /etc/apt/apt.conf.d/90undercut-ci > /dev/null <<'APT'
+          Dir::Cache::Archives "/var/cache/undercut-apt/";
+          APT::Keep-Downloaded-Packages "true";
+          Acquire::Retries "3";
+          Acquire::http::Timeout "20";
+          Acquire::https::Timeout "20";
+          DPkg::Lock::Timeout "60";
+          APT
+          tools/ci/apt-next-mirror.sh --setup
+          echo "prefix=apt-$ImageOS-$ImageVersion-pw${{ steps.pw.outputs.version }}-" >> "$GITHUB_OUTPUT"
+          echo "fallback=apt-$ImageOS-" >> "$GITHUB_OUTPUT"
+      - name: Restore apt packages
+        id: apt-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: /var/cache/undercut-apt/*.deb
+          key: ${{ steps.apt.outputs.prefix }}${{ github.run_id }}
+          # An older image's packages still save every download whose version is unchanged.
+          restore-keys: |
+            ${{ steps.apt.outputs.prefix }}
+            ${{ steps.apt.outputs.fallback }}
       - name: Cache Playwright browser
         id: pw-cache
         uses: actions/cache@v6
@@ -124,25 +157,64 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: Install Chromium
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps --only-shell chromium
+        timeout-minutes: 4
+        run: tools/ci/with-retries.sh npx playwright install --only-shell chromium
       - name: Install Chromium system libraries
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        timeout-minutes: 4
+        env:
+          ATTEMPT_TIMEOUT: '60'
+          RETRY_HOOK: tools/ci/apt-next-mirror.sh
+        run: tools/ci/with-retries.sh npx playwright install-deps chromium
       - run: npm run test:browser:lifecycle
       # The phone menu sweep on WebKit, the engine of every iPhone browser (DOM only, quick).
+      # Everything WebKit needs is fetched here, after the Chromium tests passed, and only when
+      # Playwright lists WebKit tests to run.
+      - name: WebKit tests to run
+        id: wk
+        run: |
+          # A listing that fails fails the step: it never reads as zero tests.
+          list=$(npx playwright test --list --project=webkit-phone)
+          count=$(grep -c '\[webkit-phone\]' <<< "$list" || true)
+          echo "WebKit tests listed: $count"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
       - name: Cache WebKit
         id: wk-cache
+        if: steps.wk.outputs.count != '0'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright/webkit-*
           key: playwright-webkit-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: Install WebKit
-        if: steps.wk-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps webkit
+        if: steps.wk.outputs.count != '0' && steps.wk-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 4
+        run: tools/ci/with-retries.sh npx playwright install webkit
       - name: Install WebKit system libraries
-        if: steps.wk-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps webkit
+        id: wk-deps
+        if: steps.wk.outputs.count != '0'
+        timeout-minutes: 6
+        env:
+          ATTEMPT_TIMEOUT: '90'
+          RETRY_HOOK: tools/ci/apt-next-mirror.sh
+        run: tools/ci/with-retries.sh npx playwright install-deps webkit
       - run: npm run test:browser:webkit
+      # Cache bookkeeping never fails the job, and runs even when the WebKit tests failed.
+      - name: Name the apt package set
+        id: apt-set
+        if: always() && steps.wk-deps.outcome == 'success'
+        continue-on-error: true
+        run: |
+          sudo apt-get autoclean -qq
+          echo "$(ls /var/cache/undercut-apt/*.deb | wc -l) packages, $(du -ch /var/cache/undercut-apt/*.deb | awk 'END { print $1 }')"
+          echo "hash=$(ls /var/cache/undercut-apt/*.deb | xargs -n1 basename | sort | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Save apt packages
+        if: >-
+          always() && steps.apt-set.outputs.hash &&
+          steps.apt-cache.outputs.cache-matched-key != format('{0}{1}', steps.apt.outputs.prefix, steps.apt-set.outputs.hash)
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: /var/cache/undercut-apt/*.deb
+          key: ${{ steps.apt.outputs.prefix }}${{ steps.apt-set.outputs.hash }}
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
