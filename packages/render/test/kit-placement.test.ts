@@ -422,7 +422,14 @@ describe('permanent stand banks', () => {
       { ...frame, length: 47, depth: 31, rows: 30, ox: 100 },
       { ...frame, length: 33, depth: 9, rows: 10, roof: false, oz: 100 },
     ];
-    placeKitStands(frames, fakeKit(), props, 0, false, () => undefined);
+    placeKitStands(
+      frames,
+      fakeKit(),
+      props,
+      () => 0,
+      false,
+      () => undefined,
+    );
     // Banks 0 and 1, the roofed rear bank 2; the one-bank stand reuses bank 0: three kinds.
     expect(define.mock.calls.map(([kind]) => kind.id).sort()).toEqual([
       'stand-kit-grandstand-0',
@@ -446,6 +453,7 @@ describe('permanent stand banks', () => {
     const define = vi.spyOn(props, 'define');
     const place = vi.spyOn(props, 'place');
     const seats: KitSpectator[] = [];
+    const rowsAsked = new Set<number>();
     const result = placeKitStands(
       [
         {
@@ -467,10 +475,14 @@ describe('permanent stand banks', () => {
       ],
       fakeKit(),
       props,
-      1,
+      (_, row) => (rowsAsked.add(row), 1),
       true,
       (seat) => seats.push(seat),
     );
+    // Occupancy is asked by the stand's own row, front to back over all three banks, as the
+    // procedural stands' seats are.
+    expect(Math.min(...rowsAsked)).toBe(0);
+    expect(Math.max(...rowsAsked)).toBeGreaterThanOrEqual(20);
     expect(result.modules).toBe(6);
     expect(result.fallback).toHaveLength(0);
     const heights = [...new Set(seats.map((p) => Math.round(p.y * 1000) / 1000))].sort(

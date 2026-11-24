@@ -648,7 +648,9 @@ export class CircuitWorld {
       castShadow: quality.sceneryShadows,
       shadowMaxDistance: 180,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('pit-wall') ?? [
+      // The finest level within 20 m and the middle one to 100 m: 1,556 and 720 triangles a
+      // module, a 200 m chunk of them at a time.
+      lods: o.propKit?.lodsFor('pit-wall', { distanceCaps: [20, 100, far] }) ?? [
         { geometry: canopyGeo, material: canopyMat, maxDistance: far },
       ],
     });
@@ -1085,11 +1087,19 @@ export class CircuitWorld {
     this.counts.stands = this.stands.length;
     if (this.stands.length === 0) return;
     const spectator = this.spectators(o);
+    const wq = o.quality.world;
+    const L = o.track.length;
+    // Busier near the start line, the top fifth of rows thinner: kit and procedural stands alike.
+    const occupancy = (fr: StandFrame, row: number): number => {
+      const ds = Math.min(Math.abs(fr.s), Math.abs(L - fr.s));
+      const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
+      return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
+    };
     const kitStands = placeKitStands(
       this.stands,
       o.propKit,
       o.props,
-      o.quality.world.crowd,
+      occupancy,
       o.quality.sceneryShadows,
       spectator,
     );
@@ -1110,14 +1120,8 @@ export class CircuitWorld {
     });
 
     // Crowd: fuller near the start line and the first chicane, thinner at the back of big stands.
-    const wq = o.quality.world;
     if (wq.crowd <= 0) return;
-    const L = o.track.length;
-    const seats = crowdSeats(fallback, (fr, row) => {
-      const ds = Math.min(Math.abs(fr.s), Math.abs(L - fr.s));
-      const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
-      return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
-    });
+    const seats = crowdSeats(fallback, occupancy);
     for (const seat of seats) spectator(seat);
     this.counts.crowd = seats.length + kitStands.crowd;
   }

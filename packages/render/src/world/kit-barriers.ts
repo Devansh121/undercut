@@ -26,11 +26,13 @@ export function placeKitBarriers(
     if (!kitId) continue;
     let id = kinds.get(kitId);
     if (!id) {
-      const lods = kit.lodsFor(kitId);
+      // The finest level (7,200 triangles a tyre-wall module) only within 20 m of a chunk, the
+      // middle level to 100 m: by a chunk's near edge every module in it takes the level.
+      const lods = kit.lodsFor(kitId, { distanceCaps: [20, 100, 1200] });
       if (!lods) continue;
       id = `barrier-${kitId}`;
-      // Long chunks: each is a draw call per kind, and the sleeves are cheap at any level.
-      props.define({ id, lods, chunkLength: 120, castShadow: false });
+      // 60 m chunks: a draw call per kind each, short enough that the finest level stays near.
+      props.define({ id, lods, chunkLength: 60, castShadow: false });
       kinds.set(kitId, id);
     }
     const pitch = kit.entries.get(kitId)?.moduleLength || 4;

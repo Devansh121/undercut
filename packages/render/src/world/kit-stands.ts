@@ -18,7 +18,8 @@ export function placeKitStands(
   frames: readonly StandFrame[],
   kit: PropKitAssets | null | undefined,
   props: PropRegistry,
-  crowd: number,
+  /** Share of seats taken in a stand's row (0 = front), the same rule as the procedural stands. */
+  occupancy: (frame: StandFrame, row: number) => number,
   shadows: boolean,
   spectator: (seat: KitSpectator) => void,
 ): { fallback: StandFrame[]; modules: number; crowd: number } {
@@ -32,7 +33,9 @@ export function placeKitStands(
     if (id) return id;
     const lods = kit!.lodsFor(kitId, {
       maxDistanceScale: 2.7,
-      distanceCaps: [8, 80, 1200],
+      // The middle level (4,900 to 5,100 triangles a module) only within 25 m, the far level
+      // (1,100 to 1,300) beyond: at 80 m the middle level cost 0.3 ms at Monza's grid on High.
+      distanceCaps: [8, 25, 1200],
       slotColors: { seat: [1, 1, 1] },
     })!;
     const rise = bank * 4.2;
@@ -89,7 +92,7 @@ export function placeKitStands(
           .entries()) {
           for (let j = 0; j < (marker.count ?? 0); j++) {
             const k = i * 1000000 + bank * 100000 + module * 1000 + row * 30 + j;
-            if (hash01(k, 77) > crowd * 0.85) continue;
+            if (hash01(k, 77) > occupancy(frame, bank * 10 + row)) continue;
             const lx = marker.position[0] * sx;
             const lz = (marker.position[2] + j * (marker.spacing ?? 0.55)) * sz;
             spectator({
