@@ -382,7 +382,15 @@ export class RaceSession {
       const state = this.world.cars[i]!.state;
       const f = this.facts[i]!;
       let exposure = 0;
-      if (this.control.racing(i) && !this.ghosts[i] && !f.inPitLane && state.vx > 35) {
+      // The opening-lap pack keeps the measured aero while it sorts through the first
+      // corners. The tow joins the racing tools from lap two, alongside race DRS.
+      if (
+        this.control.racing(i) &&
+        !this.ghosts[i] &&
+        !f.inPitLane &&
+        state.vx > 35 &&
+        this.control.timer(i).lap > 1
+      ) {
         // Release the tow well before a bend or a stopped queue. The speed plan and
         // recovery controller then see their measured car throughout the braking zone.
         let straight = true;
