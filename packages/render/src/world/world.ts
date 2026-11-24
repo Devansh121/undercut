@@ -1169,15 +1169,20 @@ export class CircuitWorld {
           slotColors: { clothing: [1, 1, 1] },
         });
         if (!lods) continue;
-        for (const l of lods) l.geometry.translate(0, -0.5, 0);
+        // The kit's middle level (368 triangles a person, half the finest): every person in a
+        // cell within reach is drawn, and the vertex stage then drops those past 32 m, so the
+        // finest level's vertices cost about 1 ms at Monza's grid on High.
+        const level = lods[1] ?? lods[0]!;
+        for (const l of lods) if (l !== level) l.geometry.dispose();
+        level.geometry.translate(0, -0.5, 0);
         o.props.define({
           id: `crowd-near-${v}`,
           castShadow: false,
-          // Nobody beyond 32 m draws near (crowdSwapMaterial), so only the finest level, and no
-          // cell whose near edge is further away. Cells as wide as that reach: smaller ones
-          // multiplied draw calls and per-frame chunk work (867 cells at 16 m at Monza).
+          // Nobody beyond 32 m draws near (crowdSwapMaterial), so one level, and no cell whose
+          // near edge is further away. Cells as wide as that reach: smaller ones multiplied draw
+          // calls and per-frame chunk work (867 cells at 16 m at Monza).
           gridCell: 32,
-          lods: [{ ...lods[0]!, maxDistance: Math.min(lods[0]!.maxDistance, 32) }],
+          lods: [{ ...level, maxDistance: Math.min(level.maxDistance, 32) }],
         });
       }
       this.crowdKinds = variants;
