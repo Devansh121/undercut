@@ -6,7 +6,7 @@ import type { CircuitInfo } from '../circuit';
 export const PIT_MARGIN = 0.3;
 const STEP = 2;
 /** Speed allowed in the pit lane before the first limit line's braking, m/s. */
-export const LANE_ENTRY_SPEED = 30;
+export const LANE_ENTRY_SPEED = 25;
 /** The steepest lane heading the approach and exit blends match, lateral m per m (about 17°). */
 const MAX_JOIN_SLOPE = 0.3;
 
