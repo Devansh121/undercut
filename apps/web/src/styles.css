@@ -3,6 +3,48 @@
  * colour, size and duration here is a token; layouts follow design/mock/hud.html and menu.html.
  */
 
+/*
+ * The device's safe-area insets (notch, rounded corners, home indicator; on a landscape iPhone
+ * the bars down both sides), read once here. Everything else uses these, never env() directly,
+ * so a test can set them to a real phone's values and check that nothing sits under the bars.
+ */
+:root {
+  --inset-l: env(safe-area-inset-left, 0px);
+  --inset-r: env(safe-area-inset-right, 0px);
+  --inset-t: env(safe-area-inset-top, 0px);
+  --inset-b: env(safe-area-inset-bottom, 0px);
+  /* Edge margins: the layout margin, or the inset where the device's is larger. On the root, so
+     overlays mounted on <body> (toasts, the update bar) keep clear of the bars too. */
+  --safe-l: max(var(--safe), var(--inset-l));
+  --safe-r: max(var(--safe), var(--inset-r));
+  --safe-t: max(var(--safe), var(--inset-t));
+  --safe-b: max(var(--safe), var(--inset-b));
+}
+
+/*
+ * Phones: a game, not a page. No double-tap zoom anywhere (pinch zoom stays in the menus), no
+ * grey tap flash, and no text selection, loupe or long-press callout on the interface; fields
+ * the player types into keep selection. The drive screen also blocks pinch (below).
+ */
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+#app,
+#app *,
+.ut-touch,
+.ut-touch * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#app input:not([type='range']):not([type='checkbox']):not([type='radio']),
+#app textarea {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
 html,
 body {
   overflow: hidden;
@@ -23,10 +65,6 @@ body {
 #app {
   position: fixed;
   inset: 0;
-  --safe-l: max(var(--safe), env(safe-area-inset-left, 0px));
-  --safe-r: max(var(--safe), env(safe-area-inset-right, 0px));
-  --safe-t: max(var(--safe), env(safe-area-inset-top, 0px));
-  --safe-b: max(var(--safe), env(safe-area-inset-bottom, 0px));
 }
 
 /* ================= Loading ================= */
@@ -1149,6 +1187,9 @@ body {
   inset: 0;
   z-index: 20;
   display: grid;
+  /* A definite track, so the card's max-height: 100% holds inside the safe area and the card
+     scrolls rather than running under the home bar (an upright phone). */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   background: rgba(11, 12, 14, 0.72);
@@ -1162,7 +1203,10 @@ body {
   width: min(780px, 100%);
   max-height: 100%;
   overflow: auto;
-  display: grid;
+  /* A column whose body shrinks to fit: the settings scroll and the foot (Quit) stays on screen
+     at any height, not only on a phone. */
+  display: flex;
+  flex-direction: column;
   gap: var(--sp-4);
   padding: var(--sp-6);
   background: var(--c-ink-1);
@@ -1188,6 +1232,8 @@ body {
 }
 
 .pause__body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
   gap: var(--sp-6);
@@ -1197,6 +1243,15 @@ body {
   display: grid;
   gap: var(--sp-2);
   align-content: start;
+  /* The body is height-limited: on a short window the actions scroll instead of spilling over
+     the CONTROLS legend below them. */
+  min-height: 0;
+  overflow-y: auto;
+  /* A scroll box clips at its padding edge: 4 px of padding, given back by the margin, keeps the
+     4 px focus ring (--focus-ring) inside it, and scrolling to a focused action leaves its ring. */
+  padding: 4px;
+  margin: -4px;
+  scroll-padding-block: 4px;
 }
 
 .pause__action {
@@ -1213,6 +1268,11 @@ body {
 .pause__settings {
   display: grid;
   align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  /* In a height-limited scroll box, auto rows shrink to each row's min-height and the help text
+     runs into the next row; size every row to its content instead. */
+  grid-auto-rows: max-content;
 }
 
 .pause__setting {
@@ -1223,6 +1283,10 @@ body {
   min-height: 48px;
   padding: 4px 0;
   box-shadow: inset 0 -1px 0 var(--c-line);
+}
+
+.pause__setting[hidden] {
+  display: none;
 }
 
 .pause__hint {
@@ -1569,12 +1633,12 @@ body {
   }
 
   .pause {
-    padding: var(--sp-2) var(--safe-r) var(--sp-2) var(--safe-l);
+    padding: max(var(--sp-2), var(--inset-t)) var(--safe-r) max(var(--sp-2), var(--inset-b))
+      var(--safe-l);
   }
   .pause__card {
     height: 100%;
     overflow: hidden;
-    grid-template-rows: auto minmax(0, 1fr) auto;
     padding: 10px var(--sp-4);
     gap: var(--sp-2);
   }
@@ -1591,12 +1655,7 @@ body {
     gap: var(--sp-4);
   }
   .pause__settings {
-    min-height: 0;
-    overflow-y: auto;
     padding-right: var(--sp-1);
-    /* In a height-limited scroll box, auto rows shrink to each row's 44 px min-height and the
-       help text runs into the next row; size every row to its content instead. */
-    grid-auto-rows: max-content;
   }
   /* Touch targets 44 px or more on a phone. */
   .pause__action {
@@ -1726,10 +1785,10 @@ body {
   inset: 0;
   overflow: auto;
   padding: clamp(16px, 4vw, 56px);
-  padding-top: max(clamp(16px, 4vw, 56px), env(safe-area-inset-top, 0px));
-  padding-right: max(clamp(16px, 4vw, 56px), env(safe-area-inset-right, 0px));
-  padding-bottom: max(clamp(16px, 4vw, 56px), env(safe-area-inset-bottom, 0px));
-  padding-left: max(clamp(16px, 4vw, 56px), env(safe-area-inset-left, 0px));
+  padding-top: max(clamp(16px, 4vw, 56px), var(--inset-t));
+  padding-right: max(clamp(16px, 4vw, 56px), var(--inset-r));
+  padding-bottom: max(clamp(16px, 4vw, 56px), var(--inset-b));
+  padding-left: max(clamp(16px, 4vw, 56px), var(--inset-l));
   background: var(--bg, #101215);
   color: var(--text, #edf0f2);
 }
@@ -1809,6 +1868,7 @@ body {
   white-space: pre-line;
   text-align: center;
   max-height: 60vh;
+  max-height: 60dvh;
   overflow: auto;
   pointer-events: auto;
 }
@@ -1850,6 +1910,7 @@ html[data-race-finished] .ut-touch__btn--overtake {
 @media (max-height: 500px) {
   .race-status {
     max-height: calc(100vh - 200px);
+    max-height: calc(100dvh - 200px);
   }
 }
 html[data-screen='drive']:not([data-paused]) {
@@ -1918,6 +1979,12 @@ html[data-screen='drive']:not([data-paused]) #view {
 html[data-screen='drive']:not([data-paused]) .update-bar {
   display: none;
 }
+/* The bar shows over a paused session: keep the pause card clear of it. pwa/register.ts
+   publishes the bar's measured height; 56 px (a 44 px touch target plus 6 px padding above and
+   below) stands in until it has. */
+html:has(.update-bar) .pause {
+  padding-bottom: calc(var(--safe-b, 16px) + var(--update-bar-h, 56px) + var(--sp-2));
+}
 [data-paused] .onboarding {
   display: none;
 }
@@ -1928,7 +1995,8 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
   display: grid;
   align-content: center;
   text-align: center;
-  padding: 24px;
+  padding: max(24px, var(--safe-t)) max(24px, var(--safe-r)) max(24px, var(--safe-b))
+    max(24px, var(--safe-l));
   background: var(--c-ink-0);
   color: var(--c-text-1);
 }
@@ -1945,7 +2013,7 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
 @media (orientation: portrait) {
   .rotate-prompt {
     bottom: auto;
-    padding: 12px;
+    padding: max(12px, var(--inset-t)) var(--safe-r) 12px var(--safe-l);
     border-bottom: 1px solid var(--c-line-strong);
   }
   .rotate-prompt h2 {
@@ -1956,15 +2024,12 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
     font-size: 12px;
     margin: 0;
   }
+  /* Below the rotate prompt, which grows by the top inset. */
   [data-portrait] .pause {
-    padding-top: 100px;
+    padding-top: calc(100px + var(--inset-t));
   }
 }
 @media (max-height: 500px) {
-  .pause__actions {
-    min-height: 0;
-    overflow-y: auto;
-  }
   /* Phone landscape: a compact card under the tower that lets touches through to the steering
      zone; each tip moves on by itself, and Skip lives in the pause menu. */
   .onboarding {
@@ -1990,9 +2055,14 @@ html[data-screen='drive']:not([data-paused]) .update-bar {
     flex-wrap: wrap;
   }
   .pause__body {
+    /* One column: the whole card scrolls, as before. */
+    flex: none;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     gap: 16px;
+  }
+  .pause__settings {
+    overflow-y: visible;
   }
   .pause__setting {
     grid-template-columns: minmax(0, 1fr);
@@ -2147,14 +2217,16 @@ html[data-drs='open'] .ut-touch .ut-touch__btn--drs {
 .home-hint {
   position: fixed;
   z-index: 60;
-  left: 50%;
-  top: max(var(--safe), env(safe-area-inset-top, 0px));
-  transform: translateX(-50%);
+  /* Centred between the safe edges, so a one-sided inset (notch left or right) moves it over. */
+  left: var(--safe-l);
+  right: var(--safe-r);
+  top: var(--safe-t);
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   width: max-content;
-  max-width: calc(100vw - 2 * max(var(--safe), env(safe-area-inset-left, 0px)));
+  max-width: calc(100% - var(--safe-l) - var(--safe-r));
   box-sizing: border-box;
   padding: 4px 4px 4px 14px;
   background: var(--c-ink-1);

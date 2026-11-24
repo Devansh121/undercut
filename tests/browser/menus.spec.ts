@@ -381,7 +381,7 @@ test.describe('menus, gamepad only', () => {
     await expect(page.locator('html')).toHaveAttribute('data-device', 'gamepad');
     await expect(page.locator('[data-action=start] .glyph')).toHaveText('A');
     await expect(page.locator('[data-action=back] .glyph')).toHaveText('B');
-    await expect(page.locator('[data-testid=device-chip]')).toContainText('Gamepad');
+    await expect(page.locator('[data-testid=device-chip]')).toContainText('Controller');
 
     await padPress(page, PAD.rb);
     await expect(page.locator('[data-action=mode-quickRace]')).toHaveAttribute(

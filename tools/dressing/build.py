@@ -14,7 +14,6 @@ import base64
 import json
 import math
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -46,10 +45,12 @@ CLASSES = [
     ("park", "area", lambda t: t.get("leisure") == "park" or t.get("boundary") == "protected_area"),
 ]
 
-# Names that spell a real racing series (as tools/ci/check-names.mjs finds them) are dropped: the
-# repo never writes one, and a stand or building is placed the same without its name.
-_F = "F"
-SERIES_NAME = re.compile(r"\b" + _F + r"1\b|\b" + _F + r"ormula[\s-]?(1|One)\b", re.I)
+# OpenStreetMap names are dropped unless the renderer reads them: mapped names include real
+# drivers, teams, sponsors and shops (streets, stands and buildings named after them), and the
+# repository ships none of those. A stand or building is placed the same without its name. The
+# renderer looks for these words (packages/render/src/world/furniture.ts: the podium bridge and
+# the historic banking); keep this list and that code in step.
+NAME_KEYWORDS = ("podio", "sopraelevata")
 KEEP_TAGS = ("name", "building", "levels", "building:levels", "height", "roof:shape", "surface", "layer", "leaf_type", "leaf_cycle", "covered", "highway", "barrier")
 
 
@@ -313,7 +314,7 @@ def build(cfg, offline):
             pts = simplify(ring, cfg["simplify"])
             item = {"id": "%s/%d" % (el["type"][0], el["id"]), "p": flat(pts)}
             kept = {k: tags[k] for k in KEEP_TAGS if k in tags}
-            if SERIES_NAME.search(kept.get("name", "")):
+            if "name" in kept and not any(k in kept["name"].lower() for k in NAME_KEYWORDS):
                 del kept["name"]
                 stats["unnamed"] = stats.get("unnamed", 0) + 1
             if kept:

@@ -1,4 +1,4 @@
-import type { ActionId } from '@undercut/input';
+import { MENU_BUTTONS, type ActionId, type MenuButton } from '@undercut/input';
 import { ControlsPanel, type ControlsSource } from './controls-help';
 import { el } from './dom';
 import { button } from './kit/components';
@@ -21,6 +21,8 @@ export interface PauseSetting<T extends string | number = string | number> {
   /** Not available right now (steering help on a keyboard); `hint` says why. */
   disabled?: () => boolean;
   hint?: string;
+  /** Shown only while this holds (a setting that means nothing on this device); always if absent. */
+  visible?: () => boolean;
 }
 
 /** A 0–1 level shown as a percentage, adjusted in tenths. */
@@ -80,7 +82,12 @@ export class PauseMenu {
   private readonly focusables: HTMLElement[] = [];
   private readonly rows = new Map<
     string,
-    { setting: PauseSetting; buttons: HTMLButtonElement[]; hint: HTMLElement | null }
+    {
+      setting: PauseSetting;
+      buttons: HTMLButtonElement[];
+      hint: HTMLElement | null;
+      row: HTMLElement;
+    }
   >();
   private readonly sliders = new Map<
     string,
@@ -182,7 +189,7 @@ export class PauseMenu {
       this.focusables.push(buttons[0] as HTMLButtonElement);
       row.append(name, seg);
       grid.append(row);
-      this.rows.set(setting.id, { setting, buttons, hint });
+      this.rows.set(setting.id, { setting, buttons, hint, row });
     }
 
     for (const slider of sliders) {
@@ -295,7 +302,8 @@ export class PauseMenu {
       input.style.setProperty('--v', `${v * 100}%`);
       output.textContent = `${Math.round(v * 100)}%`;
     }
-    for (const { setting, buttons, hint } of this.rows.values()) {
+    for (const { setting, buttons, hint, row } of this.rows.values()) {
+      row.hidden = !(setting.visible?.() ?? true);
       const current = String(setting.get());
       const disabled = setting.disabled?.() ?? false;
       for (const b of buttons) {
@@ -317,10 +325,11 @@ export class PauseMenu {
   navigate(action: string): boolean {
     if (!this.open) return false;
     const active = document.activeElement;
-    // The controls list sits on top: back or pause closes it, accept presses its focused button.
+    // The controls list sits on top: pause closes it, and it takes every menu action.
     if (this.controls?.open) {
-      if (action === 'menuBack' || action === 'pause') this.controls.hide();
-      else if (action === 'menuAccept') this.controls.accept();
+      if (action === 'pause') this.controls.hide();
+      else if (MENU_BUTTONS.includes(action as MenuButton))
+        this.controls.handle(action as MenuButton);
       return true;
     }
     const rowOf = (

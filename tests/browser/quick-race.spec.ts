@@ -193,5 +193,15 @@ test('Quick Race: straight to the result when the player does not finish', async
   expect(end.clusterShown).toBe(false);
   expect(end.skipShown).toBe(false);
   await expect(page.getByTestId('race-status')).toContainText('Race result');
+  // Names and words, not the engine's car codes and status ids (D01, dnf, notClassified).
+  await expect(page.getByTestId('race-status')).toContainText('Retired');
+  expect(await page.getByTestId('race-status').textContent()).not.toMatch(
+    /\bD\d{1,2}\b|\bdnf\b|\bdsq\b|notClassified/,
+  );
+  // Every row is a position and an entrant's name: a blank name would leave "12  +1L".
+  const rows = await page.getByTestId('race-status').locator('.race-status__row').allTextContents();
+  expect(rows).toHaveLength(20);
+  for (const row of rows) expect(row).toMatch(/^\d{1,2} {2}\p{L}{2,}/u);
+  await expect(page.locator('.race-status__row.is-player')).toContainText('Retired');
   await page.evaluate(() => window.__undercut!.quit());
 });

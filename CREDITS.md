@@ -4,29 +4,54 @@ Code in this repository is MIT licensed (see `LICENSE`). Third-party code and as
 
 ## Third-party code shipped in the client
 
-| Project | Licence | Use |
-| --- | --- | --- |
-| [three.js](https://github.com/mrdoob/three.js) | MIT | 3D rendering |
-| [Draco](https://github.com/google/draco) decoder (`draco_decoder.wasm`, `draco_wasm_wrapper.js`, as shipped in three.js's `examples/jsm/libs/draco/gltf/`) | Apache-2.0 | Decoding the car's compressed geometry; served from the game's own origin at `assets/draco/` |
+| Project | Package | Licence | Use |
+| --- | --- | --- | --- |
+| [three.js](https://github.com/mrdoob/three.js) | `three` | MIT | 3D rendering, bundled into the game's scripts |
+| [SMAA](https://github.com/iryoku/smaa) area and search textures (embedded in three.js's `SMAAPass`) | (in `three`) | MIT, Copyright (C) 2013 Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro, Diego Gutierrez | Anti-aliasing in the post-processing pipeline; bundled into the game's scripts |
+| [Draco](https://github.com/google/draco) decoder (`draco_decoder.wasm`, `draco_wasm_wrapper.js`, as shipped in three.js's `examples/jsm/libs/draco/gltf/`) | (in `three`) | Apache-2.0 | Decoding the compressed models; served from the game's own origin at /assets/draco/ |
+
+The build writes `licences.txt` at the site root (`apps/web/licences.ts`) with the full licence text of everything above, the fonts and the circuit data, because minifying drops the licence comments from the bundled code. The Apache-2.0 text it uses is the canonical copy in `apps/web/licences/Apache-2.0.txt`; SMAA's MIT text, with its copyright lines, is copied verbatim from upstream into `apps/web/licences/SMAA-MIT.txt`.
+
+The rooms server (`services/rooms`) bundles no third-party code.
 
 ## Tools used to build, run and test (not shipped)
 
-| Project | Licence |
-| --- | --- |
-| [TypeScript](https://github.com/microsoft/TypeScript) | Apache-2.0 |
-| [Vite](https://github.com/vitejs/vite) | MIT |
-| [Vitest](https://github.com/vitest-dev/vitest) | MIT |
-| [Playwright](https://github.com/microsoft/playwright) | Apache-2.0 |
-| [Wrangler](https://github.com/cloudflare/workers-sdk) and [workerd](https://github.com/cloudflare/workerd) | MIT or Apache-2.0; Apache-2.0 |
-| [ESLint](https://github.com/eslint/eslint), [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint) | MIT |
-| [Prettier](https://github.com/prettier/prettier) | MIT |
-| [ws](https://github.com/websockets/ws) | MIT |
-| [selfsigned](https://github.com/jfromaniello/selfsigned) | MIT |
-| [gitleaks](https://github.com/gitleaks/gitleaks) (CI only) | MIT |
+npm packages named in a `package.json`; their own dependencies are checked against `tools/ci/dependency-licences.json` by `npm run check:credits`.
+
+| Project | Package | Licence |
+| --- | --- | --- |
+| [TypeScript](https://github.com/microsoft/TypeScript) | `typescript` | Apache-2.0 |
+| [Vite](https://github.com/vitejs/vite) | `vite` | MIT |
+| [Vitest](https://github.com/vitest-dev/vitest) | `vitest` | MIT |
+| [Playwright](https://github.com/microsoft/playwright) | `@playwright/test` | Apache-2.0 |
+| [Wrangler](https://github.com/cloudflare/workers-sdk) and [workerd](https://github.com/cloudflare/workerd) | `wrangler` | MIT or Apache-2.0; Apache-2.0 |
+| [Workers types](https://github.com/cloudflare/workerd) | `@cloudflare/workers-types` | MIT or Apache-2.0 |
+| [ESLint](https://github.com/eslint/eslint) | `eslint`, `@eslint/js` | MIT |
+| [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint) | `typescript-eslint` | MIT |
+| [globals](https://github.com/sindresorhus/globals) | `globals` | MIT |
+| [Prettier](https://github.com/prettier/prettier) | `prettier` | MIT |
+| [ws](https://github.com/websockets/ws) | `ws` | MIT |
+| [selfsigned](https://github.com/jfromaniello/selfsigned) | `selfsigned` | MIT |
+| [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) type definitions | `@types/node`, `@types/ws`, `@types/three` | MIT |
+
+Two licences among those packages' own dependencies are not permissive; neither is shipped: [Lightning CSS](https://github.com/parcel-bundler/lightningcss) (MPL-2.0, Vite's CSS minifier, used unmodified) and the libvips binaries in [sharp](https://github.com/lovell/sharp)'s optional prebuilt packages (LGPL-3.0-or-later, pulled in by Wrangler's local runtime).
+
+Programs run outside npm:
+
+| Project | Licence | Use |
+| --- | --- | --- |
+| [Blender](https://www.blender.org/) 5.2 LTS | GPL-2.0-or-later | Building the car and prop models (`tools/car/`, `tools/props/`) |
+| [NumPy](https://numpy.org/) | BSD-3-Clause | Procedural textures and texture processing in the Python tools |
+| [Pillow](https://python-pillow.org/) | MIT-CMU | Image reading and writing in `tools/assets/build_textures.py` |
+| [fontTools](https://github.com/fonttools/fonttools) | MIT | Repackaging the Archivo font as WOFF2 |
+| [FFmpeg](https://ffmpeg.org/) | LGPL-2.1-or-later (GPL builds: GPL-2.0-or-later) | Encoding audio renders, screenshots and evidence images |
+| [gitleaks](https://github.com/gitleaks/gitleaks) (CI only) | MIT | Secret scan |
 
 ## Track and circuit dressing data
 
-The circuit files in `packages/track/data/` and `packages/render/data/` are databases derived from open geodata and are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md) and [`packages/render/data/LICENSE-DATA.md`](packages/render/data/LICENSE-DATA.md).
+The circuit files in `packages/track/data/` and `packages/render/data/` are databases derived from open geodata, and the racing lines in `packages/ai/data/` (`*.line.json`) are computed along them; all are offered under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/), not the MIT licence. The full notices are in [`packages/track/data/LICENSE-DATA.md`](packages/track/data/LICENSE-DATA.md), [`packages/render/data/LICENSE-DATA.md`](packages/render/data/LICENSE-DATA.md) and [`packages/ai/data/LICENSE-DATA.md`](packages/ai/data/LICENSE-DATA.md). The game shows the OpenStreetMap and Copernicus credit on its launch screen. OpenStreetMap feature names are not kept in the dressing data (many name real drivers, teams, sponsors or shops), except the two the renderer reads.
+
+Images of the circuits in `docs/evidence/` (plans, profiles, screenshots) are produced works from this data: © OpenStreetMap contributors; heights from Copernicus WorldDEM-30.
 
 | Source | Use | Licence |
 | --- | --- | --- |
@@ -81,11 +106,17 @@ Built by `npm run assets:build` (`tools/assets/build_textures.py`): resized and 
 
 Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Creative Commons CC0 1.0 Universal License.
 
+The texture index the game reads, `apps/web/public/assets/index.json`, is written by the same script and is under the repository's MIT licence.
+
 ### Car
 
 The car (`apps/web/public/assets/car/`: three GLB levels of detail, ten team livery masks and the livery index) is generated from nothing by the repository's own scripts in `tools/car/` (`npm run car:build`) and is under the same MIT licence as the code. Its textures (carbon twill, bodywork panel detail, tyre sidewall with an invented maker's mark and compound ticks, brake-disc glow) are drawn procedurally; no third-party image or model is used. The build runs [Blender](https://www.blender.org/) 5.2 LTS (GPL-2.0-or-later) as a tool; Blender is not shipped. The studio lighting in the committed Blender reference renders is Poly Haven's `studio_small_09` HDRI (CC0), used for lighting only and not committed.
 
 The team car images on the main menu (`apps/web/public/assets/ui/cars/`) are renders of that car in each driver's livery, made by `tools/ui/team-cars.mjs` (`npm run ui:cars`) with the repository's car viewer, under the same MIT licence.
+
+### Audio
+
+Every sound in the game (engines, tyres, wind, kerbs, crowd and ambience) is synthesised at run time by `packages/audio/`; no recordings or samples are used.
 
 ## Circuit prop kit
 

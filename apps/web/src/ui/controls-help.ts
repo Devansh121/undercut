@@ -1,19 +1,28 @@
 import {
   controlLabel,
   controlsFor,
+  parsePadControl,
   type ActionId,
   type BindingMap,
+  type ControlId,
   type DeviceKind,
 } from '@undercut/input';
 import { el } from './dom';
-import { button } from './kit/components';
-import { icon, type IconKey } from './kit/icons';
+import { button, tabStrip, type TabStrip } from './kit/components';
+import { faceGlyph, padFace } from './kit/glyph';
+import { focusables, navigate, type NavAction } from './kit/nav';
 import { S } from './strings';
 
 export interface ControlRow {
   id: string;
   action: string;
+  /** Everything bound, as text ("S or Down arrow"); also the row's accessible name. */
   input: string;
+  /**
+   * The bound controls, one entry per alternative: one control, or for steering the left and
+   * right pair. Empty when nothing is bound on the device.
+   */
+  slots: ControlId[][];
 }
 
 /** The listed actions, in order. Steering is one row built from its two half-axes. */
@@ -36,12 +45,6 @@ const ROWS: { id: string; label: string; actions: ActionId[] }[] = [
 ];
 
 export const DEVICE_NAMES: Readonly<Record<DeviceKind, string>> = S.menu.deviceNames;
-
-const DEVICE_ICON: Record<DeviceKind, IconKey> = {
-  keyboard: 'keyboard',
-  gamepad: 'controls',
-  touch: 'touch',
-};
 
 /**
  * Where an action with no control on a device can still be reached. The touch overlay has no
@@ -95,15 +98,51 @@ function steerLabel(map: BindingMap, device: DeviceKind): string {
   return parts.length > 0 ? capitalise(parts.join(' or ')) : NOT_BOUND;
 }
 
+/** Steering's binding slots: the n-th left control with the n-th right one. */
+function steerSlots(map: BindingMap, device: DeviceKind): ControlId[][] {
+  const left = controlsFor(map, device, 'steerLeft');
+  const right = controlsFor(map, device, 'steerRight');
+  const slots: ControlId[][] = [];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    slots.push([left[i], right[i]].filter((c): c is ControlId => c !== undefined));
+  }
+  return slots;
+}
+
 /** Action and input rows for `device`, read from the live binding map. */
 export function controlRows(map: BindingMap, device: DeviceKind): ControlRow[] {
   return ROWS.map(({ id, label, actions }) => {
-    if (id === 'steer') return { id, action: label, input: steerLabel(map, device) };
+    if (id === 'steer') {
+      return { id, action: label, input: steerLabel(map, device), slots: steerSlots(map, device) };
+    }
     const action = actions[0] as ActionId;
     let input = inputLabel(map, device, action);
     if (input === NOT_BOUND) input = ELSEWHERE[action] ?? NOT_BOUND;
-    return { id, action: label, input };
+    return { id, action: label, input, slots: controlsFor(map, device, action).map((c) => [c]) };
   });
+}
+
+/** What the panel needs to know about the devices on this machine. */
+export interface DevicePresence {
+  /** A touch screen (phones, tablets). */
+  touch: boolean;
+  /** Devices used since the page opened. */
+  used: ReadonlySet<DeviceKind>;
+}
+
+/**
+ * The devices the controls list has a tab for, in a fixed order. The controller is always
+ * listed (with a note while none is connected), so its bindings can be read before plugging one
+ * in. Touch is listed on touch screens; the keyboard everywhere except on a touch screen that has
+ * never had a key pressed. The device in use is always listed.
+ */
+export function controlsTabs(active: DeviceKind, presence: DevicePresence): DeviceKind[] {
+  const has = (d: DeviceKind): boolean => d === active || presence.used.has(d);
+  const list: DeviceKind[] = [];
+  if (!presence.touch || has('keyboard')) list.push('keyboard');
+  list.push('gamepad');
+  if (presence.touch || has('touch')) list.push('touch');
+  return list;
 }
 
 /**
@@ -140,21 +179,63 @@ export function takeFirstStartHint(): boolean {
 
 export interface ControlsSource {
   bindings(): BindingMap;
+  /** The device in use. */
   device(): DeviceKind;
+  /** A controller is connected now. */
+  padConnected?(): boolean;
+  /** The screen takes touch. */
+  touchCapable?(): boolean;
+}
+
+/** Pad controls drawn as their button glyphs; sticks and the D-pad keep a word beside them. */
+function padSlot(slot: readonly ControlId[]): Node[] {
+  const nodes: Node[] = [];
+  const axes = slot.map(parsePadControl).filter((p) => p?.kind === 'axis');
+  if (axes.length === slot.length && slot.length > 0) {
+    // One stick (or one stick direction): the stick glyph and its name.
+    const names = slot.map(controlLabel);
+    const text = names.length === 2 ? pairLabel(names[0] as string, names[1] as string) : names[0];
+    nodes.push(faceGlyph(padFace(slot[0] as ControlId), 'controls__glyph'));
+    nodes.push(el('span', 'controls__word', capitalise(text ?? '')));
+    return nodes;
+  }
+  slot.forEach((c, i) => {
+    if (i > 0) nodes.push(el('span', 'controls__sep', '/'));
+    const face = padFace(c);
+    if (face.shape === 'none') nodes.push(el('span', 'controls__word', controlLabel(c)));
+    else nodes.push(faceGlyph(face, 'controls__glyph'));
+  });
+  return nodes;
 }
 
 /**
- * The controls list: a dialog of the interface kit over the pause menu or the main menu. Rows
- * are rebuilt from the live bindings each time it opens. While it is open everything beside it
- * is inert, so Tab, pointer and menu navigation (it is a navigation scope) stay in it; Back is
- * its one control, and Esc, B or the pause button close it.
+ * The controls list: a dialog of the interface kit over the pause menu or the main menu, with a
+ * tab per input device. It opens on the device in use and follows it: using another device while
+ * it is open switches to that device's tab. Rows are rebuilt from the live bindings. While it is
+ * open everything beside it is inert, so Tab, pointer and menu navigation (it is a navigation
+ * scope) stay in it; the shoulder buttons (Q and E) step the tabs, and Esc, B or the pause
+ * button close it.
  */
 export class ControlsPanel {
   readonly root: HTMLElement;
+  private readonly head: HTMLElement;
   private readonly list: HTMLElement;
-  private readonly sub: HTMLElement;
   private readonly note: HTMLElement;
+  private readonly padNote: HTMLElement;
   private readonly close: HTMLButtonElement;
+  private tabs: TabStrip | null = null;
+  private tabIds = '';
+  /** The tab shown. */
+  private view: DeviceKind = 'keyboard';
+  /** The device in use when last looked at, to follow a change. */
+  private active: DeviceKind = 'keyboard';
+  private readonly used = new Set<DeviceKind>();
+  /**
+   * Set while the frame that switched to the device in use is handled: that device's first
+   * press both picks its tab and arrives as an action, and a shoulder button should not then
+   * step on past it.
+   */
+  private followed = false;
   private returnFocus: HTMLElement | null = null;
   /** Siblings made inert while the panel is open, so focus and pointer stay in the dialog. */
   private inerted: HTMLElement[] = [];
@@ -173,16 +254,19 @@ export class ControlsPanel {
     this.root = root;
 
     const card = el('div', 'dialog__card controls__card');
-    const head = el('header', 'dialog__head');
+    this.head = el('header', 'dialog__head controls__head');
     const title = el('h2', 'dialog__title', S.controls.title);
     title.id = 'controls-title';
-    this.sub = el('span', 'label controls__device');
-    head.append(title, this.sub);
+    this.head.append(title);
 
     const body = el('div', 'dialog__body');
+    body.id = 'controls-body';
+    body.setAttribute('role', 'tabpanel');
+    this.padNote = el('p', 'controls__pad-note', S.controls.noPad);
+    this.padNote.dataset.testid = 'controls-no-pad';
     this.list = el('dl', 'controls__list');
     this.note = el('p', 'controls__note');
-    body.append(this.list, this.note);
+    body.append(this.padNote, this.list, this.note);
 
     this.close = button({
       label: S.menu.back,
@@ -191,11 +275,14 @@ export class ControlsPanel {
       onClick: () => this.hide(),
     });
     this.close.dataset.navDefault = '';
-    // Back is the dialog's only focusable control: Tab and Shift+Tab stay on it.
+    // Tab and Shift+Tab cycle through the dialog's own controls.
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       e.preventDefault();
-      this.close.focus({ preventScroll: true });
+      const items = focusables(root);
+      const at = items.indexOf(document.activeElement as HTMLElement);
+      const next = items[(at + (e.shiftKey ? -1 : 1) + items.length) % items.length];
+      (next ?? this.close).focus({ preventScroll: true });
     });
     root.addEventListener('pointerdown', (e) => {
       if (e.target === root) this.hide();
@@ -203,8 +290,31 @@ export class ControlsPanel {
     const foot = el('footer', 'dialog__foot');
     foot.append(this.close);
 
-    card.append(head, body, foot);
+    card.append(this.head, body, foot);
     root.append(card);
+  }
+
+  get open(): boolean {
+    return !this.root.hidden;
+  }
+
+  /** The device whose controls are listed. */
+  get shown(): DeviceKind {
+    return this.view;
+  }
+
+  /**
+   * Menu actions while the panel is open: Back closes it, the shoulder buttons step the tabs,
+   * and the rest move focus inside it (accept presses the focused tab or Back). Returns false
+   * when the panel is closed.
+   */
+  handle(action: NavAction, nativeAccept = false): boolean {
+    if (!this.open) return false;
+    if (action === 'menuBack') this.hide();
+    else if (action === 'menuTabPrev' || action === 'menuTabNext') {
+      if (!this.followed) this.tabs?.step(action === 'menuTabPrev' ? -1 : 1);
+    } else navigate(this.root, action, nativeAccept);
+    return true;
   }
 
   /**
@@ -212,30 +322,29 @@ export class ControlsPanel {
    * control inside the panel. Returns true when the panel was open and took it.
    */
   accept(): boolean {
-    if (!this.open) return false;
-    const active = document.activeElement;
-    if (active instanceof HTMLButtonElement && this.root.contains(active)) active.click();
-    return true;
+    return this.handle('menuAccept');
   }
 
-  get open(): boolean {
-    return !this.root.hidden;
+  /** Follow the device in use: call when it may have changed. Switches tab when it did. */
+  sync(): void {
+    if (!this.open) return;
+    const device = this.source.device();
+    if (device === this.active) return;
+    this.active = device;
+    this.used.add(device);
+    this.view = device;
+    this.render();
+    this.followed = true;
+    queueMicrotask(() => {
+      this.followed = false;
+    });
   }
 
   show(): void {
-    const device = this.source.device();
-    const map = this.source.bindings();
-    this.sub.replaceChildren(icon(DEVICE_ICON[device]), el('span', '', DEVICE_NAMES[device]));
-    this.note.textContent = reverseNote(map, device);
-    const rows = controlRows(map, device).map((r) => {
-      const row = el('div', 'setting controls__row');
-      row.dataset.row = r.id;
-      const input = el('dd', 'controls__input', r.input);
-      if (r.input === NOT_BOUND) input.classList.add('is-empty');
-      row.append(el('dt', 'setting__k', r.action), input);
-      return row;
-    });
-    this.list.replaceChildren(...rows);
+    this.active = this.source.device();
+    this.used.add(this.active);
+    this.view = this.active;
+    this.render();
     this.returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.root.hidden = false;
@@ -257,5 +366,60 @@ export class ControlsPanel {
     this.returnFocus?.focus({ preventScroll: true });
     this.returnFocus = null;
     this.onClose();
+  }
+
+  /** Build the tabs (when the set of devices changed) and the rows for the shown device. */
+  private render(): void {
+    const devices = controlsTabs(this.active, {
+      touch: this.source.touchCapable?.() ?? false,
+      used: this.used,
+    });
+    if (!devices.includes(this.view)) this.view = this.active;
+    const ids = devices.join(' ');
+    if (ids !== this.tabIds || !this.tabs) {
+      const focusedTab = this.tabs?.root.contains(document.activeElement) ?? false;
+      this.tabs?.root.remove();
+      this.tabIds = ids;
+      this.tabs = tabStrip({
+        label: S.controls.devices,
+        tabs: devices.map((d) => ({ id: d, label: DEVICE_NAMES[d] })),
+        value: this.view,
+        onChange: (id) => {
+          this.view = id as DeviceKind;
+          this.render();
+        },
+      });
+      this.tabs.root.classList.add('controls__tabs');
+      for (const b of this.tabs.root.querySelectorAll<HTMLElement>('[role=tab]'))
+        b.setAttribute('aria-controls', 'controls-body');
+      this.head.append(this.tabs.root);
+      if (focusedTab) this.close.focus({ preventScroll: true });
+    } else {
+      this.tabs.select(this.view);
+    }
+
+    const device = this.view;
+    const map = this.source.bindings();
+    this.root.dataset.device = device;
+    this.padNote.hidden = device !== 'gamepad' || (this.source.padConnected?.() ?? false);
+    this.note.textContent = reverseNote(map, device);
+    const rows = controlRows(map, device).map((r) => {
+      const row = el('div', 'setting controls__row');
+      row.dataset.row = r.id;
+      const input = el('dd', 'controls__input');
+      input.setAttribute('aria-label', r.input);
+      if (device === 'gamepad' && r.slots.length > 0) {
+        r.slots.forEach((slot, i) => {
+          if (i > 0) input.append(el('span', 'controls__or', S.controls.or));
+          input.append(...padSlot(slot));
+        });
+      } else {
+        input.textContent = r.input;
+        if (r.input === NOT_BOUND) input.classList.add('is-empty');
+      }
+      row.append(el('dt', 'setting__k', r.action), input);
+      return row;
+    });
+    this.list.replaceChildren(...rows);
   }
 }

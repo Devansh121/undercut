@@ -52,6 +52,11 @@ export interface PlayerSettings {
   /** HUD scale, 0.8 to 1.2. */
   hudScale: number;
   subtitles: boolean;
+  /**
+   * Force feedback for kerbs and contacts: gamepad rumble, and the phone's vibration motor on
+   * touch controls where the browser has the Vibration API (Android; not iOS Safari).
+   */
+  haptics: boolean;
 }
 
 export interface MenuPrefs {
@@ -91,6 +96,7 @@ export function defaultPrefs(): MenuPrefs {
       colourBlind: false,
       hudScale: 1,
       subtitles: true,
+      haptics: true,
     },
   };
 }
@@ -177,6 +183,7 @@ export function parsePrefs(text: string | null): MenuPrefs {
           : d.settings.hudScale,
       subtitles:
         typeof settings.subtitles === 'boolean' ? settings.subtitles : d.settings.subtitles,
+      haptics: typeof settings.haptics === 'boolean' ? settings.haptics : d.settings.haptics,
     },
   };
 }

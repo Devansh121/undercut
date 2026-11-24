@@ -1,4 +1,11 @@
-import { defaultBindings, keyControl, padButton, rebind } from '@undercut/input';
+import {
+  defaultBindings,
+  keyControl,
+  padAxis,
+  padButton,
+  rebind,
+  touchControl,
+} from '@undercut/input';
 import {
   FLAT_SURFACE,
   NEUTRAL_INPUT,
@@ -12,7 +19,7 @@ import {
   type ControlInput,
 } from '@undercut/sim';
 import { describe, expect, it } from 'vitest';
-import { controlRows, controlsHint, pairLabel, reverseNote } from './controls-help';
+import { controlRows, controlsHint, controlsTabs, pairLabel, reverseNote } from './controls-help';
 
 const row = (rows: ReturnType<typeof controlRows>, id: string) => rows.find((r) => r.id === id);
 
@@ -44,6 +51,48 @@ describe('controls list', () => {
     expect(row(touch, 'brake')?.input).toBe('Brake pedal');
     expect(row(touch, 'steer')?.input).toBe('Stick');
     expect(row(touch, 'pitLimiter')?.input).toBe('Limiter button');
+  });
+
+  it('lists the bound controls of each device, one slot per alternative', () => {
+    const map = defaultBindings();
+    const pad = controlRows(map, 'gamepad');
+    expect(row(pad, 'brake')?.slots).toEqual([[padButton(6)]]);
+    expect(row(pad, 'throttle')?.slots).toEqual([[padButton(7)]]);
+    expect(row(pad, 'gearDown')?.slots).toEqual([[padButton(4)]]);
+    expect(row(pad, 'steer')?.slots[0]).toEqual([padAxis(0, -1), padAxis(0, 1)]);
+    const keys = controlRows(map, 'keyboard');
+    expect(row(keys, 'brake')?.slots).toEqual([[keyControl('KeyS')], [keyControl('ArrowDown')]]);
+    expect(row(keys, 'steer')?.slots).toEqual([
+      [keyControl('KeyA'), keyControl('KeyD')],
+      [keyControl('ArrowLeft'), keyControl('ArrowRight')],
+    ]);
+    // Nothing bound: no slots, and the text says where it is instead.
+    const touch = controlRows(map, 'touch');
+    expect(row(touch, 'pitLimiter')?.slots).toEqual([[touchControl('pitLimiter')]]);
+    expect(row(touch, 'lookBack')?.slots).toEqual([]);
+    expect(row(touch, 'resetToTrack')?.slots).toEqual([]);
+    // Every row of every device has a text form, for the accessible name.
+    for (const d of ['keyboard', 'gamepad', 'touch'] as const)
+      for (const r of controlRows(map, d)) expect(r.input.length).toBeGreaterThan(0);
+  });
+
+  it('has a tab for each device on the machine, the controller always', () => {
+    const none = new Set<never>();
+    expect(controlsTabs('keyboard', { touch: false, used: none })).toEqual(['keyboard', 'gamepad']);
+    // A pad in use on a desktop: still the keyboard, which is always there.
+    expect(controlsTabs('gamepad', { touch: false, used: none })).toEqual(['keyboard', 'gamepad']);
+    // A phone: no keyboard until a key is pressed.
+    expect(controlsTabs('touch', { touch: true, used: none })).toEqual(['gamepad', 'touch']);
+    expect(controlsTabs('touch', { touch: true, used: new Set(['keyboard'] as const) })).toEqual([
+      'keyboard',
+      'gamepad',
+      'touch',
+    ]);
+    expect(controlsTabs('keyboard', { touch: true, used: none })).toEqual([
+      'keyboard',
+      'gamepad',
+      'touch',
+    ]);
   });
 
   it('points to the pause menu for reset on touch, which has no reset button', () => {

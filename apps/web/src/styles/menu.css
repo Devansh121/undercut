@@ -11,7 +11,8 @@
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-rows: 64px minmax(0, 1fr);
+  /* The top bar grows by the top inset (status bar, Dynamic Island on an upright iPhone). */
+  grid-template-rows: calc(64px + var(--inset-t)) minmax(0, 1fr);
   background:
     radial-gradient(90% 70% at 85% 10%, rgba(255, 90, 31, 0.07), transparent 60%),
     linear-gradient(180deg, #14171b 0%, #0e1013 60%, var(--c-ink-0) 100%);
@@ -37,7 +38,7 @@
   align-items: center;
   gap: var(--sp-6);
   min-width: 0;
-  padding: 0 var(--safe-r) 0 var(--safe-l);
+  padding: var(--inset-t) var(--safe-r) 0 var(--safe-l);
   box-shadow: inset 0 -1px 0 var(--c-line);
 }
 
@@ -154,8 +155,7 @@
   align-items: center;
   gap: var(--sp-4);
   min-height: 72px;
-  padding: var(--sp-3) var(--safe-r) max(var(--sp-3), env(safe-area-inset-bottom, 0px))
-    var(--safe-l);
+  padding: var(--sp-3) var(--safe-r) max(var(--sp-3), var(--inset-b)) var(--safe-l);
   box-shadow: inset 0 1px 0 var(--c-line);
   background: rgba(11, 12, 14, 0.6);
 }
@@ -241,8 +241,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  padding: var(--sp-5) var(--safe-r) max(var(--sp-5), env(safe-area-inset-bottom, 0px))
-    var(--safe-l);
+  padding: var(--sp-5) var(--safe-r) max(var(--sp-5), var(--inset-b)) var(--safe-l);
   box-shadow: inset 0 1px 0 var(--c-line);
 }
 
@@ -985,7 +984,7 @@
 @media (max-height: 500px) and (orientation: landscape),
   (max-width: 600px) and (orientation: portrait) {
   .shell {
-    grid-template-rows: 44px minmax(0, 1fr);
+    grid-template-rows: calc(44px + var(--inset-t)) minmax(0, 1fr);
   }
   .shell.is-bare {
     grid-template-rows: minmax(0, 1fr);
@@ -1011,7 +1010,7 @@
   .actionbar {
     min-height: 48px;
     padding-top: 6px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(6px, var(--inset-b));
   }
   .actionbar .btn {
     height: 44px;
@@ -1040,7 +1039,7 @@
   }
   .launch__bar {
     padding-top: var(--sp-3);
-    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(var(--sp-3), var(--inset-b));
   }
   /* A thumb-sized hit area for the credit link; the text stays small and quiet. */
   .launch__credit {
@@ -1283,16 +1282,22 @@
   width: min(720px, 100%);
 }
 
-.controls__device {
-  display: inline-flex;
+.controls__head {
   align-items: center;
-  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.controls__pad-note {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-left: 2px solid var(--c-line-strong);
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
   color: var(--c-text-2);
 }
 
-.controls__device .icon {
-  width: 16px;
-  height: 16px;
+.controls__pad-note[hidden] {
+  display: none;
 }
 
 .controls__list {
@@ -1316,6 +1321,29 @@
   font-weight: 650;
   text-align: right;
   color: var(--c-text-1);
+}
+
+.controls__input:has(.glyph) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+}
+
+.controls__glyph {
+  opacity: 1;
+}
+
+.controls__or,
+.controls__sep {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--c-text-3);
+}
+
+.controls__sep {
+  margin: 0 calc(-1 * var(--sp-1));
 }
 
 .controls__input.is-empty {
@@ -1563,4 +1591,10 @@
   height: 24px;
   min-height: 24px;
   padding: 0;
+}
+/* The device tabs are touch targets on a phone. */
+@media (pointer: coarse) {
+  .controls__tabs .tab {
+    min-height: 44px;
+  }
 }

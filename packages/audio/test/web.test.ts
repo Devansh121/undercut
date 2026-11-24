@@ -316,3 +316,76 @@ describe('lifecycle changes while the worklet is still loading', () => {
     expect((options[0]?.processorOptions as { startPaused?: boolean }).startPaused).toBe(true);
   });
 });
+
+/**
+ * iOS Safari (WebKit) only lets an AudioContext start from inside a user-gesture handler, and
+ * a context the game creates later (a session that finished loading) or one the system
+ * interrupted (a call, Siri, the app sent to the background) stays stopped until a context
+ * `resume()` runs synchronously in a gesture. `unlock()` is that call.
+ */
+describe('unlock from a user gesture', () => {
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+
+  it('creates and resumes the context synchronously, then stays quiet until asked', async () => {
+    const { engine, context, nodes } = setup();
+    engine.unlock();
+    // Synchronously, inside the gesture's call stack.
+    expect(context.calls[0]).toBe('resume');
+    await settle();
+    expect(context.state).toBe('suspended');
+    expect(engine.status).toBe('suspended');
+    expect(nodes[0]?.sent).not.toContainEqual({ type: 'pause', paused: false });
+    // Later, outside any gesture, the game asks for sound and gets it.
+    await engine.resume();
+    expect(context.state).toBe('running');
+    expect(engine.status).toBe('running');
+    expect(nodes).toHaveLength(1);
+  });
+
+  it('brings back a context the system interrupted, inside the gesture', async () => {
+    const { engine, context } = setup();
+    await engine.resume();
+    context.state = 'interrupted';
+    context.calls.length = 0;
+    engine.unlock();
+    expect(context.calls[0]).toBe('resume');
+    expect(context.state).toBe('running');
+    await settle();
+    expect(engine.status).toBe('running');
+  });
+
+  it('does nothing to a running context or in a hidden tab', async () => {
+    const { engine, context, doc } = setup();
+    await engine.resume();
+    context.calls.length = 0;
+    engine.unlock();
+    expect(context.calls).toEqual([]);
+    doc.set('hidden');
+    await settle();
+    context.calls.length = 0;
+    engine.unlock();
+    expect(context.calls).not.toContain('resume');
+  });
+
+  it('leaves a context the game suspended alone', async () => {
+    const { engine, context } = setup();
+    await engine.resume();
+    await engine.suspend();
+    context.calls.length = 0;
+    engine.unlock();
+    await settle();
+    expect(context.calls).toEqual([]);
+    expect(context.state).toBe('suspended');
+  });
+
+  it('is safe on the silent engine and after dispose', async () => {
+    const silent = createAudioEngine({ workletUrl: 'x', visibility: null, onFallback: () => {} });
+    expect(() => silent.unlock()).not.toThrow();
+    const { engine, context } = setup();
+    await engine.resume();
+    await engine.dispose();
+    context.calls.length = 0;
+    engine.unlock();
+    expect(context.calls).toEqual([]);
+  });
+});

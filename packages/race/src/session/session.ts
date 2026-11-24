@@ -135,6 +135,8 @@ export interface RaceSessionSnapshot {
 const BLOCK_GHOST_AFTER = 6;
 /** The same for a car stalled on the grid (never yet at speed), s. */
 const STALLED_GHOST_AFTER = 1.5;
+/** A player still on the grid: with the start grace, at least six seconds to launch, s. */
+const PLAYER_STALLED_GHOST_AFTER = 5;
 /** Held up: a car within `HELD_REACH` m behind, on the road anywhere across it, under this speed, m/s. */
 const HELD_SPEED = 5;
 const HELD_REACH = 60;
@@ -475,7 +477,11 @@ export class RaceSession {
       } else if (this.headOfStillQueue(i)) {
         this.blockTime[i]! += dt;
         // (Stalled on the grid, sooner: the cars behind it have not got away at all.)
-        const after = this.atSpeed[i] ? BLOCK_GHOST_AFTER : STALLED_GHOST_AFTER;
+        const after = this.atSpeed[i]
+          ? BLOCK_GHOST_AFTER
+          : this.cars[i]!.controller.kind === 'human'
+            ? PLAYER_STALLED_GHOST_AFTER
+            : STALLED_GHOST_AFTER;
         if (this.blockTime[i]! >= after) {
           this.blockGhost[i] = true;
           this.blockTime[i] = 0;

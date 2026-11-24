@@ -38,13 +38,11 @@ export class CarState {
     createSurfaceHint(),
     createSurfaceHint(),
   ];
-  /** Barrier search hints, one per body corner (front left, front right, rear left, rear right). */
-  readonly wallHints: readonly SurfaceHint[] = [
-    createSurfaceHint(),
-    createSurfaceHint(),
-    createSurfaceHint(),
-    createSurfaceHint(),
-  ];
+  /**
+   * Barrier search hints, one per body contact point: the corners (front left, front right, rear
+   * left, rear right), then the points along the body's edges (`step.ts`, `WALL_EDGE_POINTS`).
+   */
+  readonly wallHints: readonly SurfaceHint[] = Array.from({ length: 10 }, createSurfaceHint);
   /** Hints for the contact-patch sample points, `PATCH_HINTS` per wheel. Caches only. */
   readonly patchHints: readonly SurfaceHint[] = Array.from(
     { length: 4 * PATCH_HINTS },
@@ -153,6 +151,11 @@ export class CarState {
   tyreAmbient = 0;
   readonly tyreTemp = new Float64Array(4);
   readonly tyreWear = new Float64Array(4);
+  /**
+   * Each tyre's surface grip on the last step (1 on asphalt, 0.4 on grass), from the contact
+   * patch: what the assists know of the ground under the car. Part of the snapshot.
+   */
+  readonly surfaceGrip = new Float64Array([1, 1, 1, 1]);
   /**
    * Diagnostics from the last substep, never part of a snapshot (they are outputs, recomputed
    * every substep): the carcass damping share of each tyre's vertical load, N, and the total
@@ -264,6 +267,7 @@ const ARRAY_KEYS = [
   'gripScale',
   'tyreTemp',
   'tyreWear',
+  'surfaceGrip',
 ] as const satisfies readonly (keyof CarState)[];
 
 /** Length of a car snapshot in numbers. */

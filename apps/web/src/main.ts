@@ -95,6 +95,8 @@ function today(): string {
 const shell = new Shell(app, () => undefined, {
   bindings: () => input.profile.bindings,
   device: () => input.activeDevice,
+  padConnected: () => input.gamepad.connected,
+  touchCapable: () => touch,
 });
 shell.setDevice(input.activeDevice);
 const menuInput = new MenuInput(input, {
@@ -104,6 +106,7 @@ const menuInput = new MenuInput(input, {
   },
   device: (d) => {
     shell.setDevice(d);
+    shell.controls?.sync();
     hub.setDevice(d);
   },
 });
@@ -113,12 +116,16 @@ const hub: HubScreen = new HubScreen({
   records,
   device: () => input.activeDevice,
   onStart: (choice) => {
-    // The Start press is the gesture that may start audio.
-    audio.gesture();
+    // The Start press is the gesture that may start audio: the context starts here, silent,
+    // so it may play once the session has loaded (iOS Safari allows no later start).
+    audio.prime();
     if (choice.mode === 'weekend' || choice.mode === 'championship') void showWeekend(choice);
     else start(choice).catch(() => undefined);
   },
   onOnline: () => {
+    // Not primed here: creating the context on this press stalled WebKit's page (the phone-fit
+    // sweep's Online step froze one run in six). An online race's sound starts on the first
+    // touch release instead (PageAudio.gesture unlocks the context then).
     audio.gesture();
     showOnline(null);
   },
@@ -158,7 +165,8 @@ async function showWeekend(choice: SessionChoice): Promise<void> {
     progress,
     webStorage,
     (nextChoice, options, complete) => {
-      audio.gesture();
+      // The weekend screen's Start press is the gesture for this session's sound, as on the hub.
+      audio.prime();
       start(
         nextChoice,
         undefined,
@@ -317,6 +325,13 @@ async function start(
             p.assists[device] = { ...(p.assists[device] ?? {}), [key]: value };
           }),
         ...(extension ? { extension } : {}),
+        haptics: {
+          get: () => prefs.get().settings.haptics,
+          set: (on) =>
+            prefs.update((p) => {
+              p.settings.haptics = on;
+            }),
+        },
         onQuit: () => {
           active = false;
           drive = null;
