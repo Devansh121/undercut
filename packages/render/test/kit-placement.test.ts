@@ -96,7 +96,7 @@ describe('loading prop levels', () => {
 });
 
 describe('crowd handover', () => {
-  it('shares the eye and complementary discard with the existing idle animation', () => {
+  it('shares the eye with the idle animation and decides in the vertex stage, no discard', () => {
     const eye = { value: new Vector3() };
     for (const near of [false, true]) {
       const material = crowdMaterial({ value: 3 });
@@ -109,9 +109,11 @@ describe('crowd handover', () => {
       material.onBeforeCompile(shader, {} as WebGLRenderer);
       expect(shader.uniforms.uCrowdEye).toBe(eye);
       expect(shader.vertexShader).toContain('sin(uCrowdTime');
-      expect(shader.fragmentShader).toContain(
-        near ? 'crowdNoise < vCrowdFar' : 'crowdNoise >= vCrowdFar',
+      expect(shader.vertexShader).toContain(
+        near ? 'crowdChoice < crowdFar' : 'crowdChoice >= crowdFar',
       );
+      // A discard would turn off early depth testing for every crowd fragment.
+      expect(shader.fragmentShader).not.toContain('discard');
       material.dispose();
     }
   });
@@ -145,16 +147,14 @@ describe('crowd handover, evaluated', () => {
       new RegExp(`${name} = ([^;]+);`)
         .exec(source)![1]!
         .replace(/crowdOrigin\.xz/g, '[crowdOrigin[0], crowdOrigin[2]]');
-    const far = line(shader.vertexShader, 'vCrowdFar');
-    const choice = line(shader.vertexShader, 'vCrowdChoice');
+    const far = line(shader.vertexShader, 'float crowdFar');
+    const choice = line(shader.vertexShader, 'float crowdChoice');
     const clipVertex = /if \(([^)]+)\) gl_Position/.exec(shader.vertexShader)![1]!;
-    const discard = /if \(([^)]+)\) discard/.exec(shader.fragmentShader)![1]!;
     const run = new Function(
       ...Object.keys(glsl),
       'crowdOrigin',
       'uCrowdEye',
-      `const vCrowdFar = ${far}; const vCrowdChoice = ${choice}; const crowdNoise = vCrowdChoice;
-       return !(${clipVertex}) && !(${discard});`,
+      `const crowdFar = ${far}; const crowdChoice = ${choice}; return !(${clipVertex});`,
     );
     return (origin, eye) => run(...Object.values(glsl), origin, eye) as boolean;
   }

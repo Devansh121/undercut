@@ -53,6 +53,13 @@ export interface PropKind {
    */
   shadowMaxDistance?: number;
   /**
+   * Cast shadows with this level's geometry (index into `lods`, a cheap one) at every distance,
+   * instead of with the level on show: a shadow-only copy of the chunk, sharing its instances and
+   * drawn on `SHADOW_CASTER_LAYER`, which only the sun's shadow cameras see. For big props whose
+   * shadow pass would otherwise draw their detailed levels once per cascade.
+   */
+  shadowLevel?: number;
+  /**
    * Chunk by a square world grid of this cell size (m) instead of by lap distance: for scenery
    * spread over the land around the circuit (woods), where lap chunks would be long and thin.
    */
@@ -117,7 +124,15 @@ interface Chunk {
   centre: Vector3;
   radius: number;
   meshes: InstancedMesh[];
+  /** Shadow-only copy at the kind's `shadowLevel`, on `SHADOW_CASTER_LAYER`. */
+  shadow?: InstancedMesh;
 }
+
+/**
+ * Object layer drawn only by the sun's shadow cameras (they enable it; no view camera does):
+ * shadow-only proxies of props (`PropKind.shadowLevel`).
+ */
+export const SHADOW_CASTER_LAYER = 3;
 
 /**
  * A car's body footprint for keeping debris out of it, m: from the centre to the nose and the
@@ -285,7 +300,26 @@ export class PropRegistry {
           this.group.add(im);
           return im;
         });
-        chunks.push({ centre, radius: radius + reach, meshes });
+        const level = kind.shadowLevel;
+        let shadow: InstancedMesh | undefined;
+        if (level !== undefined && (kind.castShadow ?? true)) {
+          const source = meshes[level]!;
+          const lod = kind.lods[level]!;
+          shadow = new InstancedMesh(lod.geometry, lod.material, indices.length);
+          // The level's own instances, uploaded once for both.
+          shadow.instanceMatrix = source.instanceMatrix;
+          shadow.customDepthMaterial = source.customDepthMaterial;
+          shadow.castShadow = true;
+          shadow.receiveShadow = false;
+          shadow.layers.set(SHADOW_CASTER_LAYER);
+          shadow.boundingSphere = source.boundingSphere;
+          shadow.visible = false;
+          shadow.matrixAutoUpdate = false;
+          shadow.name = `prop-shadow:${id}`;
+          this.group.add(shadow);
+          for (const im of meshes) im.castShadow = false;
+        }
+        chunks.push({ centre, radius: radius + reach, meshes, ...(shadow && { shadow }) });
       }
       this.chunks.set(id, chunks);
     }
@@ -304,12 +338,15 @@ export class PropRegistry {
         const near = Math.max(0, c.centre.distanceTo(eye) - c.radius);
         const lod = chunkLod(near, kind.lods);
         const castNow = casts && near < shadowMax;
+        const proxy = c.shadow;
         for (let i = 0; i < c.meshes.length; i++) {
           const im = c.meshes[i] as InstancedMesh;
           const active = i === lod;
           im.visible = active;
-          im.castShadow = active && castNow;
+          im.castShadow = active && castNow && !proxy;
         }
+        // Casts while a level is on show and within the shadow reach, like the level would.
+        if (proxy) proxy.visible = castNow && lod >= 0;
       }
     }
   }
@@ -482,7 +519,10 @@ export class PropRegistry {
   /** Releases the instanced meshes; kinds' geometries and materials belong to the caller. */
   dispose(): void {
     for (const chunks of this.chunks.values())
-      for (const c of chunks) for (const im of c.meshes) im.dispose();
+      for (const c of chunks) {
+        for (const im of c.meshes) im.dispose();
+        c.shadow?.dispose();
+      }
     this.chunks.clear();
     this.shadowDepth.dispose();
     this.group.removeFromParent();

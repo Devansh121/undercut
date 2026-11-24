@@ -47,8 +47,17 @@ export function placeKitStands(
         lod.geometry.computeBoundingSphere();
       }
     id = `stand-kit-${key}`;
-    // Shadows to 100 m: the kit bank's cast shadows cost three times its own triangles at 240 m.
-    props.define({ id, lods, gridCell: 100, castShadow: shadows, shadowMaxDistance: 100 });
+    // Shadows from the far level (1,100 to 1,300 triangles a module, against 4,900 to 5,100 for
+    // the level drawn within 80 m), in the shadow pass only, to 100 m: the cascades draw every
+    // caster once each, and the near levels' shadows cost more than the banks themselves.
+    props.define({
+      id,
+      lods,
+      gridCell: 100,
+      castShadow: shadows,
+      shadowMaxDistance: 100,
+      shadowLevel: lods.length - 1,
+    });
     kinds.set(key, id);
     return id;
   };

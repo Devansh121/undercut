@@ -167,7 +167,13 @@ export function crowdMaterial(time: { value: number }): MeshStandardMaterial {
   return m;
 }
 
-/** Complementary per-person handover; a seeded threshold per person avoids partial bodies at the handover. */
+/**
+ * Complementary per-person handover between the near and far crowd, decided per person in the
+ * vertex stage alone: a person's distance and seeded threshold come from its instance origin, so
+ * every vertex of a person agrees and the person is drawn whole by exactly one of the two. No
+ * fragment discard: one in the shader turns off early depth testing for the whole draw, and the
+ * far crowd covers whole stands.
+ */
 export function crowdSwapMaterial(
   material: MeshStandardMaterial,
   eye: { value: Vector3 },
@@ -179,28 +185,14 @@ export function crowdSwapMaterial(
     hook(shader, renderer);
     shader.uniforms.uCrowdEye = eye;
     shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nuniform vec3 uCrowdEye; varying float vCrowdFar; varying float vCrowdChoice;',
-      )
+      .replace('#include <common>', '#include <common>\nuniform vec3 uCrowdEye;')
       .replace(
         '#include <project_vertex>',
         `#include <project_vertex>
         vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
-        vCrowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
-        vCrowdChoice = fract(sin(dot(crowdOrigin.xz, vec2(12.9898, 78.233))) * 43758.5453);
-        if (${near ? 'vCrowdChoice < vCrowdFar' : 'vCrowdChoice >= vCrowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nvarying float vCrowdFar; varying float vCrowdChoice;',
-      )
-      .replace(
-        '#include <alphatest_fragment>',
-        `#include <alphatest_fragment>
-        float crowdNoise = vCrowdChoice;
-        if (${near ? 'crowdNoise < vCrowdFar' : 'crowdNoise >= vCrowdFar'}) discard;`,
+        float crowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
+        float crowdChoice = fract(sin(dot(crowdOrigin.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        if (${near ? 'crowdChoice < crowdFar' : 'crowdChoice >= crowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
       );
   };
   material.customProgramCacheKey = () => `${key}-swap-${near}`;
