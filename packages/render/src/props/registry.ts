@@ -62,7 +62,15 @@ export interface PropKind {
    * along the barriers, so only those really near the eye switch to their top level.
    */
   chunkLength?: number | undefined;
+  /**
+   * Drawn in the water's planar reflection (world/water.ts): 'skyline' on every preset that
+   * reflects, 'scenery' only where the preset reflects the circuit too. Absent: not reflected.
+   */
+  reflect?: Reflected | undefined;
 }
+
+/** What the water's reflection draws (world/water.ts, `userData.reflect`). */
+export type Reflected = 'skyline' | 'scenery';
 
 /** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
 export interface PropPlacement {
@@ -261,6 +269,7 @@ export class PropRegistry {
           im.visible = false;
           im.matrixAutoUpdate = false;
           im.name = `prop:${id}`;
+          if (kind.reflect) im.userData.reflect = kind.reflect;
           this.group.add(im);
           return im;
         });
