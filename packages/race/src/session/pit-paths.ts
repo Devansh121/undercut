@@ -48,14 +48,6 @@ function laneSlope(track: Track, pitS: number, span: number): number {
   return Math.abs(slope) > MAX_JOIN_SLOPE ? 0 : slope;
 }
 
-/** From `d0` leaving with slope `m0` to the lap's centre line (0, slope 0) over `run` metres. */
-function exitBlend(t: number, run: number, d0: number, m0: number): number {
-  const x = Math.max(0, Math.min(1, t));
-  const x2 = x * x;
-  const x3 = x2 * x;
-  return d0 * (2 * x3 - 3 * x2 + 1) + run * m0 * (x3 - 2 * x2 + x);
-}
-
 function forward(length: number, from: number, to: number): number {
   const d = (to - from) % length;
   return d < 0 ? d + length : d;
@@ -141,10 +133,11 @@ export function pitOutPath(
     { index: -1 },
     { s: 0, d: 0, index: -1 },
   );
-  // Out of the lane along its heading, then onto the lap: no kink at the join.
-  const slope = laneSlope(track, pit.length, -10);
+  // Onto the lap from the exit's offset with no sideways start: matching the lane's heading here
+  // sent cars across the track at once, into the path of cars on the straight (Monza seed 211,
+  // 20 m/s). The kink this leaves at the join is taken at the exit's speed anyway.
   for (let x = STEP; x <= 60; x += STEP) {
-    track.lap.pointAt(exit.s + x, exitBlend(x / 60, 60, exit.d, slope), v);
+    track.lap.pointAt(exit.s + x, exit.d * (1 - smooth(x / 60)), v);
     out.push({ x: v.x, z: v.z, v: Infinity });
   }
   return out;

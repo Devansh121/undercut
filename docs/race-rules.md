@@ -229,8 +229,8 @@ plus 1 s):
 
 | Circuit | Limited zone | Loss before | Loss now | Commonly quoted |
 | --- | --- | --- | --- | --- |
-| Monza | 418.5 m | 34.0 s | 29.6 s | about 22 to 25 s |
-| Spa-Francorchamps | 386.2 m | 24.3 s | 21.3 s | not checked |
+| Monza | 418.5 m | 34.0 s | 31.6 s | about 22 to 25 s |
+| Spa-Francorchamps | 386.2 m | 24.3 s | 23.2 s | not checked |
 | Singapore | 403.7 m | 32.1 s | 29.1 s | about 21 to 22 s at 80 km/h (2025); 28 to 30 s at the old 60 km/h |
 
 What changed, measured one step at a time (Monza / Spa / Singapore, s):
@@ -245,25 +245,27 @@ What changed, measured one step at a time (Monza / Spa / Singapore, s):
   made the zones longer (741, 717 and 820 m) and the losses larger.
 - The limiter from 30 m before the first line, not from the lane's start (31.4 / 23.0 / 29.1).
   `RaceControl.limiterZone` held cars to 80 km/h along the whole entry road.
-- The lane joins (27.3 / 20.6 / 26.6). The approach blended onto the lane heading along the lap
-  and met the lane at an angle: a 5 to 15 m radius kink at the join, taken at about 19 m/s, then
-  a second brake for the line. Where the lane leaves at a slope under 0.3 (about 17°) the approach
-  and the exit now meet it on its heading. Steeper joins (Spa's, inside the chicane, and one of
-  Singapore's) keep the plain blend: matching them, even in part, folded the path and AI cars
-  stopped in Spa's lane where it crossed itself (the weekend soak caught it).
+- The entry join (27.3 / 20.6 / 26.6 with an exit join too). The approach blended onto the lane
+  heading along the lap and met it at an angle: a 5 to 15 m radius kink, taken at about 19 m/s,
+  then a second brake for the line. Where the lane leaves at a slope under 0.3 (about 17°) the
+  approach now meets it on its heading. Steeper joins (Spa's, inside the chicane) keep the plain
+  blend: matching them folded the path and AI cars stopped in Spa's lane (the weekend soak caught
+  it). The exit keeps the plain blend everywhere: leaving on the lane's heading sent cars across
+  Monza's straight at once, into a car at 90 m/s (quick-race seed 211, 20 m/s contact). That
+  costs about 2 s at Monza and Spa against the version with both joins matched.
 - Pulling away from the box (27.1 at Monza): the follower's wheelspin guard dropped the throttle
   to 0.05 and recovered slowly; its floor is now 0.2 with twice the recovery.
 - The lane speed (26.6 / 20.0 / 25.9): the paths aim 0.3 m/s under the limit (was 0.8); cars hold
   21.5 m/s against 22.2 and the speeding tolerance (0.3 m/s over) is unchanged.
-- No faster than 25 m/s on the entry road, before braking for the first line (29.4 / 21.2 / 29.1,
-  with the steep joins on the plain blend). Without the kink, AI cars called in at racing speed
-  reached Monza's lane at 55 m/s and met its wall (two-car probes, seven of seven clean with a cap);
+- No faster than 25 m/s on the entry road, before braking for the first line (final: 31.6 / 23.2
+  / 29.1, with the steep entry joins and every exit on the plain blend). Without the kink, AI cars
+  called in at racing speed reached Monza's lane at 55 m/s and met its wall (two-car probes, seven of seven clean with a cap);
   at 30 m/s the player's assisted stop could not take the bend 140 m into Singapore's lane (it
   passes at 28 m/s; 25 leaves a margin), and 38 m/s cost Spa 5 s.
 - The drivers' plan for the fuel on board (next section) changes the no-stop baseline by 0.3 s at
   Monza.
 
-Monza stays about 4.5 to 7.5 s above the quoted range and Singapore about 7 to 8 s above the 2025
+Monza stays about 6.5 to 9.5 s above the quoted range and Singapore about 7 to 8 s above the 2025
 figure. What is left is mostly the 3.07 s service (2 to 2.5 s in the quoted races), the rejoin at
 lane speed onto Monza's main straight, and Singapore's lane geometry, which this game takes from
 OpenStreetMap (820 m against the published 404 m).

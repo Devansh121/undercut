@@ -68,12 +68,12 @@ nice -n 10 taskset -c 4-7 npx vitest run --project physics apps/web/validation/p
 
 ## Weekend follow-ups
 
-- Pit time loss (player-pit, field retired): Monza 29.6 s, Spa 21.3 s, Singapore 29.1 s (were
+- Pit time loss (player-pit, field retired): Monza 31.6 s, Spa 23.2 s, Singapore 29.1 s (were
   34.0, 24.3 and 32.1); breakdown in docs/race-rules.md.
-- Soaks on the final code, one at a time on two cores: pit-entry 2 passed (185 s), weekend
-  Monza 2 passed (303 s), Spa 2 passed (319 s; an earlier version classified 8 of 20, which led to
-  the steep-join rule), Singapore 2 passed (296 s), full-distance two-stop 1 passed with no
-  watchdog findings (122 s). Unit: 1826 passed, 30 expected fail.
+- Soaks on the final code, one at a time on two cores: pit-entry 2 passed (188 s), weekend
+  Monza 2 passed (298 s), Spa 2 passed (373 s; an earlier version classified 8 of 20, which led to
+  the steep-join rule), Singapore 2 passed (323 s), full-distance two-stop 1 passed with no
+  watchdog findings (120 s). Physics project: 364 passed with the final bounds. Unit: 1826 passed, 30 expected fail.
 - Full-distance fuel, three cars, first 700 s at Monza: 21 off-track excursions at the Parabolica
   before the mass factor, none after.
 - Simulate to end of session, a 300 s practice simulated from the start, desktop Lite world:
