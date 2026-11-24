@@ -31,6 +31,8 @@ export interface FrameResult {
    * step, so reading telemetry once per frame would miss most impacts.
    */
   wallImpact: number;
+  /** Hardest car-to-car closing speed of any step this frame, m/s; reset by the sim the same way. */
+  carImpact: number;
 }
 
 /** Longest real frame time accepted before the sim stops catching up (a stall). */
@@ -134,6 +136,7 @@ export class GameLoop {
       actions: [],
       lookBack: this.lookBackValue,
       wallImpact: 0,
+      carImpact: 0,
     };
     if (this.session.phase !== 'running') return result;
     const real = Number.isFinite(elapsed) && elapsed > 0 ? Math.min(elapsed, STALL_CLAMP) : 0;
@@ -158,6 +161,8 @@ export class GameLoop {
         session.car.state.breakableImpactSpeed,
       );
       if (impact > result.wallImpact) result.wallImpact = impact;
+      const touch = session.car.state.carContactSpeed;
+      if (touch > result.carImpact) result.carImpact = touch;
       if (stop) {
         this.pause();
         break;

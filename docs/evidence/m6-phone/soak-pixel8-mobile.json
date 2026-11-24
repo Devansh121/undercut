@@ -1,0 +1,307 @@
+{
+  "status": "not measured",
+  "totalFrames": 2579,
+  "minFrames": 3000,
+  "note": "Recorded before the frame floor existed. 2,579 frames in ten minutes on a machine at load 22 to 29 on 16 threads: below the 3,000-frame floor, so not a measurement of drift. Kept for the record.",
+  "device": "Pixel 8 emulation (Chromium, 915x412 at 2.625, touch), software WebGL",
+  "preset": "mobile",
+  "scene": "Quick Race at Monza, full world, 19 AI cars, player on its racing driver, sound on",
+  "minutes": 10,
+  "drift": {
+    "meanMs": {
+      "early": 273.6,
+      "late": 179.49
+    },
+    "p95Ms": {
+      "early": 2295.47,
+      "late": 1439.3
+    },
+    "heapMB": {
+      "early": 25.35,
+      "late": 26.02
+    }
+  },
+  "audioCpuPercent": 5.367038726806641,
+  "rows": [
+    {
+      "minute": 1,
+      "frames": 164,
+      "meanMs": 367,
+      "p50Ms": 53,
+      "p95Ms": 3098.7,
+      "p99Ms": 3348.5,
+      "over50Ms": 85,
+      "heapMB": 24.9,
+      "renderer": {
+        "geometries": 199,
+        "textures": 61,
+        "programs": 60,
+        "programRefs": 83
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 20480,
+        "processMs": 2946,
+        "audioMs": 59443.08390022676,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.05938669717561558
+      },
+      "audioStatus": "running",
+      "lap": 1,
+      "phase": "running"
+    },
+    {
+      "minute": 2,
+      "frames": 248,
+      "meanMs": 240.42,
+      "p50Ms": 41.5,
+      "p95Ms": 2244,
+      "p99Ms": 2934.2,
+      "over50Ms": 106,
+      "heapMB": 24.93,
+      "renderer": {
+        "geometries": 215,
+        "textures": 61,
+        "programs": 61,
+        "programRefs": 84
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 40960,
+        "processMs": 5864,
+        "audioMs": 118886.16780045352,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.03563108603031909
+      },
+      "audioStatus": "running",
+      "lap": 1,
+      "phase": "running"
+    },
+    {
+      "minute": 3,
+      "frames": 194,
+      "meanMs": 309.28,
+      "p50Ms": 65.2,
+      "p95Ms": 2614.1,
+      "p99Ms": 3172.9,
+      "over50Ms": 126,
+      "heapMB": 25.33,
+      "renderer": {
+        "geometries": 217,
+        "textures": 61,
+        "programs": 61,
+        "programRefs": 86
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 61440,
+        "processMs": 8923,
+        "audioMs": 178329.25170068027,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.015704822403295637
+      },
+      "audioStatus": "running",
+      "lap": 1,
+      "phase": "running"
+    },
+    {
+      "minute": 4,
+      "frames": 223,
+      "meanMs": 271.09,
+      "p50Ms": 62.6,
+      "p95Ms": 2028.3,
+      "p99Ms": 3144.5,
+      "over50Ms": 140,
+      "heapMB": 25.78,
+      "renderer": {
+        "geometries": 261,
+        "textures": 61,
+        "programs": 61,
+        "programRefs": 86
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 81920,
+        "processMs": 12074,
+        "audioMs": 237772.33560090704,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.010473203980483983
+      },
+      "audioStatus": "running",
+      "lap": 1,
+      "phase": "running"
+    },
+    {
+      "minute": 5,
+      "frames": 222,
+      "meanMs": 267.35,
+      "p50Ms": 49,
+      "p95Ms": 2288.9,
+      "p99Ms": 3298.8,
+      "over50Ms": 109,
+      "heapMB": 26.03,
+      "renderer": {
+        "geometries": 262,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 102400,
+        "processMs": 15360,
+        "audioMs": 297215.4195011338,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.009531840620504595
+      },
+      "audioStatus": "running",
+      "lap": 1,
+      "phase": "running"
+    },
+    {
+      "minute": 6,
+      "frames": 328,
+      "meanMs": 182.97,
+      "p50Ms": 49.6,
+      "p95Ms": 1232.5,
+      "p99Ms": 2434.2,
+      "over50Ms": 159,
+      "heapMB": 26.12,
+      "renderer": {
+        "geometries": 263,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 122880,
+        "processMs": 18366,
+        "audioMs": 356658.50340136053,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.01830964708588616
+      },
+      "audioStatus": "running",
+      "lap": 2,
+      "phase": "running"
+    },
+    {
+      "minute": 7,
+      "frames": 180,
+      "meanMs": 343.55,
+      "p50Ms": 87.6,
+      "p95Ms": 2693,
+      "p99Ms": 3609.6,
+      "over50Ms": 125,
+      "heapMB": 26.21,
+      "renderer": {
+        "geometries": 263,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 143360,
+        "processMs": 22180,
+        "audioMs": 416101.5873015873,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.03536250460141655
+      },
+      "audioStatus": "running",
+      "lap": 2,
+      "phase": "running"
+    },
+    {
+      "minute": 8,
+      "frames": 336,
+      "meanMs": 179.8,
+      "p50Ms": 62.1,
+      "p95Ms": 1172.8,
+      "p99Ms": 1660.7,
+      "over50Ms": 188,
+      "heapMB": 25.93,
+      "renderer": {
+        "geometries": 263,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 163840,
+        "processMs": 25563,
+        "audioMs": 475544.6712018141,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.01189841547422058
+      },
+      "audioStatus": "running",
+      "lap": 2,
+      "phase": "running"
+    },
+    {
+      "minute": 9,
+      "frames": 284,
+      "meanMs": 208.73,
+      "p50Ms": 46.4,
+      "p95Ms": 1929.5,
+      "p99Ms": 2233.2,
+      "over50Ms": 128,
+      "heapMB": 26.02,
+      "renderer": {
+        "geometries": 263,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 184320,
+        "processMs": 28655,
+        "audioMs": 534987.7551020408,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.009810171262762546
+      },
+      "audioStatus": "running",
+      "lap": 2,
+      "phase": "running"
+    },
+    {
+      "minute": 10,
+      "frames": 400,
+      "meanMs": 149.95,
+      "p50Ms": 40.5,
+      "p95Ms": 1215.6,
+      "p99Ms": 1671.1,
+      "over50Ms": 152,
+      "heapMB": 26.12,
+      "renderer": {
+        "geometries": 263,
+        "textures": 61,
+        "programs": 62,
+        "programRefs": 87
+      },
+      "audio": {
+        "type": "profile",
+        "blocks": 204800,
+        "processMs": 31659,
+        "audioMs": 594430.8390022676,
+        "clock": "Date.now (coarse aggregate)",
+        "audibleCars": 3,
+        "fieldLevel": 0.016029910448692838
+      },
+      "audioStatus": "running",
+      "lap": 2,
+      "phase": "running"
+    }
+  ]
+}
