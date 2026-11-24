@@ -147,27 +147,31 @@ const CROWN_NORMAL = /* glsl */ `
 #endif`;
 
 /**
- * Leaves let through a share of the light that falls on their back (diffusely, about a third for
- * a thin broad leaf): direct light from behind a leaf card lights it at `LEAF_TRANSMISSION` of
- * its front-lit strength. Without it a crown is black on the side away from a floodlight, and
- * the near trees' clusters (each lit by its own facing) and the cards (lit as a whole) part.
+ * Light that falls on the back of the foliage and comes through it (diffusely), as a fraction of
+ * its front-lit strength. A near tree's leaf-cluster card is one layer of leaves: it lets through
+ * about half. An impostor card stands for a whole crown, through which little comes out the far
+ * side. Without it a cluster turned from a floodlight is black, and the near trees (each cluster
+ * lit by its own facing) read darker at night than the cards they hand over to.
  */
-export const LEAF_TRANSMISSION = 0.35;
-const LEAF_LIGHT = ShaderChunk.lights_physical_pars_fragment.replace(
-  'vec3 irradiance = dotNL * directLight.color;',
-  // Diffuse only: the specular lobe is the front face's (fed transmitted light, its grazing
-  // terms overflow).
-  `vec3 irradiance = dotNL * directLight.color;
-  reflectedLight.directDiffuse += ${LEAF_TRANSMISSION.toFixed(2)} * saturate( - dot( geometryNormal, directLight.direction ) ) * directLight.color * BRDF_Lambert( material.diffuseColor );`,
-);
-if (LEAF_LIGHT === ShaderChunk.lights_physical_pars_fragment)
-  throw new Error('three.js lights chunk changed: leaf transmission not applied');
+export const LEAF_TRANSMISSION = { cluster: 0.5, crown: 0.1 };
+function leafLight(transmission: number): string {
+  const chunk = ShaderChunk.lights_physical_pars_fragment.replace(
+    'vec3 irradiance = dotNL * directLight.color;',
+    // Diffuse only: the specular lobe is the front face's (fed transmitted light, its grazing
+    // terms overflow).
+    `vec3 irradiance = dotNL * directLight.color;
+  reflectedLight.directDiffuse += ${transmission.toFixed(2)} * saturate( - dot( geometryNormal, directLight.direction ) ) * directLight.color * BRDF_Lambert( material.diffuseColor );`,
+  );
+  if (chunk === ShaderChunk.lights_physical_pars_fragment)
+    throw new Error('three.js lights chunk changed: leaf transmission not applied');
+  return chunk;
+}
 
 /** Shader hook: crown-outward normals on both faces, and the leaves' transmitted light. */
-function leafShading(shader: WebGLProgramParametersWithUniforms): void {
+function leafShading(shader: WebGLProgramParametersWithUniforms, transmission: number): void {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <normal_fragment_begin>', CROWN_NORMAL)
-    .replace('#include <lights_physical_pars_fragment>', LEAF_LIGHT);
+    .replace('#include <lights_physical_pars_fragment>', leafLight(transmission));
 }
 
 /** Wind: the crown sways with height, phase from the instance position (High only). */
@@ -358,7 +362,7 @@ export function treeMaterials(
     // The relief's defines come first: the tile pick writes the mirror sign under them.
     if (relief) addRelief(shader, relief);
     hook(shader);
-    leafShading(shader);
+    leafShading(shader, LEAF_TRANSMISSION.crown);
     if (swap) addSwap(shader, swap, false);
   };
   const material = new MeshStandardMaterial({
@@ -375,7 +379,7 @@ export function treeMaterials(
   if (relief) material.userData.surfaceUniforms = { uTreeReliefMap: { value: relief.map } };
   material.onBeforeCompile = colourHook;
   material.customProgramCacheKey = () =>
-    `tree-v3-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
+    `tree-v4-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,
@@ -403,23 +407,25 @@ export interface CloudShape {
  * already matched to the cards' painted mean, occlusion included, so this is only the extra
  * depth of the near crown (the tree-swap check: near trees against the cards they replace).
  */
-const CROWN_AO = 0.5;
+const CROWN_AO = 0.65;
 /** Shade on the trunk and limbs under the crown. */
 const TRUNK_AO = 0.6;
 
+// Cluster sizes: the near crown as full as the card it replaces (the tree-swap check at night,
+// where gaps in the crown show the dark city behind it).
 export const BROADLEAF_CLOUD: CloudShape = {
   crownY: 0.6,
   rx: 0.36,
   ry: 0.32,
   cards: 48,
-  card: 0.24,
+  card: 0.28,
 };
 export const COLUMNAR_CLOUD: CloudShape = {
   crownY: 0.58,
   rx: 0.14,
   ry: 0.4,
   cards: 40,
-  card: 0.155,
+  card: 0.18,
 };
 
 /** Atlas uv of a point (tu, tv) in tile `t`, tv = 0 at the tile's bottom (see treeAtlas). */
@@ -579,7 +585,7 @@ export function treeCloudMaterials(
     if (options.wind)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WIND);
     addSwap(shader, swap, true);
-    leafShading(shader);
+    leafShading(shader, LEAF_TRANSMISSION.cluster);
   };
   const material = new MeshStandardMaterial({
     map: atlas,
@@ -593,7 +599,7 @@ export function treeCloudMaterials(
   });
   material.name = `tree-cloud-${key}`;
   material.onBeforeCompile = hook;
-  material.customProgramCacheKey = () => `tree-cloud-v3-${options.wind ? 1 : 0}`;
+  material.customProgramCacheKey = () => `tree-cloud-v4-${options.wind ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,
