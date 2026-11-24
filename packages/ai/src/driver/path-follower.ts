@@ -242,8 +242,10 @@ export class PathFollower {
     }
     // Wheelspin: driven (rear) wheels' slip ratio.
     const slip = Math.max(tel.slipRatio[2] ?? 0, tel.slipRatio[3] ?? 0);
-    if (slip > g.slipLimit) this.throttleCap = Math.max(0.05, this.throttleCap - 6 * dt);
-    else this.throttleCap = Math.min(1, this.throttleCap + 2 * dt);
+    // (The floor and the recovery let a car pull away from its pit box: at 0.05 it crept out for
+    // two seconds.)
+    if (slip > g.slipLimit) this.throttleCap = Math.max(0.2, this.throttleCap - 6 * dt);
+    else this.throttleCap = Math.min(1, this.throttleCap + 4 * dt);
     throttle = Math.min(throttle, this.throttleCap);
     // Lock-up: any wheel sliding under braking.
     let lock = 0;

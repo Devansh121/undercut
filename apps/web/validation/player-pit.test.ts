@@ -129,15 +129,17 @@ function stintTime(setup: typeof MONZA, stop: boolean): { time: number; stops: n
   return { time: session.world.time - begin, stops: car.pitStops };
 }
 
-// Measured time lost to a stop (with a 3.07 s service), s. The floor is the limited zone at the
-// limit plus the service, less the same stretch at 90 m/s; the ceiling is the measured loss with
-// 1 s of headroom. Most of the loss is the limited zone: the authored limit lines sit 110 m into
-// the lane and 120 m before its end (docs/race-rules.md, pit time loss).
-const PIT_LOSS: Record<string, { min: number; max: number }> = {
-  monza: { min: 20.4, max: 35 },
-  spa: { min: 19.6, max: 25.5 },
-  singapore: { min: 23.1, max: 33 },
-};
+// Time lost to a stop (with a 3.07 s service), s. The ceiling is the measured loss with 1 s of
+// headroom (Monza 28.3, Spa-Francorchamps 20.1, Singapore 27.6, with the limit lines at the cited
+// timing loops: docs/race-rules.md, pit time loss). The floor is the limited zone at the limit
+// plus the service, less the same stretch at 90 m/s.
+const PIT_LOSS_MAX: Record<string, number> = { monza: 29.3, spa: 21.1, singapore: 28.6 };
+const SERVICE = 3.07;
+function pitLossFloor(setup: typeof MONZA): number {
+  const pit = setup.track().pit;
+  const zone = pit.limitEnd - pit.limitStart;
+  return zone / pit.speedLimit + SERVICE - zone / 90;
+}
 for (const setup of [MONZA, SPA, SINGAPORE]) {
   it(`${setup.id}: a stop costs the time the pit lane's geometry sets, against a lap without one`, () => {
     const withStop = stintTime(setup, true);
@@ -146,7 +148,7 @@ for (const setup of [MONZA, SPA, SINGAPORE]) {
     console.warn(setup.id, { lost, withStop: withStop.time, without: without.time });
     expect(withStop.stops).toBe(1);
     expect(without.stops).toBe(0);
-    expect(lost).toBeGreaterThan(PIT_LOSS[setup.id]!.min);
-    expect(lost).toBeLessThan(PIT_LOSS[setup.id]!.max);
+    expect(lost).toBeGreaterThan(pitLossFloor(setup));
+    expect(lost).toBeLessThan(PIT_LOSS_MAX[setup.id]!);
   }, 120_000);
 }
