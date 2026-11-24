@@ -194,7 +194,10 @@ follower (`PathFollower` in `packages/ai`); a player can have the same as an ass
 ## Playable weekends and pit strategy
 
 Race Weekend offers a five-minute practice or a skip, then the documented 18-minute qualifying
-session and the race. The qualifying order sets the grid, with untimed cars at the back. Every
+session and the race. In practice at any time, and in qualifying once the player has a lap
+time, the player can return to the box and simulate the rest of the session: the car is held in
+its garage to the flag (`RaceControl.returnToGarage`), its times standing, and the session runs on
+as fast as the page allows. The qualifying order sets the grid, with untimed cars at the back. Every
 weekend race requires two compounds. Championship runs the three circuits in order and saves
 completed sessions, race points and count-back standings locally; abandoning a session restarts it.
 
@@ -212,6 +215,25 @@ loss (lane length / speed limit + 5 s). Stops are staggered by car. A worn set c
 close rival if its estimated one-lap loss exceeds the gap and the predicted rejoin has more than
 2 s of clear air; a healthy set can extend one lap while the rival pits. The final stop cannot
 be postponed beyond the penultimate lap. These are estimates, separate from the tyre physics.
-The session snapshot carries pit-wall enablement and the player's limiter assist; decisions
-carry no additional memory. A slowing pit entrant is tested against the follower's lane at the
+Every call is logged in order on `RaceSession.pitCalls` (time, car, lap and reason: planned,
+undercut, or extend for the lap a car stays out); the session snapshot carries the log,
+pit-wall enablement and the player's limiter assist, and the decisions carry no other memory. A slowing pit entrant is tested against the follower's lane at the
 entrant's position, before crossing onto the pit surface.
+
+### Pit time loss
+
+Measured with the scripted racing driver from 700 m before the pit entry to 600 m after the exit,
+seed 3141, the field retired at the green, a stop with a 3.07 s service against the same run
+without one (`apps/web/validation/player-pit.test.ts`): Monza 34.0 s, Spa-Francorchamps 24.3 s,
+Singapore 32.1 s. Commonly quoted real losses are about 22 to 25 s at Monza and 28 to 30 s at
+Singapore (the latter with the old 60 km/h limit). The time goes in the lane: at Monza the run
+with a stop is 1.3 s behind at the entry, 30.8 s behind at the exit and 34.0 s behind 600 m later.
+The cause is the lane's limited zone. The limit lines are authored, not sourced
+(docs/track-data.md): 110 m after the lane's start and 120 m before its end at every circuit, so
+the zone is 511 m at Monza, 487 m at Spa and 590 m at Singapore, all at 80 km/h. The box assigned
+to the player's team is the first, so after release the car runs 340 m limited at Monza (16.2 s)
+before the second line. Execution adds about 2 s: the lane paths aim 0.8 m/s under the limit and
+the car holds 21.0 m/s against 22.2, and it takes 3.3 s to reach lane speed from the box. The
+lane speed margin is unchanged because it moves every AI stop; the limit lines stay until a source
+places them. The test bounds each circuit's loss between the limited zone at the limit plus the
+service, less the same stretch at 90 m/s, and the measured loss plus 1 s.

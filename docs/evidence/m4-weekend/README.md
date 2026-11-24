@@ -1,9 +1,13 @@
 # Race Weekend and player pits
 
-All runs use the shipped circuit trim, tyre condition and real car contact. The weekend proof
-skips practice, runs the documented 18-minute single qualifying session, uses its classification
-for the grid and runs five laps with the two-compound rule. Twenty scripted drivers represent
-the player and nineteen opponents. Stop decisions come from the same pit wall as the game.
+All runs use the shipped circuit trim, tyre condition and real car contact.
+
+## Weekend acceptance (nightly soak)
+
+The weekend proof skips practice, runs the documented 18-minute single qualifying session, uses
+its classification for the grid and runs five laps with the two-compound rule. Twenty scripted
+drivers represent the player and nineteen opponents. Stop decisions come from the same pit wall
+as the game. Qualifying and the race are separate tests, each with the soak's 600 s limit.
 
 | Circuit | Seed | Valid qualifying times | Race classified | Compound changes | Watchdog findings |
 | --- | --- | --- | --- | --- | --- |
@@ -11,43 +15,55 @@ the player and nineteen opponents. Stop decisions come from the same pit wall as
 | Spa-Francorchamps | 1 | 20 / 20 | 20 / 20 | 20 / 20 | 0 |
 | Singapore Marina Bay | 1 | 20 / 20 | 20 / 20 | 20 / 20 | 0 |
 
-Monza and Spa: 2 tests passed, 321.37 s wall time, two workers before the owner's reduced-load
-instruction. Singapore: 1 test passed, 356.60 s wall time. The initial six-minute qualifying
-fixture left one Singapore driver without a valid lap; the proof now uses the documented
-session duration. No classification or watchdog assertion was relaxed.
+These figures are from the run before the split (head c66f062) and the independent review's
+rerun; the split changes neither session.
 
-Player stops run through `DriveSession`, with scripted steering inputs into the lane and the
-same crew assist the player uses. Each circuit checks call/cancel, fresh hard tyres, 2.4–3.2 s
-of service, zero contact through entry and exit, a bounded loss against an on-track traversal,
-and the compound/stop history. An uncalled second visit drives through without service; turning
-the automatic limiter off and entering fast produces the speeding offence. Three tests passed
-in 45.19 s. Approach through release: Monza 39.542 s, Spa 40.467 s, Singapore 45.108 s.
+## Pit strategy
 
-The two-car pit-entry probes at seeds 3141 and 2718 both enter, service and exit without contact
-(2 tests passed, 3.38 s). Full twenty-car five-lap scheduled-stop races on both recorded seeds
-also pass: every car classified with one stop, no watchdog findings and no contact at or above
-10 m/s anywhere (2 tests passed, 171.27 s, run sequentially with reduced process priority).
+- Undercut and extend, per PR (`packages/race/validation/strategy-scenarios.test.ts`, Monza,
+  two cars, eight laps): with half-worn tyres close behind a rival on lap 2 the follower is called
+  in for an undercut a lap before its planned stop and rejoins without contact; with the rival
+  called in on the follower's planned lap the follower stays out (logged `extend`) and stops on
+  the next lap. 3 tests with the restore test, 16 s.
+- Two stops, nightly (`strategy-two-stop.soak.test.ts`, Monza full distance, three cars, seed 11):
+  every car stops on laps 17 to 19 and 35 to 37 and is classified. 132 s. The watchdog records
+  22 off-track and standstill findings at full fuel load (docs/STATUS.md, known gaps).
 
-A restored automatic-pit session continues bit for bit for 110 s through the stop decision;
-its events and final complete snapshot match (1 test passed, 7.65 s). Weekend save/load tests
-cover qualifying grids, three rounds of points, duplicate-result rejection and storage failure.
+## Pit entry
 
-Commands (one long simulation at a time on the shared laptop):
+`packages/race/validation/pit-entry.test.ts` replays the twenty-car seed 3141 incident from a
+saved race state (`data/pit-entry-3141.snapshot.json.gz`). With the pit-entrant rule disabled
+(`false &&` before `c.pitApproach` in `packages/ai/src/driver/race.ts`): 1 failed, contact
+9.15 m/s. With it: 1 passed, no contact, 10 s. The driver test at Monza's entry
+(`packages/ai/test/race-driver.test.ts`) fails the same way with the rule disabled.
+
+## Player stops
+
+`apps/web/validation/player-pit.test.ts`: call and cancel, fresh hard tyres, 2.4 to 3.2 s of
+service, no contact, drive-through and speeding; at the start of service the stopped-car prompt
+stays off and Reset to track is ignored. Time lost to a stop, against the same run without one
+(scripted racing driver, 700 m before the entry to 600 m after the exit): Monza 34.0 s, Spa 24.3
+s, Singapore 32.1 s, bounded per circuit. Most of it is the authored limited zone (511 to 590 m
+at 80 km/h); docs/race-rules.md has the breakdown. 6 tests, 125 s.
+
+`apps/web/validation/simulate-session.test.ts`: after a timed qualifying lap the car goes back to
+its box, is held there to the flag, and the classification keeps its best lap. 90 s.
+
+## Browser
+
+Weekend smoke on desktop (practice simulated to the flag, the result table, qualifying, the race
+with a player stop) and phone (practice skipped), plus the menu clipping sweep: 5 passed, 3
+viewport skips, 1.4 min. Frames inspected: [practice result](practice-result-desktop.jpg),
+[pit panel under the map](pit-panel-desktop.jpg), [weekend menu](weekend-desktop.png),
+[phone after release](pit-release-phone.png). The driving frames use the software-rendered Lite
+world for the browser budget; they show controls and HUD placement, not the dressed circuit.
+
+## Commands
+
+One long simulation at a time on the shared laptop:
 
 ```sh
-nice -n 10 npx vitest run --project soak packages/race/validation/weekend-monza.soak.test.ts --maxWorkers=2
-nice -n 10 npx vitest run --project soak packages/race/validation/weekend-spa.soak.test.ts --maxWorkers=2
-nice -n 10 npx vitest run --project soak packages/race/validation/weekend-singapore.soak.test.ts --maxWorkers=2
-nice -n 10 npx vitest run --project soak packages/race/validation/pit-entry.soak.test.ts --maxWorkers=2
-nice -n 10 npx vitest run --project physics apps/web/validation/player-pit.test.ts packages/race/validation/pit-entry.test.ts packages/race/validation/strategy-restore.test.ts --maxWorkers=2
+nice -n 10 taskset -c 4-7 npx vitest run --project soak packages/race/validation/weekend-monza.soak.test.ts --maxWorkers=2
+nice -n 10 taskset -c 4-7 npx vitest run --project soak packages/race/validation/strategy-two-stop.soak.test.ts --maxWorkers=1
+nice -n 10 taskset -c 4-7 npx vitest run --project physics apps/web/validation/player-pit.test.ts apps/web/validation/simulate-session.test.ts packages/race/validation/pit-entry.test.ts packages/race/validation/strategy-scenarios.test.ts packages/race/validation/strategy-restore.test.ts --maxWorkers=2
 ```
-
-Browser validation: 6 passed, 4 viewport-specific skips in 54.7 s. Desktop and phone smoke
-both cover the real flow and service countdown. The menu clipping sweep passes at 1440×900,
-1280×720 and 844×390, and the touch overlay stays clear of the input-lab panels. The screenshots
-were inspected: [weekend menu](weekend-desktop.png), [phone after release](pit-release-phone.png).
-The driving frame uses the software-rendered Lite world for the browser budget; it is evidence
-of controls and HUD placement, not the dressed circuit's visual quality.
-
-Local logs, traces and frames are kept small under
-`/home/devansh/.cache/undercut/scratch/m4-race-weekend/`.
