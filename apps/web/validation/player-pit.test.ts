@@ -4,6 +4,7 @@ import { NEUTRAL_INPUT } from '@undercut/sim';
 import { DriveSession } from '../src/game/session';
 import { MONZA, SPA, SINGAPORE, loadLine, loadEnvelope } from '../../../packages/ai/validation/lib';
 import { pitInPath, pitOutPath } from '@undercut/race';
+import { carStopped } from '../src/game/stopped';
 for (const setup of [MONZA, SPA, SINGAPORE]) {
   it(`${setup.id}: player calls, drives in, changes tyres and is released without contact`, () => {
     const track = setup.track();
@@ -41,7 +42,22 @@ for (const setup of [MONZA, SPA, SINGAPORE]) {
       for (const e of session.raceEvents.splice(0)) {
         if (e.type !== 'pit' || e.car !== 0) continue;
         stages.push(e.stage);
-        if (e.stage === 'serviceStart') serviceAt = e.t;
+        if (e.stage === 'serviceStart') {
+          serviceAt = e.t;
+          // At rest in the box: no stopped-car prompt, and a reset does not cut the stop short.
+          const prompt = {
+            playing: true,
+            time: session.world.time,
+            speed: session.readTelemetry().speed,
+            surface: session.surfaceUnderCar(),
+          };
+          // (The box is off the lap's asphalt: without the pit state the prompt would show.)
+          expect(carStopped(prompt)).toBe(true);
+          expect(carStopped({ ...prompt, inPit: session.inPit })).toBe(false);
+          expect(session.resetToTrack()).toEqual([]);
+          expect(session.race.control.held(0)).toBe(true);
+          expect(session.race.carFacts(0).inPitLane).toBe(true);
+        }
         if (e.stage === 'serviceEnd') {
           serviceEnd = e.t;
           expect(Math.max(...session.car.state.tyreWear)).toBeLessThan(0.001);

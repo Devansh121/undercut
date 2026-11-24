@@ -374,6 +374,11 @@ export class DriveSession {
     return true;
   }
 
+  /** The player's car is in the pit lane or held by the crew (box, garage). */
+  get inPit(): boolean {
+    return this.race.carFacts(0).inPitLane || this.race.control.held(0);
+  }
+
   cycleCompound(): void {
     const choices = ['hard', 'medium', 'soft'] as const;
     this.nextCompound = choices[(choices.indexOf(this.nextCompound) + 1) % choices.length]!;
@@ -693,6 +698,8 @@ export class DriveSession {
   /** On the centreline at the nearest point, stopped, facing along the lap. Invalidates the lap. */
   resetToTrack(): SessionEvent[] {
     const events: SessionEvent[] = [];
+    // Held by the crew (service, release, garage): the stop finishes first.
+    if (this.race.control.held(0)) return events;
     if (this.quickRace) {
       // In a race the car is not dropped on the racing line in front of the field: it is parked
       // at the edge on the side away from the line, stopped, and rejoins from there.

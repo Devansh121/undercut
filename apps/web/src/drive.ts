@@ -1563,6 +1563,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         time: session.world.time,
         speed: t.speed,
         surface: session.surfaceUnderCar(),
+        inPit: session.inPit,
       });
       if (session.quickRace) {
         // A race has no out lap, no lap invalidation (track limits are strikes, shown as
