@@ -75,10 +75,6 @@ for (const setup of [MONZA, SPA, SINGAPORE]) {
     expect(contacts).toBe(0);
     expect(session.race.control.cars[0]!.compounds).toEqual(['medium', 'hard']);
     expect(session.race.control.cars[0]!.pitStops).toBe(1);
-    const travel = (session.s - start + track.length) % track.length;
-    const lost = session.world.time - begin - travel / 50;
-    expect(lost).toBeGreaterThan(5);
-    expect(lost).toBeLessThan(70);
     // No request: drive through, with manual limiter off. Speeding remains a real offence.
     session.automaticLimiter = false;
     const sp = session.race.circuit.pit.limitStart + 10;
@@ -100,5 +96,57 @@ for (const setup of [MONZA, SPA, SINGAPORE]) {
     expect(speeding).toBe(true);
     expect(session.race.control.cars[0]!.pitStops).toBe(1);
     expect(session.race.control.pitRequested(0)).toBe(false);
+  }, 120_000);
+}
+
+/**
+ * Time from 700 m before the pit entry to 600 m after the exit, the scripted racing driver
+ * at the wheel, with a stop (called before the run) and without. The field is retired at the
+ * green, so neither run meets traffic.
+ */
+function stintTime(setup: typeof MONZA, stop: boolean): { time: number; stops: number } {
+  const track = setup.track();
+  const session = new DriveSession({
+    track,
+    seed: 3141,
+    quickRace: { laps: 5, gridPosition: 1 },
+    raceArtefacts: { line: loadLine(setup), envelope: loadEnvelope(setup) },
+  });
+  session.start();
+  while (session.race.control.phase !== 'green') session.tick({ ...NEUTRAL_INPUT }, 'keyboard');
+  for (let i = 1; i < session.race.cars.length; i++) session.race.control.retire(i, 'test');
+  session.scriptedRaceDriver = true;
+  const L = track.length;
+  const start = track.wrap(track.pit.entryS - 700);
+  session.teleport(start, 0, 60);
+  if (stop) expect(session.boxThisLap()).toBe(true);
+  const distance = ((track.pit.exitS - start + L) % L) + 600;
+  const car = session.race.control.cars[0]!;
+  const from = car.dist;
+  const begin = session.world.time;
+  while (car.dist - from < distance && session.world.time - begin < 200)
+    session.tick({ ...NEUTRAL_INPUT }, 'keyboard');
+  return { time: session.world.time - begin, stops: car.pitStops };
+}
+
+// Measured time lost to a stop (with a 3.07 s service), s. The floor is the limited zone at the
+// limit plus the service, less the same stretch at 90 m/s; the ceiling is the measured loss with
+// 1 s of headroom. Most of the loss is the limited zone: the authored limit lines sit 110 m into
+// the lane and 120 m before its end (docs/race-rules.md, pit time loss).
+const PIT_LOSS: Record<string, { min: number; max: number }> = {
+  monza: { min: 20.4, max: 35 },
+  spa: { min: 19.6, max: 25.5 },
+  singapore: { min: 23.1, max: 33 },
+};
+for (const setup of [MONZA, SPA, SINGAPORE]) {
+  it(`${setup.id}: a stop costs the time the pit lane's geometry sets, against a lap without one`, () => {
+    const withStop = stintTime(setup, true);
+    const without = stintTime(setup, false);
+    const lost = withStop.time - without.time;
+    console.warn(setup.id, { lost, withStop: withStop.time, without: without.time });
+    expect(withStop.stops).toBe(1);
+    expect(without.stops).toBe(0);
+    expect(lost).toBeGreaterThan(PIT_LOSS[setup.id]!.min);
+    expect(lost).toBeLessThan(PIT_LOSS[setup.id]!.max);
   }, 120_000);
 }
