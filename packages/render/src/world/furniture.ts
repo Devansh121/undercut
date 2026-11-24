@@ -845,7 +845,7 @@ export function buildTrackBridges(
     if (kitLods && props) {
       kitLods.forEach((l) => l.geometry.scale(1, 1, span / 20));
       const id = `bridge-kit-${bi}`;
-      props.define({ id, lods: kitLods, shadowMaxDistance: 240 });
+      props.define({ id, lods: kitLods, shadowMaxDistance: 240, reflect: 'skyline' });
       props.place(id, { x: p.x, y: gy, z: p.z, yaw: Math.atan2(-fz, fx), s });
       return;
     }

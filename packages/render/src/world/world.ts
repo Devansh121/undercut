@@ -49,6 +49,7 @@ import {
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
 import { placeKitStands } from './kit-stands';
+import { kitGarageKind } from './kit-garages';
 import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
@@ -600,15 +601,7 @@ export class CircuitWorld {
         chunks: [],
         bays: built.bays.map((b) => ({ ...b, y: b.groundY + boardY })),
       };
-      props.define({
-        id: 'pit-garage',
-        castShadow: quality.sceneryShadows,
-        shadowMaxDistance: 240,
-        // Shadows from the far level (380 triangles a bay against 1,240 for the finest).
-        shadowLevel: garageLods.length - 1,
-        receiveShadow: true,
-        lods: garageLods,
-      });
+      props.define(kitGarageKind(garageLods, quality.sceneryShadows));
       for (const b of built.bays) {
         props.place('pit-garage', {
           x: b.x - b.nx * (0.08 + wallX),

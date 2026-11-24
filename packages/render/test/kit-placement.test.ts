@@ -3,6 +3,10 @@ import monza from '@undercut/track/data/monza.json';
 import spa from '@undercut/track/data/spa.json';
 import singapore from '@undercut/track/data/singapore.json';
 import dressing from '../data/monza.dressing.json';
+import singaporeDressing from '../data/singapore.dressing.json';
+import { kitGarageKind } from '../src/world/kit-garages';
+import { buildPitBuilding } from '../src/world/pit-building';
+import { markReflected, REFLECT_LAYER } from '../src/world/water';
 import catalog from '../data/props.catalog.json';
 import { createPropKitMaterial, type PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
 import type { DressingFile } from '../src/world/dressing';
@@ -649,4 +653,63 @@ describe('stand banks far level', () => {
     props.dispose();
     far.dispose();
   });
+});
+
+describe('replacement structure reflections', () => {
+  it('puts every built Singapore kit bridge in the skyline layer without scenery reflection', () => {
+    const track = Track.fromJSON(singapore);
+    const props = new PropRegistry(track.length);
+    const texture = new DataTexture();
+    const bridges = buildTrackBridges(
+      track,
+      singaporeDressing as unknown as DressingFile,
+      new LapIndex(track),
+      texture,
+      fakeKit(),
+      props,
+    );
+    props.build();
+    const meshes = props.group.children.filter((m) => m.name.startsWith('prop:bridge-kit-'));
+    expect(meshes.length).toBe(bridges.count);
+    expect(meshes.length).toBeGreaterThan(0);
+    const scene = new Scene();
+    scene.add(bridges.group, props.group);
+    markReflected(scene, false);
+    expect(meshes.every((m) => m.layers.isEnabled(REFLECT_LAYER))).toBe(true);
+    props.dispose();
+    bridges.geometries.forEach((g) => g.dispose());
+    bridges.materials.forEach((m) => m.dispose());
+    texture.dispose();
+  });
+
+  it.each([false, true])(
+    'puts every built garage level in the skyline layer (shadows %s)',
+    (shadows) => {
+      const track = Track.fromJSON(singapore);
+      const built = buildPitBuilding(track, new LapIndex(track), 10);
+      const props = new PropRegistry(track.length);
+      const geometry = new BoxGeometry();
+      const material = new MeshStandardMaterial();
+      props.define(
+        kitGarageKind(
+          [80, 300, 1200].map((maxDistance) => ({ geometry, material, maxDistance })),
+          shadows,
+        ),
+      );
+      expect(built.bays.length).toBeGreaterThan(0);
+      for (const bay of built.bays)
+        props.place('pit-garage', { x: bay.x, y: bay.groundY, z: bay.z, s: bay.s });
+      props.build();
+      const meshes = props.group.children.filter((m) => m.name === 'prop:pit-garage');
+      expect(meshes.length).toBeGreaterThanOrEqual(3);
+      const scene = new Scene();
+      scene.add(props.group);
+      markReflected(scene, false);
+      expect(meshes.every((m) => m.layers.isEnabled(REFLECT_LAYER))).toBe(true);
+      props.dispose();
+      built.chunks.forEach((c) => c.geometry.dispose());
+      geometry.dispose();
+      material.dispose();
+    },
+  );
 });
