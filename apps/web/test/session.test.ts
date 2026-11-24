@@ -147,6 +147,24 @@ describe('GameLoop and DriveSession', () => {
     expect(loop.frame(1 / 60).wallImpact).toBe(0);
   });
 
+  it('reports the hardest car contact of any step in the frame, for haptics', () => {
+    const { loop, session } = setup();
+    const perStep = [0, 0, 5, 0];
+    const tick = session.tick.bind(session);
+    let k = 0;
+    session.tick = (control, device) => {
+      const events = tick(control, device);
+      session.car.state.carContactSpeed = perStep[k++ % perStep.length] as number;
+      return events;
+    };
+    const r = loop.frame(1 / 60);
+    expect(session.car.state.carContactSpeed).toBe(0);
+    expect(r.carImpact).toBe(5);
+    expect(r.wallImpact).toBe(0);
+    perStep.fill(0);
+    expect(loop.frame(1 / 60).carImpact).toBe(0);
+  });
+
   it('scales time for tests and tools', () => {
     const { loop, session } = setup();
     loop.timeScale = 4;

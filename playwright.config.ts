@@ -21,6 +21,14 @@ const LIFECYCLE = /\/(lifecycle|context-loss)\.spec\.ts$/;
  * WebGL), so it is quick; CI runs it in the `build` job beside the lifecycle project.
  */
 const PHONE_FIT = /\/phone-fit\.spec\.ts$/;
+/**
+ * Real-phone readiness on emulated devices: an iPhone 15 on WebKit and a Pixel 8 on Chromium
+ * (home-screen launch, safe areas, touch gestures, audio from a tap, vibration). Runs in the
+ * `build` job with the WebKit sweep.
+ */
+const PHONE_DEVICE = /\/phone-device\.spec\.ts$/;
+/** The opt-in ten-minute phone soak (PHONE_SOAK=1), on the Pixel 8 only. */
+const PHONE_SOAK = /\/phone-soak\.spec\.ts$/;
 
 // Muted: the game's audio still runs (the audio tests read its state and cost), but nothing
 // plays out of the shared laptop's speakers.
@@ -53,7 +61,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      testIgnore: LIFECYCLE,
+      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -63,7 +71,7 @@ export default defineConfig({
     },
     {
       name: 'phone',
-      testIgnore: LIFECYCLE,
+      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },
@@ -75,9 +83,17 @@ export default defineConfig({
     },
     {
       name: 'webkit-phone',
-      testMatch: PHONE_FIT,
+      testMatch: [PHONE_FIT, PHONE_DEVICE],
       use: {
-        ...devices['iPhone 13'],
+        ...devices['iPhone 15'],
+      },
+    },
+    {
+      name: 'pixel-phone',
+      testMatch: [PHONE_DEVICE, PHONE_SOAK],
+      use: {
+        ...devices['Pixel 8 landscape'],
+        launchOptions,
       },
     },
     {

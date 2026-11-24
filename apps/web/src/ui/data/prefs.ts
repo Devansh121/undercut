@@ -55,6 +55,11 @@ export interface PlayerSettings {
   textSize: TextSize;
   /** Touch controls: steering on the left and pedals on the right, or the other way round. */
   touchLayout: TouchLayoutChoice;
+  /**
+   * Force feedback for kerbs and contacts: gamepad rumble, and the phone's vibration motor on
+   * touch controls where the browser has the Vibration API (Android; not iOS Safari).
+   */
+  haptics: boolean;
 }
 
 export type TextSize = 'default' | 'large' | 'larger';
@@ -93,6 +98,7 @@ export function defaultPrefs(): MenuPrefs {
       subtitles: true,
       textSize: 'default',
       touchLayout: 'standard',
+      haptics: true,
     },
   };
 }
@@ -183,6 +189,7 @@ export function parsePrefs(text: string | null): MenuPrefs {
         ['standard', 'mirrored'] as const,
         d.settings.touchLayout,
       ),
+      haptics: typeof settings.haptics === 'boolean' ? settings.haptics : d.settings.haptics,
     },
   };
 }

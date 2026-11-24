@@ -29,6 +29,16 @@ export interface AudioEngine {
   resume(): Promise<void>;
   /** Fade out and suspend the audio context (tab hidden, game paused). */
   suspend(): Promise<void>;
+  /**
+   * Call synchronously from every user-gesture handler (pointerup, touchend, click, key). iOS
+   * Safari only lets an audio context start inside one: this creates the context if there is
+   * none yet and resumes it there, so a later `resume()` outside a gesture (a session that has
+   * finished loading) is heard. It also brings back a context the system interrupted (a call,
+   * Siri, the app in the background). It never makes sound by itself: a new context is
+   * suspended again straight after unless the game has asked for sound, and a context the game
+   * suspended (menus, pause) is left alone.
+   */
+  unlock(): void;
   /** Latest state of the player's car. Cheap; call every sim step (60–240 Hz). */
   setCarState(state: AudioCarState): void;
   /** Other cars, circuit ambience and start lights. Cheap; call every frame. */
@@ -106,6 +116,7 @@ export class SilentAudioEngine implements AudioEngine {
   suspend(): Promise<void> {
     return Promise.resolve();
   }
+  unlock(): void {}
   setScene(): void {}
   cue(): void {}
   setCarState(): void {}
@@ -157,24 +168,42 @@ class WorkletAudioEngine implements AudioEngine {
   resume(): Promise<void> {
     if (this.status === 'silent' || this.disposed) return Promise.resolve();
     this.wanted = true;
-    if (!this.context) {
-      // Create and resume the context inside the user gesture that called resume(); some
-      // browsers only let a context start from there. The module loads meanwhile.
-      try {
-        this.context = this.options.createContext();
-      } catch (error) {
-        this.fallBack(error);
-        return Promise.resolve();
-      }
-      if (this.hidden()) void this.context.suspend().catch(() => undefined);
-      else void this.context.resume().catch(() => undefined);
-      this.status = 'starting';
-      this.loading = this.load(this.context);
-    }
+    if (!this.context && !this.open()) return Promise.resolve();
     // Reconcile now, and again once the worklet has loaded: whatever was asked for while it
     // loaded (suspend, a hidden tab) is applied then.
     const now = this.reconcile();
     return this.loading ? this.loading.then(() => this.reconcile()) : now;
+  }
+
+  unlock(): void {
+    if (this.status === 'silent' || this.disposed) return;
+    if (!this.context) {
+      if (!this.open()) return;
+    } else if (this.wanted && this.context.state !== 'running' && !this.hidden()) {
+      void this.context.resume().catch(() => undefined);
+    } else return;
+    // Back to what the game wants (suspended unless it asked for sound), now and after a load.
+    void this.reconcile();
+    void this.loading?.then(() => this.reconcile());
+  }
+
+  /**
+   * Create the context and resume it in the current call stack (the user gesture that called
+   * resume() or unlock(); some browsers only let a context start from there), and start loading
+   * the worklet module. False if the context could not be made (the engine is silent then).
+   */
+  private open(): boolean {
+    try {
+      this.context = this.options.createContext();
+    } catch (error) {
+      this.fallBack(error);
+      return false;
+    }
+    if (this.hidden()) void this.context.suspend().catch(() => undefined);
+    else void this.context.resume().catch(() => undefined);
+    this.status = 'starting';
+    this.loading = this.load(this.context);
+    return true;
   }
 
   suspend(): Promise<void> {
