@@ -1121,7 +1121,13 @@ export class RaceDriver implements Driver {
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
     let target = Math.max(lo, Math.min(hi, base));
-    if (v > LAUNCHED && !this.passBypass && !this.recovering && yieldTo === null) {
+    if (
+      v > LAUNCHED &&
+      this.rejoinTime <= 0 &&
+      !this.passBypass &&
+      !this.recovering &&
+      yieldTo === null
+    ) {
       // Check the road lane ahead as well as the offset: the racing line sweeps across
       // the road while a car returns to it, even when its offset is held constant.
       const ldNext = this.at(line.d, s0 + v * 0.5);

@@ -396,6 +396,7 @@ export class RaceSession {
 
   /** Straight-line tow, shared by human and computer cars. No aero-load change. */
   private updateWakes(): void {
+    const clear = this.towClear();
     for (let i = 0; i < this.cars.length; i++) {
       const state = this.world.cars[i]!.state;
       const f = this.facts[i]!;
@@ -403,6 +404,7 @@ export class RaceSession {
       // The opening-lap pack keeps the measured aero while it sorts through the first
       // corners. The tow joins the racing tools from lap two, alongside race DRS.
       if (
+        clear &&
         this.control.racing(i) &&
         !this.ghosts[i] &&
         !f.inPitLane &&
@@ -493,6 +495,19 @@ export class RaceSession {
       this.pitCalls.push({ t: this.time, car: i, lap, reason: stop.reason });
       this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
     }
+  }
+
+  /** The tow is a green-road model; queues and a car left on the road keep it off. */
+  private towClear(): boolean {
+    if (this.control.flags.yellowSectors().some(Boolean)) return false;
+    for (let i = 0; i < this.cars.length; i++) {
+      const f = this.facts[i]!;
+      if (f.inPitLane || this.control.cars[i]!.status === 'finished' || Math.abs(f.speed) >= 1)
+        continue;
+      const edge = this.track.halfWidthAt(this.track.wrap(f.s), f.d >= 0 ? 0 : 1);
+      if (Math.abs(f.d) <= edge + ROAD_MARGIN) return false;
+    }
+    return true;
   }
 
   /** Whether a car is a ghost this tick: no car touches it (retired, or blocking). */
