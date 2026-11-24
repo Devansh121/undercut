@@ -12,6 +12,7 @@ import {
 } from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import worldProps from '../../data/world-props.json';
 import type { AssetLoader } from '../assets/loader';
 import type { Quality } from '../quality';
@@ -697,7 +698,12 @@ export class PropKitAssets {
       geometry.setAttribute('aPropPbr', new BufferAttribute(pbr, 3));
       for (const g of groups) geometry.addGroup(g.start, g.count, g.materialIndex);
       geometry.computeBoundingSphere();
-      this.ownedGeometries.push(geometry);
+      // Slot extraction expands triangle corners. Reuse identical packed vertices in the GPU's
+      // post-transform cache, preserving hard normals, UVs, albedo, PBR and tint seams. The tiny
+      // comparison cell is below Float32 precision at model scale; triangle/group order stays.
+      const indexed = mergeVertices(geometry, 1e-10);
+      geometry.dispose();
+      this.ownedGeometries.push(indexed);
 
       let maxDistance = lod.maxDistance * scale;
       if (caps && caps.length > 0) {
@@ -707,7 +713,7 @@ export class PropKitAssets {
       }
 
       return {
-        geometry,
+        geometry: indexed,
         material: materials.length === 1 ? (materials[0] as Material) : materials,
         maxDistance,
       };
