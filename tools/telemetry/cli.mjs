@@ -296,6 +296,8 @@ async function race(options, weekend = false) {
   if (options.spread !== undefined) o.spread = Number(options.spread);
   if (options['no-pit'] !== undefined) o.pitLap = null;
   if (options['grid-noise'] !== undefined) o.gridNoise = Number(options['grid-noise']);
+  if (options.tyres !== undefined) o.tyres = true;
+  if (options['start-fuel'] !== undefined) o.startFuel = Number(options['start-fuel']);
   fs.mkdirSync(outDir, { recursive: true });
   const runs = [];
   if (weekend) {
@@ -334,6 +336,7 @@ async function race(options, weekend = false) {
           cars: run.cars,
           overlaps: run.overlaps,
           firstLap: run.firstLap,
+          racing: run.racing,
           simTime: run.simTime,
           events: run.events,
         },
@@ -377,7 +380,7 @@ if (name === 'list' || options.help) {
     `  ${'lap'.padEnd(15)} reference driver, flying lap(s) at Monza (--laps, --fuel, --every)`,
   );
   console.log(
-    `  ${'race'.padEnd(15)} AI race (--circuit monza|spa|singapore, --cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit)`,
+    `  ${'race'.padEnd(15)} AI race (--circuit monza|spa|singapore, --cars 20, --laps 5, --seed 1, --spread, --grid-noise, --no-pit, --tyres, --start-fuel kg)`,
   );
   console.log(
     `  ${'weekend'.padEnd(15)} qualifying then the race (--qualifying 600, --practice, as race)`,
