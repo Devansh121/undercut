@@ -142,7 +142,10 @@ player when their own car is one. Only cars racing and under way
 count (not in the pit lane, not held by the pit crew). Under way is having been at speed, or
 still racing a second after the lights went out: a car stalled on the grid counts, and becomes a
 ghost after 1.5 s of held-up traffic rather than 6 s, since the cars behind it have not got away
-at all. The state is carried in `RaceSession.snapshot` (`blockers`).
+at all. A player who has not launched gets five seconds of held-up traffic after that first
+second of start grace: at least six seconds from lights out. A three-second hesitation stays
+solid; the field behind a player who never launches must still get past within twelve seconds.
+The state is carried in `RaceSession.snapshot` (`blockers`).
 
 ## Snapshots and cost
 

@@ -372,18 +372,9 @@ test.describe('drive', () => {
     const before = await fits();
     expect(before.quit.bottom).toBeLessThanOrEqual(before.card.bottom);
     expect(before.card.bottom).toBeLessThanOrEqual(before.h);
-    // The "new version" bar as registerOffline (pwa/register.ts) appends it; pwa.spec.ts covers
-    // the real update. It shows over a paused session and must not cover the card.
-    await page.evaluate(() => {
-      const bar = document.createElement('aside');
-      bar.className = 'update-bar';
-      bar.dataset.testid = 'update-ready';
-      const reload = document.createElement('button');
-      reload.className = 'btn btn--primary';
-      reload.textContent = 'Reload';
-      bar.append('A new version is ready.', reload);
-      document.body.append(bar);
-    });
+    // The real "new version" bar (pwa/register.ts); pwa.spec.ts covers the update itself. It
+    // shows over a paused session and must not cover the card.
+    await page.evaluate(() => window.__undercut?.updateBar(true));
     try {
       await expect(page.getByTestId('update-ready')).toBeVisible();
       const after = await fits();
@@ -392,10 +383,94 @@ test.describe('drive', () => {
       expect(after.quit.bottom).toBeLessThanOrEqual(after.card.bottom);
       await expect(quit).toBeInViewport({ ratio: 1 });
     } finally {
-      await page.evaluate(() => document.querySelector('.update-bar')?.remove());
+      await page.evaluate(() => window.__undercut?.updateBar(false));
     }
     await page.evaluate(() => window.__undercut?.resume());
     await expect(menu).toBeHidden();
+  });
+
+  test('on a short desktop window with the update bar up, the actions scroll above the controls legend', async ({
+    drive: { page },
+  }, info) => {
+    test.skip(info.project.name !== 'desktop', 'a desktop window height');
+    const size = page.viewportSize()!;
+    await page.setViewportSize({ width: 1280, height: 540 });
+    await page.evaluate(() => window.__undercut?.pause());
+    const menu = page.locator('[data-testid=pause-menu]');
+    try {
+      await expect(menu).toBeVisible();
+      await page.evaluate(() => window.__undercut?.updateBar(true));
+      await expect(page.getByTestId('update-ready')).toBeVisible();
+      const box = (sel: string): Promise<DOMRect> =>
+        page.evaluate(
+          (s) => document.querySelector(s)!.getBoundingClientRect().toJSON() as DOMRect,
+          sel,
+        );
+      const actions = await box('.pause__actions');
+      const legend = await box('.pause__controls');
+      const card = await box('.pause__card');
+      const bar = await box('.update-bar');
+      expect(actions.bottom).toBeLessThanOrEqual(legend.top);
+      expect(card.bottom).toBeLessThanOrEqual(bar.top);
+      // Every action can still be reached: the last one scrolls into view inside the column.
+      const last = menu.locator('.pause__actions > *').last();
+      await last.scrollIntoViewIfNeeded();
+      const r = (await last.boundingBox())!;
+      expect(r.y + r.height).toBeLessThanOrEqual(legend.top + 0.5);
+      expect(r.y).toBeGreaterThanOrEqual(actions.top - 0.5);
+    } finally {
+      await page.evaluate(() => window.__undercut?.updateBar(false));
+      await page.evaluate(() => window.__undercut?.resume());
+      await page.setViewportSize(size);
+    }
+    await expect(menu).toBeHidden();
+  });
+
+  test('the focused pause action keeps its whole focus ring inside the actions column', async ({
+    drive: { page },
+  }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop window sizes');
+    const size = page.viewportSize()!;
+    const menu = page.locator('[data-testid=pause-menu]');
+    try {
+      for (const vp of [
+        { width: 1440, height: 900 },
+        { width: 1280, height: 540 },
+      ]) {
+        await page.setViewportSize(vp);
+        await page.evaluate(() => window.__undercut?.pause());
+        await expect(menu).toBeVisible();
+        // The ring as keyboard and pad navigation show it (kit/nav.ts sets data-focus-ring).
+        const clipped = await page.evaluate(() => {
+          document.documentElement.dataset.focusRing = '';
+          const column = document.querySelector<HTMLElement>('.pause__actions')!;
+          // --focus-ring's outer spread (kit.css): 4 px.
+          const ring = 4;
+          const out: string[] = [];
+          for (const b of column.querySelectorAll<HTMLElement>('button')) {
+            b.focus();
+            const c = column.getBoundingClientRect();
+            const r = b.getBoundingClientRect();
+            const label = b.dataset.action ?? b.textContent ?? '';
+            if (r.left - ring < c.left - 0.5) out.push(`${label}: left`);
+            if (r.right + ring > c.right + 0.5) out.push(`${label}: right`);
+            if (r.top - ring < c.top - 0.5) out.push(`${label}: top`);
+            if (r.bottom + ring > c.bottom + 0.5) out.push(`${label}: bottom`);
+          }
+          return out;
+        });
+        expect(clipped, `${vp.width}x${vp.height}`).toEqual([]);
+        await page.evaluate(() => window.__undercut?.resume());
+        await expect(menu).toBeHidden();
+      }
+    } finally {
+      await page.evaluate(() => {
+        delete document.documentElement.dataset.focusRing;
+        (document.activeElement as HTMLElement | null)?.blur();
+        window.__undercut?.resume();
+      });
+      await page.setViewportSize(size);
+    }
   });
 
   test('lays out the HUD inside the viewport with nothing overlapping', async ({
@@ -546,7 +621,7 @@ test.describe('drive', () => {
 
   test('shows every assist with a description in the pause menu and toggles stability', async ({
     drive: { page, problems },
-  }) => {
+  }, info) => {
     await page.keyboard.press('Escape');
     const menu = page.locator('[data-testid=pause-menu]');
     await expect(menu).toBeVisible();
@@ -555,6 +630,13 @@ test.describe('drive', () => {
       await expect(row).toBeVisible();
       await expect(row.locator('.pause__help')).not.toBeEmpty();
     }
+    // Vibration only where it can act: a phone (Chromium has the Vibration API), not a
+    // keyboard-only desktop with no pad connected.
+    const haptics = menu.locator('[data-setting=haptics]');
+    if (info.project.name === 'phone') {
+      await expect(haptics).toBeVisible();
+      await expect(haptics.getByRole('radio', { name: 'On' })).toBeEnabled();
+    } else await expect(haptics).toBeHidden();
     const stab = menu.locator('[data-setting=stability]');
     await stab.getByRole('radio', { name: 'Off' }).click();
     expect(((await state(page)).assists as { stability?: number }).stability).toBe(0);

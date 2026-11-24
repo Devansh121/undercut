@@ -1288,3 +1288,37 @@ re-planned. It costs **0.216 s**, a recorded gap (`monza-fuel-10kg`, pinned by
 `packages/ai/validation/fuel-effect.test.ts`); Spa 0.296 s, Singapore 0.315 s. Monza is the
 circuit least sensitive to mass. The band is an estimate from the widely quoted 0.3 s per
 10 kg.
+
+### 7.12 The lap gap against the passing checks (M1/M4 physics pace)
+
+The time-loss budget (7.10) puts the Monza and Spa gaps in fast-corner grip, with drag and
+power next. This section measures every term it names that has a source against every check that
+passes on master. The first-chicane kerb checks at Monza stay as they are (owner's choice). The
+car is unchanged: every candidate moves at least one passing check. Each was judged on the 36
+component targets, the three reference laps (re-planned on the committed lines, and on lines
+rebuilt by `ai:build` where noted), both kerb suites (`apps/web/test/kerb-safety.test.ts`,
+`packages/track/validation/kerb-strikes.test.ts`), the Spa ten-lap soak from 39.7 kg and, for the
+Spa trims, the AI checks at Spa (lap one over 40 seeds, the parked player at Raidillon).
+Measured against master 851a39d; merging 06a8574 leaves all three laps unchanged, and the Spa
+results below were re-measured on it (the low-trim kerb results were not re-run).
+
+| Candidate (source) | Monza / Spa / Singapore lap | Passing check it moves |
+|---|---|---|
+| Lateral load slope −5 × 10⁻⁵ N⁻¹ ([44], the other end of 1.2's cited range; longitudinal kept at [56]'s), μy refitted to the slow-corner centre (2.125) | −0.353 / −0.870 / −0.473 s; Pouhon 4.92 g | Kerb cases teleport(540, 8, 300 km/h) steer −0.1 at TC 0 and TC 2, and teleport(610, 8) steer −0.1 TC 0 need the safety reset (eight open cases and both open PR 19 review seeds pass instead) |
+| Seamless upshift ([59]), on that tyre | a further −0.30 / −0.34 / −0.40 s | teleport(540, 8) steer 0 TC 0 (as in 7.10) |
+| Low-trim ClA 3.7 ([57]); at 3.9 the Monza T1 2025 time is 2.398 s (band from 2.42) | about −0.5 s at Monza with the two above | teleport(540, 8) steer −0.1 TC 0, teleport(610, 8) steer −0.1 TC 0 |
+| Floor height sensitivity 0.015 / 0.010 / 0.005 / 0 per mm (doc 1.4 estimate 0.02; [57]'s weight at 150 km/h points to more downforce at medium speed than the map gives) | −0.26 to −0.99 / −0.57 to −1.68 / −0.87 to −3.17 s | From 0.010: the low-trim DRS top speed (354.2 km/h against 354) and the Monza T1 2025 time (2.407 s against 2.42); from 0.005 also the Singapore T14 2024 distance. Every braking gap widens |
+| Medium CdA 1.25 (doc 1.4's own Spa derivation from I1 [13], 0.90–1.13 m² with DRS open, gives 1.06–1.33 with it shut) | 0 / −0.315 s (108.757 on a rebuilt line, clean; trap 313.4; T5 2025 peak 5.076 g) / 0 | AI cars hit the player parked at Raidillon at 3.67 and 3.37 m/s (seeds 1 and 2; limit 2 m/s, `apps/web/test/parked-player-spa-raidillon.test.ts`). Lap one at Spa, seeds 101–140: 789 of 800 clean against 794, seed 117 at 17 of 20. Every target, both kerb suites, the soak and `quick-race-spa` pass |
+| Medium CdA 1.28 | — | The parked player at Raidillon, seed 2: 2.63 m/s |
+| Medium CdA 1.20 with ClA 4.8 (3.15 × the car's weight at its DRS-closed top speed, inside [57]) | 0 / −1.22 s (107.849, rebuilt line) / 0 | Spa ten-lap soak: the heavy first laps reach Bruxelles up to 17 km/h over the plan, the lock recovery releases the brake while trail-braking at 2.3 g, and the car runs onto the grass (47 samples on each of laps 1–3, four wheels off) |
+| Medium CdA 1.20 with ClA 4.6 or 4.7, 1.25 with 4.7 | — | The same soak: 17 and 11, 125 and 90, 29 grass samples on the first laps |
+| Medium ClA 4.8 at CdA 1.30 | — | Spa T5 2025 peak 5.132 g (band to 5.1) |
+
+**What remains.** Every sourced term that would make the low-trim car faster also changes which
+first-chicane kerb cases need the safety reset, in both directions; with those checks kept, Monza
+stays 2.14 s outside M1. At Spa the sourced drag and downforce (CdA 1.20–1.25, ClA 4.8, worth
+0.3–1.2 s) are held by the AI rather than the car: the reference driver's plan does not see the
+heavier car of the soak's first laps, and the racing AI's avoidance of a car stopped at Raidillon
+touches it above 2 m/s once the field arrives faster. Both are `packages/ai` changes: a plan that
+re-scales for fuel mass as it already does for tyre grip (7.11), and avoidance that holds at the
+higher approach speed. With them, the medium trim above is the first change to make.

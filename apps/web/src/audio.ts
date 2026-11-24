@@ -71,7 +71,18 @@ export class PageAudio {
         this.uiCue(cue);
       }
     });
-    for (const type of ['pointerdown', 'keydown', 'touchstart'] as const) {
+    // Browsers grant the activation that may start audio on different events: a touch counts
+    // on its release (pointerup, touchend), not on touchstart, in Chromium and in iOS Safari.
+    // The touch controls cancel the touch's click, so the release events are the ones that
+    // reach here while driving.
+    for (const type of [
+      'pointerdown',
+      'pointerup',
+      'touchstart',
+      'touchend',
+      'keydown',
+      'mousedown',
+    ] as const) {
       win.addEventListener(type, onGesture, { capture: true, passive: true });
     }
   }
@@ -99,9 +110,25 @@ export class PageAudio {
     return this.engine?.status ?? 'none';
   }
 
-  /** A user gesture happened (also called by the Start button). */
+  /**
+   * A user gesture happened. Runs inside the gesture's event handler, so it may start the audio
+   * context: iOS Safari keeps a context stopped unless it is resumed there, and stops it again
+   * after an interruption (a call, Siri, the app in the background).
+   */
   gesture(): void {
     this.gestured = true;
+    if (this.active) this.play();
+    this.engine?.unlock();
+  }
+
+  /**
+   * The Start press: the last gesture before a session that loads for a few seconds and then
+   * asks for sound outside any gesture. Create the engine and unlock its context now, silent
+   * until the session starts, so iOS Safari lets it play then.
+   */
+  prime(): void {
+    this.gestured = true;
+    this.create().unlock();
     if (this.active) this.play();
   }
 
@@ -164,8 +191,7 @@ export class PageAudio {
     this.applyVolumes();
   }
 
-  private play(): void {
-    // Created inside the gesture's call stack, so the AudioContext may start.
+  private create(): AudioEngine {
     // A browser without the worklet is not an error: the game runs silent and the pause menu
     // says so, without a console warning.
     this.engine ??= createAudioEngine({
@@ -174,8 +200,14 @@ export class PageAudio {
       },
       ...(this.profiling ? { onProfile: (report) => (this.profileReport = report) } : {}),
     });
+    return this.engine;
+  }
+
+  private play(): void {
+    // Created inside the gesture's call stack where there is one, so the context may start.
+    const engine = this.create();
     this.applyVolumes();
-    void this.engine.resume();
+    void engine.resume();
   }
 
   private applyVolumes(): void {

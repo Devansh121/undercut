@@ -1,5 +1,5 @@
 {
-  "$comment": "Real-world names the repository must not use: racing series and bodies, teams and constructors, drivers, sponsors and suppliers, and official circuit names. Read by tools/ci/check-trademarks.mjs (npm run lint). Matching is whole-word and case-insensitive; a term starting with '=' matches its exact case only (for names that are also common words, such as Williams or Lotus). docs/ is not scanned (docs may cite real data sources by name). 'allow' lists the few citations outside docs/, each with its reason; add to it only for a citation of a data source, never for product text, code identifiers or assets.",
+  "$comment": "Real-world names the repository must not use: racing series and bodies, teams and constructors, drivers, sponsors and suppliers, and official circuit names. Read by tools/ci/check-trademarks.mjs (npm run lint). Matching is whole-word and case-insensitive; a term starting with '=' matches its exact case only (for names that are also common words, such as Williams or Lotus). Of docs/, only the two research documents (docs/physics-validation.md and docs/track-data.md) are skipped, because they cite real data sources throughout. 'allow' lists the few citations elsewhere, each with its reason; add to it only for a citation of a data source, never for product text, code identifiers or assets.",
   "terms": {
     "series and bodies": [
       "FIA",
@@ -55,7 +55,12 @@
       "Porsche",
       "Lamborghini",
       "Maserati",
-      "Dallara"
+      "Dallara",
+      "Jordan Grand Prix",
+      "Toleman",
+      "Hesketh",
+      "Jaguar Racing",
+      "Super Aguri"
     ],
     "drivers": [
       "Hamilton",
@@ -122,7 +127,12 @@
       "Piquet",
       "Rindt",
       "Fittipaldi",
-      "Ickx"
+      "Ickx",
+      "Coulthard",
+      "Barrichello",
+      "Montoya",
+      "Surtees",
+      "Nuvolari"
     ],
     "sponsors and suppliers": [
       "Pirelli",
@@ -177,7 +187,9 @@
       "Vodafone",
       "Allianz",
       "=AWS",
-      "Amazon Web Services"
+      "Amazon Web Services",
+      "Bybit",
+      "Crowdstrike"
     ],
     "official circuit names": ["Autodromo Nazionale", "Circuit de Spa", "Marina Bay Street Circuit"]
   },
@@ -196,6 +208,21 @@
       "files": "^(tools/research/|tools/track-pipeline/README\\.md$)",
       "term": "=AWS",
       "reason": "Citation: the Copernicus DEM tiles are fetched from their public open-data bucket"
+    },
+    {
+      "files": "^docs/STATUS\\.md$",
+      "term": "FIA",
+      "reason": "Citation: the Monza control line was measured on the governing body's published circuit map"
+    },
+    {
+      "files": "^docs/STATUS\\.md$",
+      "term": "Honda",
+      "reason": "Citation: the seamless-upshift lap-time figure comes from a 2009 manufacturer R&D paper"
+    },
+    {
+      "files": "^docs/evidence/m2-dressing/(perf\\.json|report\\.json|review-log\\.md)$",
+      "term": "Ascari",
+      "reason": "Historical record: the screenshot station's name before it was renamed to vialone-tower; the evidence is kept as captured"
     }
   ]
 }
