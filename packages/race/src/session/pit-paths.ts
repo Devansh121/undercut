@@ -3,12 +3,77 @@ import { createVec3, type Track } from '@undercut/track';
 import type { CircuitInfo } from '../circuit';
 
 /** Speed the pit-lane paths aim for under the limit, below the limit, m/s. */
-export const PIT_MARGIN = 0.8;
+export const PIT_MARGIN = 0.3;
 const STEP = 2;
+/** Lateral acceleration a pit-lane bend is taken at on the exit road, m/s² (narrow, walled). */
+const LANE_LATERAL = 6;
+/** Speed allowed in the pit lane outside the limited zone (entry and exit roads), m/s. */
+export const LANE_ENTRY_SPEED = 25;
+/** The steepest lane heading the approach and exit blends match, lateral m per m (about 17°). */
+const MAX_JOIN_SLOPE = 0.3;
 
 function smooth(t: number): number {
   const x = Math.max(0, Math.min(1, t));
   return x * x * (3 - 2 * x);
+}
+
+/**
+ * Cubic Hermite from `d0` (slope 0, along the lap) to `d1` with slope `m1` (lateral metres per
+ * metre of lap), over `t` in 0..1 of a run of `run` metres.
+ */
+function hermite(t: number, run: number, d0: number, d1: number, m1: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  const x2 = x * x;
+  const x3 = x2 * x;
+  return d0 * (2 * x3 - 3 * x2 + 1) + d1 * (-2 * x3 + 3 * x2) + run * m1 * (x3 - x2);
+}
+
+/**
+ * The pit lane's heading where it meets the lap, as a lateral slope in the lap frame: how far
+ * across the lap it moves per metre along it, measured over `span` metres of the pit lane from
+ * `pitS` (positive span: into the lane; negative: back from its exit).
+ */
+function laneSlope(track: Track, pitS: number, span: number): number {
+  const v = createVec3();
+  const hint = { index: -1 };
+  track.pit.path.pointAt(pitS, 0, v);
+  const a = track.project(v.x, v.z, hint, { s: 0, d: 0, index: -1 });
+  track.pit.path.pointAt(pitS + span, 0, v);
+  const b = track.project(v.x, v.z, hint, { s: 0, d: 0, index: -1 });
+  let ds = b.s - a.s;
+  if (ds > track.length / 2) ds -= track.length;
+  if (ds < -track.length / 2) ds += track.length;
+  const slope = Math.abs(ds) < 1e-6 ? 0 : (b.d - a.d) / ds;
+  // A lane that leaves at a steep angle (Spa's, inside the chicane) keeps the plain blend:
+  // matching its slope, even in part, bent the approach out the other way and folded the path,
+  // and cars stopped in the lane where it crossed itself.
+  return Math.abs(slope) > MAX_JOIN_SLOPE ? 0 : slope;
+}
+
+/**
+ * The speed a bend in the pit lane allows at `sp` and for the next 40 m (radius from three
+ * points 10 m apart, at `LANE_LATERAL`), never below `floor`; Infinity on a straight.
+ */
+function laneBendSpeed(track: Track, sp: number, floor: number): number {
+  const path = track.pit.path;
+  const a = createVec3();
+  const b = createVec3();
+  const c = createVec3();
+  let v = Infinity;
+  for (let k = 0; k <= 40; k += 5) {
+    const s0 = Math.min(track.pit.length - 20, sp + k);
+    path.pointAt(s0, 0, a);
+    path.pointAt(s0 + 10, 0, b);
+    path.pointAt(s0 + 20, 0, c);
+    const ab = Math.hypot(b.x - a.x, b.z - a.z);
+    const bc = Math.hypot(c.x - b.x, c.z - b.z);
+    const ac = Math.hypot(c.x - a.x, c.z - a.z);
+    const cross = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x));
+    if (cross < 1e-6) continue;
+    const r = (ab * bc * ac) / (2 * cross);
+    v = Math.min(v, Math.max(floor, Math.sqrt(LANE_LATERAL * r)));
+  }
+  return v;
 }
 
 function forward(length: number, from: number, to: number): number {
@@ -43,8 +108,11 @@ export function pitInPath(
   );
   const run = forward(L, fromS, start.s);
   if (fromPitS === undefined && run < L / 2) {
+    // Into the lane along its own heading: a blend that arrived along the lap met the lane at an
+    // angle (a 5 to 15 m radius kink at the join, taken at about 19 m/s).
+    const slope = laneSlope(track, 0, 10);
     for (let x = 0; x < run; x += STEP) {
-      const d = fromD + (start.d - fromD) * smooth(x / run);
+      const d = hermite(x / run, run, fromD, start.d, slope);
       track.lap.pointAt(fromS + x, d, v);
       out.push({ x: v.x, z: v.z, v: Infinity });
     }
@@ -53,7 +121,13 @@ export function pitInPath(
   for (let sp = fromPitS ?? 0; sp <= box.s; sp += STEP) {
     const d = sp < turnIn ? 0 : box.d * smooth((sp - turnIn) / (box.s - turnIn));
     pit.path.pointAt(sp, d, v);
-    out.push({ x: v.x, z: v.z, v: sp >= circuit.pit.limitStart - 15 ? limit : Infinity });
+    // On the entry road, before braking for the first line: no faster than `LANE_ENTRY_SPEED`
+    // (the lane is 5 to 7 m wide there; a car carried in at 55 m/s met the wall).
+    out.push({
+      x: v.x,
+      z: v.z,
+      v: sp >= circuit.pit.limitStart - 15 ? limit : LANE_ENTRY_SPEED,
+    });
   }
   pit.path.pointAt(box.s, box.d, v);
   out.push({ x: v.x, z: v.z, v: limit });
@@ -79,7 +153,14 @@ export function pitOutPath(
   for (let sp = fromPitS; sp <= pit.length; sp += STEP) {
     const d = fromPitD * (1 - smooth((sp - fromPitS) / merge));
     pit.path.pointAt(sp, d, v);
-    out.push({ x: v.x, z: v.z, v: sp <= circuit.pit.limitEnd ? limit : Infinity });
+    // Past the second line, still in the lane: through its bends at a lane's lateral grip
+    // (`LANE_LATERAL`), free on a straight exit road. Spa's lane bends just after its line and a
+    // car accelerating there met the wall (seed 17).
+    out.push({
+      x: v.x,
+      z: v.z,
+      v: sp <= circuit.pit.limitEnd ? limit : laneBendSpeed(track, sp, LANE_ENTRY_SPEED),
+    });
   }
   const exit = track.project(
     pit.exitPose.x,
@@ -87,6 +168,9 @@ export function pitOutPath(
     { index: -1 },
     { s: 0, d: 0, index: -1 },
   );
+  // Onto the lap from the exit's offset with no sideways start: matching the lane's heading here
+  // sent cars across the track at once, into the path of cars on the straight (Monza seed 211,
+  // 20 m/s). The kink this leaves at the join is taken at the exit's speed anyway.
   for (let x = STEP; x <= 60; x += STEP) {
     track.lap.pointAt(exit.s + x, exit.d * (1 - smooth(x / 60)), v);
     out.push({ x: v.x, z: v.z, v: Infinity });

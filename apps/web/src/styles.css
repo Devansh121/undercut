@@ -2282,3 +2282,9 @@ html[data-race-finished] .ut-touch__btn--nextCompound,
 html[data-race-finished] .ut-touch__btn--pitLimiter {
   display: none;
 }
+
+html[data-pit-garage] .ut-touch__btn--boxThisLap,
+html[data-pit-garage] .ut-touch__btn--nextCompound,
+html[data-pit-garage] .ut-touch__btn--pitLimiter {
+  display: none;
+}

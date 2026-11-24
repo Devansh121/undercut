@@ -280,7 +280,7 @@ Every per-circuit position in section 4 and physics-validation 4.6 was checked f
 | Spa DRS 2 activation | 30 m after turn 19 | turn 19 | none; the zone runs through s = 0 |
 | Singapore DRS 4 activation | exit of turn 19 | turn 19's end | none; the zone runs through s = 0 |
 | All sector lines, speed traps, other DRS points | before or after a numbered turn | the turn | none (two anchored on the corner's start, section 5.4) |
-| Pit-lane limit lines | not in the sources | authored, in the pit frame | none |
+| Pit-lane limit lines | Monza: "Pit in at 5.707 m", "Pit in - Pit Out: 418 m" from the finish line [29]; Spa: "Pit in at 6.918,9 m" of a 7003.9 m lap, "Pit in to pit out 386 m" [30]; Singapore: none, a 404 m pit-lane length [31] | the timing loops, projected onto the pit lane | Monza s_pit 151–569 m, Spa 181–567 m (were 110 m to 120 m before the end); Singapore a 404 m zone centred on the garages, an estimate |
 
 The Monza correction changes the DRS zone the reference driver's speed profile uses; the racing-line artefact was rebuilt with `npm run ai:build`, and the reference lap went from 84.969 s to 84.872 s (docs/physics-validation.md 7.6; 85.539 s to 85.452 s before the lap-band changes).
 
@@ -537,3 +537,6 @@ All URLs were opened while doing this work (2026-11-21).
 26. Motorsport.com, J. Noble, "Why the FIA rejected calls to ditch Paul Ricard sausage kerbs" (2021-06-22). https://www.motorsport.com/f1/news/why-the-fia-rejected-calls-to-ditch-paul-ricard-sausage-kerbs/6596554/
 27. C. Benini, M. Gadola, D. Chindamo et al., "The influence of suspension components friction on race car vertical dynamics", Vehicle System Dynamics 55(3) (2017): F4 car, "a 130 N/mm tyre vertical stiffness in running conditions". https://sites.usp.br/ldsv/wp-content/uploads/sites/1453/2024/08/The-influence-of-suspension-components-friction-on-race-car-vertical-dynamics_17.pdf
 28. Marchesin et al., "High downforce race car vertical dynamics: aerodynamic index", Vehicle System Dynamics (2017): F3 car, tyre deflection 15 of 22 mm front and 18 of 36 mm rear in a 0–230 km/h sweep. https://sites.usp.br/ldsv/wp-content/uploads/sites/1453/2024/08/High-downforce-race-car-vertical-dynamics-aerodynamic-index_17.pdf
+29. Al Kamel Systems, European Le Mans Series, 4 Hours of Monza 2021, Circuit Map v1 (2021-01-27): circuit length 5793 m, start line offset 309 m, pit in at 5707 m, pit out at 332 m, pit in to pit out 418 m. https://elms.alkamelsystems.com/Results/16_2021/04_AUTODROMO%20NAZIONALE%20DI%20MONZA/00_Event%20Info/Circuit%20Map.pdf
+30. Al Kamel Systems, Le Mans Cup, Spa-Francorchamps round 2026, Briefing Notes V2 (Doc 9): centre line 7003.9 m, start line at 122 m, pit in at 6918.9 m, pit in to pit out 386 m. https://lemanscup.alkamelsystems.com/Results_NoticeBoard/10_2026/05_SPA-FRANCORCHAMPS/009_Doc%209%20-%20Briefing%20Notes%20V2.pdf
+31. RaceFans, "Marina Bay Singapore street track" (pit lane 404 m, pit lane time loss 20.94 s). https://www.racefans.net/f1-information/going-to-a-race/singapore-street-circuit/
