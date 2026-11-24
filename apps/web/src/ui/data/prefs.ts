@@ -35,6 +35,7 @@ export interface AssistChoice {
 }
 
 export interface RaceSetup {
+  automaticPitLimiter: boolean;
   /** Laps (5 to the circuit's full distance; clamped per circuit when a race starts). */
   laps: number;
   aiSkill: AiSkill;
@@ -80,7 +81,14 @@ export function defaultPrefs(): MenuPrefs {
     team: 'calder',
     driver: 0,
     timeOfDay: {},
-    race: { laps: 5, aiSkill: 'pro', grid: 'qualifying', slot: 10, field: 'tiers' },
+    race: {
+      automaticPitLimiter: true,
+      laps: 5,
+      aiSkill: 'pro',
+      grid: 'qualifying',
+      slot: 10,
+      field: 'tiers',
+    },
     assists: {},
     settings: {
       units: 'kmh',
@@ -151,6 +159,8 @@ export function parsePrefs(text: string | null): MenuPrefs {
     driver: raw.driver === 1 ? 1 : 0,
     timeOfDay: tod,
     race: {
+      automaticPitLimiter:
+        typeof race.automaticPitLimiter === 'boolean' ? race.automaticPitLimiter : true,
       laps: int(race.laps, 1, 200, d.race.laps),
       aiSkill: oneOf(race.aiSkill, ['club', 'pro', 'elite', 'alien'] as const, d.race.aiSkill),
       grid: oneOf(race.grid, ['qualifying', 'random', 'set'] as const, d.race.grid),

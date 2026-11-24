@@ -198,10 +198,13 @@ test('Quick Race: straight to the result when the player does not finish', async
   expect(await page.getByTestId('race-status').textContent()).not.toMatch(
     /\bD\d{1,2}\b|\bdnf\b|\bdsq\b|notClassified/,
   );
-  // Every row is a position and an entrant's name: a blank name would leave "12  +1L".
-  const rows = await page.getByTestId('race-status').locator('.race-status__row').allTextContents();
-  expect(rows).toHaveLength(20);
-  for (const row of rows) expect(row).toMatch(/^\d{1,2} {2}\p{L}{2,}/u);
+  // Every row is a position and an entrant's name: a blank name would leave an empty cell.
+  const rows = page.getByTestId('race-status').locator('tbody .race-status__row');
+  await expect(rows).toHaveCount(20);
+  for (const row of await rows.all()) {
+    await expect(row.locator('td').nth(0)).toHaveText(/^\d{1,2}$/);
+    await expect(row.locator('td').nth(1)).toHaveText(/^\p{L}{2,}/u);
+  }
   await expect(page.locator('.race-status__row.is-player')).toContainText('Retired');
   await page.evaluate(() => window.__undercut!.quit());
 });

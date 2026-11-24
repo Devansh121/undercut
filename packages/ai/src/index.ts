@@ -22,6 +22,7 @@ export {
 export {
   createTrafficCar,
   createTrafficView,
+  pitCarInPath,
   type TrafficCar,
   type TrafficView,
 } from './driver/traffic';
