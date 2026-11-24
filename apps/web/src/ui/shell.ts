@@ -51,6 +51,7 @@ export class Shell {
     private readonly host: HTMLElement,
     private readonly onEmpty: () => void = () => {},
     controls?: ControlsSource,
+    onSettings?: () => void,
   ) {
     this.root = el('div', 'shell');
     this.root.dataset.testid = 'menu';
@@ -62,6 +63,21 @@ export class Shell {
     const right = el('div', 'shell__right');
     this.deviceChip = el('span', 'device-chip');
     this.deviceChip.dataset.testid = 'device-chip';
+    if (onSettings) {
+      const settings = button({
+        label: S.settings.open,
+        icon: 'settings',
+        variant: 'quiet',
+        action: 'settings',
+        onClick: () => {
+          if (this.current?.id !== 'settings' && this.current?.id !== 'credits') onSettings();
+        },
+      });
+      settings.classList.add('shell__controls');
+      // Upright phones show the icon alone.
+      settings.setAttribute('aria-label', S.settings.open);
+      right.append(settings);
+    }
     this.controls = controls ? new ControlsPanel(controls) : null;
     const panel = this.controls;
     if (panel) {
@@ -73,6 +89,7 @@ export class Shell {
         onClick: () => panel.show(),
       });
       open.classList.add('shell__controls');
+      open.setAttribute('aria-label', S.controls.title);
       right.append(open);
     }
     right.append(this.deviceChip);

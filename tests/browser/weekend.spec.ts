@@ -1,4 +1,5 @@
 import { expect, test } from './base';
+import { DESKTOP, PHONES, fitEverywhere } from './fit-sweep';
 import { openMenu } from './helpers';
 
 test('weekend: practice (simulated to the flag on desktop, skipped on a phone), qualifying result, continue to the mandatory-stop race; player pit call and service', async ({
@@ -11,6 +12,11 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
   await page.locator('[data-action=start]').click();
   await expect(page.locator('html')).toHaveAttribute('data-screen', 'weekend');
   await page.screenshot({ path: info.outputPath('weekend.png') });
+  // Each weekend screen is held to the layout and text-fit rules at every size and text size,
+  // where the flow already reaches it (no extra loads): the phone sizes, or 1440 x 900.
+  const sizes = info.project.name === 'phone' ? PHONES : DESKTOP;
+  const fit = (label: string): Promise<string[]> => fitEverywhere(page, { label, sizes });
+  expect(await fit('weekend screen')).toEqual([]);
   if (info.project.name === 'phone') {
     await page.locator('[data-action=skip-practice]').click();
   } else {
@@ -39,9 +45,13 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
   await page.evaluate(() => window.__undercut!.setTimeScale(8));
   await expect(page.getByTestId('continue-weekend')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('race-status')).toContainText('Qualifying result');
+  await expect(page.locator('[data-testid=race-status][data-table]')).toBeVisible();
+  expect(await fit('qualifying result')).toEqual([]);
   await page.getByTestId('continue-weekend').click();
   expect(await page.evaluate(() => window.__undercut!.state().screen)).toBe('launch');
   await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start Race');
+  await expect(page.locator('.weekend-table').first()).toBeVisible();
+  expect(await fit('weekend classification')).toEqual([]);
   await page.locator('[data-action=weekend-start]').click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   expect(await page.evaluate(() => window.__undercut!.state().twoCompoundRule)).toBe(true);
@@ -59,6 +69,13 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
       if (/Pit service · [0-9]+\.[0-9] s/.test(panel.textContent ?? ''))
         panel.dataset.sawService = 'true';
     }).observe(panel, { subtree: true, childList: true, characterData: true });
+  });
+  // The race HUD with its pit panel, the clock stopped while the sizes change.
+  await expect(page.getByTestId('pit-panel')).toBeVisible();
+  expect(await fit('race with pit panel')).toEqual([]);
+  await page.evaluate(() => {
+    window.__undercut!.setTimeScale(0);
+    window.__undercut!.teleport(5125.675, 0, 108);
   });
   if (info.project.name === 'phone') {
     await page.evaluate(() => window.__undercut!.setTimeScale(1));

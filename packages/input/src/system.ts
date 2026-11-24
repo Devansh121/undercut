@@ -149,8 +149,12 @@ export class InputSystem {
     return this.captureDevice;
   }
 
-  /** Report the next press from `device` as a `captured` event instead of acting on it. */
+  /**
+   * Report the next press from `device` as a `captured` event instead of acting on it. Presses
+   * not yet sampled are dropped: they came before the capture (the press that started it).
+   */
   startCapture(device: DeviceKind): void {
+    for (const source of this.sources) source.drainPresses();
     this.captureDevice = device;
   }
 
