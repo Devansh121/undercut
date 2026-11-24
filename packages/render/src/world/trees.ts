@@ -5,6 +5,7 @@ import {
   MeshDepthMaterial,
   MeshStandardMaterial,
   RGBADepthPacking,
+  ShaderChunk,
   Vector3,
   type Texture,
   type WebGLProgramParametersWithUniforms,
@@ -16,7 +17,10 @@ import { ATLAS_COLS, ATLAS_ROWS, BARK_TILE, CLUSTER_TILE } from './tree-atlas';
 /**
  * Tree impostor cards: `planes` vertical quads crossed about the trunk (and, near, a canopy
  * card), with vertex normals bent outward from the crown's centre so the sun shades the crown as
- * a volume instead of as flat cards. Height and width 1; the prop's scale sizes it.
+ * a volume instead of as flat cards. Height and width 1; the prop's scale sizes it. So the
+ * crossing does not show as the same outline repeated in a star: every other card shows the
+ * tile mirrored, and each card is folded along the trunk (its outer edges a tenth of its width
+ * forward or back, alternately), so the crown has depth seen from any side.
  */
 export function treeCards(planes: number, aspect = 1): BufferGeometry {
   const pos: number[] = [];
@@ -24,13 +28,15 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
   const uv: number[] = [];
   const idx: number[] = [];
   // Each card's own frame (for the relief level): its uv's u direction and its front normal.
+  // cardT.w: -1 where the card shows its tile mirrored (u runs against the frame's tangent).
   const cardT: number[] = [];
   const cardP: number[] = [];
   let frame: [number, number, number, number, number, number] = [1, 0, 0, 0, 0, 1];
+  let flip = 1;
   const crownY = 0.58;
   const push = (x: number, y: number, z: number, u: number, v: number): void => {
     pos.push(x, y, z);
-    cardT.push(frame[0], frame[1], frame[2]);
+    cardT.push(frame[0], frame[1], frame[2], flip);
     cardP.push(frame[3], frame[4], frame[5]);
     // Normal: outward from the crown centre, leaning up (light from the sky on the top).
     let nx = x;
@@ -41,7 +47,7 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
     ny /= l;
     nz /= l;
     nor.push(nx, ny, nz);
-    uv.push(u, v);
+    uv.push(flip < 0 ? 1 - u : u, v);
   };
   const half = 0.5 * aspect;
   for (let k = 0; k < planes; k++) {
@@ -50,14 +56,19 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
     const cz = Math.sin(a) * half;
     // u runs along (cos a, 0, sin a); the winding below faces (-sin a, 0, cos a).
     frame = [Math.cos(a), 0, Math.sin(a), -Math.sin(a), 0, Math.cos(a)];
+    flip = k % 2 === 1 ? -1 : 1;
+    // The fold: outer edges forward (even cards) or back (odd), along the card's normal.
+    const fold = (k % 2 === 0 ? 1 : -1) * FOLD * half;
+    const fx = frame[3] * fold;
+    const fz = frame[5] * fold;
     const base = pos.length / 3;
     // Split each card in two columns so the bent normals interpolate across the middle.
-    push(-cx, 0, -cz, 0, 0);
+    push(-cx + fx, 0, -cz + fz, 0, 0);
     push(0, 0, 0, 0.5, 0);
-    push(cx, 0, cz, 1, 0);
-    push(-cx, 1, -cz, 0, 1);
+    push(cx + fx, 0, cz + fz, 1, 0);
+    push(-cx + fx, 1, -cz + fz, 0, 1);
     push(0, 1, 0, 0.5, 1);
-    push(cx, 1, cz, 1, 1);
+    push(cx + fx, 1, cz + fz, 1, 1);
     // Middle column's normals point toward the viewer of either face: keep them crown-outward.
     idx.push(base, base + 1, base + 4, base, base + 4, base + 3);
     idx.push(base + 1, base + 2, base + 5, base + 1, base + 5, base + 4);
@@ -73,7 +84,7 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
       pos.push(x, y, z);
       nor.push(0, 1, 0);
       uv.push(u, v);
-      cardT.push(1, 0, 0);
+      cardT.push(1, 0, 0, 1);
       cardP.push(0, 1, 0);
     };
     pushTop(0, yTop, 0, 0.5, 0.64);
@@ -90,12 +101,15 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
-  g.setAttribute('cardT', new BufferAttribute(new Float32Array(cardT), 3));
+  g.setAttribute('cardT', new BufferAttribute(new Float32Array(cardT), 4));
   g.setAttribute('cardP', new BufferAttribute(new Float32Array(cardP), 3));
   g.setIndex(idx);
   g.computeBoundingSphere();
   return g;
 }
+
+/** Fold of each crossed card, fraction of its half-width (see treeCards). */
+const FOLD = 0.2;
 
 /** GLSL: pick an atlas tile per instance (hash of its position) among the kind's species. */
 function tileChunk(tiles: readonly number[]): string {
@@ -132,6 +146,30 @@ const CROWN_NORMAL = /* glsl */ `
   normal *= faceDirection;
 #endif`;
 
+/**
+ * Leaves let through a share of the light that falls on their back (diffusely, about a third for
+ * a thin broad leaf): direct light from behind a leaf card lights it at `LEAF_TRANSMISSION` of
+ * its front-lit strength. Without it a crown is black on the side away from a floodlight, and
+ * the near trees' clusters (each lit by its own facing) and the cards (lit as a whole) part.
+ */
+export const LEAF_TRANSMISSION = 0.35;
+const LEAF_LIGHT = ShaderChunk.lights_physical_pars_fragment.replace(
+  'vec3 irradiance = dotNL * directLight.color;',
+  // Diffuse only: the specular lobe is the front face's (fed transmitted light, its grazing
+  // terms overflow).
+  `vec3 irradiance = dotNL * directLight.color;
+  reflectedLight.directDiffuse += ${LEAF_TRANSMISSION.toFixed(2)} * saturate( - dot( geometryNormal, directLight.direction ) ) * directLight.color * BRDF_Lambert( material.diffuseColor );`,
+);
+if (LEAF_LIGHT === ShaderChunk.lights_physical_pars_fragment)
+  throw new Error('three.js lights chunk changed: leaf transmission not applied');
+
+/** Shader hook: crown-outward normals on both faces, and the leaves' transmitted light. */
+function leafShading(shader: WebGLProgramParametersWithUniforms): void {
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <normal_fragment_begin>', CROWN_NORMAL)
+    .replace('#include <lights_physical_pars_fragment>', LEAF_LIGHT);
+}
+
 /** Wind: the crown sways with height, phase from the instance position (High only). */
 const WIND = /* glsl */ `
 #include <begin_vertex>
@@ -153,39 +191,46 @@ const WIND = /* glsl */ `
  * which the far level takes over, so the switch does not show.
  */
 const RELIEF_PARS_VERTEX = /* glsl */ `
-attribute vec3 cardT;
+attribute vec4 cardT;
 attribute vec3 cardP;
 varying vec3 vCardT;
 varying vec3 vCardP;
-varying float vTreeMirror;`;
+varying float vTreeMirror;
+varying float vCardFlip;`;
 const RELIEF_VERTEX = /* glsl */ `
 #include <defaultnormal_vertex>
 #ifdef USE_INSTANCING
-  vCardT = normalMatrix * (mat3(instanceMatrix) * cardT);
+  vCardT = normalMatrix * (mat3(instanceMatrix) * cardT.xyz);
   vCardP = normalMatrix * (mat3(instanceMatrix) * cardP);
 #else
-  vCardT = normalMatrix * cardT;
+  vCardT = normalMatrix * cardT.xyz;
   vCardP = normalMatrix * cardP;
-#endif`;
+#endif
+  vCardFlip = cardT.w;`;
 const RELIEF_PARS_FRAGMENT = /* glsl */ `
 uniform sampler2D uTreeReliefMap;
 /** x: fade start, y: fade end (m from the eye), z: weight of the relief normal. */
 uniform vec3 uTreeRelief;
 varying vec3 vCardT;
 varying vec3 vCardP;
-varying float vTreeMirror;`;
+varying float vTreeMirror;
+varying float vCardFlip;`;
 const RELIEF_MAP_FRAGMENT = /* glsl */ `
 #include <map_fragment>
 vec4 treeRelief = texture2D(uTreeReliefMap, vMapUv);
 float treeReliefK = uTreeRelief.y > uTreeRelief.x
   ? 1.0 - smoothstep(uTreeRelief.x, uTreeRelief.y, length(vViewPosition))
   : 0.0;
-diffuseColor.rgb *= mix(1.0, treeRelief.b * 2.0, treeReliefK);`;
+diffuseColor.rgb *= mix(1.0, treeRelief.b * 2.0, treeReliefK);
+// A card seen edge-on is a line, not foliage: it dissolves (through the alpha test, dithered by
+// alpha to coverage) as the view comes within about 15 degrees of its plane; the crossing cards
+// cover the crown there.
+diffuseColor.a *= smoothstep(0.08, 0.26, abs(dot(normalize(vCardP), normalize(vViewPosition))));`;
 const RELIEF_NORMAL_FRAGMENT = /* glsl */ `
 #include <normal_fragment_maps>
 {
   vec2 rxy = treeRelief.rg * 2.0 - 1.0;
-  rxy.x *= vTreeMirror;
+  rxy.x *= vTreeMirror * vCardFlip;
   float rz = sqrt(max(0.0, 1.0 - dot(rxy, rxy)));
   vec3 cT = normalize(vCardT);
   vec3 cP = normalize(vCardP);
@@ -313,10 +358,7 @@ export function treeMaterials(
     // The relief's defines come first: the tile pick writes the mirror sign under them.
     if (relief) addRelief(shader, relief);
     hook(shader);
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <normal_fragment_begin>',
-      CROWN_NORMAL,
-    );
+    leafShading(shader);
     if (swap) addSwap(shader, swap, false);
   };
   const material = new MeshStandardMaterial({
@@ -333,7 +375,7 @@ export function treeMaterials(
   if (relief) material.userData.surfaceUniforms = { uTreeReliefMap: { value: relief.map } };
   material.onBeforeCompile = colourHook;
   material.customProgramCacheKey = () =>
-    `tree-v2-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
+    `tree-v3-${key}-${options.wind ? 1 : 0}-${swap ? 1 : 0}-${relief ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,
@@ -356,8 +398,12 @@ export interface CloudShape {
   card: number;
 }
 
-/** Occlusion of the innermost leaf clusters (1 at the crown's surface). */
-const CROWN_AO = 0.35;
+/**
+ * Occlusion of the innermost leaf clusters (1 at the crown's surface). The cluster tiles are
+ * already matched to the cards' painted mean, occlusion included, so this is only the extra
+ * depth of the near crown (the tree-swap check: near trees against the cards they replace).
+ */
+const CROWN_AO = 0.5;
 /** Shade on the trunk and limbs under the crown. */
 const TRUNK_AO = 0.6;
 
@@ -533,10 +579,7 @@ export function treeCloudMaterials(
     if (options.wind)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WIND);
     addSwap(shader, swap, true);
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <normal_fragment_begin>',
-      CROWN_NORMAL,
-    );
+    leafShading(shader);
   };
   const material = new MeshStandardMaterial({
     map: atlas,
@@ -550,7 +593,7 @@ export function treeCloudMaterials(
   });
   material.name = `tree-cloud-${key}`;
   material.onBeforeCompile = hook;
-  material.customProgramCacheKey = () => `tree-cloud-v2-${options.wind ? 1 : 0}`;
+  material.customProgramCacheKey = () => `tree-cloud-v3-${options.wind ? 1 : 0}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,

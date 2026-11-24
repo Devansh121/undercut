@@ -456,8 +456,7 @@ export function treeAtlas(
 
 /**
  * The colour atlas and, with `relief`, the species cards' relief atlas in the same layout (half
- * the colour's size from 512-pixel tiles up; the mid-distance cards it serves are never that
- * close): normals and the factor that takes out the painted sunlight (reliefStyle), scaled per
+ * the colour's size: shading detail, read at a distance or on a phone's screen): normals and the factor that takes out the painted sunlight (reliefStyle), scaled per
  * species so the colour without it keeps the painted colour's mean.
  */
 export function treeAtlases(
@@ -498,7 +497,7 @@ export function treeAtlases(
   matchClustersToCards(data, canvas.width, tile);
   let reliefTexture: DataTexture | null = null;
   if (relief) {
-    const rt = tile >= 512 ? tile / 2 : tile;
+    const rt = Math.max(64, tile / 2);
     const rc = document.createElement('canvas');
     rc.width = rt * ATLAS_COLS;
     rc.height = rt * ATLAS_ROWS;
