@@ -198,6 +198,15 @@ const SEE_DELAY = 0.12;
 const CORNER_CURVATURE = 1 / 150;
 /** Speed below which a car is still launching (or crawling) and does not start a pass, m/s. */
 const LAUNCHED = 25;
+/**
+ * A car within `HAZARD_SEE` m ahead at no more than `HAZARD_SPEED` m/s (stopped, or crawling
+ * round a stopped car or in its queue) keeps the racing moves (passing a car at speed, attack
+ * speed headroom, mirror clearance) off: the queue and the cars going round it drive on their measured plan, as the
+ * session keeps the tow off while a car stands in the road. A car stopped and made a ghost is
+ * not seen, but the queue it leaves crawling behind it is.
+ */
+const HAZARD_SEE = 600;
+const HAZARD_SPEED = BYPASS_SPEED + 2;
 /** Room to the edge a car turning round keeps before it changes direction, m. */
 const TURN_ROOM = 3.5;
 /** A car within this far of where it stood is standing still, m. */
@@ -288,6 +297,8 @@ export class RaceDriver implements Driver {
   private wasActive = false;
   private blueSide = 0;
   private readonly defence = { lane: 0, used: false };
+  /** A car stands still in the road ahead this tick (`HAZARD_SEE`): set first in `planTraffic`. */
+  private hazard = false;
   /** The car being passed as last seen (speed, m/s; -1 none) and its deceleration, m/s². */
   private passSeenV = -1;
   private passSeenId = -1;
@@ -385,6 +396,7 @@ export class RaceDriver implements Driver {
     this.blueSide = 0;
     this.defence.lane = 0;
     this.defence.used = false;
+    this.hazard = false;
     this.passSeenV = -1;
     this.passSeenId = -1;
     this.passDecel = 0;
@@ -646,6 +658,7 @@ export class RaceDriver implements Driver {
     const self = view.self;
     const v = Math.max(0, tel.speed);
     const s0 = self.s;
+    this.hazard = this.slowAhead(view, s0);
     // Other cars' lateral positions are taken against the line here, where this car is: the
     // line sweeps across the track, and an offset read against it where they are would put
     // them metres from where they are when they are a few lengths away.
@@ -923,7 +936,11 @@ export class RaceDriver implements Driver {
         this.switchbackSide = -this.passSide;
         this.switchbackTime = 12;
       }
-      if (lost || done || late || blockedByOther || movedOff) {
+      // A stopped or crawling car ahead: no racing a car still at speed toward it (as under a
+      // yellow). Going round a stopped or crawling car is not a race and goes on.
+      const yellow =
+        this.hazard && !this.passBypass && passCar !== null && passCar.speed >= HAZARD_SPEED;
+      if (lost || done || late || blockedByOther || movedOff || yellow) {
         if (!done && !blockedByOther && !movedOff) this.cooldown = this.passBypass ? 1 : 3;
         this.passId = -1;
       } else {
@@ -1023,6 +1040,7 @@ export class RaceDriver implements Driver {
     if (
       this.passId < 0 &&
       leader &&
+      !(this.hazard && leader.speed >= HAZARD_SPEED) &&
       this.cooldown <= 0 &&
       (!cornering || brakingMove) &&
       launched &&
@@ -1123,6 +1141,7 @@ export class RaceDriver implements Driver {
     let target = Math.max(lo, Math.min(hi, base));
     if (
       v > LAUNCHED &&
+      !this.hazard &&
       this.rejoinTime <= 0 &&
       !this.passBypass &&
       !this.recovering &&
@@ -1298,7 +1317,7 @@ export class RaceDriver implements Driver {
     limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
     this.inner.accelLimit = limit;
     this.inner.speedAllowance =
-      !cornering && this.passId >= 0 && !this.passBypass && v > LAUNCHED ? 4 : 0;
+      !cornering && this.attacking() && v > LAUNCHED ? 4 : 0;
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
     // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays
@@ -1446,14 +1465,13 @@ export class RaceDriver implements Driver {
       const sx = s0 + x;
       const k = this.at(plan.line.curvature, sx);
       const tight = k * o;
-      const attackStraight =
-        this.passId >= 0 && !this.passBypass && Math.abs(k) <= 0.5 * CORNER_CURVATURE;
+      const attackStraight = this.attacking() && Math.abs(k) <= 0.5 * CORNER_CURVATURE;
       let f = attackStraight ? 1 : 0.985;
       if (tight > 0 && !attackStraight) f *= Math.sqrt(Math.max(0.4, 1 - 1.2 * tight));
       if (this.passCommitted) {
         // Committed to a move the car brakes at its own point, as on the line: on its braking curve to
         // the slower corner speed off line (no margin on a straight, where off line is as fast).
-        if (Math.abs(k) <= 0.5 * CORNER_CURVATURE) f = 1;
+        if (Math.abs(k) <= 0.5 * CORNER_CURVATURE) f = attackStraight ? 1 : f / 0.985;
         if (f >= 1) continue;
         const vMax = this.at(plan.profile.v, sx) * f;
         if (v <= vMax) continue;
@@ -1464,7 +1482,7 @@ export class RaceDriver implements Driver {
       }
       // On the straight an attacker uses the tow and DRS to exceed the solo profile.
       // Corner samples ahead still impose their ordinary braking curve.
-      if (this.passId >= 0 && !this.passBypass && f >= 1) continue;
+      if (this.attacking() && f >= 1) continue;
       const vMax = this.at(plan.profile.v, sx) * f;
       if (v <= vMax) continue;
       const a = x < 1 ? SPEED_GAIN * (vMax - v) : (vMax * vMax - v * v) / (2 * x);
@@ -1644,6 +1662,21 @@ export class RaceDriver implements Driver {
         best = Math.max(0, ds);
     }
     return best;
+  }
+
+  /** A move on a moving car with the road ahead clear of stopped cars (tow and DRS speed). */
+  private attacking(): boolean {
+    return this.passId >= 0 && !this.passBypass && !this.hazard;
+  }
+
+  /** A car stopped or crawling within `HAZARD_SEE` ahead, anywhere across the road. */
+  private slowAhead(view: TrafficView, s0: number): boolean {
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      const ds = this.ahead(s0, c.s);
+      if (c.speed < HAZARD_SPEED && ds > 0 && ds < HAZARD_SEE) return true;
+    }
+    return false;
   }
 
   /** A car standing still on the road within `range` m ahead, anywhere across it. */
