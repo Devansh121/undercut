@@ -410,6 +410,8 @@ export const S = {
       gearDown: 'Gear down',
       drs: 'DRS',
       overtake: 'Overtake',
+      boxThisLap: 'Box this lap',
+      nextCompound: 'Next tyre compound',
       pitLimiter: 'Pit limiter',
       nextCamera: 'Camera',
       lookBack: 'Look back',
