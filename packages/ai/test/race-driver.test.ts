@@ -18,7 +18,7 @@ import {
   type RacingLineData,
   type TrafficView,
 } from '../src/index';
-import { MONZA, loadEnvelope, loadLine } from '../validation/lib/index';
+import { MONZA, SPA, loadEnvelope, loadLine } from '../validation/lib/index';
 
 // Decisions of the racing driver at Monza with the car's motion scripted: the driver's outputs
 // (target offset, followed car, acceleration ceiling, pedals) for traffic placed around it. The
@@ -666,5 +666,40 @@ describe('race driver: a pit entrant beyond the car being passed', () => {
     };
     expect(attempt(false)).toBe(1);
     expect(attempt(true)).toBe(-1);
+  });
+});
+
+describe('race driver: yielding before a narrowing road', () => {
+  it('keeps its present road lane while braking behind a car beside it', () => {
+    const circuit = SPA.track();
+    const dr = createRaceDriver({
+      track: circuit,
+      line: loadLine(SPA),
+      envelope: loadEnvelope(SPA),
+      params: createCarParams(SPA.trim),
+      skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0, aggression: 0.6 },
+    });
+    const s = 50;
+    const ld = dr['at'](dr.plan.line.d, s);
+    const me = { id: 19, s, d: 6.2, speed: 46 };
+    dr['o'] = me.d - ld;
+    dr['wasActive'] = true;
+    dr.sense(view(me, [{ id: 13, s: 63, d: 3.3, speed: 28 }]));
+    const tel = createCarTelemetry();
+    const p = circuit.pointAt(s, me.d, createVec3());
+    const tangent = circuit.tangentAt(s, createVec3());
+    Object.assign(tel, {
+      x: p.x,
+      z: p.z,
+      yaw: Math.atan2(-tangent.z, tangent.x),
+      speed: me.speed,
+      gear: 5,
+      engineRpm: 10000,
+    });
+    tel.wheelLoad.fill(4000);
+    dr.drive(tel, DT, { ...NEUTRAL_INPUT });
+    expect(dr.last.yielding).toBe(true);
+    expect(dr.last.target + ld).toBeGreaterThanOrEqual(me.d - 0.1);
+    expect(dr.last.accelLimit).toBeLessThan(0);
   });
 });

@@ -34,6 +34,29 @@ export function mirrorLane(
   return lane;
 }
 
+/** Intersect mirror clearance at the present and previewed road positions, in line offsets. */
+export function mirrorOffset(
+  view: TrafficView,
+  target: number,
+  length: number,
+  reaction: number,
+  lineHere: number,
+  lineNext: number,
+): number {
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (let k = 0; k < 2; k++) {
+    const line = k === 0 ? lineHere : lineNext;
+    const requested = line + target;
+    const safe = mirrorLane(view, requested, length, reaction);
+    if (safe < requested) hi = Math.min(hi, safe - line);
+    else if (safe > requested) lo = Math.max(lo, safe - line);
+  }
+  // If the road sweep makes both corridors incompatible, keep the present road lane.
+  if (lo > hi) return view.self.d - lineHere;
+  return Math.max(lo, Math.min(hi, target));
+}
+
 export interface DefenceMemory {
   lane: number;
   used: boolean;

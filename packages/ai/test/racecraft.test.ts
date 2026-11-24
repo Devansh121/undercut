@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { brakingTraffic, carNear, mirrorLane, roomLane } from '../src/driver/racecraft';
+import {
+  brakingTraffic,
+  carNear,
+  mirrorLane,
+  mirrorOffset,
+  roomLane,
+} from '../src/driver/racecraft';
 import { createTrafficView } from '../src/driver/traffic';
 
 function traffic(s = 100) {
@@ -137,4 +143,22 @@ it('allows falling in behind the forward car when another car is also behind', (
   Object.assign(view.cars[1]!, { id: 2, s: 108, d: 0, speed: 60 });
   view.count = 2;
   expect(brakingTraffic(view, 1000)).toBe(false);
+});
+
+describe('mirror clearance while the racing line sweeps', () => {
+  it('constrains the current road lane as well as the half-second preview', () => {
+    const view = traffic();
+    Object.assign(view.self, { s: 50, d: 3.3, speed: 28 });
+    Object.assign(view.cars[0]!, { s: 38, d: 5.4, speed: 46 });
+    // Returning an offset against only the future line would move left into the rear car now.
+    const offset = mirrorOffset(view, 6, 1000, 0.2, -0.3, -0.8);
+    expect(offset - 0.3).toBeLessThanOrEqual(view.self.d);
+  });
+  it('retains the preview constraint when the present road lane alone is clear', () => {
+    const view = traffic();
+    Object.assign(view.self, { s: 50, d: -3, speed: 50 });
+    Object.assign(view.cars[0]!, { s: 36, d: 0, speed: 65 });
+    const offset = mirrorOffset(view, 0, 1000, 0.2, -3, 0);
+    expect(offset).toBeLessThanOrEqual(-2.8);
+  });
 });

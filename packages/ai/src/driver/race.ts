@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import { OVERLAP, brakingTraffic, defensiveLane, mirrorLane, roomLane } from './racecraft';
+import { OVERLAP, brakingTraffic, defensiveLane, mirrorOffset, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
@@ -857,7 +857,22 @@ export class RaceDriver implements Driver {
       if (e.left) lo = Math.max(lo, Math.min(myO, this.o));
       else hi = Math.min(hi, Math.max(myO, this.o));
     }
-    if (lo > hi) lo = hi = Math.max(oMin, Math.min(oMax, this.o));
+    if (lo > hi) {
+      if (
+        yieldTo !== null &&
+        yieldTo.speed >= HAZARD_SPEED &&
+        !this.hazard &&
+        !this.passBypass &&
+        !this.recovering
+      ) {
+        // Future road bounds cannot pull a yielding car through the body beside it. Hold
+        // its current road lane while braking opens room, bounded by the road here and now.
+        const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
+        const hereLo = -(this.at(plan.track.halfWidth[1], s0) - margin) - ldHere;
+        const hereHi = this.at(plan.track.halfWidth[0], s0) - margin - ldHere;
+        lo = hi = Math.max(hereLo, Math.min(hereHi, myO));
+      } else lo = hi = Math.max(oMin, Math.min(oMax, this.o));
+    }
     // (A car level or behind that this one gives way to, followed at a crawl, gave way to this
     // one too: two cars side by side into La Source followed each other to a standstill.)
     if (yieldTo && yieldDs < leaderDs && (yieldDs > 0 || v >= LEVEL_YIELD_SPEED)) {
@@ -1202,9 +1217,14 @@ export class RaceDriver implements Driver {
       // exclude the mirror check. Check the road lane ahead as well as the offset: the racing
       // line sweeps across the road while a car returns to it, even with its offset held.
       const ldNext = this.at(line.d, s0 + v * 0.5);
-      target =
-        mirrorLane(view, ldNext + target, plan.track.length, SEE_DELAY + this.skill.reaction) -
-        ldNext;
+      target = mirrorOffset(
+        view,
+        target,
+        plan.track.length,
+        SEE_DELAY + this.skill.reaction,
+        ldHere,
+        ldNext,
+      );
     }
     if (
       v > HAZARD_SPEED &&
