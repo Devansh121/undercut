@@ -1367,6 +1367,14 @@ body {
   box-shadow: inset 0 0 0 1px var(--c-line-strong);
 }
 
+/* Upright phones: the session waits behind the rotate prompt; the desktop tyre panel, which a
+   landscape phone also leaves out, would hang off the left edge. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .hud-tyres {
+    display: none;
+  }
+}
+
 /* ================= Phone landscape ================= */
 
 @media (max-height: 500px) and (orientation: landscape) {
@@ -1779,6 +1787,12 @@ body {
     font-size: var(--fs-12);
   }
 }
+/* Upright phones too (the pause card under the rotate prompt): a thumb-sized slider. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .range__input {
+    height: 44px;
+  }
+}
 
 .online-screen {
   position: absolute;
@@ -1943,6 +1957,8 @@ html[data-screen='drive']:not([data-paused]) #view {
 }
 .onboarding__actions {
   display: flex;
+  /* Two buttons in a narrow card (40 vw upright) take two lines rather than spill. */
+  flex-wrap: wrap;
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }

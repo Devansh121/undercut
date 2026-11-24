@@ -2,8 +2,9 @@
  * "Every control's text stays inside its box", as one check for any screen. Run in the page
  * (`page.evaluate(textFitProblems, scope)`), so it must stay self-contained.
  *
- * A box is an element that draws an edge: a background, a border, a shadow, or an overflow
- * other than visible. Three rules, each reported once per element:
+ * A box is an element that draws an edge (a background, a border, a shadow, or an overflow other
+ * than visible) or a control (a button, tab, segment, switch, slider or output), whose label must
+ * stay inside the area a press lands on. Three rules, each reported once per element:
  * - each visible run of text lies inside its nearest box (both axes, except along an axis the
  *   box scrolls, where text below the fold is fine);
  * - no text is cut short: it lies inside every ancestor that clips (overflow hidden or clip,
@@ -19,6 +20,8 @@ export function textFitProblems(scope: string | null = null): string[] {
   const root = (scope ? document.querySelector(scope) : null) ?? document.body;
   const out = new Set<string>();
   const TOLERANCE = 0.5;
+  const CONTROLS =
+    'button, a[href], output, [role=slider], [role=tab], [role=radio], [role=switch], [role=button]';
   // Layout does not change during the check: read each element's style and box once.
   const styles = new Map<Element, CSSStyleDeclaration>();
   const rects = new Map<Element, DOMRect>();
@@ -50,6 +53,9 @@ export function textFitProblems(scope: string | null = null): string[] {
   };
   function drawsEdge(el: Element): boolean {
     if (el === document.body || el === document.documentElement) return false;
+    // A control is its own box even when it draws no edge (an unselected segment, a quiet
+    // button): its label belongs inside the area a press lands on.
+    if (el.matches(CONTROLS)) return true;
     const s = styleOf(el);
     if (s.overflowX !== 'visible' || s.overflowY !== 'visible') return true;
     if (!transparent(s.backgroundColor) || s.backgroundImage !== 'none') return true;

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { openMenu } from './helpers';
+import { DESKTOP, PHONES, layoutProblems, setTextSize } from './fit-sweep';
 import { textFitProblems } from './text-fit';
 
 /** The Settings screen, opened from the main menu's top bar. Desktop: keyboard and an emulated pad. */
@@ -259,23 +260,12 @@ test('on a wide screen, Up and Down from the top bar and the action bar reach th
   }
 });
 
-/** Every phone size phone-fit.spec.ts sweeps. */
-const PHONES = [
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
-  { width: 430, height: 932 },
-  { width: 667, height: 375 },
-  { width: 844, height: 390 },
-  { width: 932, height: 430 },
-  { width: 568, height: 320 },
-];
-
 test('the HUD and the pause card keep their text inside at every size and text size', async ({
   drive: { page },
 }) => {
   const project = test.info().project.name;
   test.skip(project !== 'phone' && project !== 'desktop', 'one phone and one desktop engine');
-  const sizes = project === 'phone' ? PHONES : [{ width: 1440, height: 900 }];
+  const sizes = project === 'phone' ? PHONES : DESKTOP;
   const before = page.viewportSize();
   const menu = page.locator('[data-testid=pause-menu]');
   const problems: string[] = [];
@@ -283,21 +273,22 @@ test('the HUD and the pause card keep their text inside at every size and text s
     for (const size of sizes) {
       await page.setViewportSize(size);
       for (const text of ['standard', 'large', 'larger']) {
-        await page.evaluate((t) => {
-          if (t === 'standard') delete document.documentElement.dataset.text;
-          else document.documentElement.dataset.text = t;
-        }, text);
+        await setTextSize(page, text);
         const at = `${size.width} x ${size.height}, ${text} text`;
         // The HUD: every piece of text in its box, and in the timing tower the name never runs
         // into the time (two texts in one row: the row is their box, so check them apart).
+        const targets = project === 'phone';
+        problems.push(...(await page.evaluate(layoutProblems, { label: `${at}, HUD`, targets })));
         for (const p of await page.evaluate(textFitProblems, '#app'))
           problems.push(`${at}, HUD: ${p}`);
-        for (const p of await page.evaluate(towerOverlaps)) problems.push(`${at}, HUD: ${p}`);
         // Upright, the session pauses itself behind the rotate prompt (phone-session.ts) and
-        // stays paused; on its side, Esc opens and closes the card.
+        // stays paused; on its side, Esc opens and closes the card, and the tower is on screen.
         const upright = size.height > size.width;
+        for (const p of await page.evaluate(towerOverlaps, !upright))
+          problems.push(`${at}, HUD: ${p}`);
         if (!(await menu.isVisible())) await page.keyboard.press('Escape');
         await expect(menu).toBeVisible();
+        problems.push(...(await page.evaluate(layoutProblems, { label: `${at}, pause`, targets })));
         for (const p of await page.evaluate(textFitProblems, '[data-testid=pause-menu]'))
           problems.push(`${at}, pause: ${p}`);
         if (!upright) {
@@ -315,9 +306,16 @@ test('the HUD and the pause card keep their text inside at every size and text s
   expect(problems).toEqual([]);
 });
 
-/** Timing tower rows where the driver code's text reaches the time's (in the page). */
-function towerOverlaps(): string[] {
+/**
+ * Timing tower rows where the driver code's text reaches the time's (in the page). `expectRows`:
+ * the tower is on screen, so finding no rows is itself a failure (not a silent pass).
+ */
+function towerOverlaps(expectRows: boolean): string[] {
   const out: string[] = [];
+  const rows = [...document.querySelectorAll('.hud-tower__row')].filter(
+    (r) => r.getClientRects().length > 0,
+  );
+  if (expectRows && rows.length === 0) out.push('no tower rows');
   const ink = (row: Element, sel: string): DOMRect | undefined => {
     const el = row.querySelector(sel);
     if (!el) return undefined;
@@ -325,8 +323,7 @@ function towerOverlaps(): string[] {
     range.selectNodeContents(el);
     return range.getBoundingClientRect();
   };
-  for (const row of document.querySelectorAll('.hud-tower__row')) {
-    if (row.getClientRects().length === 0) continue;
+  for (const row of rows) {
     const code = ink(row, '.hud-tower__code');
     const time = ink(row, '.hud-tower__time');
     if (code && time && code.width > 0 && time.width > 0 && code.right > time.left + 0.5)

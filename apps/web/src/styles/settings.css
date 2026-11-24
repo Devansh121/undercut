@@ -35,6 +35,12 @@
   --fs-16: 16px;
   --fs-20: 20px;
 }
+/* Text that sets no size of its own inherits the body's, already worked out at the larger size
+   before the tokens above were reset: start these again from the standard body size. (The hint
+   card sets its own.) */
+:root[data-text] :is(.hud, .online-race, .ut-touch) {
+  font-size: var(--fs-14);
+}
 
 /* ================= Colour-blind-safe flags ================= */
 
@@ -523,4 +529,16 @@
   text-overflow: clip;
   line-height: 1.15;
   text-align: center;
+}
+
+/* The weekend classification on an upright phone: tighter cells, and the driver's name may take
+   two lines, so the table fits the width at Large and Larger. */
+@media (max-width: 600px) and (orientation: portrait) {
+  :root[data-text] .weekend-table th,
+  :root[data-text] .weekend-table td {
+    padding: 4px 5px;
+  }
+  :root[data-text] .weekend-table td:nth-child(2) {
+    white-space: normal;
+  }
 }

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './base';
 import { openMenu, watchProblems } from './helpers';
+import { PHONES, layoutProblems } from './fit-sweep';
 import { textFitProblems } from './text-fit';
 
 /**
@@ -13,91 +14,13 @@ import { textFitProblems } from './text-fit';
  * Settings offers. The same text check runs at 1440 x 900 on the desktop project. DOM only; the
  * pause card and the HUD are checked on the shared session in settings.spec.ts.
  */
-const SIZES = [
-  // Portrait: iPhone SE / 8, iPhone 12-15, the large Pro Max size.
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
-  { width: 430, height: 932 },
-  // Landscape, and Safari with its toolbars showing on a small phone.
-  { width: 667, height: 375 },
-  { width: 844, height: 390 },
-  { width: 932, height: 430 },
-  { width: 568, height: 320 },
-];
+const SIZES = PHONES;
 
 interface Step {
   label: string;
   click?: string;
   /** The control may not exist at this size (the phone-only settings dialog): skip quietly. */
   optional?: boolean;
-}
-
-/** Layout checks for the screen as it stands: in the page, self-contained. */
-function layoutProblems(o: { label: string; targets: boolean }): string[] {
-  const { label, targets } = o;
-  const problems: string[] = [];
-  const { innerWidth: w, innerHeight: h } = window;
-  const root = document.documentElement;
-  const scrollBox = (el: Element): Element | null => {
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const y = getComputedStyle(p).overflowY;
-      if ((y === 'auto' || y === 'scroll') && p.scrollHeight > p.clientHeight) return p;
-    }
-    return null;
-  };
-  if (root.scrollWidth > w) problems.push(`${label}: page is ${root.scrollWidth}px wide`);
-  // The top bar's parts never overlap: wordmark, each breadcrumb, each button on the right.
-  const bar = [
-    ...document.querySelectorAll<HTMLElement>(
-      '.shell__top .wordmark, .shell__top .crumbs > *, .shell__right > *',
-    ),
-  ].filter((el) => el.getClientRects().length > 0 && !el.closest('[hidden]'));
-  const barName = (el: HTMLElement): string =>
-    el.getAttribute('aria-label') ?? (el.textContent?.trim() || el.className);
-  bar.forEach((a, i) => {
-    const ra = a.getBoundingClientRect();
-    for (const b of bar.slice(i + 1)) {
-      const rb = b.getBoundingClientRect();
-      const apart =
-        ra.right <= rb.left + 0.5 ||
-        rb.right <= ra.left + 0.5 ||
-        ra.bottom <= rb.top ||
-        rb.bottom <= ra.top;
-      if (!apart) problems.push(`${label}: top bar ${barName(a)} overlaps ${barName(b)}`);
-    }
-  });
-  if (root.scrollHeight > h) problems.push(`${label}: page is ${root.scrollHeight}px tall`);
-  for (const el of document.querySelectorAll<HTMLElement>('#app *')) {
-    if (el.closest('[hidden]') || el.getClientRects().length === 0) continue;
-    const style = getComputedStyle(el);
-    if (style.visibility === 'hidden' || style.position === 'fixed') continue;
-    if (el.closest('.tip')) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width === 0) continue;
-    const name = `${label}: ${el.tagName.toLowerCase()}.${String(el.className)}`;
-    const sideways = r.left < -0.5 || r.right > w + 0.5;
-    // Below the fold is fine inside a scroll box (it scrolls into view), never on the page.
-    const offPage = !scrollBox(el) && (r.top < -0.5 || r.bottom > h + 0.5);
-    if (sideways || offPage)
-      problems.push(
-        `${name} leaves the viewport (${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)})`,
-      );
-    if (el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible')
-      problems.push(`${name} clips its content sideways`);
-    if (
-      el.scrollHeight > el.clientHeight + 1 &&
-      style.overflowY !== 'visible' &&
-      style.overflowY !== 'auto'
-    )
-      problems.push(`${name} clips its content`);
-    if (
-      targets &&
-      (el.matches('button, input, a, [data-nav]') || el.getAttribute('role') === 'slider') &&
-      (r.width < 43.5 || r.height < 43.5)
-    )
-      problems.push(`${name} is a ${Math.round(r.width)} x ${Math.round(r.height)} target`);
-  }
-  return problems;
 }
 
 /**
@@ -133,7 +56,24 @@ const press = (page: Page, selector: string): Promise<void> =>
  * Every menu screen once, from the main menu and back to it: the modes, the race settings dialog
  * (phones), the controls list, Settings (each tab, every device's bindings) and Credits.
  */
+/**
+ * Every mode is playable in this build, so no row carries a "Not yet available" badge. Put one on
+ * the Championship row (as the hub draws it) so the badge's layout stays checked for the next mode
+ * that ships unavailable.
+ */
+function seedBadge(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const text = document.querySelector('[data-action=mode-championship] .lrow__text');
+    if (!text || text.querySelector('.lrow__tag')) return;
+    const tag = document.createElement('span');
+    tag.className = 'lrow__tag';
+    tag.textContent = 'Not yet available';
+    text.querySelector('.lrow__title')?.after(tag);
+  });
+}
+
 async function textScreens(page: Page, text: string, targets: boolean): Promise<string[]> {
+  await seedBadge(page);
   const t = `${text} text`;
   const problems = await sweep(
     page,
@@ -217,6 +157,8 @@ for (const size of SIZES) {
     ).toEqual([]);
     await openMenu(page);
     // Mode badges ("Not yet available") stay on one line.
+    await seedBadge(page);
+    await expect(page.locator('[data-action=mode-championship] .lrow__tag')).toBeVisible();
     expect(
       await page.evaluate(
         () =>
