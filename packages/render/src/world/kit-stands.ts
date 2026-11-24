@@ -14,9 +14,6 @@ export interface KitSpectator {
   near?: boolean;
 }
 
-/** Within this distance of the eye (to a module's origin) a bank module draws its middle level. */
-export const STAND_NEAR_REACH = 25;
-
 /** Tile human-scale ten-row banks into the mapped footprint; rear banks step up by ten risers. */
 export function placeKitStands(
   frames: readonly StandFrame[],
@@ -26,24 +23,22 @@ export function placeKitStands(
   occupancy: (frame: StandFrame, row: number) => number,
   shadows: boolean,
   spectator: (seat: KitSpectator) => void,
-  /**
-   * The near and far kinds' materials, owned by the caller, with `instanceHandover` at
-   * `STAND_NEAR_REACH` applied (near: the kit's material; far: without its sub-pixel grain).
-   * Without them, one kind per bank draws both levels by its cells' distance.
-   */
-  materials?: { near: Material; far: Material },
+  /** Material for the far level (the kit's without its sub-pixel grain); owned by the caller. */
+  farMaterial?: Material,
 ): { fallback: StandFrame[]; modules: number; crowd: number } {
   const result = { fallback: [] as StandFrame[], modules: 0, crowd: 0 };
-  // One geometry per kit model and bank height, shared by every stand: the stand's footprint fit
-  // is a per-instance stretch, never baked into geometry (a copy per stand cost hundreds of MiB).
-  const kinds = new Map<string, string[]>();
-  const kindsFor = (kitId: string, bank: number): string[] => {
+  // One kind per kit model and bank height, shared by every stand: the stand's footprint fit is
+  // a per-instance stretch, never baked into geometry (a copy per stand cost hundreds of MiB).
+  const kinds = new Map<string, string>();
+  const kindFor = (kitId: string, bank: number): string => {
     const key = `${kitId}-${bank}`;
-    let ids = kinds.get(key);
-    if (ids) return ids;
+    let id = kinds.get(key);
+    if (id) return id;
     const lods = kit!.lodsFor(kitId, {
       maxDistanceScale: 2.7,
-      distanceCaps: [8, STAND_NEAR_REACH, 1200],
+      // The middle level (4,900 to 5,100 triangles a module) only within 25 m, the far level
+      // (1,100 to 1,300) beyond: at 80 m the middle level cost 0.3 ms at Monza's grid on High.
+      distanceCaps: [8, 25, 1200],
       slotColors: { seat: [1, 1, 1] },
     })!;
     const rise = bank * 4.2;
@@ -57,53 +52,28 @@ export function placeKitStands(
         }
         lod.geometry.computeBoundingSphere();
       }
-    const id = `stand-kit-${key}`;
-    if (!materials) {
-      // Shadows from the far level, in the shadow pass only, to 100 m.
-      props.define({
-        id,
-        lods,
-        gridCell: 40,
-        // The bay reflects the stands as it does the temporary ones (world/water.ts).
-        reflect: 'skyline',
-        castShadow: shadows,
-        shadowMaxDistance: 100,
-        shadowLevel: lods.length - 1,
-      });
-      ids = [id];
-    } else {
-      // Two kinds over the same modules, split per module at STAND_NEAR_REACH in the vertex
-      // stage. Near: the middle level (4,900 to 5,100 triangles a module) in 40 m cells, so
-      // only cells within reach draw at all. Far: the far level (1,100 to 1,300) in 200 m cells,
-      // a few draw calls for every bank on the circuit (40 m cells for both levels cost Monza's
-      // grid about 130 draw calls). The finest level (18,700) is not used: no view comes
-      // within its 8 m of a bank.
-      const middle = lods[Math.min(1, lods.length - 1)]!;
-      const far = lods[lods.length - 1]!;
-      for (const lod of lods) if (lod !== middle && lod !== far) lod.geometry.dispose();
-      props.define({
-        id: `${id}-near`,
-        lods: [{ ...middle, material: materials.near, maxDistance: STAND_NEAR_REACH }],
-        gridCell: 40,
-        // The bay reflects the stands as it does the temporary ones (world/water.ts).
-        reflect: 'skyline',
-        castShadow: false,
-      });
-      // The far kind casts every module's shadow (its depth pass ignores the handover), from
-      // the far level, in the shadow pass only, to 100 m.
-      props.define({
-        id,
-        lods: [{ ...far, material: materials.far, maxDistance: 1200 }],
-        gridCell: 200,
-        reflect: 'skyline',
-        castShadow: shadows,
-        shadowMaxDistance: 100,
-        shadowLevel: 0,
-      });
-      ids = [`${id}-near`, id];
-    }
-    kinds.set(key, ids);
-    return ids;
+    const far = lods[lods.length - 1]!;
+    if (farMaterial && !Array.isArray(far.material)) far.material = farMaterial;
+    id = `stand-kit-${key}`;
+    // Shadows from the far level (1,100 to 1,300 triangles a module, against 4,900 to 5,100 for
+    // the middle level), in the shadow pass only, to 100 m: the cascades draw every caster once
+    // each, and the near levels' shadows cost more than the banks themselves.
+    props.define({
+      id,
+      lods,
+      // 40 m cells: a cell's level goes by its near edge, so 100 m cells drew a whole block of
+      // banks at the middle level from the stand beside the grid. Larger cells for the far level
+      // alone (a separate kind handed over per module) measured 0.7 to 1.5 ms dearer at Monza
+      // on High: every cascade drew whole 200 m cells of shadow casters.
+      gridCell: 40,
+      // The bay reflects the stands as it does the temporary ones (world/water.ts).
+      reflect: 'skyline',
+      castShadow: shadows,
+      shadowMaxDistance: 100,
+      shadowLevel: lods.length - 1,
+    });
+    kinds.set(key, id);
+    return id;
   };
   for (const [i, frame] of frames.entries()) {
     if (!kit?.has('grandstand') || (frame.roof && !kit.has('grandstand-roof'))) {
@@ -119,7 +89,7 @@ export function placeKitStands(
     for (let bank = 0; bank < banks; bank++) {
       const kitId = frame.roof && bank === banks - 1 ? 'grandstand-roof' : 'grandstand';
       const entry = kit.entries.get(kitId)!;
-      const ids = kindsFor(kitId, bank);
+      const id = kindFor(kitId, bank);
       const rise = bank * 4.2;
       for (let module = 0; module < n; module++) {
         const depth = (4.76 + bank * 8.5) * sx;
@@ -127,7 +97,7 @@ export function placeKitStands(
         const z = frame.oz + frame.az * ((module + 0.5) * pitch) + frame.bz * depth;
         const y = frame.base + rise;
         const placement = { x, y, z, yaw, stretch: [sx, 1, sz] as const, s: frame.s };
-        for (const id of ids) props.place(id, { ...placement, colour: frame.seat });
+        props.place(id, { ...placement, colour: frame.seat });
         result.modules++;
         for (const [row, marker] of (entry.attachments ?? [])
           .filter((a) => a.name.startsWith('crowd-row-'))
