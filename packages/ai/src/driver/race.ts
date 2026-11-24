@@ -859,14 +859,16 @@ export class RaceDriver implements Driver {
     }
     if (lo > hi) {
       if (
+        !cornering &&
         yieldTo !== null &&
         yieldTo.speed >= HAZARD_SPEED &&
         !this.hazard &&
         !this.passBypass &&
         !this.recovering
       ) {
-        // Future road bounds cannot pull a yielding car through the body beside it. Hold
-        // its current road lane while braking opens room, bounded by the road here and now.
+        // Before the planned braking zone, future road bounds cannot pull a yielding car
+        // through the body beside it. Hold its current lane while braking for room; the
+        // existing path constraints take over in the planned braking zone and bend.
         const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
         const hereLo = -(this.at(plan.track.halfWidth[1], s0) - margin) - ldHere;
         const hereHi = this.at(plan.track.halfWidth[0], s0) - margin - ldHere;
