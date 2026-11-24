@@ -940,12 +940,13 @@ const SWAP_LIGHTING = {
 /** Per circuit: a chase pose through woods and a high view over them. */
 const SWAP_POSES = {
   monza: {
-    // Chase camera through the Lesmo woods, and a high view over the park.
+    // Chase camera through the Lesmo woods at speed, and a high view over the park. Frozen before
+    // the teleport: frozen after it, the car moved on by a different distance each session.
     lesmo: () => {
       const u = globalThis.__undercut;
       u.camera('chase-near');
-      u.teleport(1640, 0, 250);
       u.setTimeScale(0);
+      u.teleport(1640, 0, 250);
     },
     park: () => {
       const u = globalThis.__undercut;
@@ -962,8 +963,9 @@ const SWAP_POSES = {
     blanchimont: () => {
       const u = globalThis.__undercut;
       u.camera('chase-near');
-      u.teleport(5600, 0, 250);
+      // Frozen before the teleport, as at Lesmo.
       u.setTimeScale(0);
+      u.teleport(5600, 0, 250);
     },
     plantation: () => {
       const u = globalThis.__undercut;
@@ -1088,6 +1090,7 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
         return { near: n ? sa / n : 0, cards: n ? sb / n : 0, changed: n / la.length };
       }, shots);
       const ratio = m.cards > 0 ? m.near / m.cards : 1;
+      const scale = await page.evaluate(() => globalThis.__undercut.renderStats().renderScale);
       cases.push({
         tod: label,
         pose: name,
@@ -1096,6 +1099,7 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
         cardLuma: +m.cards.toFixed(1),
         ratio: +ratio.toFixed(3),
         changedPct: +(m.changed * 100).toFixed(1),
+        renderScale: scale,
       });
     }
     await page.evaluate(() => globalThis.__undercut.quit());
@@ -1112,7 +1116,7 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
   const [a, b] = mode === 'swap' ? ['near', 'cards'] : ['relief', 'plain'];
   for (const c of cases)
     console.log(
-      `  tree-${mode} ${c.tod} ${c.pose}: ${a} ${c.nearLuma} vs ${b} ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
+      `  tree-${mode} ${c.tod} ${c.pose}: ${a} ${c.nearLuma} vs ${b} ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change, scale ${c.renderScale})`,
     );
   console.log(`  tree-${mode}-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
   if (!ok) report.errors.push(`Tree ${mode} check failed: ${JSON.stringify(report[key])}`);
