@@ -185,13 +185,23 @@ export function crowdSwapMaterial(
     hook(shader, renderer);
     shader.uniforms.uCrowdEye = eye;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uCrowdEye;')
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform vec3 uCrowdEye;
+        // Arithmetic hash of a person's origin (no sin: once per vertex of the whole far crowd).
+        float crowdHash(vec2 p) {
+          vec3 q = fract(vec3(p.xyx) * 0.1031);
+          q += dot(q, q.yzx + 33.33);
+          return fract((q.x + q.y) * q.z);
+        }`,
+      )
       .replace(
         '#include <project_vertex>',
         `#include <project_vertex>
         vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
         float crowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
-        float crowdChoice = fract(sin(dot(crowdOrigin.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        float crowdChoice = crowdHash(crowdOrigin.xz);
         if (${near ? 'crowdChoice < crowdFar' : 'crowdChoice >= crowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
       );
   };

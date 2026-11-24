@@ -136,6 +136,15 @@ describe('crowd handover, evaluated', () => {
     dot: (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]!,
     distance: (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!),
     vec2: (x: number, y: number) => [x, y],
+    // The shader's crowdHash, in JS (fract of float32-ish arithmetic is close enough here: the
+    // test checks the handover's complementarity, which holds for any hash both sides share).
+    crowdHash: (p: number[]) => {
+      const f = (x: number) => x - Math.floor(x);
+      let q = [f(p[0]! * 0.1031), f(p[1]! * 0.1031), f(p[0]! * 0.1031)];
+      const d = q[0]! * (q[1]! + 33.33) + q[1]! * (q[2]! + 33.33) + q[2]! * (q[0]! + 33.33);
+      q = q.map((v) => v + d);
+      return f((q[0]! + q[1]!) * q[2]!);
+    },
   };
   function drawn(near: boolean): (origin: number[], eye: number[]) => boolean {
     const material = crowdMaterial({ value: 3 });
