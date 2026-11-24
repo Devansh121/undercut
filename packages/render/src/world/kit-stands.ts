@@ -56,7 +56,9 @@ export function placeKitStands(
     props.define({
       id,
       lods,
-      gridCell: 100,
+      // 40 m cells: a cell's level goes by its near edge, so 100 m cells drew a whole block of
+      // banks at the middle level from the stand beside the grid.
+      gridCell: 40,
       castShadow: shadows,
       shadowMaxDistance: 100,
       shadowLevel: lods.length - 1,

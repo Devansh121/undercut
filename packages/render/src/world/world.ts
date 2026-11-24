@@ -574,6 +574,8 @@ export class CircuitWorld {
         id: 'pit-garage',
         castShadow: quality.sceneryShadows,
         shadowMaxDistance: 240,
+        // Shadows from the far level (380 triangles a bay against 1,240 for the finest).
+        shadowLevel: garageLods.length - 1,
         receiveShadow: true,
         lods: garageLods,
       });
