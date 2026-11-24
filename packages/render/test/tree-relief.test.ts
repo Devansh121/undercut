@@ -1,4 +1,5 @@
-import { BufferAttribute, Vector3 } from 'three';
+import type { BufferAttribute} from 'three';
+import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { ATLAS_COLS, ATLAS_ROWS, keepReliefMean } from '../src/world/tree-atlas';
 import { treeCards } from '../src/world/trees';
