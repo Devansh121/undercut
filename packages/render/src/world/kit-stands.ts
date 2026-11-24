@@ -64,6 +64,8 @@ export function placeKitStands(
         id,
         lods,
         gridCell: 40,
+        // The bay reflects the stands as it does the temporary ones (world/water.ts).
+        reflect: 'skyline',
         castShadow: shadows,
         shadowMaxDistance: 100,
         shadowLevel: lods.length - 1,
@@ -83,6 +85,8 @@ export function placeKitStands(
         id: `${id}-near`,
         lods: [{ ...middle, material: materials.near, maxDistance: STAND_NEAR_REACH }],
         gridCell: 40,
+        // The bay reflects the stands as it does the temporary ones (world/water.ts).
+        reflect: 'skyline',
         castShadow: false,
       });
       // The far kind casts every module's shadow (its depth pass ignores the handover), from
@@ -91,6 +95,7 @@ export function placeKitStands(
         id,
         lods: [{ ...far, material: materials.far, maxDistance: 1200 }],
         gridCell: 200,
+        reflect: 'skyline',
         castShadow: shadows,
         shadowMaxDistance: 100,
         shadowLevel: 0,

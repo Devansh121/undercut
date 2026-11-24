@@ -46,21 +46,29 @@ function fakeKit(): PropKitAssets {
 }
 
 /** A registry that keeps what is placed. */
-function recorder(): { props: PropRegistry; placed: Map<string, PropPlacement[]> } {
+function recorder(): {
+  props: PropRegistry;
+  placed: Map<string, PropPlacement[]>;
+  kinds: Map<string, PropKind>;
+} {
   const placed = new Map<string, PropPlacement[]>();
+  const kinds = new Map<string, PropKind>();
   const props = {
-    define: (k: PropKind) => placed.set(k.id, []),
+    define: (k: PropKind) => {
+      kinds.set(k.id, k);
+      placed.set(k.id, []);
+    },
     place: (id: string, p: PropPlacement) => {
       const list = placed.get(id);
       if (!list) throw new Error(`unknown kind ${id}`);
       list.push(p);
     },
   } as unknown as PropRegistry;
-  return { props, placed };
+  return { props, placed, kinds };
 }
 
 function streetAt(night: boolean, heightAt: (x: number, z: number) => number = () => 0) {
-  const { props, placed } = recorder();
+  const { props, placed, kinds } = recorder();
   const spectators: { x: number; z: number }[] = [];
   const res = placeStreetCircuit({
     track,
@@ -78,11 +86,19 @@ function streetAt(night: boolean, heightAt: (x: number, z: number) => number = (
     spectator: (s) => spectators.push(s),
     crowd: 0.8,
   });
-  return { res, placed, spectators };
+  return { res, placed, spectators, kinds };
 }
 
 describe('Singapore street circuit', () => {
-  const { res, placed, spectators } = streetAt(true);
+  const { res, placed, spectators, kinds } = streetAt(true);
+
+  it('puts the temporary stands in the water reflection everywhere, the street kit with the circuit', () => {
+    expect(kinds.get('temporary-stand')?.reflect).toBe('skyline');
+    for (const id of ['street-block', 'street-fence', 'floodlight-mast', 'lighting-truss'])
+      expect(kinds.get(id)?.reflect, id).toBe('scenery');
+    // Small kit along the wall is left out of the reflection.
+    expect(kinds.get('street-fence-end')?.reflect).toBeUndefined();
+  });
 
   it('lines every concrete barrier run with blocks at the module pitch, the fence on each', () => {
     let modules = 0;

@@ -263,6 +263,8 @@ export class Environment {
     });
     this.dome = new Mesh(new SphereGeometry(100, 64, 32), material);
     this.dome.name = 'sky';
+    // The water reflects the sky on every preset (world/water.ts).
+    this.dome.userData.reflect = 'skyline';
     this.dome.frustumCulled = false;
     this.dome.renderOrder = -1000;
     this.dome.onBeforeRender = (_r, _s, cam) => {

@@ -435,6 +435,7 @@ describe('permanent stand banks', () => {
       false,
       () => undefined,
     );
+    expect(define.mock.calls.every(([kind]) => kind.reflect === 'skyline')).toBe(true);
     // Banks 0 and 1, the roofed rear bank 2; the one-bank stand reuses bank 0: three kinds.
     expect(define.mock.calls.map(([kind]) => kind.id).sort()).toEqual([
       'stand-kit-grandstand-0',
@@ -583,6 +584,8 @@ describe('stand banks split near and far', () => {
     expect(f.lods[0]!.material).toBe(far);
     const at = (id: string) =>
       place.mock.calls.filter(([k]) => k === id).map(([, p]) => [p.x, p.z, p.yaw]);
+    // The water reflects both, as it does the temporary stands.
+    expect([n.reflect, f.reflect]).toEqual(['skyline', 'skyline']);
     expect(at(n.id)).toHaveLength(4);
     expect(at(n.id)).toEqual(at(f.id));
     props.dispose();

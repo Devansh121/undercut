@@ -2,7 +2,7 @@ import { Color, MeshStandardMaterial, type Material } from 'three';
 import type { Track } from '@undercut/track';
 import type { LocalLight } from '../lighting/light-pool';
 import type { PropCatalogEntry, PropKitAssets, PropLodOptions } from '../props/catalog';
-import type { PropRegistry } from '../props/registry';
+import type { PropRegistry, Reflected } from '../props/registry';
 import { footprintOnTrack } from './corridor';
 import { hash01, inRing, type MappedFeature } from './dressing';
 import type { LapIndex } from './lap-index';
@@ -118,7 +118,12 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
   const define = (
     id: string,
     kitId: string,
-    options: PropLodOptions & { chunk?: number | undefined; shadow?: number; cast?: boolean } = {},
+    options: PropLodOptions & {
+      chunk?: number | undefined;
+      shadow?: number;
+      cast?: boolean;
+      reflect?: Reflected;
+    } = {},
   ): boolean => {
     const lods = kit.lodsFor(kitId, { maxDistanceScale: scale, ...options });
     if (!lods) return false;
@@ -129,6 +134,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
       shadowMaxDistance: options.shadow ?? 120,
       receiveShadow: true,
       lods,
+      reflect: options.reflect,
     });
     return true;
   };
@@ -141,9 +147,13 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
   ];
   const hasBlock = define('street-block', street.block, {
     chunk: o.mobile ? undefined : 60,
+    reflect: 'scenery',
     ...(o.boardMaterial ? { materialOverrides: { 'board-face': o.boardMaterial } } : {}),
   });
-  const hasFence = define('street-fence', street.fence, { chunk: o.mobile ? undefined : 60 });
+  const hasFence = define('street-fence', street.fence, {
+    chunk: o.mobile ? undefined : 60,
+    reflect: 'scenery',
+  });
   const hasEnd = define('street-fence-end', street.fenceEnd, { chunk: o.mobile ? undefined : 60 });
   // The block's face 3 cm proud of the barrier line, over the track's own concrete.
   const inset = (blockEntry?.bounds?.max[0] ?? 0.4) - 0.03;
@@ -274,6 +284,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
   const hasMast = define('floodlight-mast', street.mast, {
     materialOverrides: { 'floodlight-emitter': lamps },
     shadow: 160,
+    reflect: 'scenery',
   });
   let masts = 0;
   if (hasMast) {
@@ -302,7 +313,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
   const front = standEntry?.bounds?.max[0] ?? 3.21;
   const rear = -(standEntry?.bounds?.min[0] ?? -3.62);
   const rows = (standEntry?.attachments ?? []).filter((a) => a.name.startsWith('crowd-row-'));
-  const hasStand = define('temporary-stand', street.stand, { shadow: 200 });
+  const hasStand = define('temporary-stand', street.stand, { shadow: 200, reflect: 'skyline' });
   const trussEntry = kit.entries.get(street.truss);
   const trussPitch = trussEntry?.moduleLength || 4;
   const trussLamps = attachments(trussEntry, 'lamp-');
@@ -310,6 +321,7 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
     materialOverrides: { 'floodlight-emitter': lamps },
     chunk: o.mobile ? undefined : 60,
     cast: false,
+    reflect: 'scenery',
   });
   const blocked = (x: number, z: number): boolean => {
     for (const f of o.obstacles) if (inRing(f.p, x, z)) return true;

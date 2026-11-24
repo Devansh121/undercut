@@ -771,6 +771,8 @@ export function buildTrackBridges(
 ): { group: Group; geometries: BufferGeometry[]; materials: Material[]; count: number } {
   const group = new Group();
   group.name = 'world:bridges';
+  // Bridges stand over the water: in its reflection on every preset (world/water.ts).
+  group.userData.reflect = 'skyline';
   const geometries: BufferGeometry[] = [];
   const materials: Material[] = [];
 
@@ -929,6 +931,7 @@ export function buildTrackBridges(
     geometries.push(sg, bg);
     const sMesh = new Mesh(sg, sm);
     sMesh.name = `world:bridge-struct-${bi}`;
+    sMesh.userData.reflect = 'skyline';
     sMesh.castShadow = true;
     sMesh.receiveShadow = true;
     sMesh.matrixAutoUpdate = false;
