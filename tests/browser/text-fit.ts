@@ -19,17 +19,38 @@ export function textFitProblems(scope: string | null = null): string[] {
   const root = (scope ? document.querySelector(scope) : null) ?? document.body;
   const out = new Set<string>();
   const TOLERANCE = 0.5;
+  // Layout does not change during the check: read each element's style and box once.
+  const styles = new Map<Element, CSSStyleDeclaration>();
+  const rects = new Map<Element, DOMRect>();
+  const boxes = new Map<Element, boolean>();
+  const styleOf = (el: Element): CSSStyleDeclaration => {
+    let st = styles.get(el);
+    if (!st) styles.set(el, (st = getComputedStyle(el)));
+    return st;
+  };
+  const rectOf = (el: Element): DOMRect => {
+    let r = rects.get(el);
+    if (!r) rects.set(el, (r = el.getBoundingClientRect()));
+    return r;
+  };
 
   const visible = (el: Element): boolean => {
     if (el.closest('[hidden]') || el.getClientRects().length === 0) return false;
-    const s = getComputedStyle(el);
+    const s = styleOf(el);
     return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
   };
   const transparent = (c: string): boolean =>
     c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c.replace(/\s+/g, ' '));
   const isBox = (el: Element): boolean => {
+    const known = boxes.get(el);
+    if (known !== undefined) return known;
+    const result = drawsEdge(el);
+    boxes.set(el, result);
+    return result;
+  };
+  function drawsEdge(el: Element): boolean {
     if (el === document.body || el === document.documentElement) return false;
-    const s = getComputedStyle(el);
+    const s = styleOf(el);
     if (s.overflowX !== 'visible' || s.overflowY !== 'visible') return true;
     if (!transparent(s.backgroundColor) || s.backgroundImage !== 'none') return true;
     if (s.boxShadow !== 'none') return true;
@@ -38,7 +59,7 @@ export function textFitProblems(scope: string | null = null): string[] {
         parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 &&
         s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== 'none',
     );
-  };
+  }
   const boxOf = (el: Element | null): Element | null => {
     for (let p = el; p && p !== document.body; p = p.parentElement) if (isBox(p)) return p;
     return null;
@@ -50,8 +71,8 @@ export function textFitProblems(scope: string | null = null): string[] {
   };
   /** How far `r` sticks out of `b`, in px, along the axes where `b` is not `skip`ped. */
   const past = (r: DOMRect, b: Element, skip: (overflow: string) => boolean): number => {
-    const s = getComputedStyle(b);
-    const box = b.getBoundingClientRect();
+    const s = styleOf(b);
+    const box = rectOf(b);
     let worst = 0;
     if (!skip(s.overflowX)) worst = Math.max(worst, box.left - r.left, r.right - box.right);
     if (!skip(s.overflowY)) worst = Math.max(worst, box.top - r.top, r.bottom - box.bottom);
@@ -84,8 +105,8 @@ export function textFitProblems(scope: string | null = null): string[] {
         p && p !== document.body && (x || y);
         p = p.parentElement
       ) {
-        const ps = getComputedStyle(p);
-        const box = p.getBoundingClientRect();
+        const ps = styleOf(p);
+        const box = rectOf(p);
         let c = 0;
         if (x && clips(ps.overflowX)) c = Math.max(c, box.left - r.left, r.right - box.right);
         if (y && clips(ps.overflowY)) c = Math.max(c, box.top - r.top, r.bottom - box.bottom);
@@ -104,11 +125,11 @@ export function textFitProblems(scope: string | null = null): string[] {
   // 3: boxes in the flow against the box around them.
   for (const el of root.querySelectorAll('*')) {
     if (!isBox(el) || !visible(el)) continue;
-    const pos = getComputedStyle(el).position;
+    const pos = styleOf(el).position;
     if (pos === 'absolute' || pos === 'fixed') continue;
     const outer = boxOf(el.parentElement);
     if (!outer) continue;
-    const d = past(el.getBoundingClientRect(), outer, (o) => o !== 'visible');
+    const d = past(rectOf(el), outer, (o) => o !== 'visible');
     if (d > TOLERANCE) out.add(`${name(el)} runs ${Math.round(d)} px out of ${name(outer)}`);
   }
   return [...out];
