@@ -229,8 +229,8 @@ plus 1 s):
 
 | Circuit | Limited zone | Loss before | Loss now | Commonly quoted |
 | --- | --- | --- | --- | --- |
-| Monza | 418.5 m | 34.0 s | 29.4 s | about 22 to 25 s |
-| Spa-Francorchamps | 386.2 m | 24.3 s | 21.2 s | not checked |
+| Monza | 418.5 m | 34.0 s | 29.6 s | about 22 to 25 s |
+| Spa-Francorchamps | 386.2 m | 24.3 s | 21.3 s | not checked |
 | Singapore | 403.7 m | 32.1 s | 29.1 s | about 21 to 22 s at 80 km/h (2025); 28 to 30 s at the old 60 km/h |
 
 What changed, measured one step at a time (Monza / Spa / Singapore, s):
@@ -274,7 +274,10 @@ The racing drivers' speed profile comes from the envelope measured at 810 kg (10
 At full-distance fuel (about 105 kg at Monza) the car brakes and corners on less acceleration,
 and the drivers ran wide at the Parabolica on most laps: 22 watchdog findings over a three-car
 Monza race on seed 11, none with five-lap fuel. The driver now plans on its tyres' grip times the
-envelope's mass over the car's (never above 1), which is conservative since downforce does not
-grow with the load. At the envelope's load the factor is 1, so the reference laps are unchanged.
+envelope's mass over the car's beyond a 3 % band (never above 1; conservative, since downforce
+does not grow with the load). Up to 834 kg, about 24 kg of fuel, the plan is driven unchanged:
+the reference laps, five- and ten-lap races drive as before (without the band a five-lap race's
+1 % shifted the plan, and a lapping car in the slow-player race stood in the first chicane's
+run-off for 14 s).
 The full-distance soak (`strategy-two-stop.soak.test.ts`) now passes with no findings.
 
