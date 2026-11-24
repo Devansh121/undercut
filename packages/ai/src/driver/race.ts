@@ -1190,14 +1190,16 @@ export class RaceDriver implements Driver {
     }
     this.brakingHold = hold;
     if (
-      v > LAUNCHED &&
+      v > HAZARD_SPEED &&
+      !view.launching &&
       !this.hazard &&
       this.rejoinTime <= 0 &&
       !this.passBypass &&
       !this.recovering &&
       yieldTo === null
     ) {
-      // Check the road lane ahead as well as the offset: the racing line sweeps across
+      // A car can slow below launch speed in moving traffic; only launch/crawl and recovery
+      // exclude the mirror check. Check the road lane ahead as well as the offset: the racing line sweeps across
       // the road while a car returns to it, even when its offset is held constant.
       const ldNext = this.at(line.d, s0 + v * 0.5);
       target =

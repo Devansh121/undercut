@@ -641,3 +641,15 @@ describe('race driver: a car slowing for the pit entry', () => {
     expect(leaderOf(true)).toBe(1);
   });
 });
+
+describe('race driver: mirror clearance below launch speed after the launch', () => {
+  it('does not return across a closing car when traffic has slowed it below 25 m/s', () => {
+    const dr = driver({ aggression: 0.6 });
+    dr['wasActive'] = true;
+    dr['o'] = 3;
+    const me = { id: 0, s: 100, d: lineD(dr, 100) + 3, speed: 20 };
+    const rear = { id: 1, s: 86, d: lineD(dr, 100), speed: 35 };
+    for (let k = 0; k < 240; k++) tick(dr, me, [rear], { launching: false });
+    expect(dr.snapshot().o as number).toBeGreaterThan(2.5);
+  });
+});
