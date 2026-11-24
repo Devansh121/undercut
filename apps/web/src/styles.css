@@ -2201,6 +2201,17 @@ html:has(.update-bar) .pause {
   }
 }
 
+/* Narrower still (568 px): the strip between the button stacks is too narrow for gear and speed,
+   so the cluster rises above the gear, DRS and overtake buttons (108 px tall), between the
+   steering zone (196 px wide) and the pedals (174 px in from the right). */
+@media (max-height: 500px) and (max-width: 640px) and (orientation: landscape) {
+  html:has(.ut-touch) .hud-cluster {
+    left: calc(var(--safe-l) + 208px);
+    right: calc(var(--safe-r) + 174px);
+    bottom: calc(var(--safe-b) + 116px);
+  }
+}
+
 /* The DRS touch button carries the DRS state: dim when closed, outlined when it may open,
    filled when open. */
 html[data-drs='off'] .ut-touch .ut-touch__btn--drs {

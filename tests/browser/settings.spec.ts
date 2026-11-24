@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { openMenu } from './helpers';
+import { textFitProblems } from './text-fit';
 
 /** The Settings screen, opened from the main menu's top bar. Desktop: keyboard and an emulated pad. */
 async function openSettings(page: Page): Promise<void> {
@@ -221,52 +222,6 @@ test('accessibility and display settings apply at once and are kept; credits ope
   await expect(html).toHaveAttribute('data-screen', 'settings');
 });
 
-test('the driving HUD keeps its layout at every text size on a phone', async ({
-  drive: { page },
-}) => {
-  test.skip(test.info().project.name !== 'phone', 'the phone HUD (timing tower columns)');
-  const before = page.viewportSize();
-  try {
-    for (const size of [
-      { width: 844, height: 390 },
-      { width: 932, height: 430 },
-    ]) {
-      await page.setViewportSize(size);
-      for (const text of ['large', 'larger']) {
-        await page.evaluate((t) => (document.documentElement.dataset.text = t), text);
-        const problems = await page.evaluate(() => {
-          const out: string[] = [];
-          const rows = [...document.querySelectorAll<HTMLElement>('.hud-tower__row')].filter(
-            (r) => r.getClientRects().length > 0,
-          );
-          if (rows.length === 0) out.push('no tower rows');
-          for (const row of rows) {
-            // The text's own extent: a grid cell shrinks while its text overflows it.
-            const ink = (sel: string): DOMRect | undefined => {
-              const el = row.querySelector(sel);
-              if (!el) return undefined;
-              const range = document.createRange();
-              range.selectNodeContents(el);
-              return range.getBoundingClientRect();
-            };
-            const code = ink('.hud-tower__code');
-            const time = ink('.hud-tower__time');
-            const box = row.getBoundingClientRect();
-            if (!code || !time) continue;
-            if (code.right > time.left + 0.5) out.push(`${row.textContent}: name runs into time`);
-            if (time.right > box.right + 0.5) out.push(`${row.textContent}: time is cut off`);
-          }
-          return out;
-        });
-        expect(problems, `${size.width} x ${size.height}, ${text} text`).toEqual([]);
-      }
-    }
-  } finally {
-    await page.evaluate(() => delete document.documentElement.dataset.text);
-    if (before) await page.setViewportSize(before);
-  }
-});
-
 test('on a wide screen, Up and Down from the top bar and the action bar reach the section', async ({
   page,
 }) => {
@@ -304,49 +259,78 @@ test('on a wide screen, Up and Down from the top bar and the action bar reach th
   }
 });
 
-test('the pause card keeps every label inside its control at the largest text size', async ({
+/** Every phone size phone-fit.spec.ts sweeps. */
+const PHONES = [
+  { width: 375, height: 667 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+  { width: 667, height: 375 },
+  { width: 844, height: 390 },
+  { width: 932, height: 430 },
+  { width: 568, height: 320 },
+];
+
+test('the HUD and the pause card keep their text inside at every size and text size', async ({
   drive: { page },
 }) => {
-  test.skip(test.info().project.name !== 'phone', 'the phone pause layout');
+  const project = test.info().project.name;
+  test.skip(project !== 'phone' && project !== 'desktop', 'one phone and one desktop engine');
+  const sizes = project === 'phone' ? PHONES : [{ width: 1440, height: 900 }];
   const before = page.viewportSize();
-  await page.keyboard.press('Escape');
   const menu = page.locator('[data-testid=pause-menu]');
-  await expect(menu).toBeVisible();
+  const problems: string[] = [];
   try {
-    for (const size of [
-      { width: 568, height: 320 },
-      { width: 667, height: 375 },
-      { width: 844, height: 390 },
-      { width: 932, height: 430 },
-    ]) {
+    for (const size of sizes) {
       await page.setViewportSize(size);
-      for (const text of ['large', 'larger']) {
-        await page.evaluate((t) => (document.documentElement.dataset.text = t), text);
-        const problems = await menu.evaluate((root) => {
-          const out: string[] = [];
-          // Every control's text (its Range, not its box: a box shrinks while its text spills).
-          for (const el of root.querySelectorAll<HTMLElement>('button, [role=slider], output')) {
-            if (el.getClientRects().length === 0 || el.closest('[hidden]')) continue;
-            const box = el.getBoundingClientRect();
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            for (const r of range.getClientRects()) {
-              if (r.width === 0) continue;
-              if (r.left < box.left - 0.5 || r.right > box.right + 0.5)
-                out.push(
-                  `${el.textContent?.trim() ?? el.className}: text runs ${Math.round(Math.max(box.left - r.left, r.right - box.right))} px out`,
-                );
-            }
-          }
-          return [...new Set(out)];
-        });
-        expect(problems, `${size.width} x ${size.height}, ${text} text`).toEqual([]);
+      for (const text of ['standard', 'large', 'larger']) {
+        await page.evaluate((t) => {
+          if (t === 'standard') delete document.documentElement.dataset.text;
+          else document.documentElement.dataset.text = t;
+        }, text);
+        const at = `${size.width} x ${size.height}, ${text} text`;
+        // The HUD: every piece of text in its box, and in the timing tower the name never runs
+        // into the time (two texts in one row: the row is their box, so check them apart).
+        for (const p of await page.evaluate(textFitProblems, '#app'))
+          problems.push(`${at}, HUD: ${p}`);
+        for (const p of await page.evaluate(towerOverlaps)) problems.push(`${at}, HUD: ${p}`);
+        // Upright, the session pauses itself behind the rotate prompt (phone-session.ts) and
+        // stays paused; on its side, Esc opens and closes the card.
+        const upright = size.height > size.width;
+        if (!(await menu.isVisible())) await page.keyboard.press('Escape');
+        await expect(menu).toBeVisible();
+        for (const p of await page.evaluate(textFitProblems, '[data-testid=pause-menu]'))
+          problems.push(`${at}, pause: ${p}`);
+        if (!upright) {
+          await page.keyboard.press('Escape');
+          await expect(menu).toBeHidden();
+        }
       }
     }
   } finally {
     await page.evaluate(() => delete document.documentElement.dataset.text);
     if (before) await page.setViewportSize(before);
-    await page.keyboard.press('Escape');
+    if (await menu.isVisible()) await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
   }
+  expect(problems).toEqual([]);
 });
+
+/** Timing tower rows where the driver code's text reaches the time's (in the page). */
+function towerOverlaps(): string[] {
+  const out: string[] = [];
+  const ink = (row: Element, sel: string): DOMRect | undefined => {
+    const el = row.querySelector(sel);
+    if (!el) return undefined;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect();
+  };
+  for (const row of document.querySelectorAll('.hud-tower__row')) {
+    if (row.getClientRects().length === 0) continue;
+    const code = ink(row, '.hud-tower__code');
+    const time = ink(row, '.hud-tower__time');
+    if (code && time && code.width > 0 && time.width > 0 && code.right > time.left + 0.5)
+      out.push(`tower: "${row.textContent ?? ''}" name runs into time`);
+  }
+  return out;
+}

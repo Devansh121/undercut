@@ -56,6 +56,12 @@
     right: calc(var(--safe-r) + 264px);
   }
 }
+@media (max-height: 500px) and (max-width: 640px) and (orientation: landscape) {
+  :root[data-touch-layout='mirrored']:has(.ut-touch) .hud-cluster {
+    left: calc(var(--safe-l) + 174px);
+    right: calc(var(--safe-r) + 208px);
+  }
+}
 
 /* ================= Settings screen ================= */
 
@@ -398,6 +404,7 @@
   }
   .credits__table td {
     min-width: 0;
+    height: auto;
     padding: 0;
     border: 0;
   }
@@ -478,4 +485,42 @@
     line-height: 1.1;
     text-align: left;
   }
+}
+
+/* ================= Text that grows (Settings, text size) ================= */
+
+/* At Large and Larger, text that sat on one line in a fixed width takes more lines instead of
+   running out of its box or being cut short. phone-fit.spec checks every screen for it. */
+
+/* Mode badges ("Not yet available") shrink to the row and may wrap. */
+:root[data-text] .lrow__text {
+  min-width: 0;
+}
+:root[data-text] .lrow__tag {
+  max-width: 100%;
+  white-space: normal;
+  letter-spacing: 0.04em;
+}
+
+/* Team names wrap instead of ending in an ellipsis. */
+:root[data-text] .team__name b {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* The main menu scrolls at any width rather than cutting its columns off at the bottom. */
+:root[data-text] .hub__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Binding slots: less padding, and a long control name ("Left stick right") takes two lines. */
+:root[data-text] .binds__slot {
+  padding: 4px var(--sp-2);
+  gap: var(--sp-1);
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.15;
+  text-align: center;
 }
