@@ -19,6 +19,8 @@ import {
 import { GapTower, type TowerState } from './timing/tower';
 import type { TickClock, TimingEvent } from './timing/lap-timer';
 
+/** How far before the first speed-limit line the limiter goes on, m (pit frame). */
+export const LIMITER_LEAD = 30;
 /** Returned by a tick with nothing to report: shared and frozen, so a quiet tick allocates nothing. */
 const NO_EVENTS = Object.freeze([]) as unknown as RaceEvent[];
 
@@ -368,10 +370,15 @@ export class RaceControl implements RaceCore {
     return this.circuit.pit.boxes[this.pit.box(car)] ?? null;
   }
 
-  /** In the pit lane before the end of the speed limit: the limiter should be on. */
+  /**
+   * Between the speed-limit lines, from just before the first (`LIMITER_LEAD`, where a driver
+   * presses the button): the limiter should be on. Not from the lane's start, which on a long
+   * entry road slowed cars well before the line.
+   */
   limiterZone(car: number): boolean {
     const f = this.facts[car]!;
-    return f.inPitLane && f.pitS <= this.circuit.pit.limitEnd;
+    const pit = this.circuit.pit;
+    return f.inPitLane && f.pitS >= pit.limitStart - LIMITER_LEAD && f.pitS <= pit.limitEnd;
   }
 
   /** Car about to lap this one while its blue flag is out, else -1. */

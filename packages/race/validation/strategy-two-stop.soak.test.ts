@@ -4,9 +4,8 @@ import { aiSession, runSession, RACE_CIRCUITS } from './lib/runner';
 
 // Full distance at Monza: tyre degradation repays a second stop, so the automatic pit wall plans
 // two. Three cars, the playable weekend's rules; every car classified on two stops, the calls
-// spread over the field. The watchdog's findings are logged, not asserted: at full-distance fuel
-// the drivers leave the road repeatedly (22 findings on this seed, mostly one car off track for
-// 10 to 18 s from lap 2), a recorded gap in docs/STATUS.md that is not about the pit wall.
+// spread over the field, and no watchdog findings. (Before the drivers planned for the fuel's
+// mass, they ran wide at the Parabolica on most laps: 22 findings on this seed.)
 it('monza full distance: the pit wall runs a two-stop race for every car', () => {
   const track = RACE_CIRCUITS.monza.track();
   const info = circuitInfo(track);
@@ -28,6 +27,7 @@ it('monza full distance: the pit wall runs a two-stop race for every car', () =>
     }),
   );
   expect(s.ended).toBe(true);
+  expect(run.result.anomalies).toEqual([]);
   for (const e of run.result.entries) {
     expect(e.status).toBe('finished');
     expect(e.pitStops).toBe(2);

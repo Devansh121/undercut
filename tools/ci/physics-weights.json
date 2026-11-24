@@ -1,5 +1,5 @@
 {
-  "_note": "Seconds each physics test file took on CI (PR 72, head 5974085, one 4-vCPU runner running the whole project). The shards are balanced on these; a file not listed counts as the median. Refresh when a file's time changes a lot.",
+  "_note": "Seconds each physics test file took on CI (PR 72, head 5974085, one 4-vCPU runner running the whole project). The shards are balanced on these; a file not listed counts as the median. Refresh when a file's time changes a lot. Spa scheduled-stop regression initially weighted at 170 s from the local reviewed-head reproduction; replace with its CI timing when available.",
   "seconds": {
     "apps/web/validation/player-pit.test.ts": 236,
     "apps/web/validation/simulate-session.test.ts": 147,
@@ -15,6 +15,7 @@
     "packages/race/validation/obstruction.test.ts": 508,
     "packages/race/validation/pit-entry.test.ts": 17,
     "packages/race/validation/quick-race-singapore.test.ts": 274,
+    "packages/race/validation/quick-race-spa-stops.test.ts": 170,
     "packages/race/validation/quick-race-spa.test.ts": 365,
     "packages/race/validation/quick-race.test.ts": 506,
     "packages/race/validation/race-driver.test.ts": 87,

@@ -711,11 +711,11 @@
     ]
   },
   "pit": {
-    "note": "Path from the OpenStreetMap pit-lane way. Widths, limit lines and boxes are estimates. The limit is 80 km/h from 2025.",
+    "note": "Path from the OpenStreetMap pit-lane way. Widths, boxes and the position of the limit lines are estimates: a 404 m limited zone (the published pit-lane length) centred on the garages. The limit is 80 km/h from 2025.",
     "side": "left",
     "speedLimitKmh": 80,
-    "limitStart": 110,
-    "limitEndFromExit": 120,
+    "limitStart": 208,
+    "limitEndFromExit": 208,
     "widths": [
       [0, 2.5, 2.5],
       [60, 3.5, 3.5],

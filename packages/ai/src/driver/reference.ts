@@ -111,6 +111,8 @@ function wrapAngle(a: number): number {
 
 /** Grip steps the speed profile is re-planned in, share of the reference tyre's. */
 const GRIP_BUCKET = 0.005;
+/** Mass over the envelope's the plan is driven at unchanged, as a fraction (3 %: 834 kg). */
+const MASS_BAND = 0.03;
 
 export class ReferenceDriver implements Driver {
   readonly name = 'reference';
@@ -383,7 +385,14 @@ export class ReferenceDriver implements Driver {
     // On tyres with less grip than the reference tyre the plan was made for (worn, cold or hot),
     // the profile planned on that grip: slower where the plan is grip-limited, the same where
     // the engine sets the speed. The plan itself on the reference tyre.
-    const speeds = this.profileFor(tel.tyreGrip);
+    // A car heavier than the one the envelope was measured on (fuel for a long race) brakes and
+    // corners on less acceleration: downforce does not grow with the load, so its grip per kilo
+    // falls up to in proportion to the mass. Planned as grip in proportion beyond a band the
+    // driver's own margins cover (`MASS_BAND`: short races, up to about 24 kg of fuel, drive the
+    // plan as before). Without it, cars at full-distance fuel ran wide at the Parabolica every lap.
+    const mass = this.params.mass.dryMass + tel.fuelMass;
+    const massGrip = Math.min(1, (plan.model.envelope.conditions.mass * (1 + MASS_BAND)) / mass);
+    const speeds = this.profileFor(tel.tyreGrip * massGrip);
     const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + this.speedAllowance;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
