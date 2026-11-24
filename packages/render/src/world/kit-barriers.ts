@@ -26,16 +26,19 @@ export function placeKitBarriers(
     if (!kitId) continue;
     let id = kinds.get(kitId);
     if (!id) {
-      // The middle level within 100 m of a chunk (2,900 triangles a tyre-wall module, 84 an armco
-      // one), the far level beyond; the finest (7,200 and 332) is not drawn: by a chunk's near
-      // edge every module in it takes the level, and it cost 0.4 to 0.5 ms at Monza s 4300 to 4900 on High.
-      const all = kit.lodsFor(kitId, { distanceCaps: [0, 100, 1200] });
+      // The middle level near a chunk (2,900 triangles a tyre-wall module, 84 an armco one), the
+      // far level beyond; the finest (7,200 and 332) is not drawn: by a chunk's near edge every
+      // module in it takes the level, and it cost 0.4 to 0.5 ms at Monza s 4300 to 4900 on
+      // High. The tyre wall's middle level only within 40 m, in 40 m chunks: to 100 m it was
+      // 0.41 M triangles and 0.45 ms at Monza s 4900; armco and concrete stay cheap to 100 m.
+      const tyres = kitId === 'tyre-wall';
+      const all = kit.lodsFor(kitId, { distanceCaps: [0, tyres ? 40 : 100, 1200] });
       if (!all) continue;
       const lods = all.length > 1 ? all.slice(1) : all;
       if (lods !== all) all[0]!.geometry.dispose();
       id = `barrier-${kitId}`;
-      // Long chunks: each is a draw call per kind, and the middle level is cheap enough whole.
-      props.define({ id, lods, chunkLength: 120, castShadow: false });
+      // Long chunks for the cheap sleeves: each is a draw call per kind.
+      props.define({ id, lods, chunkLength: tyres ? 40 : 120, castShadow: false });
       kinds.set(kitId, id);
     }
     const pitch = kit.entries.get(kitId)?.moduleLength || 4;
