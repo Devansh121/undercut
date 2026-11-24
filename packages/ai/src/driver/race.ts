@@ -1157,15 +1157,21 @@ export class RaceDriver implements Driver {
     if (
       v > HAZARD_SPEED &&
       !view.launching &&
+      view.openingLap !== true &&
       !this.hazard &&
       this.rejoinTime <= 0 &&
       !this.passBypass &&
       !this.recovering
     ) {
       // Racing room, on the road where the car will be: through a sweep the line carries a car
-      // held on it across the road into a car overlapping it on the inside.
+      // held on it across the road into a car overlapping it on the inside. (From lap two: the
+      // opening lap's pack keeps its own rules, lanes held under braking.)
       const ldNext = this.at(line.d, s0 + v * 0.5);
-      target = roomLane(view, ldNext + target, plan.track.length) - ldNext;
+      // (The road's edges still bound it: room is left on the road, never off it.)
+      target = Math.max(
+        lo,
+        Math.min(hi, roomLane(view, ldNext + target, plan.track.length) - ldNext),
+      );
     }
     const yielding = yieldTo !== null;
     // Launching, the car holds its grid lane while traction is limited.

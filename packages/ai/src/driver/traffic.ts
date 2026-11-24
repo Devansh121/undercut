@@ -37,6 +37,8 @@ export interface TrafficView {
   active: boolean;
   /** Launching from the grid (the controller holds the throttle under the driven wheels' grip). */
   launching: boolean;
+  /** This car is on the race's opening lap (its timing lap 1, the grid included). */
+  openingLap?: boolean;
 }
 
 export function createTrafficCar(): TrafficCar {
