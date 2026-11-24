@@ -656,11 +656,11 @@
     ]
   },
   "pit": {
-    "note": "Path from the OpenStreetMap pit-lane way. Widths, limit lines and boxes are estimates.",
+    "note": "Path from the OpenStreetMap pit-lane way. Widths and boxes are estimates. Limit lines at the published pit-in and pit-out timing loops (docs/track-data.md 5.5): pit in 86 m before the finish line, 418 m to pit out.",
     "side": "right",
     "speedLimitKmh": 80,
-    "limitStart": 110,
-    "limitEndFromExit": 120,
+    "limitStart": 151,
+    "limitEndFromExit": 172,
     "widths": [
       [0, 2.5, 2.5],
       [60, 3.5, 3.5],

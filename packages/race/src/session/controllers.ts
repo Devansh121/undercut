@@ -476,7 +476,12 @@ export class InputController implements CarController {
     } = {},
   ) {
     this.source = source;
-    this.pit = o.assistedPitLane && o.params ? new PitLaneDriving(o.params) : null;
+    // A player who steers the entry gets the car back at the lane exit too. Keeping the
+    // low-speed follower for its extra 60 m merge delayed the racing driver's acceleration.
+    this.pit =
+      o.assistedPitLane && o.params
+        ? new PitLaneDriving(o.params, 120, o.manualPitEntry ?? false)
+        : null;
     if (this.pit) this.pit.manualEntry = o.manualPitEntry ?? false;
     this.autoLimiter = o.autoLimiter ?? o.assistedPitLane ?? false;
   }
