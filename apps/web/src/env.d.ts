@@ -11,3 +11,9 @@ declare module 'virtual:undercut/circuits' {
   import type { CircuitSummary } from './ui/data/circuit-summary';
   export const CIRCUITS: CircuitSummary[];
 }
+
+/** A text file bundled as a string (Vite `?raw`): the credits screen reads CREDITS.md. */
+declare module '*.md?raw' {
+  const text: string;
+  export default text;
+}

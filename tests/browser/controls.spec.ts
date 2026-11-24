@@ -94,16 +94,21 @@ test('the pause menu lists the controls for the device in use', async ({ drive: 
   if (process.env.CONTROLS_SHOT && test.info().project.name === 'desktop')
     await page.screenshot({ path: process.env.CONTROLS_SHOT });
 
-  // Focus stays in the dialog: Tab cycles through the device tabs and Back.
+  // Focus stays in the dialog. The tab strip is one Tab stop (the selected tab), Back the other;
+  // the panel is labelled by the selected tab.
+  const selected = panel.locator('[role=tab][aria-selected=true]');
+  await expect(panel.locator('[role=tabpanel]')).toHaveAttribute(
+    'aria-labelledby',
+    (await selected.getAttribute('id')) ?? '',
+  );
   await expect(back).toBeFocused();
-  const stops = await panel.locator('[role=tab], button[data-action=close-controls]').count();
-  for (let i = 0; i < stops; i++) {
-    await page.keyboard.press('Tab');
-    expect(await panel.evaluate((p) => p.contains(document.activeElement))).toBe(true);
-  }
+  await page.keyboard.press('Tab');
+  await expect(selected).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(back).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await page.keyboard.press('Tab');
+  await expect(selected).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
   await expect(back).toBeFocused();
 
   // Esc closes the list and leaves the pause menu open.
@@ -143,6 +148,17 @@ test('gamepad A on Back closes the controls list in the pause menu', async ({
   // The session does not tick while paused, so the pad never drives the car.
   await installPad(page);
   try {
+    // A pad press while the list is open switches it to the controller (LS: no menu action).
+    await expect(panel.getByRole('tab', { name: 'Keyboard' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await padTap(page, 10);
+    await expect(panel.getByRole('tab', { name: 'Controller' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(panel.locator('[data-row=brake] dd')).toHaveAttribute('aria-label', 'LT');
     await padButton(page, 0, 1);
     await expect(panel).toBeHidden();
     await padButton(page, 0, 0);
@@ -215,6 +231,16 @@ test('main menu: the controls list follows the device in use, and gamepad A on B
   await padTap(page, 5);
   await expect(tab('Controller')).toHaveAttribute('aria-selected', 'true');
   await expect(back).toBeFocused();
+
+  // Read with the keyboard while the pad is plugged in, then unplugged: the note comes back.
+  await page.keyboard.press('Shift');
+  await tab('Controller').click();
+  await expect(panel.locator('[data-testid=controls-no-pad]')).toBeHidden();
+  await removePad(page);
+  await page.evaluate(() => window.dispatchEvent(new Event('gamepaddisconnected')));
+  await expect(panel.locator('[data-testid=controls-no-pad]')).toBeVisible();
+  await installPad(page);
+  await back.focus();
 
   await padButton(page, 0, 1);
   await expect(panel).toBeHidden();
