@@ -195,8 +195,7 @@ jobs:
         env:
           ATTEMPT_TIMEOUT: '90'
           RETRY_HOOK: tools/ci/apt-next-mirror.sh
-        run: |
-          tools/ci/with-retries.sh bash -c '[ -e "$RUNNER_TEMP/stalled" ] || { touch "$RUNNER_TEMP/stalled"; echo "TEMPORARY - forcing the first attempt to stall"; sleep 600; }; npx playwright install-deps webkit'
+        run: tools/ci/with-retries.sh npx playwright install-deps webkit
       - run: npm run test:browser:webkit
       # Cache bookkeeping never fails the job, and runs even when the WebKit tests failed.
       - name: Name the apt package set
