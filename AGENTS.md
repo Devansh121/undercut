@@ -29,7 +29,7 @@ Only `render` and `apps/web` may import three.js. `eslint.config.js` encodes thi
 ## Testing
 
 - Simulation, protocol and rules logic is written test-first.
-- `npm test` (unit), `npm run test:physics` (validation suite in `packages/sim/validation/`), `npm run test:rooms` (real Workers runtime), `npm run test:browser` (Playwright, desktop 1440×900 and landscape phone 844×390; run `npm run build` first).
+- `npm test` (unit), `npm run test:physics` (validation suites in `packages/*/validation/` and `apps/web/validation/`; CI runs it in three shards balanced on `tools/ci/physics-weights.json`, so refresh that file when a suite's time changes a lot), `npm run test:rooms` (real Workers runtime), `npm run test:browser` (Playwright, desktop 1440×900 and landscape phone 844×390; run `npm run build` first).
 - Tests that need the local Workers runtime are named `*.runtime.test.mjs` (tools) or live in `services/rooms/test/`; they run in the `rooms` project, not `unit`.
 - Never loosen a test or tolerance to get green. A flaky test is fixed or removed, never retried into green.
 - Cap parallelism on the shared laptop: vitest uses at most 4 workers, Playwright 2. Browser tests use software WebGL, so they need no GPU. Anything that does use the GPU runs under `flock ~/.cache/undercut/gpu.lock`.

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { WeightedShardSequencer } from './tools/ci/weighted-sequencer';
 
 // Projects map onto CI jobs: `unit`, `physics` and `rooms` (with `rooms-soak-short` after
 // it), and the nightly `soak` and `rooms-soak` (`npm run test:soak` runs both). Names
@@ -7,6 +8,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     maxWorkers: 4,
+    // The physics CI job runs in shards (`--shard=i/n`); they are balanced on measured time
+    // and run the longest files first (tools/ci/weighted-sequencer.ts).
+    sequence: { sequencer: WeightedShardSequencer },
     projects: [
       {
         test: {
