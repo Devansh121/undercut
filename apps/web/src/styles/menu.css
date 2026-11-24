@@ -1517,27 +1517,76 @@
 .weekend-schedule .is-current {
   border-left-color: var(--c-brand);
 }
-.weekend-table {
+/* A session classification or standings: labels over left-aligned names, numbers right-aligned
+   in tabular figures, the player's row marked with the kit's selection marker. */
+.classification {
   width: 100%;
   border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+.classification caption {
+  text-align: left;
+  padding-bottom: var(--sp-2);
+}
+.classification th {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-3);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--c-line-strong);
+}
+.classification td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-2);
+}
+.classification td:nth-child(2) {
+  color: var(--c-text-1);
+}
+.classification .num {
+  text-align: right;
+  font-family: var(--font-num);
+  font-feature-settings: 'tnum';
+}
+.classification tr.is-player td {
+  color: var(--c-text-1);
+  background: var(--c-ink-3);
+}
+.classification tr.is-player td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-brand);
+}
+.weekend-table {
   margin: 16px 0;
-  font-variant-numeric: tabular-nums;
 }
 .weekend-table td {
   padding: 8px;
-  border-bottom: 1px solid var(--c-line);
 }
-.weekend-table .is-player {
-  color: var(--c-brand);
+/* The race readout's classification: the heading stays put while the table scrolls. */
+.race-status[data-table] {
+  text-align: left;
+  white-space: normal;
+}
+.race-status[data-table] .race-status__head {
+  text-align: center;
+}
+@media (max-height: 500px) {
+  .race-status[data-table] .classification th,
+  .race-status[data-table] .classification td {
+    padding: 2px 6px;
+  }
 }
 .pit-panel {
   pointer-events: auto;
-  position: absolute;
-  right: 16px;
-  top: 240px;
-  max-width: 300px;
-  padding: 10px;
+  box-sizing: border-box;
+  width: 300px;
+  padding: var(--sp-3);
   font-size: 12px;
+}
+.pit-panel [role='status'] {
+  margin-bottom: var(--sp-2);
 }
 .pit-panel .button {
   min-height: 32px;
@@ -1555,8 +1604,10 @@
     gap: 6px;
   }
   .pit-panel {
+    position: absolute;
     top: 95px;
     right: 8px;
+    width: auto;
     max-width: 220px;
     font-size: 10px;
   }
@@ -1592,6 +1643,7 @@
   min-height: 24px;
   padding: 0;
 }
+
 /* The device tabs are touch targets on a phone. */
 @media (pointer: coarse) {
   .controls__tabs .tab {

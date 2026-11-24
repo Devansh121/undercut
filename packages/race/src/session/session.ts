@@ -675,6 +675,21 @@ export class RaceSession {
     return this.control.reposition(car, this.facts[car]!, revive);
   }
 
+  /**
+   * Practice or qualifying: put the car in its box, at rest, held there to the end of the
+   * session (`RaceControl.returnToGarage`). The lap in progress is abandoned; best laps stand.
+   */
+  returnToGarage(car: number): RaceEvent[] {
+    const box = this.control.pitBox(car);
+    if (!box || this.control.strategy.duration === null) return [];
+    const path = this.track.pit.path;
+    const at = path.pointAt(box.s, box.d, createVec3());
+    const t = path.tangent(box.s, createVec3());
+    const events = this.placeCar(car, at.x, at.z, Math.atan2(-t.z, t.x), 0);
+    this.control.returnToGarage(car);
+    return events;
+  }
+
   snapshot(): RaceSessionSnapshot {
     return {
       version: 3,

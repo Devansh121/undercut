@@ -101,6 +101,8 @@ import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu, type PauseCommand } from './ui/pause';
 import { ResultsStrip } from './ui/results';
+import { classificationTable, sessionName, stopsText } from './ui/classification';
+import { el } from './ui/dom';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
 import { debugEnabled } from './debug';
 import {
@@ -616,7 +618,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     plan,
     hudIdentity,
     ext?.label ??
-      (session.quickRace ? (o.quickRace?.session?.kind ?? S.hud.quickRace) : S.hud.timeTrial),
+      (session.quickRace
+        ? o.quickRace?.session
+          ? sessionName(o.quickRace.session.kind)
+          : S.hud.quickRace
+        : S.hud.timeTrial),
   );
   const results = new ResultsStrip();
   let quitting = false;
@@ -1083,6 +1089,30 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     loop.timeScale = MAX_TIME_SCALE;
     skipResults.hidden = true;
   });
+  // Practice and qualifying: once the player has a time (any time in practice), the car can go
+  // back to its box and the rest of the session runs on as fast as the machine allows.
+  const simulateSession = document.createElement('button');
+  simulateSession.type = 'button';
+  simulateSession.className = 'button';
+  simulateSession.dataset.testid = 'simulate-session';
+  simulateSession.textContent = 'Simulate to end of session';
+  simulateSession.hidden = true;
+  simulateSession.style.pointerEvents = 'auto';
+  let simulating = false;
+  simulateSession.addEventListener('click', () => {
+    const events = session.returnToGarage();
+    if (!events) return;
+    onEvents(events);
+    simulating = true;
+    loop.timeScale = MAX_TIME_SCALE;
+    simulateSession.hidden = true;
+  });
+  function canSimulateSession(): boolean {
+    const kind = session.race.control.strategy.kind;
+    if (simulating || session.result || !session.race.control.racing(0)) return false;
+    if (kind === 'practice') return true;
+    return kind === 'qualifying' && session.timer.bestLap !== null;
+  }
   const pitPanel = document.createElement('div');
   pitPanel.className = 'pit-panel panel';
   pitPanel.dataset.testid = 'pit-panel';
@@ -1109,7 +1139,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   continueButton.hidden = true;
   continueButton.addEventListener('click', () => quit());
   pitPanel.append(pitMessage, boxButton, compoundButton, limiterButton, continueButton);
+  /** The flag is out (or the session over) for the player: no pit call to make. */
+  function pitCallsClosed(): boolean {
+    const phase = session.race.control.phase;
+    return (
+      session.result !== null ||
+      session.playerFinished ||
+      phase === 'chequered' ||
+      phase === 'finished'
+    );
+  }
   function callBox(): void {
+    if (pitCallsClosed() || session.race.control.held(0)) return;
     const requested = session.boxThisLap();
     say(
       {
@@ -1123,8 +1164,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let resultDelivered = false;
   if (session.quickRace) {
     const control = hud.root.querySelector('.hud-control') ?? o.host;
-    control.append(raceStatus, skipResults);
-    hud.root.append(pitPanel);
+    control.append(raceStatus, skipResults, simulateSession);
+    // Desktop: in the right-hand column under the map, 8 px apart like the other modules.
+    (hud.root.querySelector('.hud-right') ?? hud.root).append(pitPanel);
     hud.root.dataset.mode = 'race';
   }
 
@@ -1194,7 +1236,36 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
    */
   let statusKey = '';
   let statusPlayer = -1;
+  let statusResult: SessionResult | null = null;
   function showRaceStatus(): void {
+    if (session.result) {
+      // The classification: a table with a heading, the player's row marked and in view.
+      if (statusResult !== session.result) {
+        statusResult = session.result;
+        statusKey = '';
+        const kind = session.result.kind;
+        const table = classificationTable(session.result, { rowClass: 'race-status__row' });
+        raceStatus.replaceChildren(
+          el('div', 'race-status__head', `${sessionName(kind)} result`),
+          table,
+        );
+        raceStatus.dataset.table = '';
+        const row = table.querySelector<HTMLElement>('.is-player');
+        if (row) {
+          // (A row's offset is from its table.)
+          const bottom = table.offsetTop + row.offsetTop + row.offsetHeight;
+          if (bottom > raceStatus.clientHeight)
+            raceStatus.scrollTop = bottom - raceStatus.clientHeight + 8;
+        }
+      }
+    } else {
+      delete raceStatus.dataset.table;
+      showRaceStatusLines();
+    }
+    const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
+    raceStatus.toggleAttribute('data-more', more);
+  }
+  function showRaceStatusLines(): void {
     const { lines, player } = raceStatusLines();
     const key = lines.join('\n');
     if (key !== statusKey) {
@@ -1211,20 +1282,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       // Into view once per standings (when the player's row moves), not against the reader's
       // own scrolling every rebuild.
       if (player > 0 && player !== statusPlayer) {
-        const el = raceStatus.children[player] as HTMLElement | undefined;
-        if (el) {
+        const rowEl = raceStatus.children[player] as HTMLElement | undefined;
+        if (rowEl) {
           // Just into view, under the heading (which stays put).
           const head = (raceStatus.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
-          const bottom = el.offsetTop + el.offsetHeight - raceStatus.clientHeight + 8;
-          const top = el.offsetTop - head - 8;
+          const bottom = rowEl.offsetTop + rowEl.offsetHeight - raceStatus.clientHeight + 8;
+          const top = rowEl.offsetTop - head - 8;
           if (raceStatus.scrollTop < bottom) raceStatus.scrollTop = bottom;
           else if (raceStatus.scrollTop > top) raceStatus.scrollTop = Math.max(0, top);
         }
       }
       statusPlayer = player;
     }
-    const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
-    raceStatus.toggleAttribute('data-more', more);
   }
 
   function raceStatusLines(): { lines: string[]; player: number } {
@@ -1241,30 +1310,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             ? ` · +${row.gap.toFixed(1)}s`
             : ''
         : '';
-    if (session.result) {
-      const entries = session.result.entries;
-      return {
-        lines: [
-          o.quickRace?.session?.kind === 'qualifying'
-            ? 'Qualifying result'
-            : o.quickRace?.session?.kind === 'practice'
-              ? 'Practice result'
-              : 'Race result',
-          ...entries.map((e) => {
-            const g =
-              e.gap === null
-                ? ''
-                : 'laps' in e.gap
-                  ? `  +${e.gap.laps}L`
-                  : `  +${e.gap.time.toFixed(3)}s`;
-            const name = session.race.entrants[e.car]?.name ?? e.code;
-            const status = formatRaceStatus(e.status);
-            return `${e.position}  ${name}${status ? `  ${status}` : ''}${g} · ${e.pitStops} stops · ${e.compounds.join(' / ')}`;
-          }),
-        ],
-        player: 1 + entries.findIndex((e) => e.car === 0),
-      };
-    }
     if (session.playerFinished) {
       return {
         lines: [
@@ -1327,6 +1372,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         carImpact: r.carImpact,
       });
       onEvents(r.events);
+      // Simulating the rest of a timed session: more steps in this frame, within a budget that
+      // keeps the page responsive.
+      if (simulating && !session.result) {
+        const until = performance.now() + 20;
+        while (performance.now() < until && session.phase === 'running' && !session.result)
+          onEvents(loop.frame(1 / 30).events);
+      }
       lookBack = r.lookBack;
       for (const action of r.actions) {
         if (action === 'boxThisLap') callBox();
@@ -1437,6 +1489,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const pitControl = session.race.control;
       const pitPhase = pitControl.pitPhase(0);
       const pitCar = pitControl.cars[0]!;
+      // After the flag there is no stop to call: the panel keeps only Continue.
+      const flagOut = pitCallsClosed();
+      boxButton.hidden = flagOut;
+      compoundButton.hidden = flagOut;
+      limiterButton.hidden = flagOut;
+      pitMessage.hidden = flagOut;
       boxButton.textContent = pitControl.pitRequested(0) ? 'Cancel pit call' : 'Box this lap';
       boxButton.disabled = pitControl.held(0) || session.result !== null;
       compoundButton.textContent = `Next tyres: ${session.nextCompound}`;
@@ -1445,7 +1503,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const remaining = pitControl.pitRemaining(0);
       pitMessage.textContent = pitControl.held(0)
         ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
-        : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${pitCar.pitStops} ${pitCar.pitStops === 1 ? 'stop' : 'stops'} · ${pitCar.compounds.join(' / ')}`;
+        : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${stopsText(pitCar.pitStops)} · ${pitCar.compounds.join(' / ')}`;
       if (pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2)
         pitMessage.textContent = `Compound change required · ${pitMessage.textContent}`;
       continueButton.hidden = !session.result || !o.onSessionComplete;
@@ -1458,6 +1516,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         }
       }
       skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
+      simulateSession.hidden = !canSimulateSession();
+      if (session.result && simulating) {
+        simulating = false;
+        loop.timeScale = 1;
+      }
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
       const finished = session.playerFinished || session.result !== null;

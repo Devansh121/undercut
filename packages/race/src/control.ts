@@ -350,6 +350,16 @@ export class RaceControl implements RaceCore {
     return this.pit.phase(car);
   }
 
+  /**
+   * A timed session: the car back in its box and held there to the end (its lap times stand,
+   * and the flag finds it in the pit lane). Does nothing in a race.
+   */
+  returnToGarage(car: number): void {
+    if (this.strategy.duration === null) return;
+    this.pit.cancel(car);
+    this.pit.startInGarage(car, Number.MAX_SAFE_INTEGER);
+  }
+
   pitRequested(car: number): boolean {
     return this.pit.requested(car);
   }

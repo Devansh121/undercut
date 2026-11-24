@@ -160,6 +160,9 @@ async function showWeekend(choice: SessionChoice): Promise<void> {
   // Browser flow fixture: the real timed-session rules with a short clock.
   const testDuration = debugEnabled() ? Number(params.get('weekendDuration')) : NaN;
   if (testDuration > 0 && testDuration <= 1080) progress.weekend.plan.qualifying = testDuration;
+  const testPractice = debugEnabled() ? Number(params.get('practiceDuration')) : NaN;
+  if (testPractice > 0 && testPractice <= 300 && progress.weekend.plan.practice !== null)
+    progress.weekend.plan.practice = testPractice;
   await progress.save(webStorage);
   const screen = new WeekendScreen(
     progress,

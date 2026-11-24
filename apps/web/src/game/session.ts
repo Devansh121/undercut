@@ -374,6 +374,19 @@ export class DriveSession {
     return true;
   }
 
+  /**
+   * Practice or qualifying: the player's car back to its box for the rest of the session, its
+   * times standing, so the session can run on to the flag without it. False in a race.
+   */
+  returnToGarage(): SessionEvent[] | null {
+    const c = this.race.control;
+    if (!this.quickRace || c.strategy.duration === null || this.result || !c.racing(0)) return null;
+    const events: SessionEvent[] = [];
+    for (const e of this.race.returnToGarage(0)) this.onRaceEvent(e, events);
+    this.assistMemory = createAssistState();
+    return events;
+  }
+
   /** The player's car is in the pit lane or held by the crew (box, garage). */
   get inPit(): boolean {
     return this.race.carFacts(0).inPitLane || this.race.control.held(0);

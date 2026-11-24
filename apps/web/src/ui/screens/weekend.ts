@@ -1,7 +1,7 @@
 import type { SessionResult } from '@undercut/race';
 import type { StoragePort } from '@undercut/input';
 import type { WeekendProgress } from '../../game/weekend';
-import { formatLapTime } from '../../game/format';
+import { classificationTable, sessionName } from '../classification';
 import type { QuickRaceOptions } from '../../game/session';
 import { el } from '../dom';
 import { TEAMS } from '../data/teams';
@@ -46,7 +46,7 @@ export class WeekendScreen implements Screen {
         el(
           'div',
           `card ${i === w.results.length ? 'is-current' : ''}`,
-          `${i + 1}  ${s.kind === 'practice' ? 'Practice · 5 min' : s.kind === 'qualifying' ? 'Qualifying · 18 min' : 'Race'}${i < w.results.length ? ' · Complete' : ''}`,
+          `${i + 1}  ${sessionName(s.kind)}${s.kind === 'practice' ? ' · 5 min' : s.kind === 'qualifying' ? ' · 18 min' : ''}${i < w.results.length ? ' · Complete' : ''}`,
         ),
       ),
     );
@@ -66,7 +66,7 @@ export class WeekendScreen implements Screen {
     if (spec)
       actions.append(
         button({
-          label: `Start ${spec.kind}`,
+          label: `Start ${sessionName(spec.kind)}`,
           variant: 'primary',
           action: 'weekend-start',
           onClick: () => {
@@ -84,7 +84,7 @@ export class WeekendScreen implements Screen {
     if (spec?.kind === 'practice')
       actions.append(
         button({
-          label: 'Skip practice',
+          label: 'Skip Practice',
           action: 'skip-practice',
           onClick: () => {
             p.skipPractice();
@@ -112,21 +112,9 @@ export class WeekendScreen implements Screen {
     const results = el('div', 'weekend-tables');
     const last = w.results.at(-1);
     if (last) {
-      const table = el('table', 'weekend-table');
-      const caption = el('caption', 'label', `${last.kind} classification`);
-      table.append(caption);
-      for (const e of last.entries) {
-        const row = el('tr', e.car === 0 ? 'is-player' : '');
-        for (const v of [
-          String(e.position),
-          e.name,
-          last.kind === 'race'
-            ? `${e.status === 'finished' ? `${e.points} pts` : e.status === 'dsq' ? 'Disqualified' : e.status === 'dnf' ? 'Retired' : 'Not classified'} · ${e.pitStops} stops · ${e.compounds.join(' / ')}${e.penaltyTime ? ` · +${e.penaltyTime.toFixed(1)} s penalty` : ''}`
-            : formatLapTime(e.bestLap),
-        ])
-          row.append(el('td', '', v));
-        table.append(row);
-      }
+      const table = classificationTable(last, { points: last.kind === 'race' });
+      table.classList.add('weekend-table');
+      table.prepend(el('caption', 'label', `${sessionName(last.kind)} classification`));
       results.append(table);
     }
     if (p.championship?.round) {
@@ -138,26 +126,26 @@ export class WeekendScreen implements Screen {
         ),
       );
       const names = last ?? p.championship.toJSON().rounds.at(-1)?.result;
-      const table = el('table', 'weekend-table');
-      table.append(el('caption', 'label', 'Drivers'));
+      const table = standingsTable('Drivers', 'Driver');
       p.championship.drivers().forEach((s, i) => {
-        const row = el('tr', s.id === 'player' ? 'is-player' : '');
         const name = names?.entries.find((e) => e.id === s.id)?.name ?? s.id;
-        for (const v of [String(i + 1), name, `${s.points} pts`]) row.append(el('td', '', v));
-        table.append(row);
+        table.tBodies[0]!.append(standingsRow(i + 1, name, s.points, s.id === 'player'));
       });
       results.append(table);
-      const teamTable = el('table', 'weekend-table');
-      teamTable.append(el('caption', 'label', 'Teams'));
+      const teamTable = standingsTable('Teams', 'Team');
       const teams = [...TEAMS].sort((a, b) =>
         a.id === p.choice.team ? -1 : b.id === p.choice.team ? 1 : 0,
       );
       p.championship.teams(names?.entries ?? []).forEach((standing, i) => {
         const team = teams[Number(standing.id)];
-        const row = el('tr', Number(standing.id) === 0 ? 'is-player' : '');
-        for (const value of [String(i + 1), team?.name ?? standing.id, `${standing.points} pts`])
-          row.append(el('td', '', value));
-        teamTable.append(row);
+        teamTable.tBodies[0]!.append(
+          standingsRow(
+            i + 1,
+            team?.name ?? standing.id,
+            standing.points,
+            Number(standing.id) === 0,
+          ),
+        );
       });
       results.append(teamTable);
     }
@@ -184,4 +172,22 @@ export class WeekendScreen implements Screen {
       results,
     );
   }
+}
+
+/** A championship standings table: caption, header row, an empty body. */
+function standingsTable(caption: string, who: string): HTMLTableElement {
+  const table = el('table', 'classification weekend-table');
+  table.append(el('caption', 'label', caption));
+  const head = el('tr');
+  head.append(el('th', 'num', 'Pos'), el('th', '', who), el('th', 'num', 'Pts'));
+  const thead = el('thead');
+  thead.append(head);
+  table.append(thead, el('tbody'));
+  return table;
+}
+
+function standingsRow(pos: number, name: string, points: number, player: boolean): HTMLElement {
+  const row = el('tr', player ? 'is-player' : '');
+  row.append(el('td', 'num', String(pos)), el('td', '', name), el('td', 'num', String(points)));
+  return row;
 }

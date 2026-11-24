@@ -1,18 +1,39 @@
 import { expect, test } from './base';
 import { openMenu } from './helpers';
 
-test('weekend: skip practice, qualifying result, continue to the mandatory-stop race; player pit call and service', async ({
+test('weekend: practice (simulated to the flag on desktop, skipped on a phone), qualifying result, continue to the mandatory-stop race; player pit call and service', async ({
   page,
 }, info) => {
-  test.setTimeout(150_000);
-  await page.goto('/?debug=1&quality=lite&world=lite&weekendDuration=0.1');
+  test.setTimeout(180_000);
+  await page.goto('/?debug=1&quality=lite&world=lite&weekendDuration=0.1&practiceDuration=12');
   await openMenu(page);
   await page.locator('[data-action=mode-weekend]').click();
   await page.locator('[data-action=start]').click();
   await expect(page.locator('html')).toHaveAttribute('data-screen', 'weekend');
   await page.screenshot({ path: info.outputPath('weekend.png') });
-  await page.locator('[data-action=skip-practice]').click();
-  await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start qualifying');
+  if (info.project.name === 'phone') {
+    await page.locator('[data-action=skip-practice]').click();
+  } else {
+    // Practice: back to the box and the rest of the session simulated.
+    await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start Practice');
+    await page.locator('[data-action=weekend-start]').click();
+    await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
+    await page.getByTestId('simulate-session').click({ timeout: 30_000 });
+    await expect(page.getByTestId('continue-weekend')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('race-status')).toContainText('Practice result');
+    await expect(page.getByTestId('race-status').locator('th')).toHaveText([
+      'Pos',
+      'Driver',
+      'Best lap',
+      'Gap',
+      'Laps',
+    ]);
+    await expect(page.getByTestId('race-status').locator('tbody tr')).toHaveCount(20);
+    await page.screenshot({ path: info.outputPath('practice-result.png') });
+    await page.getByTestId('continue-weekend').click();
+    await expect(page.locator('.weekend-table caption')).toHaveText('Practice classification');
+  }
+  await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start Qualifying');
   await page.locator('[data-action=weekend-start]').click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   await page.evaluate(() => window.__undercut!.setTimeScale(8));
@@ -20,7 +41,7 @@ test('weekend: skip practice, qualifying result, continue to the mandatory-stop 
   await expect(page.getByTestId('race-status')).toContainText('Qualifying result');
   await page.getByTestId('continue-weekend').click();
   expect(await page.evaluate(() => window.__undercut!.state().screen)).toBe('launch');
-  await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start race');
+  await expect(page.locator('[data-action=weekend-start]')).toHaveText('Start Race');
   await page.locator('[data-action=weekend-start]').click();
   await expect(page.locator('html')).toHaveAttribute('data-ready', '', { timeout: 60_000 });
   expect(await page.evaluate(() => window.__undercut!.state().twoCompoundRule)).toBe(true);
