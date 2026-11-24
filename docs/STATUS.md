@@ -115,6 +115,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Kit crowd: use the plain idle material for whole far-crowd chunks beyond 32 m, where the handover is already complete. The near-edge bound includes geometry reach, and a test checks that the plain material never covers a person inside the swap. The two levels share geometry; the extra level adds instance buffers.
+
 - Kit stands: keep the detailed levels within the documented 8 m and 25 m thresholds. The catalogue scales distance caps too; compensate for its 2.7 multiplier rather than drawing the middle level to 67.5 m. Far visibility and shadow reach stay as before.
 
 - M2 kit placement: retain the collision barrier meshes and cover their faces with catalogue sleeves; structures retain their existing mapped footprints. Permanent stands use catalogue seat markers, with human-scale ten-row banks, near crowd geometry selected per spectator inside 32 m, and cheap figures beyond. Singapore keeps its scaffold stands. Roof modules cover the rear bank. Daytime water remains a follow-up to preserve the remaining frame budget for structures and crowd.

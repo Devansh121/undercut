@@ -38,7 +38,7 @@ import {
 } from 'three';
 import { PropRegistry, placementMatrix, type PropPlacement } from '../src/props/registry';
 import { warmPropLevels } from '../src/world/warm-props';
-import { crowdMaterial, crowdSwapMaterial } from '../src/world/crowd';
+import { crowdMaterial, crowdSwapMaterial, farCrowdLods } from '../src/world/crowd';
 import { Vector3, type WebGLProgramParametersWithUniforms } from 'three';
 
 describe('loading prop levels', () => {
@@ -96,6 +96,34 @@ describe('loading prop levels', () => {
 });
 
 describe('crowd handover', () => {
+  it('uses the plain idle shader only when the entire crowd chunk is beyond the handover', () => {
+    const props = new PropRegistry(1000);
+    const geometry = new BoxGeometry(1, 2, 1);
+    const idle = crowdMaterial({ value: 3 });
+    const handover = crowdMaterial({ value: 3 });
+    crowdSwapMaterial(handover, { value: new Vector3() }, false);
+    const lods = farCrowdLods(geometry, handover, idle);
+    props.define({ id: 'crowd', lods, castShadow: false, gridCell: 100 });
+    const origins = [40, 50, 60].map((x) => new Vector3(x, 0, 0));
+    for (const p of origins) props.place('crowd', { x: p.x, y: p.y, z: p.z, s: 0 });
+    props.build();
+    for (const x of [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]) {
+      const eye = new Vector3(x, 0, 0);
+      props.update(eye);
+      const visible = props.group.children.filter((mesh) => mesh.visible) as InstancedMesh[];
+      expect(visible).toHaveLength(1);
+      expect(visible[0]!.geometry).toBe(geometry);
+      if (visible[0]!.material === idle)
+        expect(origins.every((p) => p.distanceTo(eye) >= 32)).toBe(true);
+      if (x === 0 || x === 100) expect(visible[0]!.material).toBe(idle);
+      if (x === 50) expect(visible[0]!.material).toBe(handover);
+    }
+    props.dispose();
+    geometry.dispose();
+    idle.dispose();
+    handover.dispose();
+  });
+
   it('shares the eye with the idle animation and decides in the vertex stage, no discard', () => {
     const eye = { value: new Vector3() };
     for (const near of [false, true]) {

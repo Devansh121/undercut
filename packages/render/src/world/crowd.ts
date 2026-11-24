@@ -5,6 +5,7 @@ import {
   type WebGLProgramParametersWithUniforms,
   type Vector3,
 } from 'three';
+import type { PropLod } from '../props/registry';
 
 /** Clothing colours of the crowd (linear): realistic race-day palette with muted neutrals and team-shirt accents. */
 export const CLOTHING: readonly [number, number, number][] = [
@@ -206,4 +207,20 @@ export function crowdSwapMaterial(
       );
   };
   material.customProgramCacheKey = () => `${key}-swap-${near}`;
+}
+
+/**
+ * The handover is complete outside 32 m. The registry selects by the chunk's near edge,
+ * including its geometry reach, so a plain-idle chunk cannot contain a person in the swap.
+ * Both levels share geometry and draw the same figures, colours and motion beyond that edge.
+ */
+export function farCrowdLods(
+  geometry: BufferGeometry,
+  handover: MeshStandardMaterial,
+  idle: MeshStandardMaterial,
+): PropLod[] {
+  return [
+    { geometry, material: handover, maxDistance: 32 },
+    { geometry, material: idle, maxDistance: 650 },
+  ];
 }

@@ -16,7 +16,13 @@ import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
 import { buildBuildingChunks, buildingHeight, facadeMaterial } from './buildings';
 import { buildCoverMap, type CoverMap } from './cover';
-import { crowdSwapMaterial, crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
+import {
+  crowdSwapMaterial,
+  crowdMaterial,
+  farCrowdLods,
+  spectatorGeometry,
+  CLOTHING,
+} from './crowd';
 import {
   bounds,
   decodeTerrain,
@@ -1211,7 +1217,7 @@ export class CircuitWorld {
           id: `crowd-far-${v}`,
           castShadow: false,
           chunkLength: 100,
-          lods: [{ geometry: g, material: farMat, maxDistance: 650 }],
+          lods: farCrowdLods(g, farMat, mats),
         });
         o.props.define({
           id: `crowd-${v}`,
