@@ -45,19 +45,27 @@ export interface RaceSetup {
   field: FieldRule;
 }
 
+/** Speed units are not here: they have their own store (`ui/player-settings.ts`). */
 export interface PlayerSettings {
-  units: 'kmh' | 'mph';
   reducedMotion: 'system' | 'on' | 'off';
   colourBlind: boolean;
   /** HUD scale, 0.8 to 1.2. */
   hudScale: number;
   subtitles: boolean;
+  /** Menu and HUD text: the design sizes, or the small sizes stepped up one or two. */
+  textSize: TextSize;
+  /** Touch controls: steering on the left and pedals on the right, or the other way round. */
+  touchLayout: TouchLayoutChoice;
   /**
    * Force feedback for kerbs and contacts: gamepad rumble, and the phone's vibration motor on
    * touch controls where the browser has the Vibration API (Android; not iOS Safari).
    */
   haptics: boolean;
 }
+
+export type TextSize = 'default' | 'large' | 'larger';
+export const TEXT_SIZES: readonly TextSize[] = ['default', 'large', 'larger'];
+export type TouchLayoutChoice = 'standard' | 'mirrored';
 
 export interface MenuPrefs {
   version: typeof PREFS_VERSION;
@@ -91,11 +99,12 @@ export function defaultPrefs(): MenuPrefs {
     },
     assists: {},
     settings: {
-      units: 'kmh',
       reducedMotion: 'system',
       colourBlind: false,
       hudScale: 1,
       subtitles: true,
+      textSize: 'default',
+      touchLayout: 'standard',
       haptics: true,
     },
   };
@@ -169,7 +178,6 @@ export function parsePrefs(text: string | null): MenuPrefs {
     },
     assists,
     settings: {
-      units: oneOf(settings.units, ['kmh', 'mph'] as const, d.settings.units),
       reducedMotion: oneOf(
         settings.reducedMotion,
         ['system', 'on', 'off'] as const,
@@ -183,6 +191,12 @@ export function parsePrefs(text: string | null): MenuPrefs {
           : d.settings.hudScale,
       subtitles:
         typeof settings.subtitles === 'boolean' ? settings.subtitles : d.settings.subtitles,
+      textSize: oneOf(settings.textSize, TEXT_SIZES, d.settings.textSize),
+      touchLayout: oneOf(
+        settings.touchLayout,
+        ['standard', 'mirrored'] as const,
+        d.settings.touchLayout,
+      ),
       haptics: typeof settings.haptics === 'boolean' ? settings.haptics : d.settings.haptics,
     },
   };

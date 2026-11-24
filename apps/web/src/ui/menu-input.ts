@@ -4,7 +4,7 @@
  * device. A key that the browser already turns into a click (Enter or Space on a focused button)
  * is reported as native so it is not activated twice.
  */
-import type { DeviceKind, InputSystem, MenuButton } from '@undercut/input';
+import type { ControlId, DeviceKind, InputSystem, MenuButton } from '@undercut/input';
 import { setGlyphContext } from './kit/glyph';
 
 const MENU: ReadonlySet<string> = new Set<MenuButton>([
@@ -21,6 +21,8 @@ const MENU: ReadonlySet<string> = new Set<MenuButton>([
 export interface MenuInputHandler {
   action(action: MenuButton, nativeAccept: boolean, device: DeviceKind): void;
   device?(device: DeviceKind): void;
+  /** A press captured for rebinding (`InputSystem.startCapture`). */
+  captured?(device: DeviceKind, control: ControlId): void;
 }
 
 export class MenuInput {
@@ -69,6 +71,7 @@ export class MenuInput {
       this.handler.device?.(f.device);
     }
     for (const e of f.events) {
+      if (e.type === 'captured') this.handler.captured?.(e.device, e.control);
       if (e.type !== 'action' || !MENU.has(e.action)) continue;
       const active = document.activeElement;
       const native =
