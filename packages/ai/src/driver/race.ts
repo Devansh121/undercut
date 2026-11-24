@@ -207,6 +207,12 @@ const LAUNCHED = 25;
  */
 const HAZARD_SEE = 600;
 const HAZARD_SPEED = BYPASS_SPEED + 2;
+/**
+ * A car ahead this far under the plan's corner speeds (its pace through corners, 0 to 1.2) is
+ * slow in corners, the way a new player is: it is dived on into a braking zone from behind. A
+ * car on the pace is passed into a braking zone only from an overlap.
+ */
+const SLOW_IN_CORNERS = 0.9;
 /** Room to the edge a car turning round keeps before it changes direction, m. */
 const TURN_ROOM = 3.5;
 /** A car within this far of where it stood is standing still, m. */
@@ -899,12 +905,13 @@ export class RaceDriver implements Driver {
       // all the way; otherwise the corner is the other car's, as it is for any car not alongside.
       // Only from a real overlap (front wheels level with the other car's rear wheels): a dive
       // from further back is not level by the apex, and the car ahead turns in across it.
+      // (Unless the car ahead is slow in corners: it is still braking when this one turns in.)
       if (
         cornering &&
         !this.passCommitted &&
         passCar !== null &&
         passDs >= 0.6 * CAR_LENGTH &&
-        passDs < OVERLAP &&
+        (passDs < OVERLAP || this.slowInCorners(passCar.id)) &&
         this.heldTime > 1.5 - aggression
       ) {
         const lane =
@@ -1037,7 +1044,7 @@ export class RaceDriver implements Driver {
       !midCorner &&
       held &&
       leader !== null &&
-      leaderDs < OVERLAP &&
+      (leaderDs < OVERLAP || this.slowInCorners(leader.id)) &&
       v - leader.speed > 2 &&
       this.passDecel > 2 &&
       gapAhead < 25 + v * 0.5;
@@ -1684,6 +1691,11 @@ export class RaceDriver implements Driver {
         best = Math.max(0, ds);
     }
     return best;
+  }
+
+  /** The car ahead, watched through corners, is well under the plan's corner speeds. */
+  private slowInCorners(id: number): boolean {
+    return this.aheadPaceId === id && this.aheadPace < SLOW_IN_CORNERS;
   }
 
   /** A move on a moving car with the road ahead clear of stopped cars (tow and DRS speed). */
