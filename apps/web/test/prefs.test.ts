@@ -57,9 +57,9 @@ describe('menu prefs', () => {
     expect(p.timeOfDay).toEqual({ monza: 'night-floodlit' });
     expect(p.race).toEqual({ laps: 5, aiSkill: 'elite', grid: 'set', slot: 10, field: 'equal' });
     expect(p.assists.keyboard).toEqual({ tractionControl: 0, abs: 2 });
+    // Units are not kept here (their own store), so a saved copy is dropped.
     expect(p.settings).toEqual({
       ...defaultPrefs().settings,
-      units: 'mph',
       subtitles: false,
       touchLayout: 'mirrored',
     });

@@ -303,3 +303,50 @@ test('on a wide screen, Up and Down from the top bar and the action bar reach th
     await expect.poll(inPane, { message: `Up from Credits, ${section}` }).toBe(section);
   }
 });
+
+test('the pause card keeps every label inside its control at the largest text size', async ({
+  drive: { page },
+}) => {
+  test.skip(test.info().project.name !== 'phone', 'the phone pause layout');
+  const before = page.viewportSize();
+  await page.keyboard.press('Escape');
+  const menu = page.locator('[data-testid=pause-menu]');
+  await expect(menu).toBeVisible();
+  try {
+    for (const size of [
+      { width: 568, height: 320 },
+      { width: 667, height: 375 },
+      { width: 844, height: 390 },
+      { width: 932, height: 430 },
+    ]) {
+      await page.setViewportSize(size);
+      for (const text of ['large', 'larger']) {
+        await page.evaluate((t) => (document.documentElement.dataset.text = t), text);
+        const problems = await menu.evaluate((root) => {
+          const out: string[] = [];
+          // Every control's text (its Range, not its box: a box shrinks while its text spills).
+          for (const el of root.querySelectorAll<HTMLElement>('button, [role=slider], output')) {
+            if (el.getClientRects().length === 0 || el.closest('[hidden]')) continue;
+            const box = el.getBoundingClientRect();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            for (const r of range.getClientRects()) {
+              if (r.width === 0) continue;
+              if (r.left < box.left - 0.5 || r.right > box.right + 0.5)
+                out.push(
+                  `${el.textContent?.trim() ?? el.className}: text runs ${Math.round(Math.max(box.left - r.left, r.right - box.right))} px out`,
+                );
+            }
+          }
+          return [...new Set(out)];
+        });
+        expect(problems, `${size.width} x ${size.height}, ${text} text`).toEqual([]);
+      }
+    }
+  } finally {
+    await page.evaluate(() => delete document.documentElement.dataset.text);
+    if (before) await page.setViewportSize(before);
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+  }
+});

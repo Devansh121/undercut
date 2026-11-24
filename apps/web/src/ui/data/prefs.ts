@@ -44,8 +44,8 @@ export interface RaceSetup {
   field: FieldRule;
 }
 
+/** Speed units are not here: they have their own store (`ui/player-settings.ts`). */
 export interface PlayerSettings {
-  units: 'kmh' | 'mph';
   reducedMotion: 'system' | 'on' | 'off';
   colourBlind: boolean;
   /** HUD scale, 0.8 to 1.2. */
@@ -91,7 +91,6 @@ export function defaultPrefs(): MenuPrefs {
     race: { laps: 5, aiSkill: 'pro', grid: 'qualifying', slot: 10, field: 'tiers' },
     assists: {},
     settings: {
-      units: 'kmh',
       reducedMotion: 'system',
       colourBlind: false,
       hudScale: 1,
@@ -169,7 +168,6 @@ export function parsePrefs(text: string | null): MenuPrefs {
     },
     assists,
     settings: {
-      units: oneOf(settings.units, ['kmh', 'mph'] as const, d.settings.units),
       reducedMotion: oneOf(
         settings.reducedMotion,
         ['system', 'on', 'off'] as const,

@@ -24,10 +24,10 @@
   --fs-20: 22px;
 }
 
-/* The driving HUD and the touch controls keep the design sizes: their modules have fixed
-   footprints (the timing tower's columns, the cluster between the touch buttons), and HUD scale
-   is what makes them larger. */
-:root[data-text] :is(.hud, .online-race, .ut-touch) {
+/* The driving HUD, the first-lap hint card and the touch controls keep the design sizes: they
+   have fixed footprints (the timing tower's columns, the cluster between the touch buttons, the
+   hint beside the steering zone), and HUD scale is what makes them larger. */
+:root[data-text] :is(.hud, .online-race, .ut-touch, .onboarding) {
   --fs-10: 10px;
   --fs-11: 11px;
   --fs-12: 12px;
@@ -464,5 +464,18 @@
 @media (max-height: 500px) and (max-width: 720px) and (orientation: landscape) {
   .crumbs > :not(:last-child) {
     display: none;
+  }
+}
+
+/* Larger text on a phone: the pause menu's actions (176 px wide) keep their labels inside. They
+   tighten, and a long one ("Reset to track") may take two lines within the 44 px button. */
+@media (max-height: 500px) and (orientation: landscape),
+  (max-width: 600px) and (orientation: portrait) {
+  :root[data-text] .pause__action {
+    padding: 0 var(--sp-2);
+    letter-spacing: 0.02em;
+    white-space: normal;
+    line-height: 1.1;
+    text-align: left;
   }
 }
