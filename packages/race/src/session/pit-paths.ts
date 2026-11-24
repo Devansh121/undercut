@@ -42,9 +42,10 @@ function laneSlope(track: Track, pitS: number, span: number): number {
   if (ds > track.length / 2) ds -= track.length;
   if (ds < -track.length / 2) ds += track.length;
   const slope = Math.abs(ds) < 1e-6 ? 0 : (b.d - a.d) / ds;
-  // A lane that leaves at a steep angle (Spa's, inside the chicane) is joined part way: matching
-  // its full slope bends the blend out the other way and folds the path over itself.
-  return Math.max(-MAX_JOIN_SLOPE, Math.min(MAX_JOIN_SLOPE, slope));
+  // A lane that leaves at a steep angle (Spa's, inside the chicane) keeps the plain blend:
+  // matching its slope, even in part, bent the approach out the other way and folded the path,
+  // and cars stopped in the lane where it crossed itself.
+  return Math.abs(slope) > MAX_JOIN_SLOPE ? 0 : slope;
 }
 
 /** From `d0` leaving with slope `m0` to the lap's centre line (0, slope 0) over `run` metres. */

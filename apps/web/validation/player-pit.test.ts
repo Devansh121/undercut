@@ -130,10 +130,10 @@ function stintTime(setup: typeof MONZA, stop: boolean): { time: number; stops: n
 }
 
 // Time lost to a stop (with a 3.07 s service), s. The ceiling is the measured loss with 1 s of
-// headroom (Monza 28.3, Spa-Francorchamps 20.1, Singapore 27.6, with the limit lines at the cited
+// headroom (Monza 28.3, Spa-Francorchamps 20.7, Singapore 28.0, with the limit lines at the cited
 // timing loops: docs/race-rules.md, pit time loss). The floor is the limited zone at the limit
 // plus the service, less the same stretch at 90 m/s.
-const PIT_LOSS_MAX: Record<string, number> = { monza: 29.3, spa: 21.1, singapore: 28.6 };
+const PIT_LOSS_MAX: Record<string, number> = { monza: 29.3, spa: 21.7, singapore: 29 };
 const SERVICE = 3.07;
 function pitLossFloor(setup: typeof MONZA): number {
   const pit = setup.track().pit;
