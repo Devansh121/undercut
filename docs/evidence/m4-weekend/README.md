@@ -31,11 +31,9 @@ rerun; the split changes neither session.
 
 ## Pit entry
 
-`packages/race/validation/pit-entry.test.ts` replays the twenty-car seed 3141 incident from a
-saved race state (`data/pit-entry-3141.snapshot.json.gz`). With the pit-entrant rule disabled
-(`false &&` before `c.pitApproach` in `packages/ai/src/driver/race.ts`): 1 failed, contact
-9.15 m/s. With it: 1 passed, no contact, 10 s. The driver test at Monza's entry
-(`packages/ai/test/race-driver.test.ts`) fails the same way with the rule disabled.
+The per-PR replay of the seed 3141 incident was retired in the weekend follow-ups (docs/STATUS.md):
+with the new pit-lane entry, no race on ten seeds has a pit-entry contact with the rule disabled.
+`packages/ai/test/race-driver.test.ts` (the Monza entry case) still fails with the rule disabled.
 
 ## Player stops
 
@@ -65,5 +63,19 @@ One long simulation at a time on the shared laptop:
 ```sh
 nice -n 10 taskset -c 4-7 npx vitest run --project soak packages/race/validation/weekend-monza.soak.test.ts --maxWorkers=2
 nice -n 10 taskset -c 4-7 npx vitest run --project soak packages/race/validation/strategy-two-stop.soak.test.ts --maxWorkers=1
-nice -n 10 taskset -c 4-7 npx vitest run --project physics apps/web/validation/player-pit.test.ts apps/web/validation/simulate-session.test.ts packages/race/validation/pit-entry.test.ts packages/race/validation/strategy-scenarios.test.ts packages/race/validation/strategy-restore.test.ts --maxWorkers=2
+nice -n 10 taskset -c 4-7 npx vitest run --project physics apps/web/validation/player-pit.test.ts apps/web/validation/simulate-session.test.ts packages/race/validation/strategy-scenarios.test.ts packages/race/validation/strategy-restore.test.ts --maxWorkers=2
 ```
+
+## Weekend follow-ups
+
+- Pit time loss (player-pit, field retired): Monza 29.4 s, Spa 21.2 s, Singapore 29.1 s (were
+  34.0, 24.3 and 32.1); breakdown in docs/race-rules.md.
+- Soaks on the final code, one at a time on two cores: pit-entry 2 passed (198 s), weekend
+  Monza 2 passed (317 s), Spa 2 passed (350 s; an earlier version classified 8 of 20, which led to
+  the steep-join rule), Singapore 2 passed (325 s), full-distance two-stop 1 passed with no
+  watchdog findings (118 s).
+- Full-distance fuel, three cars, first 700 s at Monza: 21 off-track excursions at the Parabolica
+  before the mass factor, none after.
+- Simulate to end of session, a 300 s practice simulated from the start, desktop Lite world:
+  86.8 s (was 90.0 s).
+

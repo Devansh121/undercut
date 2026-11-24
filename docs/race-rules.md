@@ -224,16 +224,57 @@ entrant's position, before crossing onto the pit surface.
 
 Measured with the scripted racing driver from 700 m before the pit entry to 600 m after the exit,
 seed 3141, the field retired at the green, a stop with a 3.07 s service against the same run
-without one (`apps/web/validation/player-pit.test.ts`): Monza 34.0 s, Spa-Francorchamps 24.3 s,
-Singapore 32.1 s. Commonly quoted real losses are about 22 to 25 s at Monza and 28 to 30 s at
-Singapore (the latter with the old 60 km/h limit). The time goes in the lane: at Monza the run
-with a stop is 1.3 s behind at the entry, 30.8 s behind at the exit and 34.0 s behind 600 m later.
-The cause is the lane's limited zone. The limit lines are authored, not sourced
-(docs/track-data.md): 110 m after the lane's start and 120 m before its end at every circuit, so
-the zone is 511 m at Monza, 487 m at Spa and 590 m at Singapore, all at 80 km/h. The box assigned
-to the player's team is the first, so after release the car runs 340 m limited at Monza (16.2 s)
-before the second line. Execution adds about 2 s: the lane paths aim 0.8 m/s under the limit and
-the car holds 21.0 m/s against 22.2, and it takes 3.3 s to reach lane speed from the box. The
-lane speed margin is unchanged because it moves every AI stop; the limit lines stay until a source
-places them. The test bounds each circuit's loss between the limited zone at the limit plus the
-service, less the same stretch at 90 m/s, and the measured loss plus 1 s.
+without one (`apps/web/validation/player-pit.test.ts`, which bounds each at the measured loss
+plus 1 s):
+
+| Circuit | Limited zone | Loss before | Loss now | Commonly quoted |
+| --- | --- | --- | --- | --- |
+| Monza | 418.5 m | 34.0 s | 29.4 s | about 22 to 25 s |
+| Spa-Francorchamps | 386.2 m | 24.3 s | 21.2 s | not checked |
+| Singapore | 403.7 m | 32.1 s | 29.1 s | about 21 to 22 s at 80 km/h (2025); 28 to 30 s at the old 60 km/h |
+
+What changed, measured one step at a time (Monza / Spa / Singapore, s):
+
+- Limit lines (31.9 / 24.3 / 29.9). They were authored 110 m into each lane and 120 m before its
+  end (511, 487 and 590 m zones). Monza's and Spa's now sit at the pit-in and pit-out timing
+  loops published for endurance races there (docs/track-data.md 5.5): pit in 86 m before the
+  finish line and 418 m to pit out at Monza, 85 m and 386 m at Spa. Projected onto the pit lanes
+  these are s_pit 151 to 569 m and 181 to 567 m. No loop
+  positions were found for Singapore; its zone is the published 404 m pit-lane length, centred
+  on the garages (208 to 612 m), an estimate. Moving the lines to the lanes' own ends would have
+  made the zones longer (741, 717 and 820 m) and the losses larger.
+- The limiter from 30 m before the first line, not from the lane's start (31.4 / 23.0 / 29.1).
+  `RaceControl.limiterZone` held cars to 80 km/h along the whole entry road.
+- The lane joins (27.3 / 20.6 / 26.6). The approach blended onto the lane heading along the lap
+  and met the lane at an angle: a 5 to 15 m radius kink at the join, taken at about 19 m/s, then
+  a second brake for the line. Where the lane leaves at a slope under 0.3 (about 17°) the approach
+  and the exit now meet it on its heading. Steeper joins (Spa's, inside the chicane, and one of
+  Singapore's) keep the plain blend: matching them, even in part, folded the path and AI cars
+  stopped in Spa's lane where it crossed itself (the weekend soak caught it).
+- Pulling away from the box (27.1 at Monza): the follower's wheelspin guard dropped the throttle
+  to 0.05 and recovered slowly; its floor is now 0.2 with twice the recovery.
+- The lane speed (26.6 / 20.0 / 25.9): the paths aim 0.3 m/s under the limit (was 0.8); cars hold
+  21.5 m/s against 22.2 and the speeding tolerance (0.3 m/s over) is unchanged.
+- No faster than 25 m/s on the entry road, before braking for the first line (29.4 / 21.2 / 29.1,
+  with the steep joins on the plain blend). Without the kink, AI cars called in at racing speed
+  reached Monza's lane at 55 m/s and met its wall (two-car probes, seven of seven clean with a cap);
+  at 30 m/s the player's assisted stop could not take the bend 140 m into Singapore's lane (it
+  passes at 28 m/s; 25 leaves a margin), and 38 m/s cost Spa 5 s.
+- The drivers' plan for the fuel on board (next section) changes the no-stop baseline by 0.3 s at
+  Monza.
+
+Monza stays about 4.5 to 7.5 s above the quoted range and Singapore about 7 to 8 s above the 2025
+figure. What is left is mostly the 3.07 s service (2 to 2.5 s in the quoted races), the rejoin at
+lane speed onto Monza's main straight, and Singapore's lane geometry, which this game takes from
+OpenStreetMap (820 m against the published 404 m).
+
+### Fuel load and the drivers' targets
+
+The racing drivers' speed profile comes from the envelope measured at 810 kg (10 kg of fuel).
+At full-distance fuel (about 105 kg at Monza) the car brakes and corners on less acceleration,
+and the drivers ran wide at the Parabolica on most laps: 22 watchdog findings over a three-car
+Monza race on seed 11, none with five-lap fuel. The driver now plans on its tyres' grip times the
+envelope's mass over the car's (never above 1), which is conservative since downforce does not
+grow with the load. At the envelope's load the factor is 1, so the reference laps are unchanged.
+The full-distance soak (`strategy-two-stop.soak.test.ts`) now passes with no findings.
+
