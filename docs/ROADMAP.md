@@ -16,27 +16,29 @@ Last updated 23 Nov 2026, at the pause tagged `v0.5.0` (PRs #1 to #53 merged, pl
 
 After v1: pick the weakest scorecard axis and raise it. Candidates are weather and wet tyres, safety car, replays, car setup, more circuits, public matchmaking, wheel support and a career mode.
 
-## Where things stand (pause point, 23 Nov 2026)
+## Where things stand (24 Nov 2026)
+
+Releases v0.6.0 (Quick Race everywhere, tyres and fuel, breakable boards), v0.7.0 (phone
+readiness, fairer starts, polish) and v0.8.0 (Race Weekend, Championship and pit stops) are
+published. Merged since the 23 Nov pause: #52, #54, #55, #58 to #70 (all but #57) and #73 to #75.
 
 ### In progress (open PRs and branches)
 
-| Work | Branch / PR | State at the pause |
-| --- | --- | --- |
-| Quick Race at Spa and Singapore (M4b slice 1) | `m4/quick-race-all-circuits`, #52 | CI green, conflicts with master. Review blocker: a queue of cars rear-ends a stopped car at Spa. Fixed at Bus Stop on every seed tried; Raidillon clean on two of four seeds (recorded as a gap, seed 1). Regression tests being written. Singapore off-track counts rose (Nicoll Highway 142 against 102, turn 13 38 against 13) and need a look before re-review |
-| Tyres and fuel (M4b slice 2) | `m4/tyres-fuel`, #54 | CI green, conflicts with master. Review items to fix: AI grip scaling slows it on straights, turn-one regression on cold tyres, stale calibration, Spa and Singapore proof with tyres on, a supplier name to remove, HUD band rounding |
-| Physics time-loss budget | `m4/physics-gap-budget`, #55 | Second review asked for changes: phase classification must count the hybrid deployment actually used, and the sector reconciliation must hold at 1 ms (it was loosened to 3 ms; Spa misses by 1.4 ms). Smaller: trim the CLI JSON (52 MB). Fixes being pushed. No game behaviour change |
-| Kit structures and crowd in the world | `m2/kit-placement` | Just started: kit grandstands, start gantry, pit building, barriers and near-row crowd at all three circuits, kit levels uploaded at load |
+| Work | PR |
+| --- | --- |
+| Circuit structures and near crowd from the prop kit | #57 |
+| Singapore water by day and mid-distance trees | #71 |
+| Settings and Credits screens, controls list follow-ups | #72 |
+| AI racecraft: mirror clearance and on-track moves | #76 |
+| Weekend follow-ups: pit time loss, full-distance races, pit-entry replay check, simulating a session, pit-panel styling | `m4/weekend-followups` |
 
 ### Next, in order
 
-1. Finish and merge #55, #52, #54 (each: fixes, an independent review, merge, redeploy).
-2. M4b slice 3: Race Weekend (practice, qualifying, race with a mandatory compound change, AI one- or two-stop strategy, pit stops through the lane) and Championship over the three circuits, phone-friendly menus. Includes the acceptance test: a scripted Race Weekend against nineteen AI cars on every circuit, headless, no stuck cars.
-3. Interface slice 2: race HUD on the race engine's events (twenty-car tower, gaps, flags by sector, start lights, pit and penalty messages), results with classification and penalties, championship standings, the full Settings screen (rebinding per device, accessibility, HUD scale, units), credits screen, lobby and results restyled on the kit.
-4. AI follow-ups: turn-one lane changes on seeds 1022 and 7307 (18/20), pit-entry rear-ends (seeds 3141, 2718), a player ghosted 2.5 s after a slow launch, contacts in moving packs, Singapore seed 119 (7/20 with three spins), a 22.4 m/s lap-1 contact on phone seed 4114380179.
-5. Physics pace: the downforce shortfall (Spa +8.5 % against pole, Monza 2.14 s outside its band). An owner choice is open: the Monza first-chicane kerb checks block some gains; the default is to keep them.
-6. Graphics polish: Singapore water by day, crowd figures, mid-distance trees.
-7. Real-phone acceptance: everything provable without a device is in (#66: launch images, safe areas, audio unlock, haptics, iPhone 15 and Pixel 8 tests, ten-minute soak); left is one pass of `docs/real-phone-test.md` on an iPhone and an Android phone. Then the independent QUALITY.md scoring and the final acceptance run.
-8. Small leftovers: Singapore day ambience, and the phone's first-lap coach card over the HUD message tag (the update bar over the pause card, desktop pause below the fold, the offline fallback for chosen presets and the results overlay's raw codes are fixed).
+1. Finish and merge the open PRs above.
+2. The independent QUALITY.md scoring.
+3. The owner's real-phone check: one pass of `docs/real-phone-test.md` on an iPhone and an
+   Android phone (everything provable without a device is in, #66).
+4. The final acceptance run.
 
 ### Done-criteria status
 
@@ -45,7 +47,7 @@ After v1: pick the weakest scorecard axis and raise it. Candidates are weather a
 | 1 | Public repo, protected master, green CI | Done |
 | 2 | M0–M6 merged | M0, M3 (Monza), M5 done; M1, M2, M4, M6 open |
 | 3 | Physics validation on all three circuits within tolerance | Singapore inside; Monza and Spa outside, recorded as gaps |
-| 4 | Scripted Race Weekend vs nineteen AI on every circuit | Acceptance proof in PR #60; see docs/evidence/m4-weekend/ |
+| 4 | Scripted Race Weekend vs nineteen AI on every circuit | Done (#60; docs/evidence/m4-weekend/) |
 | 5 | Two-browser online test | Done, in CI |
 | 6 | Keyboard, gamepad, touch on desktop and phone | Done in browser tests; real-phone check open |
 | 7 | One command starts game and rooms | Done (`./start.sh`) |
