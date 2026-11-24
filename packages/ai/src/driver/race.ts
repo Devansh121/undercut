@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import { OVERLAP, defensiveLane, mirrorLane, roomLane } from './racecraft';
+import { OVERLAP, carNear, defensiveLane, mirrorLane, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
@@ -684,6 +684,11 @@ export class RaceDriver implements Driver {
     const toCorner = this.at(this.cornerAhead, s0);
     const cornering = toCorner < 30 + v * 0.8;
     const midCorner = Math.abs(this.at(line.curvature, s0)) > CORNER_CURVATURE;
+    // The opening lap: no change of lane under braking, and into the first corner no move that
+    // is not already alongside (the field arrives there together).
+    const opening = view.openingLap === true && !view.launching;
+    const firstEnd = plan.track.corners[0]?.end ?? 0;
+    const firstCorner = opening && cornering && (s0 < firstEnd || s0 > plan.track.length / 2);
     const straightness = Math.max(0, Math.min(1, (toCorner - v) / 150));
 
     // The car ahead in this car's path, and the cars alongside (or about to be). Other cars are
@@ -950,7 +955,8 @@ export class RaceDriver implements Driver {
       // yellow). Going round a stopped or crawling car is not a race and goes on.
       const yellow =
         this.hazard && !this.passBypass && passCar !== null && passCar.speed >= HAZARD_SPEED;
-      if (lost || done || late || blockedByOther || movedOff || yellow) {
+      const notAlongside = firstCorner && !this.passBypass && passCar !== null && passDs >= OVERLAP;
+      if (lost || done || late || blockedByOther || movedOff || yellow || notAlongside) {
         if (!done && !blockedByOther && !movedOff) this.cooldown = this.passBypass ? 1 : 3;
         this.passId = -1;
       } else {
@@ -1052,6 +1058,7 @@ export class RaceDriver implements Driver {
       this.passId < 0 &&
       leader &&
       !(this.hazard && leader.speed >= HAZARD_SPEED) &&
+      !(firstCorner && leaderDs >= OVERLAP) &&
       this.cooldown <= 0 &&
       (!cornering || brakingMove) &&
       launched &&
@@ -1150,6 +1157,19 @@ export class RaceDriver implements Driver {
 
     // The target offset: as close to the base as the cars alongside and the edges allow.
     let target = Math.max(lo, Math.min(hi, base));
+    if (
+      opening &&
+      cornering &&
+      !midCorner &&
+      !this.hazard &&
+      !this.passBypass &&
+      !this.recovering &&
+      carNear(view, plan.track.length, 20)
+    ) {
+      // Braking on the opening lap among other cars the lane holds (the cars alongside and the
+      // edges still bound it). Alone on the road the car takes its line as planned.
+      target = Math.max(lo, Math.min(hi, this.o));
+    }
     if (
       v > LAUNCHED &&
       !this.hazard &&

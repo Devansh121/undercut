@@ -540,6 +540,51 @@ describe('race driver: late braking', () => {
   });
 });
 
+describe('race driver: the opening lap', () => {
+  /** In the first chicane's braking zone, short of the turn-in. */
+  const BRAKING = 520;
+  it('gives up a move into the first corner unless already alongside', () => {
+    for (const openingLap of [true, false]) {
+      const dr = driver();
+      const me = { id: 0, s: BRAKING, d: lineD(dr, BRAKING) - 3, speed: 60 };
+      const ahead = { id: 1, s: BRAKING + 8, d: lineD(dr, BRAKING + 8), speed: 55 };
+      dr['passId'] = 1;
+      dr['passSide'] = -1;
+      dr['passCommitted'] = true;
+      dr['o'] = -3;
+      tick(dr, me, [ahead], { openingLap });
+      expect(dr.snapshot().passId).toBe(openingLap ? -1 : 1);
+    }
+  });
+  it('keeps a move into the first corner when already alongside', () => {
+    const dr = driver();
+    const me = { id: 0, s: BRAKING, d: lineD(dr, BRAKING) - 3, speed: 60 };
+    const ahead = { id: 1, s: BRAKING + 2, d: lineD(dr, BRAKING + 2), speed: 55 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['passCommitted'] = true;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.snapshot().passId).toBe(1);
+  });
+  it('holds its offset from the line while braking on the opening lap, with a car near', () => {
+    const hold = (openingLap: boolean, near: boolean) => {
+      const dr = driver();
+      // Early in the braking zone, where the road leaves room either side of the line.
+      dr['o'] = -2.5;
+      const me = { id: 0, s: 420, d: lineD(dr, 420) - 2.5, speed: 60 };
+      // A car 12 m back on the other side of the line: near, and not in the way.
+      const other = { id: 1, s: 408, d: lineD(dr, 408) + 3, speed: 60 };
+      for (let k = 0; k < 120; k++) tick(dr, me, near ? [other] : [], { openingLap });
+      return dr.snapshot().o as number;
+    };
+    expect(hold(true, true)).toBeCloseTo(-2.5, 6);
+    expect(hold(false, true)).toBeGreaterThan(-2.4);
+    // Alone on the road the car takes its line as planned.
+    expect(hold(true, false)).toBeGreaterThan(-2.4);
+  });
+});
+
 describe('race driver: a car slowing for the pit entry', () => {
   it('counts the entrant against the road the follower reaches there, not only where it is now', () => {
     const half = BODY_HALF_WIDTH;

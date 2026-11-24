@@ -99,3 +99,14 @@ export function roomLane(view: TrafficView, target: number, length: number): num
   }
   return lane;
 }
+
+/** Another moving car within `range` m ahead or behind, anywhere across the road. SI. */
+export function carNear(view: TrafficView, length: number, range: number): boolean {
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (c.speed >= 1 && Math.abs(ds) < range) return true;
+  }
+  return false;
+}

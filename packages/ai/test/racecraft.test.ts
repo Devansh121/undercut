@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mirrorLane, roomLane } from '../src/driver/racecraft';
+import { carNear, mirrorLane, roomLane } from '../src/driver/racecraft';
 import { createTrafficView } from '../src/driver/traffic';
 
 function traffic(s = 100) {
@@ -94,5 +94,20 @@ describe('racing room for an overlapping car', () => {
     view.self.s = 1;
     view.cars[0]!.s = 998.5;
     expect(roomLane(view, -4, 1000)).toBeGreaterThanOrEqual(1.6);
+  });
+});
+
+describe('a car near', () => {
+  it('is within the range ahead or behind, moving, across the start line too', () => {
+    const view = createTrafficView(1);
+    Object.assign(view.self, { id: 0, s: 5, d: 0, speed: 50 });
+    Object.assign(view.cars[0]!, { id: 1, s: 990, d: 4, speed: 50 });
+    view.count = 1;
+    expect(carNear(view, 1000, 20)).toBe(true);
+    view.cars[0]!.s = 980;
+    expect(carNear(view, 1000, 20)).toBe(false);
+    view.cars[0]!.s = 15;
+    view.cars[0]!.speed = 0;
+    expect(carNear(view, 1000, 20)).toBe(false);
   });
 });
