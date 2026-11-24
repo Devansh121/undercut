@@ -62,3 +62,20 @@ medium tyres after formation warm-up, no stops, and the five-lap start load even
 after lap one. For example, Monza uses `--tyres --start-fuel 11.88679245283019 --no-pit`;
 `--laps 1` and `--laps 5` then have the same starting condition. The sweep of seeds 101–120
 at each circuit is in `racing-followups.soak.test.ts`.
+
+`racecraft-proof.mjs` runs resumable batches with those same settings and records every car,
+including unsuccessful classifications and watchdog findings. Keep a separate JSONL file for
+each revision. For example, under the shared-machine CPU limit:
+
+```sh
+nice -n 10 taskset -c 8-11 timeout 900 node tools/telemetry/racecraft-proof.mjs \
+  --circuit monza --group start-a --label REVISION \
+  --out "$HOME/.cache/undercut/scratch/ai-racecraft/REVISION.jsonl"
+```
+
+Run `start-a`, `start-b` and `race-a` through `race-e` for each of `monza`, `spa` and
+`singapore`: twenty one-lap seeds and ten five-lap seeds per circuit, plus the two recorded
+Monza starts. Repeating a completed batch skips its saved cases. `--module FILE` can load a
+saved ESM bundle instead of the current TypeScript source. After collecting both revisions,
+add `--baseline BASELINE.jsonl --baseline-label BASE_REVISION --report REPORT.md` to write
+the master/head tables; missing cases and unmet proof criteria return a nonzero exit status.
