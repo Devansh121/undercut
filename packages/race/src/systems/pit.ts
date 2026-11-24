@@ -77,6 +77,10 @@ export class PitSystem implements RaceSystem<PitState> {
     }));
   }
 
+  remaining(car: number, now: number): number {
+    return Math.max(0, this.cars[car]!.until - now);
+  }
+
   phase(car: number): PitPhase {
     return this.cars[car]!.phase;
   }

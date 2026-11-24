@@ -10,12 +10,24 @@ export interface Rect {
   height: number;
 }
 
-export type TouchButton = 'gearUp' | 'gearDown' | 'drs' | 'overtake' | 'camera' | 'pause';
+export type TouchButton =
+  | 'gearUp'
+  | 'gearDown'
+  | 'drs'
+  | 'overtake'
+  | 'boxThisLap'
+  | 'nextCompound'
+  | 'pitLimiter'
+  | 'camera'
+  | 'pause';
 export const TOUCH_BUTTONS: readonly TouchButton[] = [
   'gearUp',
   'gearDown',
   'drs',
   'overtake',
+  'boxThisLap',
+  'nextCompound',
+  'pitLimiter',
   'camera',
   'pause',
 ];
@@ -68,6 +80,9 @@ export class TouchSource implements DeviceSource {
     gearDown: null,
     drs: null,
     overtake: null,
+    boxThisLap: null,
+    nextCompound: null,
+    pitLimiter: null,
     camera: null,
     pause: null,
   };

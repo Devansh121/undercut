@@ -10,7 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
-import type { TrafficCar, TrafficView } from './traffic';
+import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
 /**
  * How a racing driver drives, each 0 to 1 unless a unit is given. The player-facing difficulty
@@ -714,9 +714,14 @@ export class RaceDriver implements Driver {
         ds > 0 &&
         ds < bypassReach &&
         Math.abs(c.d - bypassLane) < CAR_WIDTH + wide + PASS_CLEARANCE;
-      const inPath = passing
-        ? lateral < CAR_WIDTH + wide + PASS_CLEARANCE
-        : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns || inLane;
+      const pitInPath =
+        c.pitApproach === true &&
+        pitCarInPath(self.d, c.d, this.at(line.d, c.s) + this.o, BODY_HALF_WIDTH, c.halfWidth);
+      const inPath =
+        pitInPath ||
+        (passing
+          ? lateral < CAR_WIDTH + wide + PASS_CLEARANCE
+          : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns || inLane);
       // Ahead and in the way (or overlapping it already): follow it.
       const closing = Math.max(0, v - c.speed);
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
