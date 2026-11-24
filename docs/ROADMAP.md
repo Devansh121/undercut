@@ -35,7 +35,7 @@ After v1: pick the weakest scorecard axis and raise it. Candidates are weather a
 4. AI follow-ups: turn-one lane changes on seeds 1022 and 7307 (18/20), pit-entry rear-ends (seeds 3141, 2718), a player ghosted 2.5 s after a slow launch, contacts in moving packs, Singapore seed 119 (7/20 with three spins), a 22.4 m/s lap-1 contact on phone seed 4114380179.
 5. Physics pace: the downforce shortfall (Spa +8.5 % against pole, Monza 2.14 s outside its band). An owner choice is open: the Monza first-chicane kerb checks block some gains; the default is to keep them.
 6. Graphics polish: Singapore water by day, crowd figures, mid-distance trees.
-7. Real-phone acceptance (iPhone Safari and home-screen icon, side bars in landscape, haptics, sustained frame rate, audio CPU), then the independent QUALITY.md scoring and the final acceptance run.
+7. Real-phone acceptance: everything provable without a device is in (#66: launch images, safe areas, audio unlock, haptics, iPhone 15 and Pixel 8 tests, ten-minute soak); left is one pass of `docs/real-phone-test.md` on an iPhone and an Android phone. Then the independent QUALITY.md scoring and the final acceptance run.
 8. Small leftovers: Singapore day ambience, and the phone's first-lap coach card over the HUD message tag (the update bar over the pause card, desktop pause below the fold, the offline fallback for chosen presets and the results overlay's raw codes are fixed).
 
 ### Done-criteria status
