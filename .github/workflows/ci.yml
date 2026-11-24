@@ -54,9 +54,17 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
 
-  physics:
+  # The validation suite in three shards on separate runners, balanced on measured time
+  # (tools/ci/weighted-sequencer.ts): every file runs in exactly one shard. One runner took
+  # 14-15 minutes for the whole suite, against the 15-minute limit.
+  physics-shard:
+    name: physics shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -64,7 +72,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run test:physics
+      - run: npm run test:physics -- --shard=${{ matrix.shard }}/3
+
+  # The required check: passes only when every shard passed (a failed, cancelled or skipped
+  # shard fails it).
+  physics:
+    if: always()
+    needs: physics-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every physics shard passed
+        run: test "${{ needs.physics-shard.result }}" = success
 
   rooms:
     runs-on: ubuntu-latest

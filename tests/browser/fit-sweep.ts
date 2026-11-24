@@ -101,7 +101,8 @@ export function setTextSize(page: Page, text: string): Promise<void> {
  * The screen as it stands, at each size and text size: layout (viewport, top bar, clipping, and on
  * phones 44 px targets) and every piece of text inside its box. Restores the viewport and the
  * standard text size. In a session, turning a phone upright pauses it behind the rotate prompt
- * (phone-session.ts); on the way back to landscape the pause is lifted, as a player would.
+ * (phone-session.ts); on the way back to landscape that pause is lifted, as a player would, unless
+ * the session was already paused when the sweep began.
  */
 export async function fitEverywhere(
   page: Page,
@@ -109,6 +110,12 @@ export async function fitEverywhere(
 ): Promise<string[]> {
   const before = page.viewportSize();
   const problems: string[] = [];
+  // A pause the caller had open stays open: only one the sweep caused (by turning upright) is
+  // lifted at the end.
+  const pausedBefore = await page.evaluate(() => {
+    const menu = document.querySelector<HTMLElement>('[data-testid=pause-menu]');
+    return menu !== null && !menu.hidden;
+  });
   try {
     for (const size of o.sizes) {
       await page.setViewportSize(size);
@@ -124,10 +131,11 @@ export async function fitEverywhere(
   } finally {
     await setTextSize(page, 'standard');
     if (before) await page.setViewportSize(before);
-    await page.evaluate(() => {
-      const menu = document.querySelector<HTMLElement>('[data-testid=pause-menu]');
-      if (menu && !menu.hidden && innerWidth > innerHeight) window.__undercut?.resume();
-    });
+    if (!pausedBefore)
+      await page.evaluate(() => {
+        const menu = document.querySelector<HTMLElement>('[data-testid=pause-menu]');
+        if (menu && !menu.hidden && innerWidth > innerHeight) window.__undercut?.resume();
+      });
   }
   return problems;
 }
