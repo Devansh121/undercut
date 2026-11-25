@@ -12,6 +12,7 @@ import {
 } from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import worldProps from '../../data/world-props.json';
 import type { AssetLoader } from '../assets/loader';
 import type { Quality } from '../quality';
@@ -236,7 +237,15 @@ function sampleMaterialLinearColor(mat: Material): [number, number, number] {
  * optional gentle idle sway for spectators.
  */
 export function createPropKitMaterial(
-  options: { swayTime?: { value: number }; key?: string } = {},
+  options: {
+    swayTime?: { value: number };
+    key?: string;
+    /**
+     * World-space colour and roughness grain (default on). Off for levels only drawn far away,
+     * where the 7 cm grain is below a pixel and its two hashes a fragment are pure cost.
+     */
+    grain?: boolean;
+  } = {},
 ): MeshStandardMaterial {
   const m = new MeshStandardMaterial({
     vertexColors: true,
@@ -245,6 +254,7 @@ export function createPropKitMaterial(
   });
   m.name = options.key ?? 'prop-kit-unified';
   const sway = options.swayTime;
+  const grain = options.grain ?? true;
   m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     if (sway) shader.uniforms.uCrowdTime = sway;
     shader.vertexShader = shader.vertexShader
@@ -306,23 +316,28 @@ export function createPropKitMaterial(
         `#include <common>
         varying vec2 vPropRM;
         varying vec3 vPropWorld;
+        // Arithmetic hash of the 7 cm cell (no sin: its range reduction on large world
+        // coordinates made the grain the dearest part of every kit fragment).
         float propGrain(vec3 p) {
-          vec3 q = floor(p * 14.0);
-          return fract(sin(dot(q, vec3(12.9898, 78.233, 37.719))) * 43758.5453) - 0.5;
+          vec3 q = fract(floor(p * 14.0) * vec3(0.1031, 0.1030, 0.0973));
+          q += dot(q, q.yzx + 33.33);
+          return fract((q.x + q.y) * q.z) - 0.5;
         }`,
       )
       .replace(
         '#include <color_fragment>',
-        `#include <color_fragment>
+        grain
+          ? `#include <color_fragment>
         {
           float g = propGrain(vPropWorld);
           diffuseColor.rgb *= 1.0 + g * 0.055 * (1.0 - vPropRM.y * 0.5);
-        }`,
+        }`
+          : '#include <color_fragment>',
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-        roughnessFactor = clamp(vPropRM.x + propGrain(vPropWorld * 0.5) * 0.04, 0.06, 1.0);`,
+        roughnessFactor = clamp(vPropRM.x${grain ? ' + propGrain(vPropWorld * 0.5) * 0.04' : ''}, 0.06, 1.0);`,
       )
       .replace(
         '#include <metalnessmap_fragment>',
@@ -330,7 +345,8 @@ export function createPropKitMaterial(
         metalnessFactor = clamp(vPropRM.y, 0.0, 1.0);`,
       );
   };
-  m.customProgramCacheKey = () => `prop-kit-unified-v1-${sway ? 'sway' : 'static'}`;
+  m.customProgramCacheKey = () =>
+    `prop-kit-unified-v1-${sway ? 'sway' : 'static'}${grain ? '' : '-smooth'}`;
   return m;
 }
 
@@ -682,7 +698,12 @@ export class PropKitAssets {
       geometry.setAttribute('aPropPbr', new BufferAttribute(pbr, 3));
       for (const g of groups) geometry.addGroup(g.start, g.count, g.materialIndex);
       geometry.computeBoundingSphere();
-      this.ownedGeometries.push(geometry);
+      // Slot extraction expands triangle corners. Reuse identical packed vertices in the GPU's
+      // post-transform cache, preserving hard normals, UVs, albedo, PBR and tint seams. The tiny
+      // comparison cell is below Float32 precision at model scale; triangle/group order stays.
+      const indexed = mergeVertices(geometry, 1e-10);
+      geometry.dispose();
+      this.ownedGeometries.push(indexed);
 
       let maxDistance = lod.maxDistance * scale;
       if (caps && caps.length > 0) {
@@ -692,7 +713,7 @@ export class PropKitAssets {
       }
 
       return {
-        geometry,
+        geometry: indexed,
         material: materials.length === 1 ? (materials[0] as Material) : materials,
         maxDistance,
       };

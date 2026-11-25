@@ -348,7 +348,30 @@ const CIRCUIT_STATIONS = {
     },
   ],
 };
-const STATIONS = circuit === 'monza' ? MONZA_STATIONS : CIRCUIT_STATIONS[circuit];
+const STATIONS = [
+  ...(circuit === 'monza' ? MONZA_STATIONS : CIRCUIT_STATIONS[circuit]),
+  {
+    name: 'gantry-lights',
+    camera: 'tv',
+    run: async (page) => {
+      await page.evaluate(() => {
+        const u = globalThis.__undercut;
+        u.restartLap();
+        u.setTimeScale(0);
+        u.gridCars(19);
+        u.setStartLights(31);
+        const eye = u.trackPoint(-70, 0, 1.6);
+        const aim = u.trackPoint(0, 0, 5.6);
+        u.tvCamera(eye.x, eye.y, eye.z, 38, aim);
+      });
+    },
+    after: (page) =>
+      page.evaluate(() => {
+        globalThis.__undercut.setStartLights(0);
+        globalThis.__undercut.gridCars(0);
+      }),
+  },
+];
 
 /** Sessions start on the chosen circuit: the menu's saved choice, set before the page loads. */
 async function onCircuit(context) {
@@ -728,6 +751,7 @@ async function perfRuns(report, vsync) {
           skippedDraws: stats.skippedDraws - before.skipped,
           gpu,
           render: stats,
+          loadTimes: await page.evaluate(() => globalThis.__undercut.loadTimes()),
           memory: await page.evaluate(() => ({
             heapBytes: performance.memory?.usedJSHeapSize ?? null,
             resources: performance
