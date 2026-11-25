@@ -48,6 +48,7 @@ export class OnlineAiField {
   private readonly launchCaps: number[];
   private readonly launching: boolean[];
   private elapsed = 0;
+  private readonly stalls: { s: number; since: number; resets: number; graceUntil: number }[];
   private readonly recovery = new BlockedCars();
   private blocked: ReadonlySet<number> = new Set();
   private readonly crossings: { seat: number; crossing: Crossing }[] = [];
@@ -89,6 +90,12 @@ export class OnlineAiField {
     this.hints = this.cars.map(() => ({ index: -1 }));
     this.launchCaps = this.cars.map(() => 0.6);
     this.launching = this.cars.map(() => true);
+    this.stalls = this.cars.map((g) => ({
+      s: circuit.grid[g.index]!.s,
+      since: 0,
+      resets: 0,
+      graceUntil: 0,
+    }));
   }
 
   progress(seat: number): { lap: number; raceMs: number } | null {
@@ -104,6 +111,7 @@ export class OnlineAiField {
   takeover(handover: readonly AiHandover[]): void {
     this.world.tick = Math.max(this.world.tick, ...handover.map((h) => h.car?.tick ?? 0));
     this.world.time = this.world.tick * this.world.step;
+    for (const stall of this.stalls) stall.since = this.world.time;
     for (const h of handover) {
       const i = this.cars.findIndex((g) => g.seat === h.seat);
       if (i < 0) continue;
@@ -138,6 +146,12 @@ export class OnlineAiField {
         car.previousPose.yaw -= s.yawRate * this.world.step;
         const q = this.track.project(s.x, s.z, this.hints[i]!, this.point);
         c.placed(q.s, this.world.time);
+        this.stalls[i] = {
+          s: q.s,
+          since: this.world.time - ((s.flags & CAR_FLAG.ghost) !== 0 ? 6 : 0),
+          resets: s.resets,
+          graceUntil: this.world.time + ((s.flags & CAR_FLAG.ghost) !== 0 ? 2 : 0),
+        };
         this.launching[i] = Math.hypot(s.vx, s.vz) < 10;
         if ((s.flags & CAR_FLAG.ghost) !== 0 && h.state === 'racing') {
           this.recovery.restore({
@@ -155,6 +169,60 @@ export class OnlineAiField {
     }
   }
 
+  /** Ghosting cannot free a car pinned to scenery or facing away from the road forever. */
+  private recoverStalls(): void {
+    for (let i = 0; i < this.cars.length; i++) {
+      if (this.cars[i]!.state !== 'racing') continue;
+      const car = this.world.cars[i]!;
+      const q = this.track.project(car.state.x, car.state.z, this.hints[i]!, this.point);
+      const stall = this.stalls[i]!;
+      let advance = q.s - stall.s;
+      if (advance > this.track.length / 2) advance -= this.track.length;
+      if (advance < -this.track.length / 2) advance += this.track.length;
+      if (advance >= 6) {
+        stall.s = q.s;
+        stall.since = this.world.time;
+      }
+      if (this.world.time - stall.since < 8) continue;
+      // Same longitudinal position: no distance or lap is awarded by the placement.
+      const s = q.s;
+      const p = this.track.pointAt(s, 0, createVec3());
+      const t = this.track.tangentAt(s, createVec3());
+      const broken = car.state.brokenObjects.slice();
+      const fresh = createCarState(car.state.params, {
+        x: p.x,
+        z: p.z,
+        yaw: Math.atan2(-t.z, t.x),
+        speed: 8,
+        fuel: car.state.fuelMass,
+        surface: this.world.surface,
+      });
+      restoreCar(car.state, snapshotCar(fresh));
+      car.state.brokenObjects.set(broken);
+      setErsMode(car.state, this.drivers[i]!.ersMode);
+      readCarPose(car.state, car.pose);
+      readCarPose(car.state, car.previousPose);
+      this.counters[i]!.placed(s, this.world.time);
+      this.drivers[i]!.reset();
+      this.hints[i]!.index = -1;
+      this.launching[i] = true;
+      this.launchCaps[i] = 0.6;
+      stall.s = s;
+      stall.since = this.world.time;
+      stall.resets = (stall.resets + 1) % 4;
+      stall.graceUntil = this.world.time + 2;
+      this.recovery.restore({
+        seat: this.cars[i]!.seat,
+        x: p.x,
+        z: p.z,
+        yaw: car.state.yaw,
+        vx: 0,
+        vz: 0,
+        yawRate: 0,
+      });
+    }
+  }
+
   private halfWidth(s: number, yaw: number): number {
     const tangent = this.track.tangentAt(s, this.tangent);
     const heading = yaw - Math.atan2(-tangent.z, tangent.x);
@@ -169,9 +237,11 @@ export class OnlineAiField {
     this.crossings.length = 0;
     if (released) {
       this.elapsed += this.world.step;
+      this.recoverStalls();
       const bodies = this.bodies();
       this.blocked = this.recovery.update(bodies, this.world.step, [...bodies, ...humans]);
     }
+    if (!released) for (const stall of this.stalls) stall.since = this.world.time;
     const field = this.field;
     field.count = 0;
     for (let i = 0; i < this.cars.length; i++) {
@@ -221,7 +291,10 @@ export class OnlineAiField {
       readCarTelemetry(car.state, this.telemetry);
       driver.drive(this.telemetry, this.world.step, car.input);
       const racing = this.cars[i]!.state === 'racing';
-      car.ghost = !racing || this.blocked.has(this.cars[i]!.seat);
+      car.ghost =
+        !racing ||
+        this.blocked.has(this.cars[i]!.seat) ||
+        this.world.time < this.stalls[i]!.graceUntil;
       if (!released || !racing) {
         car.input.throttle = 0;
         car.input.brake = 1;
@@ -274,7 +347,10 @@ export class OnlineAiField {
         vx: s.vx * c - s.vy * sin,
         vz: -s.vx * sin - s.vy * c,
         yawRate: s.yawRate,
-        ghost: g.state !== 'racing' || this.blocked.has(g.seat),
+        ghost:
+          g.state !== 'racing' ||
+          this.blocked.has(g.seat) ||
+          this.world.time < this.stalls[i]!.graceUntil,
       };
     });
   }
@@ -300,10 +376,15 @@ export class OnlineAiField {
         drs: t.drs > 0.5,
         lap: this.counters[i]!.laps,
         s: this.counters[i]!.lineS(q.s),
-        resets: 0,
+        resets: this.stalls[i]!.resets,
         brokenCursor: Math.floor(this.world.tick / 8) % 64,
       });
-      if (g.state !== 'racing' || this.blocked.has(g.seat)) snapshot.flags |= CAR_FLAG.ghost;
+      if (
+        g.state !== 'racing' ||
+        this.blocked.has(g.seat) ||
+        this.world.time < this.stalls[i]!.graceUntil
+      )
+        snapshot.flags |= CAR_FLAG.ghost;
       return snapshot;
     });
   }

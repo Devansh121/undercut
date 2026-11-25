@@ -116,3 +116,68 @@ describe('host AI field', () => {
     expect(Math.hypot(after[1]!.vx, after[1]!.vz)).toBeGreaterThan(20);
   });
 });
+
+describe('bounded stalled-car recovery', () => {
+  it('recovers the reviewed seat 15 trap without changing counted progress, and migrates its reset state', () => {
+    const recoveryGrid = Array.from({ length: 16 }, (_, seat) => ({
+      seat,
+      kind: seat === 15 ? ('ai' as const) : ('human' as const),
+      member: seat === 15 ? null : `m${seat}`,
+      aiIndex: seat === 15 ? 13 : null,
+      state: 'racing' as const,
+    }));
+    const build = () => new OnlineAiField(track, { line, envelope }, recoveryGrid, 'low');
+    const field = build();
+    const start = field.snapshots(0)[0]!;
+    const p = track.pointAt(677.17, -2.26, { x: 0, y: 0, z: 0 });
+    field.takeover([
+      {
+        seat: 15,
+        aiIndex: 13,
+        lap: 1,
+        raceMs: 90000,
+        state: 'racing',
+        behindLine: false,
+        car: { ...start, x: p.x, z: p.z, vx: 0, vz: 0, resets: 2, lap: 1 },
+      },
+    ]);
+    let reset = false;
+    for (let tick = 0; tick < 240 * 12; tick++) {
+      // Reproduce a car held in place even after the ordinary ghost grace.
+      const st = field.world.cars[0]!.state;
+      st.x = p.x;
+      st.z = p.z;
+      st.vx = 0;
+      st.vy = 0;
+      st.yawRate = 0;
+      field.step(true, []);
+      if (field.snapshots(0)[0]!.resets !== 2) {
+        reset = true;
+        break;
+      }
+    }
+    expect(reset).toBe(true);
+    const recovered = field.snapshots(10000)[0]!;
+    expect(recovered.lap).toBe(1);
+    expect(recovered.resets).toBe(3);
+    expect(field.progress(15)?.raceMs).toBe(90000);
+    const before = { x: recovered.x, z: recovered.z };
+    for (let i = 0; i < 240 * 4; i++) field.step(true, []);
+    const moving = field.snapshots(14000)[0]!;
+    expect(Math.hypot(moving.x - before.x, moving.z - before.z)).toBeGreaterThan(10);
+    const next = build();
+    next.takeover([
+      {
+        seat: 15,
+        aiIndex: 13,
+        lap: 1,
+        raceMs: 90000,
+        state: 'racing',
+        behindLine: false,
+        car: moving,
+      },
+    ]);
+    expect(next.snapshots(14000)[0]).toMatchObject({ lap: 1, resets: 3 });
+    expect(next.progress(15)?.raceMs).toBe(90000);
+  });
+});
