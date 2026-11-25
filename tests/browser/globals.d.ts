@@ -11,6 +11,7 @@ declare global {
         releasedSimEpoch: number | null;
         releasedServerAt: number | null;
         elapsedRaceMs: number;
+        lapTimeSec: number;
         start: { lightsOutAt: number } | null;
         lightsOutLocalEpoch: number | null;
         clockErrorMs: number | null;
