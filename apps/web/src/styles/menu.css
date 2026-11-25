@@ -1559,14 +1559,6 @@
   border-radius: 1px;
   background: var(--row-team, var(--c-brand));
 }
-.classification td.is-fastest {
-  color: var(--c-time-overall);
-  font-weight: 700;
-}
-.classification td.is-penalty {
-  color: var(--c-time-invalid);
-  font-weight: 700;
-}
 .classification .num {
   text-align: right;
   font-family: var(--font-num);
@@ -1578,6 +1570,16 @@
 }
 .classification tr.is-player td:first-child {
   box-shadow: inset 3px 0 0 var(--c-brand);
+}
+.classification td.is-fastest,
+.classification tr.is-player td.is-fastest {
+  color: var(--c-time-overall);
+  font-weight: 700;
+}
+.classification td.is-penalty,
+.classification tr.is-player td.is-penalty {
+  color: var(--c-time-invalid);
+  font-weight: 700;
 }
 .weekend-table {
   margin: 16px 0;

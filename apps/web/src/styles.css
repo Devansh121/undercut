@@ -1914,11 +1914,27 @@ body {
   color: var(--c-text-3);
 }
 
-.hud-tower__cols .hud-tower__col--r {
+.hud-tower__col-pos {
+  grid-column: 1;
+  text-align: right;
+}
+
+.hud-tower__col-drv {
+  grid-column: 3;
+}
+
+.hud-tower__col-tyre {
+  grid-column: 5;
+  text-align: right;
+}
+
+.hud-tower__col-pit {
+  grid-column: 6;
   text-align: right;
 }
 
 .hud-tower__mode {
+  grid-column: 4;
   pointer-events: auto;
   justify-self: end;
   border: 0;
@@ -2021,8 +2037,13 @@ body {
   font-weight: 700;
 }
 
-.hud-tower__row.is-in-pit {
-  background: rgba(246, 201, 14, 0.08);
+.hud-tower__row.is-in-pit:not(.is-player) {
+  background: rgba(246, 201, 14, 0.1);
+}
+
+.hud-tower__row.is-player.is-in-pit {
+  background: var(--c-flag-yellow);
+  color: var(--c-text-inverse);
 }
 
 .hud-tower__row.is-retired {
@@ -2041,7 +2062,8 @@ body {
 
 .hud-tower__row.is-player .hud-tower__age,
 .hud-tower__row.is-player .hud-tower__pits,
-.hud-tower__row.is-player .hud-tower__time {
+.hud-tower__row.is-player .hud-tower__time,
+.hud-tower__row.is-player.is-in-pit .hud-tower__time[data-tone='pit'] {
   color: var(--c-text-inverse);
 }
 
@@ -2056,7 +2078,7 @@ body {
 
 /* Start-lights gantry overlay (5 dual-lamp red pods + caption + jump-start warning). */
 .hud-lights {
-  display: none;
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
@@ -2066,8 +2088,8 @@ body {
   box-shadow: var(--e-2), var(--edge-top);
 }
 
-.hud-lights.is-on {
-  display: flex;
+.hud-lights[hidden] {
+  display: none;
 }
 
 .hud-lights__gantry {
@@ -2117,11 +2139,18 @@ body {
   color: var(--c-text-2);
 }
 
-.hud-lights[data-phase='out'] .hud-lights__caption {
+.hud-lights__caption[hidden] {
+  display: none;
+}
+
+.hud-lights[data-state='out'] .hud-lights__caption {
   color: var(--c-flag-green);
 }
 
 .hud-lights__jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 10px;
   border-radius: var(--r-1);
   background: var(--c-flag-red);
@@ -2217,6 +2246,15 @@ body {
   display: none;
 }
 
+.hud-msg--queue {
+  display: flex;
+  max-width: 100%;
+}
+
+.hud-msg--queue[hidden] {
+  display: none;
+}
+
 .hud-msg[data-tone='warning'] .hud-msg__tag {
   background: var(--c-flag-yellow);
   color: var(--c-text-inverse);
@@ -2309,9 +2347,13 @@ body {
   display: none;
 }
 
-/* After the player's flag the standings take the screen: the driving cluster and the
-   first-lap coach go. */
+/* After the player's flag the standings take the screen: the driving cluster, live banners/queue,
+   and the first-lap coach go so Skip to results stays inside a landscape phone viewport. */
 .hud[data-finished] .hud-cluster,
+.hud[data-finished] .hud-lights,
+.hud[data-finished] .hud-flag--race,
+.hud[data-finished] .hud-prompt--safety,
+.hud[data-finished] .hud-messages,
 .hud[data-finished] ~ .onboarding {
   display: none;
 }
@@ -2389,12 +2431,44 @@ html[data-race-finished] .ut-touch__btn--overtake {
   .hud-tower[data-race-tower='on'] .hud-tower__pits {
     display: none;
   }
+  .hud-lights {
+    gap: 4px;
+    padding: 6px 10px;
+  }
+  .hud-lights__gantry {
+    gap: 5px;
+    padding: 4px 6px;
+  }
+  .hud-lights__pod {
+    gap: 3px;
+    padding: 3px 4px;
+  }
+  .hud-lights__lamp {
+    width: 11px;
+    height: 11px;
+  }
+  .hud-messages .hud-msg--queue {
+    height: auto;
+    min-height: 24px;
+    padding: 3px var(--sp-2) 3px 0;
+    gap: var(--sp-2);
+    white-space: normal;
+  }
+  .hud-messages .hud-msg--queue .hud-msg__tag {
+    padding: 2px var(--sp-2);
+    font-size: var(--fs-10);
+    white-space: nowrap;
+  }
+  .hud-messages .hud-msg--queue .hud-msg__body {
+    font-size: var(--fs-11);
+    line-height: 1.25;
+  }
   .hud[data-race-result] .hud-control {
     top: calc(var(--safe-t) + 168px);
     max-width: calc(100vw - var(--safe-l) - var(--safe-r) - 8px);
   }
   .hud[data-race-result] .race-status[data-table] {
-    max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 236px);
+    max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 292px);
   }
 }
 html[data-screen='drive']:not([data-paused]) {
@@ -2532,6 +2606,11 @@ html:has(.update-bar) .pause {
     display: none;
   }
 }
+@media (max-height: 500px) and (min-height: 360px) and (orientation: landscape) {
+  html[data-touch]:has(.hud[data-mode='race']) .onboarding {
+    top: calc(100dvh - var(--safe-b) - 188px);
+  }
+}
 @media (orientation: portrait) and (max-width: 600px) {
   .pause__card {
     min-width: 0;
@@ -2588,15 +2667,15 @@ html:has(.update-bar) .pause {
     width: 158px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__head {
-    height: 22px;
+    height: 20px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__status {
-    height: 18px;
+    height: 16px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__row {
     grid-template-columns: 15px 3px minmax(0, 1fr) auto 16px;
     gap: 4px;
-    height: 21px;
+    height: 19px;
     padding: 0 6px 0 4px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__pos,
@@ -2633,6 +2712,22 @@ html:has(.update-bar) .pause {
   .hud-lights__jump {
     font-size: var(--fs-10);
     padding: 2px 6px;
+  }
+  .hud-messages .hud-msg--queue {
+    height: auto;
+    min-height: 24px;
+    padding: 3px var(--sp-2) 3px 0;
+    gap: var(--sp-2);
+    white-space: normal;
+  }
+  .hud-messages .hud-msg--queue .hud-msg__tag {
+    padding: 2px var(--sp-2);
+    font-size: var(--fs-10);
+    white-space: nowrap;
+  }
+  .hud-messages .hud-msg--queue .hud-msg__body {
+    font-size: var(--fs-11);
+    line-height: 1.25;
   }
   .hud-messages .hud-msg--queue:nth-child(n + 3) {
     display: none;
