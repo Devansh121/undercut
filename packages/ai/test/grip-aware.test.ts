@@ -55,6 +55,32 @@ function target(s: number, v: number, grip: number): number {
   return dr.last.targetSpeed;
 }
 
+for (const phase of [Phase.Brake, Phase.Throttle]) {
+  it(`applies passing speed headroom only outside braking (phase ${phase})`, () => {
+    const plain = driver();
+    const passing = driver();
+    const plan = plain.plan;
+    const i = plan.profile.phase.findIndex(
+      (value, k) => value === phase && plan.profile.v[k]! > 40,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const tel = at(i * track.lap.step, plan.profile.v[i]!, 1);
+    tel.x = plan.line.x[i]!;
+    tel.z = plan.line.z[i]!;
+    tel.yaw = plan.line.heading[i]!;
+    passing.speedAllowance = 4;
+    const normal = { ...NEUTRAL_INPUT };
+    const attack = { ...NEUTRAL_INPUT };
+    plain.drive(tel, 1 / 240, normal);
+    passing.drive(tel, 1 / 240, attack);
+    expect(passing.last.targetSpeed - plain.last.targetSpeed).toBeCloseTo(
+      phase === Phase.Brake ? 0 : 4,
+      8,
+    );
+    if (phase === Phase.Brake) expect(attack.brake).toBeCloseTo(normal.brake, 8);
+  });
+}
+
 it('drives the plan itself on the reference tyre', () => {
   const dr = driver();
   const out: ControlInput = { ...NEUTRAL_INPUT };

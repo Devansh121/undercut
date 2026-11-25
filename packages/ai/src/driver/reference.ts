@@ -393,7 +393,8 @@ export class ReferenceDriver implements Driver {
     // driver's own margins cover (`MASS_BAND`: short races, up to about 24 kg of fuel, drive the
     // plan as before). Without it, cars at full-distance fuel ran wide at the Parabolica every lap.
     const speeds = this.speedProfileFor(tel);
-    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + this.speedAllowance;
+    const allow = speeds.phase[i] !== Phase.Brake ? this.speedAllowance : 0;
+    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + allow;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
     // Already under the speed the profile wants a moment ahead: no reason to brake early for
