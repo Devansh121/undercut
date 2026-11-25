@@ -82,6 +82,7 @@ A valid message in a phase that does not take it gets `wrong_phase` (no strike).
 | `limits` | each track-limits report | seat, lap, warnings so far |
 | `pit` | relayed pit events | seat, event, lap, time |
 | `host` | host change, or more AI for the host | new host, and every AI car with its laps, race time, state and last snapshot |
+| `order` | while racing, at most 5 Hz | shared future activation time, seat order and continuous progress at one common evaluation time |
 | `results` | race end | the final classification, identical for everyone |
 | `error` | a refused message | stable `code` and a human-readable `detail` |
 
@@ -519,16 +520,16 @@ The driver's internal reaction and traffic memory restarts; this is a physical w
 the last received pose, not a bit-identical continuation of an unreceived physics state.
 
 Online timing uses the server race clock for both the current lap and official crossing claims,
-so a clamped render stall does not make the HUD clock under-report the lap. The timing tower uses member names and AI identities, orders cars by
-continuous progress projected from their drawn poses, and shows distance-based estimated gaps.
-Those estimates are presentation; final classification comes from the room.
+so a clamped render stall does not make the HUD clock under-report the lap. The timing tower uses
+member names and AI identities, and reads the room's shared running order and progress for
+positions and distance-based estimated gaps. Those estimates are presentation; final classification
+comes from the room.
 
 Browser proof: `tests/browser/online-v2.spec.ts` checks a full moving grid and AI takeover at
 every circuit, and symmetric contact at 50, 100 and 150 ms with jitter and 2% snapshot loss.
 `ONLINE_SOAK=1 npx playwright test tests/browser/online-soak.spec.ts --project=online --workers=1`
 runs five real-time laps with two scripted humans and eighteen host AI at each circuit, recording
 stuck cars, rejected timing, and the identical twenty-car classification in both contexts.
-
 
 A stopped AI that makes less than 6 m of useful progress over 6 s temporarily becomes a ghost,
 so another stopped car cannot pin it or hold the field indefinitely. It is shown faded and does
@@ -540,3 +541,36 @@ official grid state. This extends the offline race's stopped-queue recovery to t
 
 The `online` Playwright project runs the short tests with one worker in its own CI job, using the
 build job's client artifact. The viewport suite stays separate. The long soaks remain opt-in.
+
+### Review follow-up: bounded recovery and shared running order
+
+If an AI gains less than 6 m along the lap over 8 s, ghosting has not restored useful progress.
+The host places it at the same centreline s, aligned with the road, at 8 m/s, and resets its driver.
+No lap or longitudinal distance is awarded by the move. Its line counter and last counted race
+time are retained; its reset counter advances on the wire and survives host migration. Two
+seconds of contact grace protect the recovering car. The seat-15 regression pins a previously
+counted car at Monza s 677.17 m, d -2.26 m even after ghosting, then checks recovery and migration
+without changing its lap or counted time.
+
+The room evaluates every seat at server now minus 200 ms from at most sixteen recent progress
+samples per seat. It interpolates normally and caps extrapolation at 300 ms. It publishes at
+most five orders per second, with a shared activation time 300 ms ahead. Finishers use official
+counted laps and race time; running cars use common-time progress, retaining their previous
+order within a 2 m deadband. The client keeps at most thirty-two orders and applies the latest
+due one to every row, including itself. Positions and gaps therefore use one authority rather
+than comparing a current local pose with delayed remote poses. No extra physics runs in the
+Worker, and order computation does not write room storage.
+
+The order regression compares both HUD order lookups at identical server epochs under 150 ms
+latency and 2% loss, then verifies a live overtake on both clients. Epochs are explicit because two
+browser processes can answer simultaneous requests at different times under software rendering.
+Contact proof samples both oriented footprints on the same server timestamps throughout the
+touch, checks side ordering and the unchanged penetration and height limits, and requires zero
+final penetration. Trace payloads are fetched explicitly with the debug API; ordinary status
+queries do not serialize the footprint history.
+
+A remote contact proxy also carries its snapshot age. For converging aged poses the solver
+reserves `age * relativeSpeed` of closing distance, capped at 0.3 m (an estimated prediction
+allowance). Fresh and equally moving poses have no allowance. This starts a bounded planar
+response before hidden closing motion creates a deep overlap. Existing impulse, push-out,
+extrapolation and barrier limits are unchanged.

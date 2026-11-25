@@ -12,6 +12,9 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 - Online slice 2 (PR #81): circuit choice (Monza, Spa, Singapore), live lap timing and named timing tower, bounded symmetric remote contact under latency and loss, and host AI fill up to 20 cars with pose/progress handover on host migration. Two-browser short acceptance passed at all three circuits (`online` CI job); contact passed at 50/100/150 ms with 20 ms jitter and 2% snapshot loss; five-lap 2-human + 18-AI browser soaks passed at Monza (11.3 min), Spa (16.0 min), and Singapore (8.7 min) under 100 ms latency / 20 ms jitter / 2% loss with zero stuck cars, zero rejected laps, and identical 20-car classification on both clients.
 
+- Online review follow-up (PR #81): bounded AI recovery retains counted laps and reset state;
+  the service publishes running order at shared epochs; contact tests compare synchronized
+  oriented footprints. The new three-circuit five-lap browser soaks are being verified.
 
 - M4 Race Weekend and Championship (PR #60): practice, single-session qualifying and a race on every circuit; qualifying sets the grid and every weekend race requires two compounds. Championship runs Monza, Spa-Francorchamps and Singapore Marina Bay in order, with driver and team points, count-back and locally saved progress at session boundaries. The menu offers five laps, fifteen laps or the circuit's full distance.
 - Player pit stops in Quick Race and weekends: I / D-pad up / BOX calls or cancels the crew; O / D-pad down / TYRE cycles the next compound. Drive into the lane; the assist takes the car to its box, shows the service countdown and waits for a safe release. The automatic limiter defaults on and is saved in session settings; turn it off to use L / left-stick click / LIM. An uncalled visit is a drive-through. The HUD and classification show stops and compounds.
@@ -392,3 +395,13 @@ Raw reports and both intentional mutation failures are retained in [the evidence
 - AI physics stays in the host browser; the Worker remains the timing referee and snapshot relay. AI-to-human contact applies the same bounded symmetric response as human-to-human contact, including for the host's own human car. AI-to-AI contact uses the existing sim solver.
 - Online cars retain reference tyres and 20 kg fuel, topped up at line crossings, matching the human online session. The AI driver's private reaction/traffic memory restarts on migration; its latest physical pose, velocities, gears, snapshot tick and service-counted progress carry over. This avoids introducing full sim-state payloads or Worker-side physics in this slice.
 - Long two-browser races are opt-in with ONLINE_SOAK=1 to preserve the ordinary PR browser job's budget. Short circuit, fill, takeover and network-contact proofs run in a separate one-worker CI job, sharing the built client artifact.
+
+### Decided for you — online review follow-up
+
+- A stalled AI is placed at its current longitudinal position, on the centreline, at 8 m/s after
+  8 s without 6 m of forward progress. The move earns no lap, retains counted race time and uses
+  the existing reset counter and two-second ghost grace, including after migration.
+- Running positions use a service-published order with 200 ms evaluation lag and 300 ms shared
+  activation lead, at most 5 Hz. This adds presentation delay while leaving driving immediate.
+- A prediction allowance capped at 0.3 m accounts for closing motion hidden by aged snapshots;
+  fresh or equally moving poses have none. Existing physical safety limits are retained.

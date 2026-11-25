@@ -21,4 +21,6 @@ The details are in [docs/netcode.md](../netcode.md). Where the build differs fro
 - **Unjoined sockets are bounded per room and per client address** before the upgrade is accepted, and the per-address limits trust only `CF-Connecting-IP` as the edge (or a local proxy) sets it.
 - **Time runs in real time.** A Durable Object reads the wall clock, so the soak cannot run accelerated; it runs a short race in CI and a longer one nightly. Tests shorten the room timings through the service's `ROOM_TIMINGS` variable instead.
 - **Online car-to-car contact is symmetric and latency-compensated.** Each client resolves 240 Hz planar contact between its owned car(s) and remote peers extrapolated to `serverNow` (circular-arc extrapolation up to 250 ms), applying its own equal-mass share with bounded per-step separation and mandatory post-contact `resolveWallContact` clamping so no car can be launched or pushed through a barrier. AI-vs-AI pairs use full two-way `resolveCarContacts`; human-vs-AI contact uses the symmetric proxy solver on both sides, even for the host human.
-
+- **Live running order comes from the room at a common epoch.** The service evaluates all seats
+  on one delayed timeline and publishes a shared future activation time. Clients use that order
+  for their own car as well as opponents; rendered poses remain independent for smooth driving.
