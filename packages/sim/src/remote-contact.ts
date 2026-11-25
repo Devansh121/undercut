@@ -216,6 +216,16 @@ export function resolveRemoteCarContacts(
         const pbx = r.vx + r.yawRate * (hitScratch.pz - r.z);
         const pbz = r.vz - r.yawRate * (hitScratch.px - r.x);
         if ((pbx - pax) * hitScratch.nx + (pbz - paz) * hitScratch.nz >= 0) continue;
+      } else if ((r.ageSec ?? 0) > 0) {
+        // Already touching a stale proxy: it still hides age * closing speed of approach along
+        // this normal. Reserve that depth only while the contact point is closing, so
+        // parallel or separating contact is resolved on its measured overlap alone.
+        const pax = local.vx * lc - local.vy * ls + local.yawRate * (hitScratch.pz - local.z);
+        const paz = -local.vx * ls - local.vy * lc - local.yawRate * (hitScratch.px - local.x);
+        const pbx = r.vx + r.yawRate * (hitScratch.pz - r.z);
+        const pbz = r.vz - r.yawRate * (hitScratch.px - r.x);
+        const closing = (pax - pbx) * hitScratch.nx + (paz - pbz) * hitScratch.nz;
+        if (closing > 0) hitScratch.depth += Math.min(0.3, r.ageSec! * closing);
       }
       if (i < 31) hitMask |= 1 << i;
       passHit = true;

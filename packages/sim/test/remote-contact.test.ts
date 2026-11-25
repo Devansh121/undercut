@@ -300,6 +300,58 @@ describe('aged remote poses', () => {
     expect(car.state.y).toBe(y);
   });
 
+  it.each([-0.04, -0.01, 0.01, 0.04])(
+    'anticipates converging stale poses at a small relative yaw of %s rad',
+    (yaw) => {
+      const world = createWorld({ step: STEP, seed: 1 });
+      const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+      // Alongside with a small gap and a steering difference, closing laterally at 1 m/s.
+      const remote: RemoteContactBody = {
+        seat: 1,
+        x: 0,
+        z: 2 * BODY_HALF_WIDTH + 0.1,
+        yaw,
+        vx: 20 * Math.cos(yaw),
+        vz: -20 * Math.sin(yaw) - 1,
+        yawRate: 0,
+        ageSec: 0.2,
+      };
+      const y = car.state.y;
+      expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(1);
+      expect(car.state.carContactImpulse).toBeGreaterThan(0);
+      expect(car.state.y).toBe(y);
+    },
+  );
+
+  it('reserves the hidden approach of a stale overlapping pose only while closing', () => {
+    const run = (ageSec: number, vz: number) => {
+      const world = createWorld({ step: STEP, seed: 1 });
+      const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+      // Overlapping by 0.04 m: just past the contact slop.
+      const remote: RemoteContactBody = {
+        seat: 1,
+        x: 0,
+        z: 2 * BODY_HALF_WIDTH - 0.04,
+        yaw: 0,
+        vx: 20,
+        vz,
+        yawRate: 0,
+        ageSec,
+      };
+      const y = car.state.y;
+      expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(1);
+      expect(car.state.y).toBe(y);
+      return -car.state.z;
+    };
+    // Closing at 1 m/s: a 0.2 s old pose hides 0.2 m of approach along the normal.
+    const fresh = run(0, -1);
+    const stale = run(0.2, -1);
+    expect(stale).toBeGreaterThan(fresh);
+    expect(stale).toBeLessThanOrEqual(MAX_REMOTE_PUSH_PER_STEP);
+    // Separating or parallel: age adds nothing to the overlap.
+    for (const vz of [0, 1]) expect(run(0.2, vz)).toBe(run(0, vz));
+  });
+
   it('caps the prediction allowance even for extremely old converging poses', () => {
     const world = createWorld({ step: STEP, seed: 1 });
     const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });

@@ -416,13 +416,15 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   snapshot age times closing speed along the separating face normal. The proxy is already
   extrapolated; this reserves approaching distance only. Tangential or separating motion cannot
   trigger contact across a gap. Ambiguous corner normals fall back to actual-overlap contact.
+  While already overlapping a stale proxy, the same capped age × normal closing speed is added
+  to the measured depth only while the contact point is closing. Without it, the 150 ms contact
+  proof passed 8 of 10 runs (penetration up to 0.41 m); with it, 10 of 10 (at most 0.07 m).
 - Browser order comparisons freeze one active epoch and wait up to 6 s for both clients to
   receive it and reach activation before querying that same timestamp. Startup also waits for
   active epochs and live peer snapshots. A deterministic 900 ms guest control-message delay
   covers delivery after the scheduled activation and the former fixed look-back.
 
-- The order proof uses the supported 844×390 landscape viewport to bound two software renderers'
-  raster work. At 1440×900 on the shared machine, a 20-run series passed 14 races before the
-  alongside setup failed: both render loops stalled, snapshots became held/faded, and neither
-  peer remained fully visible. Every geometry, visibility, order, position and timeout assertion
-  is retained. Contact and soak viewports remain 1440×900.
+- The order proof runs twice, at 1440×900 desktop and at 844×390 landscape phone, with identical
+  assertions. An earlier commit on this branch moved it to the phone viewport alone after a
+  desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
+  phone is added rather than substituted.
