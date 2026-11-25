@@ -220,12 +220,17 @@ export function tileMean(
  * The near trees replace the cards within the swap distance, so their leaves must average to the
  * same colour as the card crowns or a band of lighter trees travels with the camera. Scale each
  * cluster tile (in linear light) so its mean over opaque texels equals the mean of the species
- * card tiles, keeping the clusters' small differences between each other.
+ * card tiles, keeping the clusters' small differences between each other. Return each species'
+ * linear colour relative to that mean, for the near instances to restore their own species.
  */
-function matchClustersToCards(data: Uint8Array, width: number, tile: number): void {
+export function matchClustersToCards(
+  data: Uint8Array,
+  width: number,
+  tile: number,
+): [number, number, number][] {
   const target = [0, 0, 0];
-  SPECIES.forEach((_, t) => {
-    const m = tileMean(data, width, tile, t);
+  const means = SPECIES.map((_, t) => tileMean(data, width, tile, t));
+  means.forEach((m) => {
     for (let c = 0; c < 3; c++)
       target[c] = (target[c] as number) + (m[c] as number) / SPECIES.length;
   });
@@ -245,6 +250,11 @@ function matchClustersToCards(data: Uint8Array, width: number, tile: number): vo
       }
     }
   });
+  // Shared cluster tiles use the all-species mean. The near shader restores each instance's
+  // species colour, using the same species choice as its full-crown impostor.
+  return means.map(
+    (m) => m.map((v, c) => (target[c]! > 1e-9 ? v / target[c]! : 1)) as [number, number, number],
+  );
 }
 
 /** Bark: vertical fissures in grey-brown, tiling top to bottom. */
@@ -464,7 +474,7 @@ export function treeAtlases(
   anisotropy: number,
   species: Readonly<Record<string, Partial<Species>>> = {},
   relief = false,
-): { colour: DataTexture; relief: DataTexture | null } {
+): { colour: DataTexture; relief: DataTexture | null; clusterTints: [number, number, number][] } {
   const canvas = document.createElement('canvas');
   canvas.width = tile * ATLAS_COLS;
   canvas.height = tile * ATLAS_ROWS;
@@ -494,7 +504,7 @@ export function treeAtlases(
   paintBark(ctx, (BARK_TILE % ATLAS_COLS) * tile, Math.floor(BARK_TILE / ATLAS_COLS) * tile, tile);
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = new Uint8Array(img.data.buffer.slice(0));
-  matchClustersToCards(data, canvas.width, tile);
+  const clusterTints = matchClustersToCards(data, canvas.width, tile);
   let reliefTexture: DataTexture | null = null;
   if (relief) {
     const rt = Math.max(64, tile / 2);
@@ -520,6 +530,7 @@ export function treeAtlases(
   }
   bleed(data, canvas.width, canvas.height);
   return {
+    clusterTints,
     colour: atlasTexture(data, canvas.width, canvas.height, anisotropy, true),
     relief: reliefTexture,
   };
