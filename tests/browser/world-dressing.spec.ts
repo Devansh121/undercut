@@ -98,17 +98,20 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   for (const [kind, flag] of Object.entries({
     sky: 'skyline',
     'world:buildings': 'skyline',
-    'world:pit-building': 'skyline',
-    'world:stands': 'skyline',
-    'world:bridges': 'skyline',
+    'prop:pit-garage': 'skyline',
+    'prop:stand-kit-grandstand': 'skyline',
+    'prop:stand-kit-grandstand-roof': 'skyline',
+    'prop:bridge-kit': 'skyline',
     'world:ground': 'scenery',
     track: 'scenery',
     'prop:tree-wood': 'scenery',
+    'prop:tree-wood-skyline': 'scenery',
     'prop:tree-row': 'scenery',
     'prop:tree-park': 'scenery',
     // Not reflected: small props and the crowd.
     'prop:hoarding-front': 'none',
-    'prop:crowd': 'none',
+    'prop:crowd-far': 'none',
+    'prop:crowd-near': 'none',
   }))
     expect(reflect[kind], kind).toEqual([flag]);
 
