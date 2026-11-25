@@ -1,0 +1,11 @@
+/*
+ * Main game stylesheet order. Imported as a single CSS entry so the bundler keeps tokens, kit,
+ * menu, settings, HUD and online rules in exact cascade order instead of splitting stylesheets
+ * shared with ui-gallery into a later chunk.
+ */
+@import '../../../../design/mock/tokens.css';
+@import './kit.css';
+@import './menu.css';
+@import './settings.css';
+@import '../styles.css';
+@import '../online/race-hud.css';

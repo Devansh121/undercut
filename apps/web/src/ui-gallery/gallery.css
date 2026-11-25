@@ -1,4 +1,7 @@
 /* Living gallery for the design tokens and interface kit (ui-gallery.html). */
+@import '../../../../design/mock/tokens.css';
+@import '../styles/kit.css';
+@import '../styles.css';
 
 .gallery-page {
   overflow: auto;

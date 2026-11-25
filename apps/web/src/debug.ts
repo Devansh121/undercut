@@ -170,6 +170,7 @@ export function installDebugApi(
       timeOfDay: d.timeOfDay,
       phase: s.phase,
       racePhase: s.race.control.phase,
+      startLightsMask: d.startLightsMask,
       cars: s.race.world.cars.length,
       raceResult: s.result,
       sessionKind: s.race.control.strategy.kind,

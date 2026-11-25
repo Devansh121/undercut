@@ -1,5 +1,6 @@
 import type { ResultEntry, SessionKind, SessionResult } from '@undercut/race';
 import { formatLapTime, formatRaceStatus } from '../game/format';
+import { TEAMS, type Team } from './data/teams';
 import { el } from './dom';
 
 /** A session's name as the menus and the HUD print it. */
@@ -26,6 +27,12 @@ export function compoundsText(compounds: readonly string[]): string {
   return compounds.map((c) => c.charAt(0).toUpperCase()).join(' / ');
 }
 
+/** Order `TEAMS` with the player's chosen team at index 0, matching entrant `team` indices. */
+export function orderedTeams(playerTeamId?: string): readonly Team[] {
+  if (!playerTeamId) return TEAMS;
+  return [...TEAMS].sort((a, b) => (a.id === playerTeamId ? -1 : b.id === playerTeamId ? 1 : 0));
+}
+
 /** Race: the winner's time, then the gap or the reason a car has none. */
 function raceTime(e: ResultEntry): string {
   if (e.status !== 'finished') return formatRaceStatus(e.status);
@@ -40,38 +47,68 @@ function timedGap(e: ResultEntry): string {
   return `+${e.gap.time.toFixed(3)} s`;
 }
 
+/** Penalties column: unserved time added to finish, or served penalty total if any. */
+function penaltyText(e: ResultEntry): string {
+  if (e.penaltyTime > 0) return `+${e.penaltyTime.toFixed(0)} s`;
+  const served = e.penalties.reduce((sum, p) => sum + (p.served ? p.seconds : 0), 0);
+  if (served > 0) return `${served.toFixed(0)} s served`;
+  return '';
+}
+
 export interface ClassificationColumn {
   head: string;
   /** Numbers align right in tabular figures. */
   num?: boolean;
+  /** Optional responsive column class (e.g. `col-team`, `col-tyres`, `col-best`). */
+  colClass?: string;
   cell(e: ResultEntry): string;
+}
+
+export interface ClassificationOptions {
+  points?: boolean;
+  rowClass?: string;
+  /** Team order (index 0 = player's team) used for team names and colour bars. */
+  teams?: readonly Team[];
 }
 
 /** The columns a session's classification shows. */
 export function classificationColumns(
   kind: SessionKind,
-  o: { points?: boolean } = {},
+  o: { points?: boolean; teams?: readonly Team[] } = {},
 ): ClassificationColumn[] {
+  const teams = o.teams ?? TEAMS;
   const pos: ClassificationColumn = { head: 'Pos', num: true, cell: (e) => String(e.position) };
   const driver: ClassificationColumn = { head: 'Driver', cell: (e) => e.name };
   if (kind !== 'race')
     return [
       pos,
       driver,
-      { head: 'Best lap', num: true, cell: (e) => formatLapTime(e.bestLap) },
+      { head: 'Best lap', num: true, colClass: 'col-best', cell: (e) => formatLapTime(e.bestLap) },
       { head: 'Gap', num: true, cell: timedGap },
       { head: 'Laps', num: true, cell: (e) => String(e.laps) },
     ];
   return [
     pos,
     driver,
+    {
+      head: 'Team',
+      colClass: 'col-team',
+      cell: (e) => teams[e.team]?.name ?? '',
+    },
     { head: 'Time', num: true, cell: raceTime },
+    {
+      head: 'Best lap',
+      num: true,
+      colClass: 'col-best',
+      cell: (e) => (e.bestLap !== null ? formatLapTime(e.bestLap) : '—'),
+    },
     { head: 'Pits', num: true, cell: (e) => String(e.pitStops) },
-    { head: 'Tyres', cell: (e) => compoundsText(e.compounds) },
+    { head: 'Tyres', colClass: 'col-tyres', cell: (e) => compoundsText(e.compounds) },
     {
       head: 'Pen',
       num: true,
-      cell: (e) => (e.penaltyTime ? `+${e.penaltyTime.toFixed(0)} s` : ''),
+      colClass: 'col-pen',
+      cell: penaltyText,
     },
     ...(o.points
       ? [{ head: 'Pts', num: true, cell: (e: ResultEntry) => (e.points ? String(e.points) : '') }]
@@ -79,25 +116,60 @@ export function classificationColumns(
   ];
 }
 
+/** A team colour bar + name cell shared by classification and championship standings. */
+export function teamBar(colour: string): HTMLElement {
+  const bar = el('i', 'classification__bar');
+  bar.style.setProperty('--row-team', colour);
+  bar.setAttribute('aria-hidden', 'true');
+  return bar;
+}
+
 /**
- * A session's classification as a table: a header row, one row per entrant, the player's own
- * row marked (`is-player`, car 0).
+ * A session's classification as a table: a header row, one row per entrant, team colour bar,
+ * fastest-lap highlight, and the player's own row marked (`is-player`, car 0).
  */
 export function classificationTable(
   result: SessionResult,
-  o: { points?: boolean; rowClass?: string } = {},
+  o: ClassificationOptions = {},
 ): HTMLTableElement {
-  const cols = classificationColumns(result.kind, o);
+  const teams = o.teams ?? TEAMS;
+  const cols = classificationColumns(result.kind, { ...o, teams });
+  const fastestCar = result.fastestLap?.car ?? null;
   const table = el('table', 'classification');
+  table.dataset.kind = result.kind;
   const head = el('tr');
-  for (const c of cols) head.append(el('th', c.num ? 'num' : '', c.head));
+  for (const c of cols) {
+    const cls = `${c.num ? 'num ' : ''}${c.colClass ?? ''}`.trim();
+    head.append(el('th', cls, c.head));
+  }
   const thead = el('thead');
   thead.append(head);
   table.append(thead);
   const body = el('tbody');
   for (const e of result.entries) {
     const row = el('tr', `${o.rowClass ?? ''}${e.car === 0 ? ' is-player' : ''}`.trim());
-    for (const c of cols) row.append(el('td', c.num ? 'num' : '', c.cell(e)));
+    const teamColour = teams[e.team]?.colours.tower ?? '#626c74';
+    for (const c of cols) {
+      const isBest = c.head === 'Best lap' && fastestCar === e.car && e.bestLap !== null;
+      const isPen = c.head === 'Pen' && e.penaltyTime > 0;
+      const cls = [
+        c.num ? 'num' : '',
+        c.colClass ?? '',
+        isBest ? 'is-fastest' : '',
+        isPen ? 'is-penalty' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      if (c.head === 'Driver') {
+        const td = el('td', cls);
+        const wrap = el('span', 'classification__driver');
+        wrap.append(teamBar(teamColour), el('span', '', c.cell(e)));
+        td.append(wrap);
+        row.append(td);
+      } else {
+        row.append(el('td', cls, c.cell(e)));
+      }
+    }
     body.append(row);
   }
   table.append(body);
