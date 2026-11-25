@@ -350,4 +350,50 @@ describe('far and shadow batches', () => {
     farGeo.dispose();
     material.dispose();
   });
+
+  it('reuses shadow prefixes and repacks when a different chunk becomes the prefix', () => {
+    const geometry = new BoxGeometry(1, 2, 1);
+    const material = new MeshBasicMaterial();
+    const make = (batched: boolean) => {
+      const reg = new PropRegistry(2000);
+      reg.define({
+        id: 'shadow-bank',
+        gridCell: 40,
+        castShadow: true,
+        shadowLevel: 0,
+        shadowMaxDistance: 100,
+        ...(batched && { shadowBatchCell: 360 }),
+        lods: [{ geometry, material, maxDistance: 600 }],
+      });
+      for (const x of [0, 60, 65]) reg.place('shadow-bank', { x, y: 0, z: 0, s: x });
+      reg.build();
+      return reg;
+    };
+    const batch = make(true);
+    const shadow = batch.group.children.find(
+      (m) => m.name === 'prop-shadow:shadow-bank',
+    ) as InstancedMesh;
+    batch.update(new Vector3(-20, 2, 0));
+    const version = shadow.instanceMatrix.version;
+    expect(shadow.count).toBe(3);
+    for (const x of [-60, -20, 1500, -20]) {
+      const eye = new Vector3(x, 2, 0);
+      batch.update(eye);
+      const cold = make(false);
+      cold.update(eye);
+      expect(instances(batch, true)).toEqual(instances(cold, true));
+      expect(shadow.instanceMatrix.version).toBe(version);
+      cold.dispose();
+    }
+    batch.update(new Vector3(140, 2, 0));
+    expect(shadow.count).toBe(2);
+    expect(shadow.instanceMatrix.version).toBeGreaterThan(version);
+    const cold = make(false);
+    cold.update(new Vector3(140, 2, 0));
+    expect(instances(batch, true)).toEqual(instances(cold, true));
+    cold.dispose();
+    batch.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
 });
