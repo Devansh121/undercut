@@ -1,5 +1,6 @@
 import { DoubleSide, Group, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
+import carStats from '../../../docs/evidence/m2-car/stats.json';
 import { COCKPIT_NIGHT } from '../src/car/car-model';
 import { CONTACT_FOOTPRINT, contactFootprint } from '../src/car/contact-shadows';
 import { CockpitMirrors, MIRROR_TINT, MIRROR_VIEW } from '../src/car/mirrors';
@@ -72,6 +73,13 @@ describe('cockpit mirrors', () => {
     expect(mirrors.material.uniforms.uLive?.value).toBe(0);
     expect(mirrors.material.userData.surfaceUniforms).toEqual({});
     mirrors.dispose();
+  });
+
+  it('have their own glass on the levels a player drives (High and Mobile), not the far one', () => {
+    const stats = carStats as unknown as Record<string, { nodes: { body: { materials: string[] } } }>;
+    expect(stats.high?.nodes.body.materials).toContain('mirror_glass');
+    expect(stats.mobile?.nodes.body.materials).toContain('mirror_glass');
+    expect(stats.far?.nodes.body.materials).not.toContain('mirror_glass');
   });
 
   it('reflect like silvered glass, not a grey panel', () => {

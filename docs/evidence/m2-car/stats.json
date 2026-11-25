@@ -231,17 +231,18 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 656332,
+    "bytes": 657576,
     "triangles": 39820,
-    "draw_calls": 25,
+    "draw_calls": 26,
     "nodes": {
       "body": {
         "triangles": 21892,
-        "primitives": 3,
+        "primitives": 4,
         "materials": [
           "paint",
           "dark",
-          "carbon"
+          "carbon",
+          "mirror_glass"
         ],
         "morph_targets": 0
       },
@@ -611,5 +612,5 @@
       "bytes": 24276
     }
   },
-  "total_bytes": 2681197
+  "total_bytes": 2682441
 }

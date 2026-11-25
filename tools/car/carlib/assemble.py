@@ -25,10 +25,12 @@ _MINOR = {"soot": "dark", "plank": "dark", "tcam": "dark", "headrest": "dark", "
           "grip": "dark", "nut": "rim"}
 REMAP = {
     "high": dict(_MINOR),
-    "mobile": dict(_MINOR, **{"carbon_matte": "carbon", "mirror_glass": "dark", "metal_dark": "dark",
+    # Mobile keeps the mirror glass its own material: the player's car on Mobile shows the
+    # cockpit mirrors' static reflection on it (packages/render/src/car/mirrors.ts).
+    "mobile": dict(_MINOR, **{"carbon_matte": "carbon", "metal_dark": "dark",
                               "exhaust": "dark", "visor": "dark"}),
 }
-REMAP["far"] = dict(REMAP["mobile"], **{"brake_disc": "dark"})
+REMAP["far"] = dict(REMAP["mobile"], **{"brake_disc": "dark", "mirror_glass": "dark"})
 # per node, extra merges that only make sense there (a cover on a Mobile wheel is rim-coloured)
 NODE_REMAP = {
     "mobile": {"wheel": {"paint": "rim"}, "upright": {"carbon": "brake_disc", "dark": "brake_disc"},
