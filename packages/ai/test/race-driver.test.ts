@@ -10,6 +10,7 @@ import {
 import { createVec3, type Track } from '@undercut/track';
 import {
   DEFAULT_RACE_SKILL,
+  Phase,
   createRaceDriver,
   createTrafficView,
   pitCarInPath,
@@ -18,7 +19,7 @@ import {
   type RacingLineData,
   type TrafficView,
 } from '../src/index';
-import { MONZA, loadEnvelope, loadLine } from '../validation/lib/index';
+import { MONZA, SPA, SINGAPORE, loadEnvelope, loadLine } from '../validation/lib/index';
 
 // Decisions of the racing driver at Monza with the car's motion scripted: the driver's outputs
 // (target offset, followed car, acceleration ceiling, pedals) for traffic placed around it. The
@@ -173,6 +174,27 @@ describe('race driver: gap keeping', () => {
 });
 
 describe('race driver: passing', () => {
+  for (const [yaw, gap, openingLap, clear] of [
+    [0.03, 40, false, true],
+    [-0.03, 40, false, false],
+    [0.03, 8, false, false],
+    [0.03, 40, true, false],
+  ] as const) {
+    it(`keeps following until the measured pull-out clears before a catch (${yaw}, ${gap}, lap one ${openingLap})`, () => {
+      const dr = driver();
+      const s = STRAIGHT;
+      const d = lineD(dr, s);
+      const me = { id: 0, s, d: d + 1.2, speed: 70 };
+      const ahead = { id: 1, s: s + gap, d, speed: 65 };
+      dr['passId'] = 1;
+      dr['passSide'] = 1;
+      dr['o'] = 3.7;
+      dr.sense(view(me, [ahead], { openingLap }));
+      dr.drive(at(s, me.d, me.speed, yaw), DT, { ...NEUTRAL_INPUT });
+      expect(dr.last.leader).toBe(clear ? -1 : 1);
+    });
+  }
+
   it('pulls out beside a slower car on a straight, passes it and rejoins its line', () => {
     const dr = driver({ aggression: 0.8 });
     const me = { id: 0, s: STRAIGHT - 350, d: 0, speed: 85 };
@@ -490,6 +512,243 @@ describe('race driver: stopped cars on the road', () => {
   });
 });
 
+describe('race driver: switchback', () => {
+  it('remembers an unsuccessful inside attack for an exit move, including a restore', () => {
+    const dr = driver();
+    const s =
+      Array.from(dr.plan.line.curvature).findIndex((k, i) => i > 150 && Math.abs(k) > 1 / 150) *
+      track.lap.step;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 35 };
+    const ahead = { id: 1, s: s + 10, d: me.d, speed: 35 };
+    dr['passId'] = 1;
+    dr['passSide'] = 1;
+    dr['passCommitted'] = true;
+    tick(dr, me, [ahead]);
+    expect(dr.snapshot().switchbackId).toBe(1);
+    expect(dr.snapshot().switchbackSide).toBe(-1);
+    const restored = driver();
+    restored.restore(JSON.parse(JSON.stringify(dr.snapshot())));
+    expect(restored.snapshot().switchbackId).toBe(1);
+    expect(restored.snapshot().switchbackSide).toBe(-1);
+  });
+});
+
+describe('race driver: building a run after lap one', () => {
+  it('releases the DRS request during a lift and requests it again when throttle returns', () => {
+    const dr = driver({ reaction: 0 });
+    const plan = dr.plan;
+    const i = plan.drsZone.findIndex(
+      (zone, k) =>
+        zone === 1 && plan.profile.phase[k] === Phase.Throttle && plan.profile.v[k]! > 70,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const s = i * track.lap.step;
+    const d = lineD(dr, s);
+    const out: ControlInput = { ...NEUTRAL_INPUT };
+    const ahead = { id: 1, s: s + 36, d, speed: 69 };
+    dr.sense(view({ id: 0, s, d, speed: 70 }, [ahead], { openingLap: false }));
+    dr.drive(at(s, d, 70), DT, out);
+    expect(out.brake).toBeLessThan(0.02);
+    expect(out.throttle).toBeLessThan(0.3);
+    expect(out.drs).toBe(false);
+    dr.sense(view({ id: 0, s, d, speed: 70 }, [], { openingLap: false }));
+    dr.drive(at(s, d, 70), DT, out);
+    expect(out.throttle).toBeGreaterThanOrEqual(0.3);
+    expect(out.drs).toBe(true);
+  });
+
+  it('keeps extra racing deployment off on lap one and around stopped traffic', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: 60, d: lineD(dr, 60), speed: 80 };
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr['inner'].racingDeploy).toBe(false);
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr['inner'].racingDeploy).toBe(true);
+    const stopped = { id: 2, s: 200, d: lineD(dr, 200), speed: 0 };
+    tick(dr, me, [ahead, stopped], { openingLap: false });
+    expect(dr['inner'].racingDeploy).toBe(false);
+  });
+
+  it('uses the braking available over the speed range behind moving traffic during a later attack', () => {
+    const dr = driver();
+    const s = STRAIGHT;
+    const d = lineD(dr, s);
+    const me = { id: 0, s, d: d - 3.7, speed: 62 };
+    const target = { id: 1, s: s + 10, d, speed: 60 };
+    const beyond = { id: 2, s: s + 100, d: d - 3.7, speed: 20 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -3.7;
+    tick(dr, me, [target, beyond], { openingLap: false });
+    expect(dr.last.leader).toBe(2);
+    expect(dr.last.accelLimit).toBeGreaterThan(-20);
+    tick(dr, me, [target, beyond], { openingLap: true });
+    expect(dr.last.accelLimit).toBeLessThan(-20);
+  });
+
+  it('uses straight-line headroom while still drafting, before choosing a passing lane', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: s + 60, d: lineD(dr, s + 60), speed: 80 };
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['inner'].speedAllowance).toBeGreaterThan(0);
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr['inner'].speedAllowance).toBe(0);
+  });
+
+  it('carries a closing move to the braking point after lap one', () => {
+    const dr = driver();
+    const s = 400;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 70 };
+    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 68 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(1);
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.last.passing).toBe(-1);
+  });
+
+  it('releases drafting headroom for braking or stopped traffic', () => {
+    for (const s of [0, 520]) {
+      const dr = driver();
+      const me = { id: 0, s, d: lineD(dr, s), speed: 70 };
+      const ahead = { id: 1, s: s + 60, d: lineD(dr, s + 60), speed: 70 };
+      const stopped = { id: 2, s: s + 180, d: 0, speed: 0 };
+      tick(dr, me, s === 0 ? [ahead, stopped] : [ahead], { openingLap: false });
+      expect(dr['inner'].speedAllowance).toBe(0);
+    }
+  });
+
+  it('stays in the tow when close but still slower than the car ahead', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: s + 25, d: lineD(dr, s + 25), speed: 81 };
+    dr['heldTime'] = 5;
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['inner'].speedAllowance).toBeGreaterThan(0);
+  });
+});
+
+it('uses the available-grip speed profile for a committed off-line braking move', () => {
+  const dr = driver();
+  dr['passId'] = 1;
+  dr['passCommitted'] = true;
+  dr['o'] = -3;
+  const reference = dr['offLineLimit'](550, 70);
+  const available = dr['inner'].speedProfileFor({ tyreGrip: 0.8, fuelMass: 0 }).v;
+  expect(dr['offLineLimit'](550, 70, available)).toBeLessThan(reference);
+});
+
+it('uses straight-line speed headroom in a move while retaining the corner braking limit', () => {
+  const dr = driver();
+  dr['o'] = 3;
+  const s = 0;
+  const v = dr.plan.profile.v[0]! + 2;
+  expect(dr['offLineLimit'](s, v)).toBeLessThan(0);
+  dr['passId'] = 1;
+  expect(dr['offLineLimit'](s, v)).toBe(Number.POSITIVE_INFINITY);
+  expect(dr['offLineLimit'](450, v)).toBeLessThan(0);
+});
+
+describe('race driver: late braking', () => {
+  it('does not dive into a braking zone from behind a car it does not overlap', () => {
+    const dr = driver();
+    // Held up into the first chicane's braking zone, 10 m behind a car braking earlier.
+    const s = 420;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 70 };
+    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 50 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['heldTime'] = 5;
+    dr['passDecel'] = 8;
+    dr['o'] = -3;
+    tick(dr, me, [ahead]);
+    expect(dr.snapshot().passCommitted).toBe(false);
+    expect(dr.snapshot().passId).toBe(-1);
+  });
+});
+
+describe('race driver: the opening lap', () => {
+  /** In the first chicane's braking zone, short of the turn-in. */
+  const BRAKING = 520;
+  it('gives up a move into the first corner unless already alongside', () => {
+    for (const openingLap of [true, false]) {
+      const dr = driver();
+      const me = { id: 0, s: BRAKING, d: lineD(dr, BRAKING) - 3, speed: 60 };
+      const ahead = { id: 1, s: BRAKING + 8, d: lineD(dr, BRAKING + 8), speed: 55 };
+      dr['passId'] = 1;
+      dr['passSide'] = -1;
+      dr['passCommitted'] = true;
+      dr['o'] = -3;
+      tick(dr, me, [ahead], { openingLap });
+      expect(dr.snapshot().passId).toBe(openingLap ? -1 : 1);
+    }
+  });
+  it('does not apply the first-corner prohibition to a later braking zone on lap one', () => {
+    const dr = driver();
+    const s = 4500;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 60 };
+    const ahead = { id: 1, s: s + 8, d: lineD(dr, s + 8), speed: 55 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['passCommitted'] = true;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.snapshot().passId).toBe(1);
+  });
+  it('keeps a move into the first corner when already alongside', () => {
+    const dr = driver();
+    const me = { id: 0, s: BRAKING, d: lineD(dr, BRAKING) - 3, speed: 60 };
+    const ahead = { id: 1, s: BRAKING + 2, d: lineD(dr, BRAKING + 2), speed: 55 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['passCommitted'] = true;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.snapshot().passId).toBe(1);
+  });
+  it('keeps the braking road lane across motion and snapshot restoration', () => {
+    const dr = driver();
+    dr['o'] = -2.5;
+    const other = { id: 1, s: 408, d: lineD(dr, 408) + 3, speed: 60 };
+    tick(dr, { id: 0, s: 420, d: lineD(dr, 420) - 2.5, speed: 60 }, [other], { openingLap: true });
+    const saved = dr.snapshot();
+    expect(saved.brakingHold).toBe(true);
+    const restored = driver();
+    restored.restore(saved);
+    const me = { id: 0, s: 421, d: lineD(dr, 420) - 2.5, speed: 60 };
+    tick(dr, me, [other], { openingLap: true });
+    tick(restored, me, [other], { openingLap: true });
+    expect(dr.snapshot().brakingLane).toBe(saved.brakingLane);
+    expect(restored.snapshot().brakingLane).toBe(saved.brakingLane);
+    expect(restored.snapshot().o).toBeCloseTo(dr.snapshot().o as number, 10);
+  });
+  it('holds its offset from the line while braking on the opening lap, with a car near', () => {
+    const hold = (openingLap: boolean, near: boolean) => {
+      const dr = driver();
+      // Early in the braking zone, where the road leaves room either side of the line.
+      dr['o'] = -2.5;
+      const me = { id: 0, s: 420, d: lineD(dr, 420) - 2.5, speed: 60 };
+      // A car 12 m back on the other side of the line: near, and not in the way.
+      const other = { id: 1, s: 408, d: lineD(dr, 408) + 3, speed: 60 };
+      for (let k = 0; k < 120; k++) tick(dr, me, near ? [other] : [], { openingLap });
+      return dr.snapshot().o as number;
+    };
+    expect(hold(true, true)).toBeCloseTo(-2.5, 6);
+    expect(hold(false, true)).toBeGreaterThan(-2.4);
+    // Alone on the road the car takes its line as planned.
+    expect(hold(true, false)).toBeGreaterThan(-2.4);
+  });
+});
+
 describe('race driver: a car slowing for the pit entry', () => {
   it('counts the entrant against the road the follower reaches there, not only where it is now', () => {
     const half = BODY_HALF_WIDTH;
@@ -516,5 +775,100 @@ describe('race driver: a car slowing for the pit entry', () => {
     };
     expect(leaderOf(false)).not.toBe(1);
     expect(leaderOf(true)).toBe(1);
+  });
+});
+
+describe('race driver: mirror clearance below launch speed after the launch', () => {
+  it('does not return across a closing car when traffic has slowed it below 25 m/s', () => {
+    const dr = driver({ aggression: 0.6 });
+    dr['wasActive'] = true;
+    dr['o'] = 3;
+    const me = { id: 0, s: 100, d: lineD(dr, 100) + 3, speed: 20 };
+    const rear = { id: 1, s: 86, d: lineD(dr, 100), speed: 35 };
+    for (let k = 0; k < 240; k++) tick(dr, me, [rear], { launching: false });
+    expect(dr.snapshot().o as number).toBeGreaterThan(2.5);
+  });
+});
+
+describe('race driver: a pit entrant beyond the car being passed', () => {
+  it('holds racing moves while an entrant ahead is slowing, before it crosses into the lane', () => {
+    const attempt = (pitApproach: boolean) => {
+      const dr = driver();
+      const me = { id: 0, s: 100, d: lineD(dr, 100), speed: 80 };
+      const leader = { id: 1, s: 125, d: lineD(dr, 125), speed: 70 };
+      const entrant = { id: 2, s: 220, d: lineD(dr, 220) + 4, speed: 40, pitApproach };
+      for (let k = 0; k < 240; k++) tick(dr, me, [leader, entrant]);
+      return dr.snapshot().passId;
+    };
+    expect(attempt(false)).toBe(1);
+    expect(attempt(true)).toBe(-1);
+  });
+});
+
+describe('race driver: yielding before a narrowing road', () => {
+  it('keeps its present road lane while braking behind a car beside it', () => {
+    const circuit = SPA.track();
+    const dr = createRaceDriver({
+      track: circuit,
+      line: loadLine(SPA),
+      envelope: loadEnvelope(SPA),
+      params: createCarParams(SPA.trim),
+      skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0, aggression: 0.6 },
+    });
+    const s = 50;
+    const ld = dr['at'](dr.plan.line.d, s);
+    const me = { id: 19, s, d: 6.2, speed: 46 };
+    dr['o'] = me.d - ld;
+    dr['wasActive'] = true;
+    dr.sense(view(me, [{ id: 13, s: 63, d: 3.3, speed: 28 }]));
+    const tel = createCarTelemetry();
+    const p = circuit.pointAt(s, me.d, createVec3());
+    const tangent = circuit.tangentAt(s, createVec3());
+    Object.assign(tel, {
+      x: p.x,
+      z: p.z,
+      yaw: Math.atan2(-tangent.z, tangent.x),
+      speed: me.speed,
+      gear: 5,
+      engineRpm: 10000,
+    });
+    tel.wheelLoad.fill(4000);
+    dr.drive(tel, DT, { ...NEUTRAL_INPUT });
+    expect(dr.last.yielding).toBe(true);
+    expect(dr.last.target + ld).toBeGreaterThanOrEqual(me.d - 0.1);
+    expect(dr.last.accelLimit).toBeLessThan(0);
+  });
+});
+
+describe('race driver: room while the bodies overlap under braking', () => {
+  it('does not cut across the forward car while yielding in the braking zone', () => {
+    const circuit = SINGAPORE.track();
+    const dr = createRaceDriver({
+      track: circuit,
+      line: loadLine(SINGAPORE),
+      envelope: loadEnvelope(SINGAPORE),
+      params: createCarParams(SINGAPORE.trim),
+      skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0, aggression: 0.6 },
+    });
+    const me = { id: 3, s: 229, d: -3.86, speed: 28 };
+    const ld = dr['at'](dr.plan.line.d, me.s);
+    dr['o'] = me.d - ld;
+    dr['wasActive'] = true;
+    dr.sense(view(me, [{ id: 2, s: 233.5, d: -6.36, speed: 38 }], { openingLap: true }));
+    const tel = createCarTelemetry();
+    const p = circuit.pointAt(me.s, me.d, createVec3());
+    const tangent = circuit.tangentAt(me.s, createVec3());
+    Object.assign(tel, {
+      x: p.x,
+      z: p.z,
+      yaw: Math.atan2(-tangent.z, tangent.x),
+      speed: me.speed,
+      gear: 5,
+      engineRpm: 10000,
+    });
+    tel.wheelLoad.fill(4000);
+    dr.drive(tel, DT, { ...NEUTRAL_INPUT });
+    expect(dr.last.yielding).toBe(true);
+    expect(dr.last.target + ld).toBeGreaterThanOrEqual(me.d - 0.1);
   });
 });
