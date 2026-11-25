@@ -10,6 +10,7 @@ import {
 import { createVec3, type Track } from '@undercut/track';
 import {
   DEFAULT_RACE_SKILL,
+  Phase,
   createRaceDriver,
   createTrafficView,
   pitCarInPath,
@@ -173,6 +174,27 @@ describe('race driver: gap keeping', () => {
 });
 
 describe('race driver: passing', () => {
+  for (const [yaw, gap, openingLap, clear] of [
+    [0.03, 40, false, true],
+    [-0.03, 40, false, false],
+    [0.03, 8, false, false],
+    [0.03, 40, true, false],
+  ] as const) {
+    it(`keeps following until the measured pull-out clears before a catch (${yaw}, ${gap}, lap one ${openingLap})`, () => {
+      const dr = driver();
+      const s = STRAIGHT;
+      const d = lineD(dr, s);
+      const me = { id: 0, s, d: d + 1.2, speed: 70 };
+      const ahead = { id: 1, s: s + gap, d, speed: 65 };
+      dr['passId'] = 1;
+      dr['passSide'] = 1;
+      dr['o'] = 3.7;
+      dr.sense(view(me, [ahead], { openingLap }));
+      dr.drive(at(s, me.d, me.speed, yaw), DT, { ...NEUTRAL_INPUT });
+      expect(dr.last.leader).toBe(clear ? -1 : 1);
+    });
+  }
+
   it('pulls out beside a slower car on a straight, passes it and rejoins its line', () => {
     const dr = driver({ aggression: 0.8 });
     const me = { id: 0, s: STRAIGHT - 350, d: 0, speed: 85 };
@@ -512,6 +534,60 @@ describe('race driver: switchback', () => {
 });
 
 describe('race driver: building a run after lap one', () => {
+  it('releases the DRS request during a lift and requests it again when throttle returns', () => {
+    const dr = driver({ reaction: 0 });
+    const plan = dr.plan;
+    const i = plan.drsZone.findIndex(
+      (zone, k) =>
+        zone === 1 && plan.profile.phase[k] === Phase.Throttle && plan.profile.v[k]! > 70,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const s = i * track.lap.step;
+    const d = lineD(dr, s);
+    const out: ControlInput = { ...NEUTRAL_INPUT };
+    const ahead = { id: 1, s: s + 36, d, speed: 69 };
+    dr.sense(view({ id: 0, s, d, speed: 70 }, [ahead], { openingLap: false }));
+    dr.drive(at(s, d, 70), DT, out);
+    expect(out.brake).toBeLessThan(0.02);
+    expect(out.throttle).toBeLessThan(0.3);
+    expect(out.drs).toBe(false);
+    dr.sense(view({ id: 0, s, d, speed: 70 }, [], { openingLap: false }));
+    dr.drive(at(s, d, 70), DT, out);
+    expect(out.throttle).toBeGreaterThanOrEqual(0.3);
+    expect(out.drs).toBe(true);
+  });
+
+  it('keeps extra racing deployment off on lap one and around stopped traffic', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: 60, d: lineD(dr, 60), speed: 80 };
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr['inner'].racingDeploy).toBe(false);
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr['inner'].racingDeploy).toBe(true);
+    const stopped = { id: 2, s: 200, d: lineD(dr, 200), speed: 0 };
+    tick(dr, me, [ahead, stopped], { openingLap: false });
+    expect(dr['inner'].racingDeploy).toBe(false);
+  });
+
+  it('uses the braking available over the speed range behind moving traffic during a later attack', () => {
+    const dr = driver();
+    const s = STRAIGHT;
+    const d = lineD(dr, s);
+    const me = { id: 0, s, d: d - 3.7, speed: 62 };
+    const target = { id: 1, s: s + 10, d, speed: 60 };
+    const beyond = { id: 2, s: s + 100, d: d - 3.7, speed: 20 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -3.7;
+    tick(dr, me, [target, beyond], { openingLap: false });
+    expect(dr.last.leader).toBe(2);
+    expect(dr.last.accelLimit).toBeGreaterThan(-20);
+    tick(dr, me, [target, beyond], { openingLap: true });
+    expect(dr.last.accelLimit).toBeLessThan(-20);
+  });
+
   it('uses straight-line headroom while still drafting, before choosing a passing lane', () => {
     const dr = driver();
     const s = 0;

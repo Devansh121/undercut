@@ -99,22 +99,71 @@ it('on less grip, slows where the plan is grip-limited and keeps the top speed',
   expect(Math.abs(target(sFlat, 75, 0.9) - full)).toBeLessThan(0.01 * full);
 });
 
-it('releases the DRS request during a lift and requests it again when throttle returns', () => {
+it('uses a racing energy request outside the solo deployment plan without exceeding demanded acceleration', () => {
   const dr = driver();
   const plan = dr.plan;
-  const i = plan.drsZone.findIndex(
-    (zone, k) => zone === 1 && plan.profile.phase[k] === Phase.Throttle && plan.profile.v[k]! > 70,
+  const i = plan.profile.deploying.findIndex(
+    (deploy, k) =>
+      deploy === 0 &&
+      plan.profile.phase[k] !== Phase.Brake &&
+      plan.profile.v[k]! > 60 &&
+      Math.abs(plan.line.curvature[k]!) < 1 / 250,
   );
   expect(i).toBeGreaterThanOrEqual(0);
-  const tel = at(i * track.lap.step, 70, 1);
+  const v = plan.profile.v[i]! - 10;
+  const tel = at(i * track.lap.step, v, 1);
+  tel.x = plan.line.x[i]!;
+  tel.z = plan.line.z[i]!;
+  tel.yaw = plan.line.heading[i]!;
+  tel.ersStore = params.ers.storeWindow;
+  dr['crossedLine'] = true;
+  const drag = plan.model.drag(v, false);
+  const ice = plan.model.drive(v, false, false) + drag;
+  const boost = plan.model.drive(v, false, true) - plan.model.drive(v, false, false);
+  const demand = 0.75 * ice + boost - drag;
+  dr.accelLimit = demand;
+  dr['racingDeploy'] = true;
   const out: ControlInput = { ...NEUTRAL_INPUT };
-  dr.accelLimit = -0.5 * plan.model.drag(70, false);
   dr.drive(tel, 1 / 240, out);
-  expect(out.brake).toBeLessThan(0.02);
-  expect(out.throttle).toBeLessThan(0.3);
-  expect(out.drs).toBe(false);
-  dr.accelLimit = Infinity;
+  expect(out.overtake).toBe(true);
+  expect(ice * out.throttle + boost - drag).toBeCloseTo(demand, 3);
+  dr.accelLimit = -20;
   dr.drive(tel, 1 / 240, out);
-  expect(out.throttle).toBeGreaterThanOrEqual(0.3);
-  expect(out.drs).toBe(true);
+  expect(out.brake).toBeGreaterThan(0.02);
+  expect(out.overtake).toBe(false);
 });
+
+for (const blocked of ['empty store', 'lap limit', 'gear change'] as const) {
+  it(`does not request extra racing deployment with ${blocked}`, () => {
+    const dr = driver();
+    const plan = dr.plan;
+    const i = plan.profile.deploying.findIndex(
+      (deploy, k) =>
+        deploy === 0 &&
+        plan.profile.phase[k] !== Phase.Brake &&
+        plan.profile.v[k]! > 60 &&
+        Math.abs(plan.line.curvature[k]!) < 1 / 250,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const v = plan.profile.v[i]! - 10;
+    const tel = at(i * track.lap.step, v, 1);
+    tel.x = plan.line.x[i]!;
+    tel.z = plan.line.z[i]!;
+    tel.yaw = plan.line.heading[i]!;
+    tel.ersStore = params.ers.storeWindow;
+    dr['crossedLine'] = true;
+    const drag = plan.model.drag(v, false);
+    const ice = plan.model.drive(v, false, false) + drag;
+    const boost = plan.model.drive(v, false, true) - plan.model.drive(v, false, false);
+    const demand = 0.75 * ice + boost - drag;
+    dr.accelLimit = demand;
+    dr['racingDeploy'] = true;
+    const out: ControlInput = { ...NEUTRAL_INPUT };
+
+    if (blocked === 'empty store') tel.ersStore = 0;
+    if (blocked === 'lap limit') tel.ersDeployLap = params.ers.deployPerLap;
+    if (blocked === 'gear change') tel.shifting = true;
+    dr.drive(tel, 1 / 240, out);
+    expect(out.overtake).toBe(false);
+  });
+}

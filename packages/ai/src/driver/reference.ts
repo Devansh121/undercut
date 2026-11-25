@@ -164,6 +164,8 @@ export class ReferenceDriver implements Driver {
   accelLimit = Number.POSITIVE_INFINITY;
   /** Straight-line speed headroom for a racing move, m/s. Zero for the reference lap. */
   speedAllowance = 0;
+  /** Use spare deployment for a racing run; the physical store and lap limits still apply. */
+  racingDeploy = false;
   /**
    * The least share of the brake pedal kept whatever the lock-up feel says (0 to 1). At walking
    * pace a wheel light on a kerb reads as locked at a touch of brake, and a car that has to stop
@@ -405,10 +407,28 @@ export class ReferenceDriver implements Driver {
     const model = plan.model;
     const drag = model.drag(v, tel.drs > 0.5);
     const full = model.drive(v, tel.drs > 0.5, deployHere);
+    const extraDeploy =
+      this.racingDeploy &&
+      !deployHere &&
+      (this.crossedLine || this.deployBeforeLine) &&
+      speeds.phase[i] !== Phase.Brake &&
+      tel.ersStore > 0 &&
+      tel.ersDeployLap < p.ers.deployPerLap &&
+      tel.gear > 0 &&
+      !tel.shifting;
+    let racingBoost = false;
     let throttle = 0;
     let brake = 0;
     if (aDemand >= -drag) {
-      throttle = (aDemand + drag) / Math.max(full + drag, 0.1);
+      if (extraDeploy) {
+        const ice = model.drive(v, tel.drs > 0.5, false);
+        const boost = Math.max(0, model.drive(v, tel.drs > 0.5, true) - ice);
+        const withBoost = (aDemand + drag - boost) / Math.max(ice + drag, 0.1);
+        // Overtake mode deploys above half throttle. Subtract its contribution from the
+        // engine request; simply adding the button would exceed the acceleration ceiling.
+        racingBoost = boost > 0 && withBoost >= 0.5;
+        throttle = (aDemand + drag - (racingBoost ? boost : 0)) / Math.max(ice + drag, 0.1);
+      } else throttle = (aDemand + drag) / Math.max(full + drag, 0.1);
     } else {
       const mass = p.mass.dryMass + tel.fuelMass;
       brake = ((-aDemand - drag) * mass * p.tyre.rollingRadius) / this.brakeTorque;
@@ -479,8 +499,15 @@ export class ReferenceDriver implements Driver {
     out.throttle = throttle;
     out.brake = brake;
     out.gearShift = sliding ? 0 : this.gear(tel, throttle);
-    out.drs = drsHere && brake < 0.02 && throttle >= 0.3;
-    out.overtake = deployHere && throttle > 0.9;
+    out.drs = drsHere && brake < 0.02;
+    out.overtake = racingBoost
+      ? throttle >= 0.5 &&
+        brake < 0.02 &&
+        !saturated &&
+        spin <= 0 &&
+        slide <= 0 &&
+        this.throttleCap >= throttleWanted
+      : deployHere && throttle > 0.9;
     out.pitLimiter = false;
 
     const last = this.last;

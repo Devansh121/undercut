@@ -10,6 +10,7 @@ import type { DrivingPlan } from '../profile/plan';
 import { Phase } from '../profile/speed-profile';
 import type { Driver, DriverMemory, DriverSkill } from './driver';
 import { ReferenceDriver } from './reference';
+import { BrakingCurve } from './braking-curve';
 import { OVERLAP, brakingTraffic, defensiveLane, mirrorOffset, roomLane } from './racecraft';
 import { pitCarInPath, type TrafficCar, type TrafficView } from './traffic';
 
@@ -274,6 +275,7 @@ export class RaceDriver implements Driver {
   private readonly lateralShare: number;
   /** Per line sample: distance to the next braking zone or corner, m (0 inside one). */
   private readonly cornerAhead: Float64Array;
+  private readonly brakingCurve: BrakingCurve;
   private view: TrafficView | null = null;
   private readonly seen: CarTelemetry = createCarTelemetry();
   private rng: Rng;
@@ -359,6 +361,9 @@ export class RaceDriver implements Driver {
     });
     this.rng = createRng((o.skill.seed ^ 0x9e3779b9) >>> 0);
     this.cornerAhead = cornerDistances(o.plan);
+    this.brakingCurve = new BrakingCurve(
+      (v) => o.plan.model.brake(v, 1) + o.plan.model.drag(v, false),
+    );
     const shares = driverSkillFor(o.skill).envelope;
     this.tractionShare = shares.traction;
     this.lateralShare = shares.lateral;
@@ -548,6 +553,7 @@ export class RaceDriver implements Driver {
       inner.offsetSlope = 0;
       inner.accelLimit = Number.POSITIVE_INFINITY;
       inner.speedAllowance = 0;
+      inner.racingDeploy = false;
       inner.brakeFloor = 0;
       inner.throttleFloor = 0;
       inner.maxCorrection = BASE_CORRECTION;
@@ -559,6 +565,8 @@ export class RaceDriver implements Driver {
     }
     inner.offset = this.o;
     inner.drive(seen, dt, out);
+    // Race DRS latches shut on a throttle lift (< 0.3) and re-arms only when the request drops.
+    if (out.throttle < 0.3) out.drs = false;
     this.last.offset = this.o;
     if (view) this.recover(view, tel, dt, out);
     if (view && !this.recovering) this.backUp(view, tel, dt, out);
@@ -775,13 +783,35 @@ export class RaceDriver implements Driver {
       const pitInPath =
         c.pitApproach === true &&
         pitCarInPath(self.d, c.d, this.at(line.d, c.s) + this.o, BODY_HALF_WIDTH, c.halfWidth);
+      const closing = Math.max(0, v - c.speed);
+      const clearWidth = CAR_WIDTH + wide + PASS_CLEARANCE;
+      const clearingTime =
+        SEE_DELAY +
+        this.skill.reaction +
+        REACT_MARGIN +
+        (1.2 * Math.max(0, clearWidth - lateral)) / Math.max(0.1, Math.abs(dRate));
+      const closingAcceleration =
+        (this.brakeAt(c.speed) / BRAKE_SHARE) * this.leaderBrakeScale() +
+        Math.max(0, plan.model.drive(v, false, true));
+      const clearingRoom =
+        STANDSTILL_GAP +
+        closing * clearingTime +
+        0.5 * closingAcceleration * clearingTime * clearingTime;
+      const pullingOut =
+        later &&
+        !cornering &&
+        !this.passBypass &&
+        c.id === this.passId &&
+        dRate * (self.d - c.d) > 0 &&
+        Math.abs(od - this.o) >= clearWidth &&
+        ds - CAR_LENGTH > clearingRoom;
       const inPath =
         pitInPath ||
-        (passing
-          ? lateral < CAR_WIDTH + wide + PASS_CLEARANCE
-          : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns || inLane);
+        (!pullingOut &&
+          (passing
+            ? lateral < clearWidth
+            : lateral < inPathAt || Math.abs(od - this.o) < inPathAt || owns || inLane));
       // Ahead and in the way (or overlapping it already): follow it.
-      const closing = Math.max(0, v - c.speed);
       if (ds > 0 && inPath && !(ds < CAR_LENGTH && lateral >= CAR_WIDTH + wide)) {
         // The queue in this car's lane, further cars included (see `queueLimit`).
         if (nq < this.queue.length) {
@@ -1314,6 +1344,24 @@ export class RaceDriver implements Driver {
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
+    // An established racing attack uses stopping distance over the whole speed range. Keep
+    // the existing opening-lap, crawl and known slow-car queue rules.
+    const grip = Math.min(
+      1,
+      tel.tyreGrip *
+        Math.min(
+          1,
+          plan.model.envelope.conditions.mass / (this.params.mass.dryMass + tel.fuelMass),
+        ),
+    );
+    const lateral = Math.abs(this.at(line.curvature, s0)) * v * v;
+    const lateralCapacity = this.lateralShare * plan.model.lateral(v, 1) * grip;
+    const brakeScale =
+      later && this.attacking() && !queueStop && !midCorner && !this.slowInCorners(this.passId)
+        ? BRAKE_SHARE *
+          grip *
+          plan.model.remaining(lateralCapacity > 0 ? lateral / lateralCapacity : 1)
+        : 0;
     let limit = Number.POSITIVE_INFINITY;
     // A car standing in the road ahead: arrive no faster than slows to a crawl beside it
     // (`CAUTION_DECEL`), in whatever lane. Where the line sweeps, reach the crawl before the
@@ -1348,7 +1396,11 @@ export class RaceDriver implements Driver {
       const stopping = vl < 1 || (vl < 3 && !view.launching);
       const room = gap - (stopping ? STILL_GAP : standstill);
       const vKin =
-        room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl - 1;
+        room <= 0
+          ? vl - 1
+          : brakeScale > 0 && vl > 15
+            ? this.brakingCurve.safeSpeed(room, vl, tau, brakeScale, this.leaderBrakeScale())
+            : -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room);
       let aSafe = SPEED_GAIN * (vSafe - v);
       const aKin = SPEED_GAIN * (vKin - v);
       // Mid-corner, high lateral load leaves little friction-circle margin for comfort braking:
@@ -1383,7 +1435,7 @@ export class RaceDriver implements Driver {
     const queueOn =
       !view.launching || (leader !== null && leaderDs - CAR_LENGTH < LAUNCH_QUEUE_GAP);
     if (nq > 1 && queueOn && !this.passBypass) {
-      limit = Math.min(limit, this.queueLimit(nq, v, queueStop));
+      limit = Math.min(limit, this.queueLimit(nq, v, queueStop, brakeScale));
     }
     limit = Math.min(
       limit,
@@ -1430,6 +1482,8 @@ export class RaceDriver implements Driver {
     const drafting = later && leader !== null && gapAhead < 90 && leader.speed > 30;
     this.inner.speedAllowance =
       !cornering && v > LAUNCHED && (this.attacking() || drafting) ? 4 : 0;
+    this.inner.racingDeploy =
+      later && view.active && !cornering && v > LAUNCHED && (this.attacking() || drafting);
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
     // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays
@@ -1486,7 +1540,7 @@ export class RaceDriver implements Driver {
    * now, before the car ahead does. Each car in the lane sets a safe speed (Gipps, as for the car
    * ahead) with room left for the cars in between: a car length and the standstill gap each.
    */
-  private queueLimit(nq: number, v: number, queueStop: boolean): number {
+  private queueLimit(nq: number, v: number, queueStop: boolean, brakeScale = 0): number {
     const q = this.queue;
     // Order by distance (insertion sort; a handful of cars).
     for (let i = 1; i < nq; i++) {
@@ -1507,7 +1561,12 @@ export class RaceDriver implements Driver {
       const vl = Math.max(0, q[r]!.speed);
       const room = q[r]!.ds - (r + 1) * (CAR_LENGTH + (queueStop ? QUEUE_GAP : STANDSTILL_GAP));
       const b = this.stopBrake(v, vl, queueStop);
-      const vKin = room > 0 ? -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room) : vl;
+      const vKin =
+        room <= 0
+          ? vl
+          : brakeScale > 0 && vl > 15
+            ? this.brakingCurve.safeSpeed(room, vl, tau, brakeScale, this.leaderBrakeScale())
+            : -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room);
       const a = SPEED_GAIN * (vKin - v);
       if (a < limit) limit = a;
     }
@@ -1523,6 +1582,11 @@ export class RaceDriver implements Driver {
   private stopBrake(v: number, vl: number, queue: boolean): number {
     const b = this.brakeAt(Math.min(v, vl));
     return queue && vl < SLOW_STOP_BELOW && b > QUEUE_BRAKE ? QUEUE_BRAKE : b;
+  }
+
+  /** The leader can be lighter and brake at full reference grip; do not give it our margins. */
+  private leaderBrakeScale(): number {
+    return Math.max(1, this.plan.model.envelope.conditions.mass / this.params.mass.dryMass);
   }
 
   /** The deceleration this car can be counted on for at speed `v`, m/s² (on its own plan's grip). */
