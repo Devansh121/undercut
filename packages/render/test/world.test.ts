@@ -1,9 +1,16 @@
-import { DataTexture, type Mesh, type MeshStandardMaterial } from 'three';
+import { BoxGeometry, DataTexture, InstancedMesh, MeshStandardMaterial, type Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { Track, createVec3, type TrackData } from '@undercut/track';
 import monzaTrackJson from '@undercut/track/data/monza.json';
+import spaTrackJson from '@undercut/track/data/spa.json';
 import brandsJson from '../../../design/brands.json';
+import catalogJson from '../data/props.catalog.json';
 import monzaDressingJson from '../data/monza.dressing.json';
+import spaDressingJson from '../data/spa.dressing.json';
+import type { PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
+import { PropRegistry } from '../src/props/registry';
+import { QUALITY } from '../src/quality';
+import { CircuitWorld } from '../src/world/world';
 import { decodeTerrain, gridHeight, hash01, type DressingFile } from '../src/world/dressing';
 import {
   buildHistoricBanking,
@@ -278,6 +285,133 @@ describe('near trees', () => {
       expect(top).toBeGreaterThan(0.85);
       expect(top).toBeLessThan(1.1);
       g.dispose();
+    }
+  });
+});
+
+function withStubCanvas<T>(fn: () => T): T {
+  const prev = (globalThis as { document?: unknown }).document;
+  const noop = () => undefined;
+  const ctx = new Proxy(
+    {
+      canvas: { width: 0, height: 0 },
+      createLinearGradient: () => ({ addColorStop: noop }),
+      createRadialGradient: () => ({ addColorStop: noop }),
+      measureText: () => ({ width: 0 }),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({
+        data: new Uint8ClampedArray(Math.max(1, w) * Math.max(1, h) * 4),
+      }),
+    } as Record<string, unknown>,
+    { get: (target, prop) => (prop in target ? target[prop as string] : noop) },
+  );
+  (globalThis as { document?: unknown }).document = {
+    createElement: (tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element: ${tag}`);
+      return { width: 0, height: 0, getContext: () => ctx };
+    },
+  };
+  try {
+    return fn();
+  } finally {
+    if (prev === undefined) delete (globalThis as { document?: unknown }).document;
+    else (globalThis as { document?: unknown }).document = prev;
+  }
+}
+
+describe('High-world near tree reflections', () => {
+  it('marks instantiated near cloud trees and kit conifers as scenery for water reflections', () => {
+    const entries = new Map(
+      (catalogJson as unknown as { props: PropCatalogEntry[] }).props.map((e) => [e.id, e]),
+    );
+    const kitGeo = new BoxGeometry(1, 1, 1);
+    const kitMat = new MeshStandardMaterial();
+    const propKit = {
+      entries,
+      has: (id: string) => entries.has(id),
+      lodsFor: (id: string) =>
+        entries.has(id) ? [{ geometry: kitGeo, material: kitMat, maxDistance: 100 }] : null,
+    } as unknown as PropKitAssets;
+    const tex = dummyTexture();
+    const track = Track.fromJSON(spaTrackJson);
+    const props = new PropRegistry(track.length, 200, () => undefined);
+    // Two small wooded strips exercise both near-tree builders with the unchanged High
+    // preset. Omit unrelated mapped scenery rather than rebuilding the whole circuit map.
+    const full = spaDressingJson as unknown as DressingFile;
+    const wood = (id: string, start: number, leaf_type: string) => ({
+      id,
+      t: { leaf_type },
+      p: [
+        [start, 30],
+        [start + 40, 30],
+        [start + 40, 60],
+        [start, 60],
+      ].flatMap(([s, d]) => {
+        const p = createVec3();
+        track.lap.pointAt(s!, d!, p);
+        return [p.x, p.z];
+      }),
+    });
+    const dressing: DressingFile = {
+      ...full,
+      authored: {},
+      mapped: {
+        ...Object.fromEntries(Object.keys(full.mapped).map((k) => [k, []])),
+        wood: [
+          wood('test-broadleaf', 5450, 'broadleaved'),
+          wood('test-conifers', 5600, 'needleleaved'),
+        ],
+      } as DressingFile['mapped'],
+    };
+    let world: CircuitWorld | null = null;
+    try {
+      world = withStubCanvas(
+        () =>
+          new CircuitWorld({
+            track,
+            dressing,
+            quality: QUALITY.high,
+            drivable: [],
+            grass: { map: tex, normal: tex, arm: tex, sizeM: 10 },
+            grassColour: '',
+            props,
+            propKit,
+          }),
+      );
+      props.build();
+
+      const nearTrees: { name: string; count: number; reflect: unknown }[] = [];
+      props.group.traverse((o) => {
+        if (
+          o instanceof InstancedMesh &&
+          o.name.startsWith('prop:tree-') &&
+          o.name.includes('-near')
+        ) {
+          nearTrees.push({ name: o.name, count: o.count, reflect: o.userData.reflect ?? null });
+        }
+      });
+
+      const clouds = nearTrees.filter((o) => /^prop:tree-(wood|row|park)-near$/.test(o.name));
+      const conifers = nearTrees.filter((o) => o.name.startsWith('prop:tree-conifer-near-'));
+      for (const [kind, meshes] of [
+        ['cloud trees', clouds],
+        ['kit conifers', conifers],
+      ] as const) {
+        expect(meshes.length, `${kind}: instantiated meshes`).toBeGreaterThan(0);
+        expect(
+          meshes.reduce((n, o) => n + o.count, 0),
+          `${kind}: instances`,
+        ).toBeGreaterThan(0);
+        for (const mesh of meshes) expect(mesh.reflect, mesh.name).toBe('scenery');
+      }
+      expect(new Set(conifers.map((o) => o.name))).toEqual(
+        new Set(['prop:tree-conifer-near-forest-spruce', 'prop:tree-conifer-near-forest-fir']),
+      );
+    } finally {
+      world?.dispose();
+      props.dispose();
+      kitGeo.dispose();
+      kitMat.dispose();
+      tex.dispose();
     }
   });
 });

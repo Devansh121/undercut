@@ -161,7 +161,9 @@ const WOOD_DENSITY = 1 / 42;
  * Linear tone calibration of the kit conifers against the spruce cards they replace, measured
  * with a fixed animation clock and interleaved captures at the swap distance.
  */
-const NEAR_CONIFER_TONE = 0.7;
+const NEAR_CONIFER_TONE = 0.65;
+/** Match the full-crown cards' cover without changing the kit trees' height or triangle count. */
+const NEAR_CONIFER_WIDTH = 1.35;
 /** Grid cell of the near kit conifers, m, and the distance (cell near edge) of their finest level. */
 const NEAR_CONIFER_CELL = 60;
 const NEAR_CONIFER_HIGH = 20;
@@ -831,6 +833,16 @@ export class CircuitWorld {
             distanceCaps: [NEAR_CONIFER_HIGH, wq.treeCloud + 15],
           });
           if (!lods) continue;
+          // The kit's narrow crowns leave bright sky between boughs where the impostor has
+          // foliage. Widen owned copies in the horizontal plane; keep the model height and
+          // the shared catalogue geometry intact.
+          const nearLods = lods.map((level) => {
+            const geometry = level.geometry
+              .clone()
+              .scale(NEAR_CONIFER_WIDTH, 1, NEAR_CONIFER_WIDTH);
+            this.geometries.push(geometry);
+            return { ...level, geometry };
+          });
           const nearId = `${k.id}-near-${id}`;
           props.define({
             id: nearId,
@@ -842,7 +854,7 @@ export class CircuitWorld {
             castShadow: false,
             shadowMaxDistance: 170,
             receiveShadow: true,
-            lods,
+            lods: nearLods,
           });
           nearKits.push({ id: nearId, height: o.propKit.entries.get(id)?.bounds?.max[1] ?? 16 });
         }
