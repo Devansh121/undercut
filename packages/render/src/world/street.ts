@@ -419,6 +419,46 @@ export interface Backdrop {
 }
 
 /**
+ * The backdrops as prop kinds (one per kit model, its lit-window mask the given material) and
+ * their placements. Seen across the city, as far as the mapped buildings; in the water's
+ * reflection on every preset that reflects (`reflect: 'skyline'`).
+ */
+export function placeBackdrops(
+  props: PropRegistry,
+  kit: PropKitAssets,
+  backdrops: readonly Backdrop[],
+  windows: Material,
+  castShadow: boolean,
+  far: number,
+): void {
+  for (const id of new Set(backdrops.map((b) => b.kitId))) {
+    const lods = kit.lodsFor(id, {
+      materialOverrides: { 'window-emissive-mask': windows },
+      maxDistanceScale: 3.4,
+      distanceCaps: [80, 300, far],
+    });
+    if (!lods) continue;
+    props.define({
+      id: `backdrop-${id}`,
+      reflect: 'skyline',
+      castShadow,
+      shadowMaxDistance: 220,
+      receiveShadow: true,
+      lods,
+    });
+  }
+  for (const b of backdrops)
+    props.place(`backdrop-${b.kitId}`, {
+      x: b.x,
+      y: b.y,
+      z: b.z,
+      yaw: b.yaw,
+      scale: b.scale,
+      s: b.s,
+    });
+}
+
+/**
  * The mapped buildings near the track small and low enough for one of the kit's backdrops: the
  * first backdrop whose height the building's (mapped, or from its footprint) fits, laid along the
  * footprint's longest side with its front (+X) to the track and scaled to the footprint's area.

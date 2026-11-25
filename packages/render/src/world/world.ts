@@ -57,7 +57,7 @@ import {
 } from './pit-building';
 import { buildSurfaceDecals } from './surface-decals';
 import type { LocalLight } from '../lighting/light-pool';
-import { pickBackdrops, placeStreetCircuit, windowMaterial } from './street';
+import { pickBackdrops, placeBackdrops, placeStreetCircuit, windowMaterial } from './street';
 import {
   buildTerrain,
   TERRAIN_HIGH,
@@ -158,10 +158,12 @@ const FAR_DECALS = 900;
 /** Trees per square metre of woodland at full density (about one per 42 m²). */
 const WOOD_DENSITY = 1 / 42;
 /**
- * The kit conifers' colour against the spruce cards they take over from at the swap distance:
- * at 1 they measured 12–15% lighter (by day and under floodlights).
+ * Linear tone calibration of the kit conifers against the spruce cards they replace, measured
+ * with a fixed animation clock and interleaved captures at the swap distance.
  */
-const NEAR_CONIFER_TONE = 0.8;
+const NEAR_CONIFER_TONE = 0.65;
+/** Match the full-crown cards' cover without changing the kit trees' height or triangle count. */
+const NEAR_CONIFER_WIDTH = 1.35;
 /** Grid cell of the near kit conifers, m, and the distance (cell near edge) of their finest level. */
 const NEAR_CONIFER_CELL = 60;
 const NEAR_CONIFER_HIGH = 20;
@@ -831,6 +833,16 @@ export class CircuitWorld {
             distanceCaps: [NEAR_CONIFER_HIGH, wq.treeCloud + 15],
           });
           if (!lods) continue;
+          // The kit's narrow crowns leave bright sky between boughs where the impostor has
+          // foliage. Widen owned copies in the horizontal plane; keep the model height and
+          // the shared catalogue geometry intact.
+          const nearLods = lods.map((level) => {
+            const geometry = level.geometry
+              .clone()
+              .scale(NEAR_CONIFER_WIDTH, 1, NEAR_CONIFER_WIDTH);
+            this.geometries.push(geometry);
+            return { ...level, geometry };
+          });
           const nearId = `${k.id}-near-${id}`;
           props.define({
             id: nearId,
@@ -842,7 +854,7 @@ export class CircuitWorld {
             castShadow: false,
             shadowMaxDistance: 170,
             receiveShadow: true,
-            lods,
+            lods: nearLods,
           });
           nearKits.push({ id: nearId, height: o.propKit.entries.get(id)?.bounds?.max[1] ?? 16 });
         }
@@ -850,7 +862,7 @@ export class CircuitWorld {
         const cm = treeCloudMaterials(
           atlas,
           k.id,
-          { wind: wq.wind, coverage },
+          { wind: wq.wind, coverage, tiles: k.tiles, clusterTints: atlases.clusterTints },
           mats.time,
           this.treeSwap,
         );
@@ -1035,32 +1047,7 @@ export class CircuitWorld {
     if (kit && backdrops.length > 0) {
       const windows = windowMaterial(o.night ?? false);
       this.materials.push(windows);
-      for (const id of new Set(backdrops.map((b) => b.kitId))) {
-        const lods = kit.lodsFor(id, {
-          materialOverrides: { 'window-emissive-mask': windows },
-          // Seen across the city: as far as the mapped buildings.
-          maxDistanceScale: 3.4,
-          distanceCaps: [80, 300, FAR_BUILDINGS],
-        });
-        if (!lods) continue;
-        o.props.define({
-          id: `backdrop-${id}`,
-          reflect: 'skyline',
-          castShadow: o.quality.sceneryShadows,
-          shadowMaxDistance: 220,
-          receiveShadow: true,
-          lods,
-        });
-      }
-      for (const b of backdrops)
-        o.props.place(`backdrop-${b.kitId}`, {
-          x: b.x,
-          y: b.y,
-          z: b.z,
-          yaw: b.yaw,
-          scale: b.scale,
-          s: b.s,
-        });
+      placeBackdrops(o.props, kit, backdrops, windows, o.quality.sceneryShadows, FAR_BUILDINGS);
       this.counts.backdrops = backdrops.length;
     }
     const { chunks, count } = buildBuildingChunks(
