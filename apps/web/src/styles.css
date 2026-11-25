@@ -1045,20 +1045,13 @@ body {
 
 .hud-ers__meter u {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  transform: translateX(0%);
-  will-change: transform;
-}
-
-.hud-ers__meter u::after {
-  content: '';
-  position: absolute;
   top: 0;
   bottom: 0;
-  right: 0;
+  left: 100%;
   width: 2px;
+  pointer-events: none;
   background: var(--c-text-1);
+  transform: translateX(-100%);
 }
 
 .hud-drs {

@@ -721,15 +721,15 @@ export class Hud {
     }
     setClass(this.root, 'is-limiter', flash);
 
-    // Compositor-only transform updates so the ERS bar never triggers layout.
+    // The fill uses a compositor transform; the two-pixel lap marker stays inside the meter.
     const ersScale = h.ers.toFixed(3);
     if (ersScale !== this.lastErs) {
       this.ersFill.style.transform = `scaleX(${ersScale})`;
       this.lastErs = ersScale;
     }
-    const markShift = `${((h.ersLap - 1) * 100).toFixed(1)}%`;
+    const markShift = `${(h.ersLap * 100).toFixed(1)}%`;
     if (markShift !== this.lastMark) {
-      this.ersMark.style.transform = `translateX(${markShift})`;
+      this.ersMark.style.left = `clamp(2px, ${markShift}, 100%)`;
       this.lastMark = markShift;
     }
     setData(this.drsEl, 'state', h.drs);

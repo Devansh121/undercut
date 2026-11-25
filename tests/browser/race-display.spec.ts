@@ -274,7 +274,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   expect(await fitEverywhere(page, { label: 'pit service with HUD scale', sizes })).toEqual([]);
   await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
 
-  // Complete the pit stop and let the racing driver finish the 3-lap race to inspect final results.
+  // Complete the pit stop and let the racing driver finish the 2-lap race to inspect final results.
   await page.evaluate(() => {
     window.__undercut!.raceDriver(true);
     window.__undercut!.setTimeScale(8);
