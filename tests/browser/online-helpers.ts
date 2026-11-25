@@ -17,7 +17,9 @@ export async function onlinePair(browser: Browser, baseURL: string, netSim = '')
   await host!.getByLabel('Driver name').fill('Host');
   await host!.getByRole('button', { name: 'Create room', exact: true }).click();
   await expect(host!.getByTestId('invite')).toBeVisible();
-  await guest!.goto((await host!.getByTestId('invite').getAttribute('href'))! + suffix);
+  const invite = new URL((await host!.getByTestId('invite').getAttribute('href'))!, baseURL);
+  expect(invite.searchParams.get('room')).toBeTruthy();
+  await guest!.goto('/' + invite.search + suffix);
   await guest!.getByLabel('Driver name').fill('Guest');
   await guest!.getByRole('button', { name: 'Join room', exact: true }).click();
   await expect.poll(async () => (await onlineState(host!)).state?.members.length).toBe(2);
