@@ -20,6 +20,9 @@ describe('racecraft proof cases and metrics', () => {
         cases.filter((c) => c.laps === 1 && c.seed >= 101 && c.seed <= 120).map((c) => c.seed),
       ).toEqual(Array.from({ length: 20 }, (_, i) => 101 + i));
       expect(cases).toHaveLength(circuit === 'monza' ? 32 : 30);
+      expect(proofCases(circuit, 'default')).toEqual(
+        [1, 4, 7].map((seed) => ({ circuit, seed, laps: 5, settings: 'default' })),
+      );
       if (circuit === 'monza')
         expect(cases.filter((c) => c.seed > 120).map((c) => c.seed)).toEqual([1022, 7307]);
     }
@@ -28,7 +31,7 @@ describe('racecraft proof cases and metrics', () => {
     const r = summarizeRace(
       { circuit: 'monza', seed: 1, laps: 5 },
       {
-        racing: { overtakes: 4, overtakesByLap: [0, 1, 2, 1] },
+        racing: { overtakes: 4, overtakesByLap: [1, 1, 2, 1] },
         cars: [
           {
             turnOne: 'clean',
@@ -37,6 +40,10 @@ describe('racecraft proof cases and metrics', () => {
             maxContactSpeed: 1.5,
             beyondBarrier: -1,
             longestContact: 0.1,
+            allOffTicks: 7,
+            maxOffset: 6.5,
+            wallHits: 0,
+            maxWallSpeed: 0,
           },
           {
             turnOne: 'contact',
@@ -45,6 +52,10 @@ describe('racecraft proof cases and metrics', () => {
             maxContactSpeed: 4,
             beyondBarrier: 0.2,
             longestContact: 0.3,
+            allOffTicks: 3,
+            maxOffset: 9,
+            wallHits: 2,
+            maxWallSpeed: 6,
           },
         ],
         result: {
@@ -58,7 +69,12 @@ describe('racecraft proof cases and metrics', () => {
     );
     expect(r).toMatchObject({
       passes: 4,
-      byLap: [0, 1, 2, 1],
+      byLap: [1, 1, 2, 1],
+      laterPasses: 4,
+      allOffTicks: 10,
+      maxOffset: 9,
+      wallHits: 2,
+      wallPeak: 6,
       clean: 1,
       spins: 1,
       contactTicks: 5,

@@ -238,18 +238,23 @@ function printRun(lib, run) {
         `max wheels off ${c.maxWheelsOff}  all-off ticks ${c.allOffTicks}  max |d| ${c.maxOffset.toFixed(1)} m  ` +
         `contact ${(c.contactTicks / 240).toFixed(2)} s (longest ${c.longestContact.toFixed(2)} s, ` +
         `${c.maxContactSpeed.toFixed(1)} m/s, ${c.contactImpulse.toFixed(0)} N·s)  spins ${c.spins}  ` +
-        `turn one ${c.turnOne}  barrier ${c.beyondBarrier > 0 ? `${c.beyondBarrier.toFixed(1)} m past` : 'clear'}`,
+        `turn one ${c.turnOne}  wall hits ${c.wallHits} (${c.maxWallSpeed.toFixed(1)} m/s)  ` +
+        `barrier ${c.beyondBarrier > 0 ? `${c.beyondBarrier.toFixed(1)} m past` : 'clear'}`,
     );
   }
   if (run.result.kind === 'race') {
     const clean = run.cars.filter((c) => c.turnOne === 'clean').length;
     console.log(
       `\nTurn one: ${clean} of ${run.cars.length} clean; longest contact ${Math.max(...run.cars.map((c) => c.longestContact)).toFixed(2)} s; ` +
-        `spins ${run.cars.reduce((a, c) => a + c.spins, 0)}; past a barrier line ${run.cars.filter((c) => c.beyondBarrier > 0).length}`,
+        `spins ${run.cars.reduce((a, c) => a + c.spins, 0)}; past a barrier line ${run.cars.filter((c) => c.beyondBarrier > 0).length}; ` +
+        `wall hits ${run.cars.reduce((a, c) => a + c.wallHits, 0)}; all-off ticks ${run.cars.reduce((a, c) => a + c.allOffTicks, 0)}`,
     );
     const r = run.racing;
     console.log(
-      `Racing: ${r.overtakes} on-track position changes; closest gap ${r.closestGap.toFixed(2)} s; ` +
+      `Passes: ${r.overtakes} on-track position changes, ${r.overtakesAfterLap1} on lap 2 or later (by lap: ${Array.from({ length: run.result.laps ?? 0 }, (_, i) => r.overtakesByLap[i] ?? 0).join(', ')})`,
+    );
+    console.log(
+      `Racing: closest gap ${r.closestGap.toFixed(2)} s; ` +
         `at racing speed ${(100 * r.within05).toFixed(1)} % of the time within 0.5 s of the car ahead, ${(100 * r.within10).toFixed(1)} % within 1 s`,
     );
   }

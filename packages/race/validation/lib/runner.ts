@@ -82,6 +82,12 @@ export interface CarSummary {
   beyondBarrier: number;
   /** Spins after the start (heading more than 0.8 rad off the track's direction, outside the pit lane). */
   spins: number;
+  /** Barrier contacts: separate hits (a hit ends after 0.5 s clear of the barrier), ticks touching one, and the largest impact speed, m/s. */
+  wallHits: number;
+  /** Lap s of each wall hit, m (the first 20). */
+  wallHitsAt: number[];
+  wallTicks: number;
+  maxWallSpeed: number;
   /** Through the first corners on lap 1 cleanly, or what went wrong there. */
   turnOne: 'clean' | 'contact' | 'spin' | 'off' | 'stopped' | 'pending';
 }
@@ -114,6 +120,8 @@ export interface RacingStats {
   overtakes: number;
   /** Position swaps grouped by the passing car's lap (index 0 is lap 1). */
   overtakesByLap: number[];
+  /** Position swaps by a car on its second lap or later. */
+  overtakesAfterLap1: number;
   /** Closest time gap between a car and the one ahead on track at racing speed, s. */
   closestGap: number;
   /** Share of samples, over followers above 30 m/s, within 0.5 s and within 1 s of the car ahead. */
@@ -131,6 +139,8 @@ export function defaultPitLap(laps: number): ((car: number) => number | null) | 
 /** Car footprint for the overlap count, m: length and width with a little margin off. */
 const CAR_LENGTH = 5.4;
 const CAR_WIDTH = 1.9;
+/** Time clear of the barrier that separates two wall hits, s. */
+const WALL_HIT_GAP = 0.5;
 
 export function entrantsFor(count: number): EntrantInfo[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -233,8 +243,13 @@ export function runSession(
     longestContact: 0,
     beyondBarrier: Number.NEGATIVE_INFINITY,
     spins: 0,
+    wallHits: 0,
+    wallHitsAt: [],
+    wallTicks: 0,
+    maxWallSpeed: 0,
     turnOne: 'pending',
   }));
+  const wallClear = new Float64Array(n).fill(Infinity);
   const contactRun = new Float64Array(n);
   const spinning = new Array<boolean>(n).fill(false);
   const offTime = new Float64Array(n);
@@ -253,6 +268,7 @@ export function runSession(
   const stats: RacingStats = {
     overtakes: 0,
     overtakesByLap: [],
+    overtakesAfterLap1: 0,
     closestGap: Infinity,
     within05: 0,
     within10: 0,
@@ -325,6 +341,7 @@ export function runSession(
             stats.overtakes++;
             const lap = c.timer(after > 0 ? i : j).lap;
             stats.overtakesByLap[lap - 1] = (stats.overtakesByLap[lap - 1] ?? 0) + 1;
+            if (lap > 1) stats.overtakesAfterLap1++;
           }
         }
       }
@@ -366,6 +383,15 @@ export function runSession(
         } else contactRun[i] = 0;
         s.maxContactSpeed = Math.max(s.maxContactSpeed, st.carContactSpeed);
         s.contactImpulse += st.carContactImpulse;
+        if (st.wallContact !== 0) {
+          if (wallClear[i]! >= WALL_HIT_GAP) {
+            s.wallHits++;
+            if (s.wallHitsAt.length < 20) s.wallHitsAt.push(Math.round(f.s));
+          }
+          s.wallTicks++;
+          wallClear[i] = 0;
+          s.maxWallSpeed = Math.max(s.maxWallSpeed, st.wallImpactSpeed);
+        } else wallClear[i] = wallClear[i]! + dt;
         const side = f.d >= 0 ? 0 : 1;
         const barrier = track.lap.interpolate(track.barrier[side], f.s);
         s.beyondBarrier = Math.max(s.beyondBarrier, Math.abs(f.d) - barrier);

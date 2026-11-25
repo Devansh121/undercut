@@ -17,6 +17,11 @@ export function runFollowupRace(circuit: RaceCircuit, seed: number, laps = 1): R
   return runRace({ circuit, cars: 20, laps, seed, pitLap: null, tyres: true, startFuel });
 }
 
+/** A race with the telemetry command's own settings: pit stops on, no tyre model, the default start fuel. */
+export function runDefaultRace(circuit: RaceCircuit, seed: number, laps = 5): RaceRun {
+  return runRace({ circuit, cars: 20, laps, seed });
+}
+
 /**
  * Starts that still fail with the game's tyres and fuel, held by the tests as expected failures
  * so a fix shows (docs/STATUS.md, open gaps). `start`: fails the Quick Race lap-one acceptance
