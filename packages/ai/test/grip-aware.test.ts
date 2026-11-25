@@ -98,3 +98,23 @@ it('on less grip, slows where the plan is grip-limited and keeps the top speed',
   const full = target(sFlat, 75, 1);
   expect(Math.abs(target(sFlat, 75, 0.9) - full)).toBeLessThan(0.01 * full);
 });
+
+it('releases the DRS request during a lift and requests it again when throttle returns', () => {
+  const dr = driver();
+  const plan = dr.plan;
+  const i = plan.drsZone.findIndex(
+    (zone, k) => zone === 1 && plan.profile.phase[k] === Phase.Throttle && plan.profile.v[k]! > 70,
+  );
+  expect(i).toBeGreaterThanOrEqual(0);
+  const tel = at(i * track.lap.step, 70, 1);
+  const out: ControlInput = { ...NEUTRAL_INPUT };
+  dr.accelLimit = -0.5 * plan.model.drag(70, false);
+  dr.drive(tel, 1 / 240, out);
+  expect(out.brake).toBeLessThan(0.02);
+  expect(out.throttle).toBeLessThan(0.3);
+  expect(out.drs).toBe(false);
+  dr.accelLimit = Infinity;
+  dr.drive(tel, 1 / 240, out);
+  expect(out.throttle).toBeGreaterThanOrEqual(0.3);
+  expect(out.drs).toBe(true);
+});

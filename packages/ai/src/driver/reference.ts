@@ -479,7 +479,7 @@ export class ReferenceDriver implements Driver {
     out.throttle = throttle;
     out.brake = brake;
     out.gearShift = sliding ? 0 : this.gear(tel, throttle);
-    out.drs = drsHere && brake < 0.02;
+    out.drs = drsHere && brake < 0.02 && throttle >= 0.3;
     out.overtake = deployHere && throttle > 0.9;
     out.pitLimiter = false;
 
