@@ -107,6 +107,7 @@ export function classificationColumns(
     {
       head: 'Pen',
       num: true,
+      colClass: 'col-pen',
       cell: penaltyText,
     },
     ...(o.points

@@ -802,4 +802,9 @@ export class Hud {
       dot.setAttribute('opacity', o.opacity.toFixed(2));
     }
   }
+
+  /** Release listeners and observers held by child HUD modules. */
+  destroy(): void {
+    this.tower.destroy();
+  }
 }

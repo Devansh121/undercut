@@ -1020,7 +1020,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const rootObserver = new MutationObserver(measureCluster);
   rootObserver.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['style', 'data-text-size'],
+    attributeFilter: ['style', 'data-text'],
   });
   window.addEventListener('resize', measureCluster);
   measureCluster();
@@ -2087,6 +2087,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     o.canvas.removeEventListener('webglcontextrestored', onContextRestored);
     clusterObserver.disconnect();
     rootObserver.disconnect();
+    hud.destroy();
     window.removeEventListener('resize', measureCluster);
     loop.quit();
     ext?.detach?.();

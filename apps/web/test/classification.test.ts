@@ -68,6 +68,7 @@ describe('session classification', () => {
       cells('race', entry({ penalties: [{ reason: 'jumpStart', seconds: 5, served: true }] })).Pen,
     ).toBe('5 s served');
     expect(compoundsText(['medium', 'hard', 'soft'])).toBe('M / H / S');
+    expect(classificationColumns('race').find((c) => c.head === 'Pen')?.colClass).toBe('col-pen');
   });
 
   it('shows a timed session as best lap and gap to the fastest', () => {

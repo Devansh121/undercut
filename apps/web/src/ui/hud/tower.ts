@@ -73,6 +73,7 @@ export class TimingTower {
   private lastRows: readonly TowerRow[] = [];
   private readonly compactRows: number;
   private readonly phone: MediaQueryList | null;
+  private readonly textObserver: MutationObserver | null;
   private readonly onCompactChange: () => void;
   private raceMode: boolean;
 
@@ -140,9 +141,24 @@ export class TimingTower {
     this.setStatus('green', S.hud.greenFlag);
 
     this.onCompactChange = () => {
-      if (this.lastRows.length > 0) this.update(this.lastRows);
+      if (this.lastRows.length > 0) this.render(this.lastRows, false);
     };
     this.phone?.addEventListener?.('change', this.onCompactChange);
+    if (typeof MutationObserver === 'function' && typeof document !== 'undefined') {
+      this.textObserver = new MutationObserver(this.onCompactChange);
+      this.textObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-text'],
+      });
+    } else {
+      this.textObserver = null;
+    }
+  }
+
+  /** Disconnect listeners and observers owned by the tower. */
+  destroy(): void {
+    this.phone?.removeEventListener?.('change', this.onCompactChange);
+    this.textObserver?.disconnect();
   }
 
   /** Switch race-tower mode (column header, tyre age, pit stops) on or off. */
@@ -186,11 +202,23 @@ export class TimingTower {
     setClass(this.footValueEl, 'is-empty', muted);
   }
 
+  /** Compact phone row budget: 4 at standard text, 3 at large/larger so the tower clears touch buttons. */
+  private compactLimit(): number {
+    const text =
+      typeof document !== 'undefined' ? document.documentElement.dataset.text : undefined;
+    return text === 'large' || text === 'larger' ? Math.min(this.compactRows, 3) : this.compactRows;
+  }
+
   /** Show `rows` (in position order). Cheap when nothing changed. */
   update(rows: readonly TowerRow[]): void {
+    this.render(rows, true);
+  }
+
+  private render(rows: readonly TowerRow[], animate: boolean): void {
     this.lastRows = rows;
-    const compact = Boolean(this.phone?.matches) && rows.length > this.compactRows;
-    const shown = compact ? towerWindow(rows, this.compactRows) : rows;
+    const limit = this.compactLimit();
+    const compact = Boolean(this.phone?.matches) && rows.length > limit;
+    const shown = compact ? towerWindow(rows, limit) : rows;
     for (let i = 0; i < shown.length; i++) {
       const r = shown[i]!;
       const split =
@@ -204,7 +232,7 @@ export class TimingTower {
     let same = shown.length === this.order.length;
     for (let i = 0; same && i < shown.length; i++) same = shown[i]?.id === this.order[i];
     if (same) return;
-    this.reorder(shown);
+    this.reorder(shown, animate);
   }
 
   private write(r: TowerRow, gapSplit: boolean): void {
@@ -295,21 +323,28 @@ export class TimingTower {
   }
 
   /** Put rows in their new order, sliding each from where it was (FLIP). */
-  private reorder(shown: readonly TowerRow[]): void {
+  private reorder(shown: readonly TowerRow[], animate: boolean): void {
     const before = new Map<string, number>();
-    for (const id of this.order) {
-      const n = this.nodes.get(id);
-      if (n?.li.isConnected) before.set(id, n.li.offsetTop);
+    if (animate) {
+      for (const id of this.order) {
+        const n = this.nodes.get(id);
+        if (n?.li.isConnected) before.set(id, n.li.offsetTop);
+      }
     }
     const keep = new Set<string>();
     for (const r of shown) {
       const n = this.nodes.get(r.id);
       if (!n) continue;
       keep.add(r.id);
+      if (!animate) {
+        n.li.style.transition = '';
+        n.li.style.transform = '';
+      }
       this.list.append(n.li);
     }
     for (const [id, n] of this.nodes) if (!keep.has(id)) n.li.remove();
     this.order = shown.map((r) => r.id);
+    if (!animate) return;
     const moved: HTMLElement[] = [];
     for (const r of shown) {
       const n = this.nodes.get(r.id);

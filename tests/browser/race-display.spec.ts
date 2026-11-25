@@ -1,7 +1,94 @@
 import { mkdir } from 'node:fs/promises';
+import type { Page } from '@playwright/test';
 import { expect, test } from './base';
-import { DESKTOP, PHONES, fitEverywhere, setTextSize } from './fit-sweep';
+import { DESKTOP, PHONES, TEXT_SIZES, fitEverywhere, setTextSize } from './fit-sweep';
 import { watchProblems } from './helpers';
+
+type Box = { x: number; y: number; width: number; height: number };
+
+const apart = (a: Box, b: Box): boolean =>
+  a.x + a.width <= b.x + 1 ||
+  b.x + b.width <= a.x + 1 ||
+  a.y + a.height <= b.y + 1 ||
+  b.y + b.height <= a.y + 1;
+
+async function assertPhoneHudClearance(
+  page: Page,
+  o: {
+    expectStatusVisible: boolean;
+    capture?: (stage: string) => Promise<void>;
+    largerCaptureStage?: string;
+  },
+): Promise<void> {
+  const tower = page.getByTestId('tower');
+  const statusEl = page.getByTestId('tower-status');
+  const gapToggle = page.getByTestId('tower-gap-toggle');
+  const touchBtns = [
+    page.locator('.ut-touch__btn--boxThisLap'),
+    page.locator('.ut-touch__btn--nextCompound'),
+    page.locator('.ut-touch__btn--pitLimiter'),
+  ];
+  const timing = page.locator('.hud-timing');
+  const onboarding = page.getByTestId('onboarding');
+  const steerTag = page.locator('.ut-touch__steer .ut-touch__tag');
+  const map = page.locator('.hud-map');
+  const lights = page.getByTestId('start-lights');
+
+  for (const size of TEXT_SIZES) {
+    await setTextSize(page, size);
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+    );
+    const expectedRows = size === 'standard' ? 4 : 3;
+    await expect(tower.locator('.hud-tower__row')).toHaveCount(expectedRows);
+    const playerRow = tower.locator('.hud-tower__row.is-player');
+    await expect(playerRow).toHaveCount(1);
+    await expect(playerRow).toBeVisible();
+    if (o.expectStatusVisible) {
+      await expect(statusEl).toBeVisible();
+    }
+
+    const towerBox = (await tower.boundingBox())!;
+    const playerBox = (await playerRow.boundingBox())!;
+    const gapBox = (await gapToggle.boundingBox())!;
+    const timingBox = (await timing.boundingBox())!;
+    expect(gapBox.width).toBeGreaterThanOrEqual(48);
+    expect(gapBox.height).toBeGreaterThanOrEqual(48);
+    expect(apart(gapBox, timingBox)).toBe(true);
+    expect(apart(towerBox, timingBox)).toBe(true);
+
+    for (const btn of touchBtns) {
+      const btnBox = (await btn.boundingBox())!;
+      expect(towerBox.y + towerBox.height).toBeLessThanOrEqual(btnBox.y + 1);
+      expect(playerBox.y + playerBox.height).toBeLessThanOrEqual(btnBox.y + 1);
+      expect(apart(gapBox, btnBox)).toBe(true);
+    }
+
+    if (await onboarding.isVisible()) {
+      const coachBox = (await onboarding.boundingBox())!;
+      if (await steerTag.isVisible()) {
+        expect(apart(coachBox, (await steerTag.boundingBox())!)).toBe(true);
+      }
+      for (const btn of touchBtns) {
+        expect(apart(coachBox, (await btn.boundingBox())!)).toBe(true);
+      }
+      if (await map.isVisible()) {
+        expect(apart(coachBox, (await map.boundingBox())!)).toBe(true);
+      }
+      if (await lights.isVisible()) {
+        expect(apart(coachBox, (await lights.boundingBox())!)).toBe(true);
+      }
+    }
+
+    if (size === 'larger' && o.capture && o.largerCaptureStage) {
+      await o.capture(o.largerCaptureStage);
+    }
+  }
+  await setTextSize(page, 'standard');
+  await page.evaluate(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+  );
+}
 
 test('race display: start lights, 20-car timing tower, yellow sector on minimap, pit & penalty messages, and classification results', async ({
   page,
@@ -63,6 +150,13 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   );
 
   await capture('start');
+  if (isPhone) {
+    await assertPhoneHudClearance(page, {
+      expectStatusVisible: true,
+      capture,
+      largerCaptureStage: 'start-larger',
+    });
+  }
   await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
   const textPixels = async () =>
     page
@@ -143,23 +237,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(gapToggle).toBeVisible();
   await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
   if (isPhone) {
-    const box = await gapToggle.boundingBox();
-    expect(box!.width).toBeGreaterThanOrEqual(48);
-    expect(box!.height).toBeGreaterThanOrEqual(48);
-    const towerBox = await tower.boundingBox();
-    const boxBtn = await page.locator('.ut-touch__btn--boxThisLap').boundingBox();
-    const timingBox = await page.locator('.hud-timing').boundingBox();
-    expect(towerBox!.y + towerBox!.height).toBeLessThanOrEqual(boxBtn!.y + 1);
-    const apart = (
-      a: { x: number; y: number; width: number; height: number },
-      b: { x: number; y: number; width: number; height: number },
-    ) =>
-      a.x + a.width <= b.x + 1 ||
-      b.x + b.width <= a.x + 1 ||
-      a.y + a.height <= b.y + 1 ||
-      b.y + b.height <= a.y + 1;
-    expect(apart(box!, boxBtn!)).toBe(true);
-    expect(apart(box!, timingBox!)).toBe(true);
+    await assertPhoneHudClearance(page, { expectStatusVisible: false });
   }
   await gapToggle.click();
   await expect(gapToggle).toHaveAttribute('data-mode', 'interval');
@@ -198,6 +276,13 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   expect(await yellowSegments.count()).toBeGreaterThanOrEqual(1);
 
   await capture('yellow');
+  if (isPhone) {
+    await assertPhoneHudClearance(page, {
+      expectStatusVisible: true,
+      capture,
+      largerCaptureStage: 'yellow-larger',
+    });
+  }
 
   // Call a pit stop and verify the pit message enters the race-control message queue.
   await page.evaluate(() => {
@@ -408,6 +493,9 @@ test('race display: real blue flag banner, tower status, and HUD scale fit', asy
   await expect(page.getByTestId('race-flag')).toHaveAttribute('data-flag', 'blue');
   await expect(page.getByTestId('race-flag')).toContainText(/Blue flag/i);
   await expect(page.getByTestId('tower-status')).toHaveAttribute('data-flag', 'blue');
+  if (info.project.name === 'phone') {
+    await assertPhoneHudClearance(page, { expectStatusVisible: true });
+  }
   await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
   expect(await fitEverywhere(page, { label: 'blue flag with HUD scale', sizes })).toEqual([]);
   await page.evaluate(() => {
