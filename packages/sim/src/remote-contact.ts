@@ -40,6 +40,12 @@ export const MAX_CONTACT_EXTRAPOLATION_S = 0.25;
 export const MAX_REMOTE_CLOSING_SPEED = 40;
 /** Maximum positional push-out applied to the owned car per 240 Hz step, m (14.4 m/s). */
 export const MAX_REMOTE_PUSH_PER_STEP = 0.06;
+/**
+ * Largest clock-sync uncertainty added to a proxy's prediction horizon, s. The client's measured
+ * error is an upper bound (half the worst of its best round trips); on a slow link it can exceed
+ * any real offset, so it is capped here. The 0.3 m allowance cap still applies on top.
+ */
+export const MAX_CONTACT_CLOCK_ERROR_S = 0.1;
 /** Solver passes per step (handles being pinched between two remote cars). */
 export const REMOTE_CONTACT_PASSES = 2;
 
@@ -56,6 +62,11 @@ export interface RemoteContactBody {
   yawRate: number;
   /** Age of the newest received pose at the contact tick, s. Zero for owned/fresh bodies. */
   ageSec?: number;
+  /**
+   * This client's measured clock-sync error, s (`ClockSync.error`). A pose's true age may differ
+   * from `ageSec` by up to this much. Clamped to `[0, MAX_CONTACT_CLOCK_ERROR_S]`.
+   */
+  clockErrorSec?: number;
   /** True when the remote car must not collide (held, fading, retired, reset grace). */
   ghost?: boolean;
 }
@@ -74,6 +85,7 @@ export function extrapolateRemoteBody(
     dtSec <= 0 ? 0 : dtSec > MAX_CONTACT_EXTRAPOLATION_S ? MAX_CONTACT_EXTRAPOLATION_S : dtSec;
   out.seat = src.seat;
   out.ageSec = src.ageSec ?? 0;
+  out.clockErrorSec = src.clockErrorSec ?? 0;
   out.ghost = src.ghost === true;
   out.yawRate = src.yawRate;
   if (dt === 0) {
@@ -117,6 +129,13 @@ const massScratch: MassState = {
 const localBox: CarFootprint = { cx: 0, cz: 0, fx: 1, fz: 0, halfLength: 0, halfWidth: 0 };
 const remoteBox: CarFootprint = { cx: 0, cz: 0, fx: 1, fz: 0, halfLength: 0, halfWidth: 0 };
 const hitScratch: FootprintHit = { depth: 0, nx: 0, nz: 0, px: 0, pz: 0 };
+
+/** Prediction horizon for a stale proxy: pose age plus bounded clock-sync uncertainty, s. */
+function predictionHorizon(r: RemoteContactBody): number {
+  const age = Math.max(0, r.ageSec ?? 0);
+  const clock = Math.min(MAX_CONTACT_CLOCK_ERROR_S, Math.max(0, r.clockErrorSec ?? 0));
+  return age + clock;
+}
 
 function projectedRadius(b: CarFootprint, ax: number, az: number): number {
   return (
@@ -177,10 +196,12 @@ export function resolveRemoteCarContacts(
       remoteBox.halfLength = halfLength;
       remoteBox.halfWidth = halfWidth;
 
+      const horizon = predictionHorizon(r);
       if (!collideFootprints(localBox, remoteBox, hitScratch)) {
         // The proxy is already extrapolated to now. This is an approach-only prediction
         // horizon, not another extrapolation or an isotropic pose-error margin.
-        // Find the separating face normal, then reserve at most age * normal closing speed.
+        // Find the separating face normal, then reserve at most horizon * normal closing speed
+        // (pose age plus bounded clock-sync error).
         let gap = -Infinity;
         let nx = 0;
         let nz = 0;
@@ -201,7 +222,7 @@ export function resolveRemoteCarContacts(
           (local.vx * lc - local.vy * ls - r.vx) * nx +
           (-local.vx * ls - local.vy * lc - r.vz) * nz;
         if (closing <= 0) continue;
-        const allowance = Math.min(0.3, Math.max(0, r.ageSec ?? 0) * closing);
+        const allowance = Math.min(0.3, horizon * closing);
         if (gap >= allowance) continue;
         // Translate only along that normal; recheck all SAT axes at the predicted face.
         remoteBox.cx -= nx * allowance;
@@ -216,8 +237,8 @@ export function resolveRemoteCarContacts(
         const pbx = r.vx + r.yawRate * (hitScratch.pz - r.z);
         const pbz = r.vz - r.yawRate * (hitScratch.px - r.x);
         if ((pbx - pax) * hitScratch.nx + (pbz - paz) * hitScratch.nz >= 0) continue;
-      } else if ((r.ageSec ?? 0) > 0) {
-        // Already touching a stale proxy: it still hides age * closing speed of approach along
+      } else if (horizon > 0) {
+        // Already touching a stale proxy: it still hides horizon * closing speed of approach along
         // this normal. Reserve that depth only while the contact point is closing, so
         // parallel or separating contact is resolved on its measured overlap alone.
         const pax = local.vx * lc - local.vy * ls + local.yawRate * (hitScratch.pz - local.z);
@@ -225,7 +246,7 @@ export function resolveRemoteCarContacts(
         const pbx = r.vx + r.yawRate * (hitScratch.pz - r.z);
         const pbz = r.vz - r.yawRate * (hitScratch.px - r.x);
         const closing = (pax - pbx) * hitScratch.nx + (paz - pbz) * hitScratch.nz;
-        if (closing > 0) hitScratch.depth += Math.min(0.3, r.ageSec! * closing);
+        if (closing > 0) hitScratch.depth += Math.min(0.3, horizon * closing);
       }
       if (i < 31) hitMask |= 1 << i;
       passHit = true;

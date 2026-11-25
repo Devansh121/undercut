@@ -4,6 +4,7 @@ import {
   BODY_NOSE,
   BODY_TAIL,
   FLAT_SURFACE,
+  MAX_CONTACT_CLOCK_ERROR_S,
   MAX_CONTACT_EXTRAPOLATION_S,
   MAX_REMOTE_PUSH_PER_STEP,
   REFERENCE_CAR,
@@ -350,6 +351,75 @@ describe('aged remote poses', () => {
     expect(stale).toBeLessThanOrEqual(MAX_REMOTE_PUSH_PER_STEP);
     // Separating or parallel: age adds nothing to the overlap.
     for (const vz of [0, 1]) expect(run(0.2, vz)).toBe(run(0, vz));
+  });
+
+  describe('clock-sync error', () => {
+    // Alongside with a 0.1 m gap, the remote closing laterally at 1 m/s, pose 0.05 s old.
+    const setup = (vz: number, clockErrorSec: number) => {
+      const world = createWorld({ step: STEP, seed: 1 });
+      const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+      const remote: RemoteContactBody = {
+        seat: 1,
+        x: 0,
+        z: 2 * BODY_HALF_WIDTH + 0.1,
+        yaw: 0,
+        vx: 20,
+        vz,
+        yawRate: 0,
+        ageSec: 0.05,
+        clockErrorSec,
+      };
+      return { car, remote };
+    };
+
+    it('widens the closing horizon so a closing pair separates', () => {
+      // Age alone reserves 0.05 m, short of the gap: no contact.
+      const fresh = setup(-1, 0);
+      expect(resolveRemoteCarContacts(fresh.car.state, [fresh.remote], FLAT_SURFACE)).toBe(0);
+      // With 0.08 s of sync error the horizon is 0.13 s: 0.13 m reserved, the gap is closed.
+      const { car, remote } = setup(-1, 0.08);
+      const y = car.state.y;
+      expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(1);
+      expect(car.state.carContactImpulse).toBeGreaterThan(0);
+      // The impulse drives the local car away from the remote (towards -Z, its left).
+      const c = Math.cos(car.state.yaw);
+      const sn = Math.sin(car.state.yaw);
+      expect(-car.state.vx * sn - car.state.vy * c).toBeLessThan(0);
+      expect(car.state.y).toBe(y);
+    });
+
+    it('adds nothing for parallel or separating motion, across a gap or touching', () => {
+      for (const vz of [0, 1]) {
+        const { car, remote } = setup(vz, MAX_CONTACT_CLOCK_ERROR_S);
+        const before = { ...car.state };
+        expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+        expect(car.state).toEqual(before);
+        // Touching (0.04 m overlap): resolved on measured overlap alone, as with no sync error.
+        const push = (clockErrorSec: number) => {
+          const s = setup(vz, clockErrorSec);
+          s.remote.z = 2 * BODY_HALF_WIDTH - 0.04;
+          expect(resolveRemoteCarContacts(s.car.state, [s.remote], FLAT_SURFACE)).toBe(1);
+          return { ...s.car.state };
+        };
+        expect(push(MAX_CONTACT_CLOCK_ERROR_S)).toEqual(push(0));
+      }
+    });
+
+    it('clamps an implausible sync error', () => {
+      const run = (clockErrorSec: number) => {
+        const s = setup(-1, clockErrorSec);
+        s.remote.z = 2 * BODY_HALF_WIDTH + 0.12;
+        return resolveRemoteCarContacts(s.car.state, [s.remote], FLAT_SURFACE);
+      };
+      // Horizon 0.05 + 0.1 (clamped) = 0.15 s: 0.15 m reserved, reaches a 0.12 m gap.
+      expect(run(MAX_CONTACT_CLOCK_ERROR_S)).toBe(1);
+      // A 10 s "error" or a negative one does not reach further than the clamp allows.
+      const far = setup(-1, 10);
+      far.remote.z = 2 * BODY_HALF_WIDTH + 0.2;
+      expect(resolveRemoteCarContacts(far.car.state, [far.remote], FLAT_SURFACE)).toBe(0);
+      const neg = setup(-1, -1);
+      expect(resolveRemoteCarContacts(neg.car.state, [neg.remote], FLAT_SURFACE)).toBe(0);
+    });
   });
 
   it('caps the prediction allowance even for extremely old converging poses', () => {

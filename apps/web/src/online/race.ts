@@ -443,6 +443,8 @@ export class OnlineRace implements DriveExtension {
         this.contactExpires.set(seat, latest.t + 250);
         proxy.ageSec = Math.max(0, (serverTime - latest.t) / 1000);
       }
+      // The sim clamps this; it widens only the closing-speed prediction horizon.
+      proxy.clockErrorSec = (this.client.clock.error ?? 0) / 1000;
       this.contactProxies.push(proxy);
     }
   }

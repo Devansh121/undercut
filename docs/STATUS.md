@@ -419,6 +419,11 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   While already overlapping a stale proxy, the same capped age × normal closing speed is added
   to the measured depth only while the contact point is closing. Without it, the 150 ms contact
   proof passed 8 of 10 runs (penetration up to 0.41 m); with it, 10 of 10 (at most 0.07 m).
+- The prediction horizon is pose age plus this client's measured clock-sync error
+  (`ClockSync.error`, clamped to 0.1 s), still times normal closing speed and capped at 0.3 m.
+  A CI run of the 50 ms contact proof ended 0.02 m overlapped: the guest kept closing at about
+  3.5° after neutral input, and both clients' age-only horizons were short by the sync error
+  between their clocks. Parallel or separating motion still adds nothing.
 - Browser order comparisons freeze one active epoch and wait up to 6 s for both clients to
   receive it and reach activation before querying that same timestamp. Startup also waits for
   active epochs and live peer snapshots. A deterministic 900 ms guest control-message delay

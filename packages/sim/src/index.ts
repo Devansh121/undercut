@@ -101,6 +101,7 @@ export {
   type FootprintHit,
 } from './car-contact';
 export {
+  MAX_CONTACT_CLOCK_ERROR_S,
   MAX_CONTACT_EXTRAPOLATION_S,
   MAX_REMOTE_CLOSING_SPEED,
   MAX_REMOTE_PUSH_PER_STEP,
