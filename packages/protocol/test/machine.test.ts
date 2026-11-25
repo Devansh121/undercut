@@ -866,6 +866,18 @@ describe('review findings', () => {
     expect(handover.ai.map((a) => a.seat)).toEqual([2, 3]);
   });
 
+  it('hands over the cleared grid-line crossing even before the first counted lap', () => {
+    const { h } = inPhase('grid');
+    const length = h.state.settings.circuit.lengthM;
+    h.snap('c1', [car(2, { tick: 100, s: length - 20, lap: 0 })]);
+    h.snap('c1', [car(2, { tick: 101, s: 10, lap: 0 })]);
+    h.snap('c1', [car(2, { tick: 102, s: length - 20, lap: 0 })]);
+    h.send('c1', { type: 'leave' });
+    const handed = h.last('c2', 'host')!.ai.find((a) => a.seat === 2)!;
+    expect(handed.behindLine).toBe(false);
+    expect(handed.lap).toBe(0);
+  });
+
   it('keeps a retired host that still sends its AI cars', () => {
     const { h } = inPhase('racing');
     h.send('c1', { type: 'retire', seat: 0 });

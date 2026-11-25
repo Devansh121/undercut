@@ -112,6 +112,8 @@ export interface Results {
 }
 
 export interface AiHandover {
+  /** Still owes the grid's initial timing-line crossing (older servers omit this). */
+  behindLine?: boolean;
   seat: number;
   aiIndex: number;
   /** Laps counted and race time so far. */

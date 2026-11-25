@@ -230,7 +230,7 @@ export class DriveSession {
     this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
     const artefacts = this.quickRace
       ? raceArtefactsFor(options.track, options.raceArtefacts)
-      : null;
+      : (options.raceArtefacts ?? null);
     const line = artefacts ? decodeRacingLine(artefacts.line) : null;
     if (line && (line.circuit !== options.track.id || line.count !== options.track.lap.count)) {
       throw new Error(`the racing line for ${line.circuit} does not fit ${options.track.id}`);
@@ -267,7 +267,7 @@ export class DriveSession {
             // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
             gridNoise: options.quickRace?.gridNoise ?? 0.5,
             envelope: decodeEnvelope(artefacts.envelope),
-            count: 20,
+            count: this.quickRace ? 20 : 1,
             seed: options.seed,
             ...(options.quickRace?.skillSpread !== undefined
               ? { spread: options.quickRace.skillSpread }

@@ -10,6 +10,12 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- Online slice 2 (PR #81, in progress): circuit choice, live lap timing and named timing tower,
+  bounded symmetric remote contact, and host AI fill with pose/progress handover. Two-browser
+  short acceptance passed at all three circuits; contact passed at 50/100/150 ms with 2% loss.
+  Five-lap full-field soak proof is still being collected.
+
+
 - M4 Race Weekend and Championship (PR #60): practice, single-session qualifying and a race on every circuit; qualifying sets the grid and every weekend race requires two compounds. Championship runs Monza, Spa-Francorchamps and Singapore Marina Bay in order, with driver and team points, count-back and locally saved progress at session boundaries. The menu offers five laps, fifteen laps or the circuit's full distance.
 - Player pit stops in Quick Race and weekends: I / D-pad up / BOX calls or cancels the crew; O / D-pad down / TYRE cycles the next compound. Drive into the lane; the assist takes the car to its box, shows the service countdown and waits for a safe release. The automatic limiter defaults on and is saved in session settings; turn it off to use L / left-stick click / LIM. An uncalled visit is a drive-through. The HUD and classification show stops and compounds.
 
@@ -360,3 +366,16 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Traction control on grass and gravel (both driven wheels on surface grip under 0.7, below 8 m/s): the launch throttle of 0.3 stays while the rears' slip ratio is under 0.5. From rest on Monza grass, full throttle reaches 31.9 km/h in 3.6 s instead of 22.3 (traction control off: 31.8). Asphalt launches are unchanged. Each tyre's surface grip of the last step is now part of the car state and its snapshot (`CarState.surfaceGrip`). Full lock from rest on grass barely moves, with traction control or without: that is the tyres, not the assist.
 - A slowly struck board is kept out of the car bodies while it is low (under 0.9 m): ahead of a car's centre it rides on the nose, otherwise it leaves by the nearer side or the tail, and the push carries into its settled place. This is cosmetic and depends on the cars drawn, so clients can differ slightly in where such a board lands.
 - Reference laps at all three circuits are bit-identical to master (lap times and whole-trace digests), and the open kerb-strike cases keep master's expected failures.
+
+
+### Decided for you — online slice 2
+
+- AI physics stays in the host browser; the Worker remains the timing referee and snapshot
+  relay. AI-to-human contact applies the same bounded symmetric response as human-to-human
+  contact, including for the host's own human car. AI-to-AI contact uses the existing sim solver.
+- Online cars retain reference tyres and 20 kg fuel, topped up at line crossings, matching the
+  human online session. The AI driver's private reaction/traffic memory restarts on migration;
+  its latest physical pose, velocities, gears, snapshot tick and service-counted progress carry
+  over. This avoids introducing full sim-state payloads or Worker-side physics in this slice.
+- Long two-browser races are opt-in with ONLINE_SOAK=1 to preserve the ordinary PR browser
+  job's budget. Short circuit, fill, takeover and network-contact proofs run in ordinary CI.

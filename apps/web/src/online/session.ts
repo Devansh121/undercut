@@ -10,6 +10,7 @@
  */
 import {
   CLOSE,
+  MAX_CARS,
   RoomClient,
   normalizeRoomCode,
   roomsApi,
@@ -109,6 +110,7 @@ export class OnlineSession {
   private results: Results | null = null;
   private ended: Ended | null = null;
   private busy = false;
+  private initAiOff = false;
   private generation = 0;
   private code: string | null = null;
   private name = '';
@@ -219,6 +221,7 @@ export class OnlineSession {
             : 'The room service did not answer. Check your connection and try again.',
       });
     }
+    this.initAiOff = true;
     this.connect(res.code, name);
   }
 
@@ -290,14 +293,13 @@ export class OnlineSession {
         this.busy = false;
         this.ended = null;
         this.setToken(code, w.resume);
-        this.offAi();
+        this.initAiDefault();
         this.changed();
       }),
       client.on('room', (room) => {
         for (const n of roomNotices(previous, room, client.me)) this.emit('notice', n);
         previous = room;
         if (room.phase === 'lobby') this.results = null;
-        this.offAi();
         this.changed();
       }),
       client.on('results', (m) => {
@@ -336,11 +338,10 @@ export class OnlineSession {
     this.changed();
   }
 
-  /**
-   * AI fill comes in a later slice (the host's game does not drive AI cars yet), so a room this
-   * game hosts keeps it off; otherwise AI seats would sit on the grid and never finish.
-   */
-  private offAi(): void {
+  /** New rooms start with AI fill off until the host chooses otherwise. */
+  private initAiDefault(): void {
+    if (!this.initAiOff) return;
+    this.initAiOff = false;
     const c = this.clientValue;
     const room = c?.room;
     if (!c || !room || !c.isHost || room.phase !== 'lobby') return;
@@ -356,6 +357,15 @@ export class OnlineSession {
     const c = this.clientValue;
     if (!c?.isHost || !Number.isInteger(laps)) return false;
     return c.changeSettings({ laps: Math.max(1, Math.min(99, laps)) });
+  }
+
+  /** Host only, in the lobby: number of AI cars filling empty grid slots. */
+  setAiCount(count: number): boolean {
+    const c = this.clientValue;
+    const room = c?.room;
+    if (!c?.isHost || room?.phase !== 'lobby' || !Number.isInteger(count)) return false;
+    const maxAi = Math.max(0, MAX_CARS - room.members.length);
+    return c.changeSettings({ aiCount: Math.max(0, Math.min(maxAi, count)) });
   }
 
   /** Host only, in the lobby: choose which circuit the room races. */

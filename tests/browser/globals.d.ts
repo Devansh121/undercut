@@ -12,10 +12,13 @@ declare global {
         releasedServerAt: number | null;
         elapsedRaceMs: number;
         lapTimeSec: number;
+        circuit: string;
+        pose: { x: number; y: number; z: number };
+        contacts: { count: number; maxSpeed: number; maxImpulse: number };
         start: { lightsOutAt: number } | null;
         lightsOutLocalEpoch: number | null;
         clockErrorMs: number | null;
-        remote: unknown[];
+        remote: { seat: number; x: number; z: number; opacity: number; mode: string }[];
         claims: unknown[];
         timing: { status: string }[];
       } | null;

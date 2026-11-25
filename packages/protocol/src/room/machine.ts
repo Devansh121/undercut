@@ -72,6 +72,7 @@ export interface RoomInfo {
 
 /** Per-seat snapshot bookkeeping. Memory only: lost on eviction, rebuilt within a tick. */
 interface SeatTrack {
+  behindLine: boolean;
   tick: number;
   snap: CarSnapshot;
   at: number;
@@ -641,6 +642,7 @@ export class RoomMachine {
         raceMs: c.raceMs,
         state: c.state,
         car: this.seats.get(c.seat)?.snap ?? null,
+        behindLine: this.seats.get(c.seat)?.behindLine ?? true,
       }));
   }
 
@@ -1154,7 +1156,11 @@ export class RoomMachine {
       }
       const track = this.seats.get(snap.seat);
       if (track && snap.tick <= track.tick) continue; // stale or duplicate: drop
-      this.seats.set(snap.seat, { tick: snap.tick, snap, at: this.now });
+      const behindLine =
+        (track?.behindLine ?? true) &&
+        snap.lap === 0 &&
+        snap.s > this.state.settings.circuit.lengthM / 2;
+      this.seats.set(snap.seat, { tick: snap.tick, snap, at: this.now, behindLine });
       accepted.push(snap);
       const start = this.state.start;
       if (start && this.now < start.lightsOutAt && snapshotSpeed(snap) > LIMITS.jumpSpeed) {

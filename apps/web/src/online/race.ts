@@ -21,7 +21,12 @@ import {
   type RemoteContactBody,
 } from '@undercut/sim';
 import { createPathPoint, type Track } from '@undercut/track';
-import { CAR_FLAG, type RoomClient, type StartSchedule, type TimingMessage } from '@undercut/protocol';
+import {
+  CAR_FLAG,
+  type RoomClient,
+  type StartSchedule,
+  type TimingMessage,
+} from '@undercut/protocol';
 import type { DriveExtension, DriveExtensionContext } from '../drive';
 import type { ControlSource, DriverFrame } from '../game/loop';
 import type { SessionEvent } from '../game/session';
@@ -30,6 +35,8 @@ import type { HudState, TowerRow } from '../ui/hud';
 import { S } from '../ui/strings';
 import { poseFromView, toSnapshot } from './car-state';
 import { seatLivery } from './liveries';
+import { OnlineAiField } from './ai-field';
+import type { AiHandover } from '@undercut/protocol';
 import { LineCounter } from './progress';
 import { StartGate } from './start-gate';
 import { RaceHud } from './race-hud';
@@ -84,10 +91,11 @@ export interface OnlineRaceReport {
   /** Live running order as seat numbers (leader first). */
   order: number[];
   claims: { lap: number; raceMs: number; lapMs: number }[];
-  timing: { lap: number; status: string; reason: string | null }[];
+  timing: { seat: number; lap: number; status: string; reason: string | null }[];
   snapshotsSent: number;
   remote: { seat: number; x: number; z: number; opacity: number; mode: string }[];
   smoother: { snaps: number; corrections: number; maxCorrectionM: number };
+  pose: { x: number; y: number; z: number };
   contacts: { count: number; maxSpeed: number; maxImpulse: number };
   position: number | null;
 }
@@ -128,7 +136,10 @@ export class OnlineRace implements DriveExtension {
   private readonly projPoint = createPathPoint();
   private readonly latestProgress = new Map<number, number>();
   private latestOrder: number[] = [];
+  private ai: OnlineAiField | null = null;
+  private aiHandover: AiHandover[] | null = null;
   private readonly contactProxies: RemoteContactBody[] = [];
+  private readonly contactExpires = new Map<number, number>();
   private readonly remoteResets = new Map<number, number>();
   private readonly remoteResetUntil = new Map<number, number>();
   private localResetUntil = 0;
@@ -208,9 +219,17 @@ export class OnlineRace implements DriveExtension {
       snapshotsSent: 0,
       remote: [],
       smoother: this.smoother.stats,
+      pose: { x: 0, y: 0, z: 0 },
       contacts: { count: 0, maxSpeed: 0, maxImpulse: 0 },
       position: null,
     };
+    this.unsubscribe.push(
+      client.on('host', (m) => {
+        this.ai = null;
+        this.aiHandover = m.member === client.me ? m.ai : null;
+        this.ensureAi();
+      }),
+    );
     if (track) this.bindTrack(track);
   }
 
@@ -240,6 +259,78 @@ export class OnlineRace implements DriveExtension {
     return { s: slot.s, d: slot.d };
   }
 
+  private ensureAi(): void {
+    const ctx = this.ctx;
+    const room = this.client.room;
+    if (!ctx || !room?.grid || !this.client.isHost || this.ai) return;
+    if (!room.grid.some((g) => g.kind === 'ai') && !this.aiHandover?.length) return;
+    if (!ctx.artefacts) throw new Error('Online AI needs the circuit racing line');
+    // The host message can arrive before the room broadcast converting a departing grid seat.
+    const grid = room.grid.map((g) => {
+      const h = this.aiHandover?.find((h) => h.seat === g.seat);
+      return h
+        ? { ...g, kind: 'ai' as const, member: null, aiIndex: h.aiIndex, state: h.state }
+        : g;
+    });
+    this.ai = new OnlineAiField(this.track, ctx.artefacts, grid, ctx.session.trim);
+    if (this.aiHandover) this.ai.takeover(this.aiHandover);
+    this.aiHandover = null;
+  }
+
+  private stepAi(): void {
+    this.ensureAi();
+    const ai = this.ai;
+    const ctx = this.ctx;
+    const room = this.client.room;
+    if (!ai || !ctx || !room || !this.client.isHost) return;
+    ai.states(room.grid ?? []);
+    const aiSeats = new Set(room.grid?.filter((g) => g.kind === 'ai').map((g) => g.seat));
+    const humans = this.contactProxies.filter((p) => !aiSeats.has(p.seat));
+    const st = ctx.session.car.state;
+    const c = Math.cos(st.yaw),
+      sin = Math.sin(st.yaw);
+    humans.push({
+      seat: this.seat,
+      x: st.x,
+      z: st.z,
+      yaw: st.yaw,
+      vx: st.vx * c - st.vy * sin,
+      vz: -st.vx * sin - st.vy * c,
+      yawRate: st.yawRate,
+      ghost:
+        (this.client.serverNow() ?? 0) < this.localResetUntil || this.finishedAt.has(this.seat),
+    });
+    const crossings = ai.step(this.released, humans);
+    const at = this.gate.tickAt(ctx.session.world.time);
+    for (const { seat, crossing } of crossings) {
+      const progress = ai.progress(seat)!;
+      const claim = lapClaim({
+        seat,
+        lap: crossing.lap,
+        crossTime: crossing.time,
+        simTime: ai.world.time,
+        serverNow: at,
+        lightsOutAt: room.start?.lightsOutAt ?? Infinity,
+        lastRaceMs: progress.raceMs,
+        tick: ai.world.tick,
+        s: 0,
+        speed: (() => {
+          const body = ai.bodies().find((b) => b.seat === seat)!;
+          return Math.hypot(body.vx, body.vz);
+        })(),
+      });
+      if (claim) {
+        this.client.reportLap(claim);
+        ai.counted(seat, claim.raceMs);
+      }
+    }
+    // Owned AI poses are current physics, rather than the delayed render buffer.
+    for (let i = this.contactProxies.length - 1; i >= 0; i--) {
+      if (aiSeats.has(this.contactProxies[i]!.seat)) this.contactProxies.splice(i, 1);
+    }
+    this.contactProxies.push(...ai.bodies());
+  }
+
   wrapControl(source: ControlSource): ControlSource {
     return new StartHold(source, () => this.heldForTick());
   }
@@ -266,6 +357,7 @@ export class OnlineRace implements DriveExtension {
    */
   private prepareContactProxies(serverTime: number): void {
     this.contactProxies.length = 0;
+    this.contactExpires.clear();
     const room = this.client.room;
     const finishedSeats = new Set<number>(this.finishedAt.keys());
     if (room?.grid) {
@@ -314,6 +406,8 @@ export class OnlineRace implements DriveExtension {
           );
         }
       }
+      const latest = this.client.remoteCars.latest(seat);
+      if (latest) this.contactExpires.set(seat, latest.t + 250);
       this.contactProxies.push(proxy);
     }
   }
@@ -321,12 +415,19 @@ export class OnlineRace implements DriveExtension {
   /** Run at 240 Hz right after each fixed sim step: resolve symmetric contact with remote cars. */
   afterStep(dt: number): void {
     const ctx = this.ctx;
-    if (!ctx || !this.released) return;
+    if (!ctx) return;
+    if (!this.released) {
+      this.stepAi();
+      return;
+    }
     // Advance remote proxies in lockstep across all substeps of this frame.
     for (let i = 0; i < this.contactProxies.length; i++) {
       const p = this.contactProxies[i]!;
       extrapolateRemoteBody(p, dt, p);
+      if (this.gate.tickAt(ctx.session.world.time) > (this.contactExpires.get(p.seat) ?? Infinity))
+        p.ghost = true;
     }
+    this.stepAi();
     const now = this.client.serverNow() ?? 0;
     if (
       this.contactProxies.length === 0 ||
@@ -384,6 +485,7 @@ export class OnlineRace implements DriveExtension {
   attach(ctx: DriveExtensionContext): void {
     this.ctx = ctx;
     if (!this.trackBound) this.bindTrack(ctx.session.track);
+    this.ensureAi();
     this.report.trim = ctx.session.trim;
     const pose = ctx.session.car.pose;
     this.wheelDrop = Array.from(pose.wheelY, (y) => y - pose.y);
@@ -426,8 +528,8 @@ export class OnlineRace implements DriveExtension {
   }
 
   private onTiming(m: TimingMessage): void {
+    this.report.timing.push({ seat: m.seat, lap: m.lap, status: m.status, reason: m.reason });
     if (m.seat !== this.seat) return;
-    this.report.timing.push({ lap: m.lap, status: m.status, reason: m.reason });
     if (m.status === 'rejected' && m.reason !== 'duplicate') {
       const why = (m.reason && REASON_TEXT[m.reason]) ?? 'refused by the room';
       this.ctx?.say({ tag: 'Lap not counted', text: why, tone: 'invalid' }, 4);
@@ -493,6 +595,7 @@ export class OnlineRace implements DriveExtension {
     const c = this.client;
     const room = c.room;
     const session = ctx.session;
+    this.report.pose = { x: session.car.pose.x, y: session.car.pose.y, z: session.car.pose.z };
     const policy = room?.settings.assists;
     if (policy) enforceAssistPolicy(policy, session);
     const now = c.serverNow();
@@ -544,6 +647,7 @@ export class OnlineRace implements DriveExtension {
       now !== null;
     if (onTrack && c.snapshotDue()) {
       const t = session.readTelemetry();
+      const aiSnapshots = c.isHost ? (this.ai?.snapshots(now) ?? []) : [];
       const sent = c.sendSnapshots([
         toSnapshot({
           seat: this.seat,
@@ -564,8 +668,10 @@ export class OnlineRace implements DriveExtension {
           resets: this.resets,
           brokenCursor: this.brokenCursor,
         }),
+        ...aiSnapshots,
       ]);
       if (sent) {
+        for (const snapshot of aiSnapshots) c.remoteCars.push(snapshot, now);
         this.report.snapshotsSent++;
         this.brokenCursor = (this.brokenCursor + 1) % 64;
       }

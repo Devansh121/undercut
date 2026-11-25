@@ -464,9 +464,9 @@ Online play uses **symmetric local contact resolution against latency-compensate
 proxies** (`packages/sim/src/remote-contact.ts`), matching the state-sync architecture where each
 browser runs its own 240 Hz physics and the rooms service relays snapshots without simulating cars.
 
-- **Owned vs owned cars** (host human car vs host-simulated AI cars, and AI vs AI on the host):
-  resolved with full two-way rigid-body contact (`resolveCarContacts`), identical to solo Quick
-  Race, followed by barrier clamping.
+- **AI vs AI on the host** uses the normal two-way contact solver (`resolveCarContacts`).
+  Human vs AI uses the same bounded symmetric proxy solver on both cars, including when the
+  human is the host, so being the host does not change the human's contact response.
 - **Owned vs remote cars**: colliding against the delayed render pose (`serverNow - delayMs`,
   ~140–190 ms behind) would place a side-by-side car 7–15 m behind at racing speed and cause
   pass-through on both clients. Instead, before each frame's fixed steps, every active non-ghost
@@ -494,3 +494,37 @@ browser runs its own 240 Hz physics and the rooms service relays snapshots witho
   (`opacity < 1`, i.e., silent past 250 ms), retired or in the pit lane (`CAR_FLAG.retired` /
   `CAR_FLAG.pitLane`), finished, or within a 2 s reset grace window after either car teleports onto
   the track.
+
+
+### Host AI field and circuit selection
+
+The lobby offers the three shipped circuits and their matching race trim and sky. The host can
+set AI cars from zero to the remaining grid capacity, or press Fill grid. New rooms default to
+zero; room updates and host migration preserve the chosen fill.
+
+`apps/web/src/online/ai-field.ts` runs only on the current host. It uses the shipped racing
+line, envelope and racing driver for the selected circuit, a seeded driver per AI identity, and
+the same 240 Hz sim as the humans. AI cars read both the other AI cars and extrapolated human
+poses as traffic. A slip-limited launch hands over to the racing driver; AI snapshots share the
+host's existing 30 Hz batch with its human car. Each line crossing is claimed on the room clock,
+through the same plausibility checks as human crossings. The browser does no extra Worker-side
+physics or per-car timers. Online cars use reference tyres and a 20 kg fuel load topped up on
+crossings; tyre strategy remains the offline race mode's responsibility.
+
+On takeover, the new host restores each AI car's latest pose, world velocity, yaw rate, gear,
+engine and wheel speeds, counted laps and last race time. Snapshot ticks continue above the old
+host's tick, so the service accepts the new stream immediately. The service also retains whether
+a car still owes its initial grid-line crossing: migrating a back-row car must not drop a lap.
+The driver's internal reaction and traffic memory restarts; this is a physical warm start from
+the last received pose, not a bit-identical continuation of an unreceived physics state.
+
+Online timing uses the released simulation epoch for the current lap and the server clock for
+official crossing claims. The timing tower uses member names and AI identities, orders cars by
+continuous progress projected from their drawn poses, and shows distance-based estimated gaps.
+Those estimates are presentation; final classification comes from the room.
+
+Browser proof: `tests/browser/online-v2.spec.ts` checks a full moving grid and AI takeover at
+every circuit, and symmetric contact at 50, 100 and 150 ms with jitter and 2% snapshot loss.
+`ONLINE_SOAK=1 npx playwright test tests/browser/online-soak.spec.ts --project=desktop --workers=1`
+runs five real-time laps with two scripted humans and eighteen host AI at each circuit, recording
+stuck cars, rejected timing, and the identical twenty-car classification in both contexts.

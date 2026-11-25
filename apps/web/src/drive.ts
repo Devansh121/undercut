@@ -469,7 +469,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     record,
     today: o.today,
     ...(o.quickRace ? { quickRace: o.quickRace, drivers } : {}),
-    ...(o.quickRace && ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
+    ...((o.quickRace || o.extension?.raceTrim) && ai?.artefacts
+      ? { raceArtefacts: ai.artefacts }
+      : {}),
     ...(extTrim ? { trim: extTrim } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),

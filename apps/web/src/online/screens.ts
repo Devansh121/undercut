@@ -1,3 +1,4 @@
+import { MAX_CARS } from '@undercut/protocol';
 import { el } from '../ui/dom';
 import { ONLINE_CIRCUITS, onlineCircuit } from './circuits';
 import { displayCode, inviteLink, networkOrigin } from './invite';
@@ -169,12 +170,31 @@ export class RoomScreens {
         i.min = '1';
         i.max = '99';
         i.disabled = !s.isHost || s.stage !== 'lobby';
-        const aiText =
-          s.room.settings.aiCount > 0 ? `AI fill: ${s.room.settings.aiCount}` : 'AI fill off';
+
+        const maxAi = Math.max(0, MAX_CARS - s.members.length);
+        const aiCount = Math.min(maxAi, s.room.settings.aiCount);
+        const aiField = field('AI cars', String(aiCount), (v) =>
+          this.session.setAiCount(Number(v)),
+        );
+        const aiInput = aiField.querySelector('input')!;
+        aiInput.type = 'number';
+        aiInput.min = '0';
+        aiInput.max = String(maxAi);
+        aiInput.disabled = !s.isHost || s.stage !== 'lobby';
+        const fillBtn = button(
+          aiCount === maxAi && maxAi > 0 ? 'Clear AI' : 'Fill grid',
+          () => this.session.setAiCount(aiCount === maxAi ? 0 : maxAi),
+          !s.isHost || s.stage !== 'lobby' || maxAi === 0,
+        );
+        fillBtn.id = 'online-ai-fill';
+
+        const aiText = aiCount > 0 ? `AI fill: ${aiCount}` : 'AI fill off';
         content.append(
           el('p', '', `${currentCircuit.name} · Equal cars · Team assigned by seat · ${aiText}`),
           circuitRow,
           laps,
+          aiField,
+          fillBtn,
         );
         for (const key of Object.keys(
           s.room.settings.assists,
