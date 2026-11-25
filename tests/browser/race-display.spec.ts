@@ -21,7 +21,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await page.goto('/?debug=1&quality=lite&world=lite');
   await page.waitForFunction(() => !!window.__undercut);
 
-  // Start a 3-lap Quick Race from P10 so the timing tower has cars ahead and behind the player.
+  // Start a 2-lap Quick Race from P10 so the timing tower has cars ahead and behind the player.
   await page.evaluate(() => {
     const w = window as unknown as {
       lightsObserved: { lit: number; mask: number }[];
@@ -41,7 +41,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
       requestAnimationFrame(watch);
     };
     requestAnimationFrame(watch);
-    return window.__undercut!.startQuickRace(3, { gridPosition: 10 });
+    return window.__undercut!.startQuickRace(2, { gridPosition: 10 });
   });
 
   // Run through the lights ramp slowly enough to observe lit pods synced with the 3D gantry.
@@ -353,9 +353,22 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     timeout: 15_000,
   });
 
-  // Real blue flag: hold at the start in two short waits (under the 60 s stuck retirement limit)
-  // so the field comes nearly a full lap around, then drive slower than the pack with clumsyPilot
-  // so the yellow clears and approaching lapping cars cross timing boundaries within blueGap (1 s).
+  expect(problems).toEqual([]);
+});
+
+test('race display: real blue flag banner, tower status, and HUD scale fit', async ({
+  page,
+}, info) => {
+  test.setTimeout(120_000);
+  const problems = watchProblems(page);
+  const sizes = info.project.name === 'phone' ? PHONES : DESKTOP;
+
+  await page.goto('/?debug=1&quality=lite&world=lite');
+  await page.waitForFunction(() => !!window.__undercut);
+
+  // Hold at the start in two short waits (under the 60 s stuck retirement limit) so the field
+  // comes nearly a full lap around, then drive slower than the pack with clumsyPilot so the
+  // yellow clears and approaching lapping cars cross timing boundaries within blueGap (1 s).
   await page.evaluate(() => window.__undercut!.startQuickRace(3, { gridPosition: 20 }));
   await page.evaluate(() => {
     window.__undercut!.setTimeScale(8);
@@ -373,11 +386,11 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     timeout: 15_000,
   });
   await page.evaluate(() => window.__undercut!.drive({ throttle: 0, brake: 1, steer: 0 }));
-  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 70, tGreen, {
+  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 75, tGreen, {
     timeout: 30_000,
   });
   await page.evaluate(() => {
-    window.__undercut!.setTimeScale(3);
+    window.__undercut!.setTimeScale(4);
     window.__undercut!.clumsyPilot(7);
   });
   await page.waitForFunction(
