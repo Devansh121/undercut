@@ -20,6 +20,8 @@ declare global {
       } | null;
     };
     onlineSettings(patch: Record<string, unknown>): boolean;
+    /** The race view (render package), for scene checks. */
+    view(): unknown;
     start(): Promise<void>;
     startQuickRace(
       laps?: number,

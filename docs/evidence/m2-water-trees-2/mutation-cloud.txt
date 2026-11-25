@@ -1,0 +1,37 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - import "./tools/ci/weighted-sequencer" without a file extension (vitest.config.ts:2:40). Add the file extension
+  - import "./shards" without a file extension (tools/ci/weighted-sequencer.ts:4:30). Add the file extension
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.12 /home/devansh/.cache/undercut/wt/m2-water-trees-2
+
+ ❯ |unit| packages/render/test/world.test.ts (13 tests | 1 failed | 12 skipped) 1057ms
+     × marks instantiated near cloud trees and kit conifers as scenery for water reflections 1055ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| packages/render/test/world.test.ts > High-world near tree reflections > marks instantiated near cloud trees and kit conifers as scenery for water reflections
+AssertionError: prop:tree-wood-near: expected null to be 'scenery' // Object.is equality
+
+- Expected:
+"scenery"
+
++ Received:
+null
+
+ ❯ packages/render/test/world.test.ts:404:68
+    402|           `${kind}: instances`,
+    403|         ).toBeGreaterThan(0);
+    404|         for (const mesh of meshes) expect(mesh.reflect, mesh.name).toB…
+       |                                                                    ^
+    405|       }
+    406|       expect(new Set(conifers.map((o) => o.name))).toEqual(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  06:38:42
+   Duration  2.65s (transform 807ms, setup 0ms, import 1.47s, tests 1.06s, environment 0ms)
+
