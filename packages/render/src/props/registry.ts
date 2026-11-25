@@ -11,6 +11,7 @@ import {
   Color,
   Group,
   InstancedMesh,
+  InstancedBufferAttribute,
   Matrix4,
   MeshDepthMaterial,
   MeshStandardMaterial,
@@ -53,10 +54,23 @@ export interface PropKind {
    */
   shadowMaxDistance?: number;
   /**
+   * Cast shadows with this level's geometry (index into `lods`, a cheap one) at every distance,
+   * instead of with the level on show: a shadow-only copy of the chunk, sharing its instances and
+   * drawn on `SHADOW_CASTER_LAYER`, which only the sun's shadow cameras see. For big props whose
+   * shadow pass would otherwise draw their detailed levels once per cascade.
+   */
+  shadowLevel?: number;
+  /**
    * Chunk by a square world grid of this cell size (m) instead of by lap distance: for scenery
    * spread over the land around the circuit (woods), where lap chunks would be long and thin.
    */
   gridCell?: number;
+  /** Batch the last visual level across cells this wide, keeping fine LOD/shadow decisions. */
+  farBatchCell?: number | undefined;
+  /** Batch nearer visual levels (before the last) across cells this wide, for static non-shadow-direct kinds. */
+  nearBatchCell?: number | undefined;
+  /** Batch shadow-only proxy instances across cells this wide, keeping fine-cell shadow reach. */
+  shadowBatchCell?: number | undefined;
   /**
    * Lap chunk length for this kind, m (default the registry's): short chunks for small props
    * along the barriers, so only those really near the eye switch to their top level.
@@ -72,7 +86,11 @@ export interface PropKind {
 /** What the water's reflection draws (world/water.ts, `userData.reflect`). */
 export type Reflected = 'skyline' | 'scenery';
 
-/** World placement: position of the prop's origin (m), yaw about +Y (rad), uniform scale. */
+/**
+ * World placement: position of the prop's origin (m), yaw about +Y (rad), pitch about the prop's
+ * own +X axis (rad, applied before yaw: positive tips local +Z down), uniform scale and an
+ * optional per-axis stretch in the prop's own frame (applied before pitch and yaw).
+ */
 export interface PropPlacement {
   /** Shared lightweight contact footprint; absent for solid supporting structures. */
   breakable?: BreakableObject;
@@ -80,7 +98,9 @@ export interface PropPlacement {
   y: number;
   z: number;
   yaw?: number;
+  pitch?: number;
   scale?: number;
+  stretch?: readonly [number, number, number];
   /** Lap distance of the place, m; decides the chunk. */
   s: number;
   /** Per-instance colour multiplier (linear), e.g. leaf tint. */
@@ -119,7 +139,44 @@ interface Chunk {
   centre: Vector3;
   radius: number;
   meshes: InstancedMesh[];
+  /** Shadow-only copy at the kind's `shadowLevel`, on `SHADOW_CASTER_LAYER`. */
+  shadow?: InstancedMesh;
+  lod: number;
+  casting: boolean;
+  /** Safe camera travel before a level or shadow boundary can be crossed. */
+  margin: number;
+  levelBatches?: (LevelBatch | undefined)[];
+  shadowBatch?: ShadowBatch;
 }
+
+interface LevelBatch {
+  mesh: InstancedMesh;
+  chunks: Chunk[];
+  level: number;
+  dirty: boolean;
+}
+
+interface ShadowBatch {
+  mesh: InstancedMesh;
+  chunks: Chunk[];
+  level: number;
+  dirty: boolean;
+}
+
+interface KindState {
+  kind: PropKind;
+  chunks: Chunk[];
+  casts: boolean;
+  shadowMax: number;
+  minMargin: number;
+  deferredTravel: number;
+}
+
+/**
+ * Object layer drawn only by the sun's shadow cameras (they enable it; no view camera does):
+ * shadow-only proxies of props (`PropKind.shadowLevel`).
+ */
+export const SHADOW_CASTER_LAYER = 3;
 
 /**
  * A car's body footprint for keeping debris out of it, m: from the centre to the nose and the
@@ -135,9 +192,26 @@ const DEBRIS_CLEARANCE = 0.4;
 
 const m = new Matrix4();
 const q = new Quaternion();
+const qPitch = new Quaternion();
 const pos = new Vector3();
 const scl = new Vector3();
 const UP = new Vector3(0, 1, 0);
+const RIGHT = new Vector3(1, 0, 0);
+
+/** Instance matrix of a placement: translate · yaw · pitch · scale (pure; tested). */
+export function placementMatrix(p: PropPlacement, out = new Matrix4()): Matrix4 {
+  q.setFromAxisAngle(UP, p.yaw ?? 0);
+  if (p.pitch) q.multiply(qPitch.setFromAxisAngle(RIGHT, p.pitch));
+  const s = p.scale ?? 1;
+  const k = p.stretch ?? ([1, 1, 1] as const);
+  return out.compose(pos.set(p.x, p.y, p.z), q, scl.set(s * k[0], s * k[1], s * k[2]));
+}
+
+/** Largest axis scale of a placement. */
+function placementReach(p: PropPlacement): number {
+  const k = p.stretch ?? ([1, 1, 1] as const);
+  return (p.scale ?? 1) * Math.max(k[0], k[1], k[2]);
+}
 
 /** Group placements by a square world grid: cell key → placement indices (pure; tested). */
 export function bucketByGrid(
@@ -161,6 +235,11 @@ export class PropRegistry {
   private readonly kinds = new Map<string, PropKind>();
   private readonly placements = new Map<string, PropPlacement[]>();
   private readonly chunks = new Map<string, Chunk[]>();
+  private readonly kindStates: KindState[] = [];
+  private readonly levelBatches: LevelBatch[] = [];
+  private readonly shadowBatches: ShadowBatch[] = [];
+  private readonly lastEye = new Vector3();
+  private hasLastEye = false;
   private built = false;
   private readonly breakableObjects = new Map<number, BreakableObject>();
   private readonly breakableInstances = new Map<number, { mesh: InstancedMesh; index: number }[]>();
@@ -196,6 +275,7 @@ export class PropRegistry {
     private readonly groundHeight?: (x: number, z: number) => number,
   ) {
     this.group.name = 'props';
+    this.group.matrixAutoUpdate = false;
   }
 
   define(kind: PropKind): void {
@@ -219,7 +299,27 @@ export class PropRegistry {
       for (const p of list) if (p.breakable) this.breakableObjects.set(p.breakable.id, p.breakable);
     for (const [id, kind] of this.kinds) {
       const list = this.placements.get(id) ?? [];
+      const hasBreakables = list.some((p) => p.breakable);
+      const shadowMax = kind.shadowMaxDistance ?? Infinity;
+      const farCannotCast =
+        kind.castShadow === false ||
+        kind.shadowLevel !== undefined ||
+        (kind.lods.length > 1 && shadowMax <= kind.lods[kind.lods.length - 2]!.maxDistance);
+      if (kind.farBatchCell && (!farCannotCast || hasBreakables))
+        throw new Error('Far batches need static props whose far level does not cast shadows');
+      if (
+        kind.nearBatchCell &&
+        ((kind.castShadow !== false && kind.shadowLevel === undefined) || hasBreakables)
+      )
+        throw new Error('Near batches need static props with independent shadows');
+      if (kind.shadowBatchCell && (kind.shadowLevel === undefined || hasBreakables))
+        throw new Error('Shadow batches need static props with a shadowLevel');
+      const batchCellFor = (level: number): number | undefined =>
+        level === kind.lods.length - 1 ? kind.farBatchCell : kind.nearBatchCell;
       const chunks: Chunk[] = [];
+      const casts = kind.castShadow ?? true;
+      const useShadowProxy = kind.shadowLevel !== undefined && casts;
+      const useShadowBatch = useShadowProxy && Boolean(kind.shadowBatchCell);
       const buckets = kind.gridCell
         ? bucketByGrid(list, kind.gridCell)
         : bucketBySector(list, this.lapLength, kind.chunkLength ?? this.chunkLength);
@@ -235,7 +335,7 @@ export class PropRegistry {
         for (const i of indices) {
           const p = list[i] as PropPlacement;
           radius = Math.max(radius, centre.distanceTo(pos.set(p.x, p.y, p.z)));
-          if (p.scale !== undefined && p.scale > maxScale) maxScale = p.scale;
+          maxScale = Math.max(maxScale, placementReach(p));
         }
         // How far any level's geometry reaches from the prop's origin (its bounding sphere is
         // not centred on the origin: towers and boards reach up), scaled.
@@ -246,8 +346,8 @@ export class PropRegistry {
           if (gs) reach = Math.max(reach, gs.center.length() + gs.radius);
         }
         reach *= maxScale;
-        if (list.some((p) => p.breakable)) reach += 40;
-        const meshes = kind.lods.map((lod) => {
+        if (hasBreakables) reach += 40;
+        const meshes = kind.lods.map((lod, level) => {
           const im = new InstancedMesh(lod.geometry, lod.material, indices.length);
           indices.forEach((i, k) => {
             const p = list[i] as PropPlacement;
@@ -256,13 +356,11 @@ export class PropRegistry {
               refs.push({ mesh: im, index: k });
               this.breakableInstances.set(p.breakable.id, refs);
             }
-            q.setFromAxisAngle(UP, p.yaw ?? 0);
-            const s = p.scale ?? 1;
-            im.setMatrixAt(k, m.compose(pos.set(p.x, p.y, p.z), q, scl.set(s, s, s)));
+            im.setMatrixAt(k, placementMatrix(p, m));
             if (p.colour) im.setColorAt(k, tint.setRGB(p.colour[0], p.colour[1], p.colour[2]));
           });
           im.customDepthMaterial = lod.depthMaterial ?? this.shadowDepth;
-          im.castShadow = kind.castShadow ?? true;
+          im.castShadow = casts && !useShadowProxy;
           im.receiveShadow = kind.receiveShadow ?? true;
           // Chunk bounds for frustum culling: every instance's whole geometry inside.
           im.boundingSphere = new Sphere(centre.clone(), reach + radius);
@@ -270,34 +368,275 @@ export class PropRegistry {
           im.matrixAutoUpdate = false;
           im.name = `prop:${id}`;
           if (kind.reflect) im.userData.reflect = kind.reflect;
-          this.group.add(im);
+          if (!batchCellFor(level)) this.group.add(im);
           return im;
         });
-        chunks.push({ centre, radius: radius + reach, meshes });
+        let shadow: InstancedMesh | undefined;
+        if (useShadowProxy && !useShadowBatch) {
+          const level = kind.shadowLevel!;
+          const source = meshes[level]!;
+          const lod = kind.lods[level]!;
+          shadow = new InstancedMesh(lod.geometry, lod.material, indices.length);
+          // The level's own instances, uploaded once for both.
+          shadow.instanceMatrix = source.instanceMatrix;
+          shadow.customDepthMaterial = source.customDepthMaterial;
+          shadow.castShadow = true;
+          shadow.receiveShadow = false;
+          shadow.layers.set(SHADOW_CASTER_LAYER);
+          shadow.boundingSphere = source.boundingSphere;
+          shadow.visible = false;
+          shadow.matrixAutoUpdate = false;
+          shadow.name = `prop-shadow:${id}`;
+          this.group.add(shadow);
+        }
+        chunks.push({
+          centre,
+          radius: radius + reach,
+          meshes,
+          lod: -2,
+          casting: false,
+          margin: 0,
+          ...(shadow && { shadow }),
+        });
+      }
+      if (chunks.length > 0) {
+        const centres = chunks.map((c) => c.centre);
+        for (let level = 0; level < kind.lods.length; level++) {
+          const cell = batchCellFor(level);
+          if (!cell) continue;
+          const batchBuckets = bucketByGrid(centres, cell);
+          const lod = kind.lods[level]!;
+          for (const indices of batchBuckets.values()) {
+            const members = indices.map((i) => chunks[i]!);
+            const capacity = members.reduce((n, c) => n + c.meshes[level]!.count, 0);
+            const mesh = new InstancedMesh(lod.geometry, lod.material, capacity);
+            mesh.castShadow = false;
+            mesh.receiveShadow = kind.receiveShadow ?? true;
+            mesh.matrixAutoUpdate = false;
+            mesh.visible = false;
+            mesh.name = `prop:${id}`;
+            if (kind.reflect) mesh.userData.reflect = kind.reflect;
+            const bounds = new Sphere().makeEmpty();
+            for (const c of members) bounds.union(c.meshes[level]!.boundingSphere!);
+            mesh.boundingSphere = bounds;
+            if (members.some((c) => c.meshes[level]!.instanceColor))
+              mesh.instanceColor = new InstancedBufferAttribute(
+                new Float32Array(capacity * 3).fill(1),
+                3,
+              );
+            // Seed all slots so a zero-active batch can still warm its level during loading.
+            let offset = 0;
+            for (const c of members) {
+              const source = c.meshes[level]!;
+              mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
+              if (source.instanceColor)
+                mesh.instanceColor!.array.set(source.instanceColor.array, offset * 3);
+              offset += source.count;
+            }
+            const batch: LevelBatch = { mesh, chunks: members, level, dirty: true };
+            for (const c of members) {
+              c.levelBatches ??= new Array<LevelBatch | undefined>(kind.lods.length);
+              c.levelBatches[level] = batch;
+            }
+            this.levelBatches.push(batch);
+            this.group.add(mesh);
+          }
+        }
+      }
+      if (useShadowBatch && chunks.length > 0) {
+        const shadowBuckets = bucketByGrid(
+          chunks.map((c) => c.centre),
+          kind.shadowBatchCell!,
+        );
+        const level = kind.shadowLevel!;
+        const lod = kind.lods[level]!;
+        for (const indices of shadowBuckets.values()) {
+          const members = indices.map((i) => chunks[i]!);
+          const capacity = members.reduce((n, c) => n + c.meshes[level]!.count, 0);
+          const mesh = new InstancedMesh(lod.geometry, lod.material, capacity);
+          mesh.customDepthMaterial = lod.depthMaterial ?? this.shadowDepth;
+          mesh.castShadow = true;
+          mesh.receiveShadow = false;
+          mesh.layers.set(SHADOW_CASTER_LAYER);
+          mesh.matrixAutoUpdate = false;
+          mesh.visible = false;
+          mesh.name = `prop-shadow:${id}`;
+          const bounds = new Sphere().makeEmpty();
+          for (const c of members) bounds.union(c.meshes[level]!.boundingSphere!);
+          mesh.boundingSphere = bounds;
+          let offset = 0;
+          for (const c of members) {
+            const source = c.meshes[level]!;
+            mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
+            offset += source.count;
+          }
+          const shadowBatch: ShadowBatch = { mesh, chunks: members, level, dirty: true };
+          for (const c of members) c.shadowBatch = shadowBatch;
+          this.shadowBatches.push(shadowBatch);
+          this.group.add(mesh);
+        }
       }
       this.chunks.set(id, chunks);
+      this.kindStates.push({
+        kind,
+        chunks,
+        casts,
+        shadowMax: kind.shadowMaxDistance ?? Infinity,
+        minMargin: 0,
+        deferredTravel: 0,
+      });
     }
+    this.group.updateMatrixWorld(true);
+    // Every child is a static InstancedMesh at identity; Three.js passes force=true every frame
+    // whenever Scene.matrixAutoUpdate is true, so skip the child walk when our world transform
+    // is unchanged.
+    const lastWorld = this.group.matrixWorld.clone();
+    const nextWorld = new Matrix4();
+    const updateWorld = Group.prototype.updateMatrixWorld;
+    this.group.updateMatrixWorld = () => {
+      if (this.group.matrixAutoUpdate) this.group.updateMatrix();
+      if (this.group.parent)
+        nextWorld.multiplyMatrices(this.group.parent.matrixWorld, this.group.matrix);
+      else nextWorld.copy(this.group.matrix);
+      if (!this.group.matrixWorldNeedsUpdate && nextWorld.equals(lastWorld)) return;
+      lastWorld.copy(nextWorld);
+      updateWorld.call(this.group, true);
+    };
     this.register(this.group);
   }
 
   /** Per frame: pick each chunk's level and shadow state by its near edge's distance from the camera. */
   update(eye: Vector3): void {
-    for (const [id, chunks] of this.chunks) {
-      const kind = this.kinds.get(id) as PropKind;
-      const casts = kind.castShadow ?? true;
-      const shadowMax = kind.shadowMaxDistance ?? Infinity;
-      for (const c of chunks) {
+    let movement: number;
+    if (!this.hasLastEye) {
+      this.hasLastEye = true;
+      this.lastEye.copy(eye);
+      movement = Infinity;
+    } else {
+      movement = eye.distanceTo(this.lastEye);
+      if (movement === 0) return;
+      this.lastEye.copy(eye);
+    }
+    let anyLevelDirty = false;
+    let anyShadowDirty = false;
+    for (let k = 0; k < this.kindStates.length; k++) {
+      const state = this.kindStates[k]!;
+      // Distance is 1-Lipschitz: if no chunk in this kind can cross a threshold, skip the whole kind.
+      if (state.minMargin > movement) {
+        state.minMargin -= movement;
+        state.deferredTravel += movement;
+        continue;
+      }
+      const step = movement + state.deferredTravel;
+      state.deferredTravel = 0;
+      const { kind, chunks, casts, shadowMax } = state;
+      const lods = kind.lods;
+      let kindMinMargin = Infinity;
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const c = chunks[ci]!;
+        if (c.margin > step) {
+          c.margin -= step;
+          if (c.margin < kindMinMargin) kindMinMargin = c.margin;
+          continue;
+        }
         // Level and shadow by the distance to the chunk's near edge, so a prop beside the eye is
         // never drawn at a reduced level because its chunk's centre is far away.
         const near = Math.max(0, c.centre.distanceTo(eye) - c.radius);
-        const lod = chunkLod(near, kind.lods);
+        let margin = Infinity;
+        for (let i = 0; i < lods.length; i++) {
+          const d = Math.abs(near - lods[i]!.maxDistance);
+          if (d < margin) margin = d;
+        }
+        if (casts) {
+          const d = Math.abs(near - shadowMax);
+          if (d < margin) margin = d;
+        }
+        c.margin = margin;
+        if (margin < kindMinMargin) kindMinMargin = margin;
+        const lod = chunkLod(near, lods);
         const castNow = casts && near < shadowMax;
+        if (lod === c.lod && castNow === c.casting) continue;
+        if (c.levelBatches && c.lod !== lod) {
+          const prev = c.lod >= 0 ? c.levelBatches[c.lod] : undefined;
+          if (prev) {
+            prev.dirty = true;
+            anyLevelDirty = true;
+          }
+          const next = lod >= 0 ? c.levelBatches[lod] : undefined;
+          if (next) {
+            next.dirty = true;
+            anyLevelDirty = true;
+          }
+        }
+        if (c.shadowBatch && (c.casting && c.lod >= 0) !== (castNow && lod >= 0)) {
+          c.shadowBatch.dirty = true;
+          anyShadowDirty = true;
+        }
+        c.lod = lod;
+        c.casting = castNow;
+        const proxy = c.shadow;
+        const hasShadowProxy = Boolean(proxy || c.shadowBatch);
         for (let i = 0; i < c.meshes.length; i++) {
           const im = c.meshes[i] as InstancedMesh;
           const active = i === lod;
-          im.visible = active;
-          im.castShadow = active && castNow;
+          im.visible = active && !c.levelBatches?.[i];
+          im.castShadow = active && castNow && !hasShadowProxy;
         }
+        // Casts while a level is on show and within the shadow reach, like the level would.
+        if (proxy) proxy.visible = castNow && lod >= 0;
+      }
+      state.minMargin = kindMinMargin;
+    }
+    if (anyLevelDirty || movement === Infinity) {
+      for (const batch of this.levelBatches) {
+        if (!batch.dirty) continue;
+        let offset = 0;
+        for (const c of batch.chunks) {
+          if (c.lod !== batch.level) continue;
+          const source = c.meshes[batch.level]!;
+          if (offset === 0) batch.mesh.boundingSphere!.copy(source.boundingSphere!);
+          else batch.mesh.boundingSphere!.union(source.boundingSphere!);
+          batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
+          if (source.instanceColor)
+            batch.mesh.instanceColor!.array.set(source.instanceColor.array, offset * 3);
+          else batch.mesh.instanceColor?.array.fill(1, offset * 3, (offset + source.count) * 3);
+          offset += source.count;
+        }
+        batch.mesh.count = offset;
+        batch.mesh.visible = offset > 0;
+        if (offset > 0) {
+          batch.mesh.instanceMatrix.clearUpdateRanges();
+          batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
+          batch.mesh.instanceMatrix.needsUpdate = true;
+          if (batch.mesh.instanceColor) {
+            batch.mesh.instanceColor.clearUpdateRanges();
+            batch.mesh.instanceColor.addUpdateRange(0, offset * 3);
+            batch.mesh.instanceColor.needsUpdate = true;
+          }
+        }
+        batch.dirty = false;
+      }
+    }
+    if (anyShadowDirty || movement === Infinity) {
+      for (const batch of this.shadowBatches) {
+        if (!batch.dirty) continue;
+        let offset = 0;
+        for (const c of batch.chunks) {
+          if (!c.casting || c.lod < 0) continue;
+          const source = c.meshes[batch.level]!;
+          if (offset === 0) batch.mesh.boundingSphere!.copy(source.boundingSphere!);
+          else batch.mesh.boundingSphere!.union(source.boundingSphere!);
+          batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
+          offset += source.count;
+        }
+        batch.mesh.count = offset;
+        batch.mesh.visible = offset > 0;
+        if (offset > 0) {
+          batch.mesh.instanceMatrix.clearUpdateRanges();
+          batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
+          batch.mesh.instanceMatrix.needsUpdate = true;
+        }
+        batch.dirty = false;
       }
     }
   }
@@ -469,9 +808,18 @@ export class PropRegistry {
 
   /** Releases the instanced meshes; kinds' geometries and materials belong to the caller. */
   dispose(): void {
+    for (const b of this.levelBatches) b.mesh.dispose();
+    this.levelBatches.length = 0;
+    for (const b of this.shadowBatches) b.mesh.dispose();
+    this.shadowBatches.length = 0;
     for (const chunks of this.chunks.values())
-      for (const c of chunks) for (const im of c.meshes) im.dispose();
+      for (const c of chunks) {
+        for (const im of c.meshes) im.dispose();
+        c.shadow?.dispose();
+      }
     this.chunks.clear();
+    this.kindStates.length = 0;
+    this.hasLastEye = false;
     this.shadowDepth.dispose();
     this.group.removeFromParent();
   }

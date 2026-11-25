@@ -8,11 +8,23 @@
     "marshal-post",
     "absorber-block",
     "screen-tower",
-    "camera-tower"
+    "camera-tower",
+    "pit-garage",
+    "pit-wall",
+    "start-gantry",
+    "pedestrian-bridge",
+    "crew-mechanic-standing",
+    "crew-engineer-seated",
+    "crowd-seated-0",
+    "crowd-seated-1",
+    "crowd-seated-2",
+    "armco-three",
+    "concrete-wall",
+    "tyre-wall"
   ],
   "circuits": {
     "spa": {
-      "ids": ["hill-pit-garage"],
+      "ids": ["hill-pit-garage", "grandstand", "grandstand-roof"],
       "nearTrees": ["forest-spruce", "forest-fir"]
     },
     "singapore": {
@@ -27,6 +39,9 @@
         "marina-hotel",
         "marina-pavilion"
       ]
+    },
+    "monza": {
+      "ids": ["grandstand", "grandstand-roof"]
     }
   }
 }

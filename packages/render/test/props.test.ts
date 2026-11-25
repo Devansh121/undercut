@@ -1,7 +1,13 @@
 import type { InstancedMesh } from 'three';
-import { BoxGeometry, Matrix4, MeshBasicMaterial, Vector3 } from 'three';
+import { BoxGeometry, Layers, Matrix4, MeshBasicMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { PropRegistry, bucketBySector, chunkLod, sectorOf } from '../src/props/registry';
+import {
+  PropRegistry,
+  SHADOW_CASTER_LAYER,
+  bucketBySector,
+  chunkLod,
+  sectorOf,
+} from '../src/props/registry';
 
 describe('prop registry', () => {
   it('buckets placements by lap sector, wrapping past the line', () => {
@@ -69,6 +75,50 @@ describe('prop registry', () => {
     post.dispose();
     near.dispose();
     far.dispose();
+  });
+
+  it('casts shadows with a cheap level, seen only by shadow cameras, within the shadow reach', () => {
+    const detailed = new BoxGeometry(1, 1, 1, 8, 8, 8);
+    const cheap = new BoxGeometry(1, 1, 1);
+    const mat = new MeshBasicMaterial();
+    const reg = new PropRegistry(1000, 200);
+    reg.define({
+      id: 'bank',
+      castShadow: true,
+      shadowMaxDistance: 100,
+      shadowLevel: 1,
+      lods: [
+        { geometry: detailed, material: mat, maxDistance: 80 },
+        { geometry: cheap, material: mat, maxDistance: 1200 },
+      ],
+    });
+    reg.place('bank', { x: 0, y: 0, z: 0, s: 0 });
+    reg.place('bank', { x: 10, y: 0, z: 0, s: 10 });
+    reg.build();
+    const meshes = reg.group.children as InstancedMesh[];
+    const proxy = meshes.find((m) => m.name === 'prop-shadow:bank')!;
+    const [near, far] = meshes.filter((m) => m !== proxy);
+    expect(proxy.geometry).toBe(cheap);
+    // The same instances: one buffer, uploaded once.
+    expect(proxy.instanceMatrix).toBe(far!.instanceMatrix);
+    const view = new Layers();
+    const shadowCamera = new Layers();
+    shadowCamera.enable(SHADOW_CASTER_LAYER);
+    expect(proxy.layers.test(view)).toBe(false);
+    expect(proxy.layers.test(shadowCamera)).toBe(true);
+    // Near: the detailed level shows but casts nothing; the proxy casts.
+    reg.update(new Vector3(0, 1, 5));
+    expect([near!.visible, near!.castShadow, far!.castShadow]).toEqual([true, false, false]);
+    expect([proxy.visible, proxy.castShadow]).toEqual([true, true]);
+    // Past the shadow reach the proxy stops; past the last level nothing draws.
+    reg.update(new Vector3(0, 1, 300));
+    expect([far!.visible, proxy.visible]).toEqual([true, false]);
+    reg.update(new Vector3(0, 1, 5000));
+    expect([far!.visible, proxy.visible]).toEqual([false, false]);
+    reg.dispose();
+    detailed.dispose();
+    cheap.dispose();
+    mat.dispose();
   });
 });
 
