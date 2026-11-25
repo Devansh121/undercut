@@ -1,7 +1,13 @@
 import type { BufferAttribute } from 'three';
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { ATLAS_COLS, ATLAS_ROWS, keepReliefMean } from '../src/world/tree-atlas';
+import {
+  ATLAS_COLS,
+  ATLAS_ROWS,
+  CLUSTER_TILE,
+  keepReliefMean,
+  matchClustersToCards,
+} from '../src/world/tree-atlas';
 import { treeCards } from '../src/world/trees';
 
 const toLinear = (c: number): number => Math.pow(c / 255, 2.2);
@@ -78,5 +84,36 @@ describe('tree cards', () => {
       expect(Math.sign(along)).toBe(k % 2 === 0 ? 1 : -1);
       expect(Math.abs(along)).toBeCloseTo(0.1, 5);
     }
+  });
+});
+
+describe('near tree species colour', () => {
+  it('restores each crown species from the shared cluster mean, excluding transparent texels', () => {
+    const tile = 2;
+    const width = ATLAS_COLS * tile;
+    const data = new Uint8Array(width * ATLAS_ROWS * tile * 4);
+    const colours = Array.from({ length: CLUSTER_TILE }, (_, i) => [
+      50 + i * 8,
+      70 + i * 7,
+      40 + i * 5,
+    ]);
+    const paint = (t: number, rgb: number[]) => {
+      const x = (t % ATLAS_COLS) * tile;
+      const y = Math.floor(t / ATLAS_COLS) * tile;
+      for (let dy = 0; dy < tile; dy++)
+        for (let dx = 0; dx < tile; dx++)
+          data.set(dx === 0 ? [...rgb, 255] : [255, 255, 255, 0], ((y + dy) * width + x + dx) * 4);
+    };
+    colours.forEach((rgb, i) => paint(i, rgb));
+    for (let i = 0; i < 3; i++) paint(CLUSTER_TILE + i, [60, 80, 50]);
+    const tints = matchClustersToCards(data, width, tile);
+    for (let c = 0; c < 3; c++) {
+      const mean = colours.reduce((sum, rgb) => sum + toLinear(rgb[c]!), 0) / colours.length;
+      for (let i = 0; i < colours.length; i++)
+        expect(tints[i]![c]! * mean).toBeCloseTo(toLinear(colours[i]![c]!), 8);
+      expect(tints.reduce((sum, rgb) => sum + rgb[c]!, 0) / tints.length).toBeCloseTo(1, 8);
+    }
+    expect(tints[0]![1]).toBeLessThan(1);
+    expect(tints.at(-1)![1]).toBeGreaterThan(1);
   });
 });
