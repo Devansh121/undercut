@@ -1,0 +1,28 @@
+# master 3f3ed77 with the head spec: npx playwright test tests/browser/world-dressing.spec.ts --project=desktop --workers=1 -g Monza --reporter=line
+
+Running 1 test using 1 worker
+
+[1/1] [desktop] › tests/browser/world-dressing.spec.ts:38:1 › loads Monza circuit dressing and places world scenery, pit crew, and furniture
+  1) [desktop] › tests/browser/world-dressing.spec.ts:38:1 › loads Monza circuit dressing and places world scenery, pit crew, and furniture
+
+    Error: Mobile Monza grid draw calls
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 384
+    Received:    394
+
+      150 |   );
+      151 |   expect(gridStats.cars).toBe(20);
+    > 152 |   expect(gridStats.calls, 'Mobile Monza grid draw calls').toBeLessThanOrEqual(384);
+          |                                                           ^
+      153 |   expect(gridStats.triangles, 'Mobile Monza grid triangles').toBeLessThanOrEqual(1_465_000);
+      154 |
+      155 |   // Quitting releases the world without errors (GL balance with the full world is checked on
+        at tests/browser/world-dressing.spec.ts:152:59
+
+    Error Context: test-results/world-dressing-loads-Monza-e97fc-nery-pit-crew-and-furniture-desktop/error-context.md
+
+  1 failed
+    [desktop] › tests/browser/world-dressing.spec.ts:38:1 › loads Monza circuit dressing and places world scenery, pit crew, and furniture
+master exit 1
