@@ -118,6 +118,12 @@ const localBox: CarFootprint = { cx: 0, cz: 0, fx: 1, fz: 0, halfLength: 0, half
 const remoteBox: CarFootprint = { cx: 0, cz: 0, fx: 1, fz: 0, halfLength: 0, halfWidth: 0 };
 const hitScratch: FootprintHit = { depth: 0, nx: 0, nz: 0, px: 0, pz: 0 };
 
+function projectedRadius(b: CarFootprint, ax: number, az: number): number {
+  return (
+    b.halfLength * Math.abs(b.fx * ax + b.fz * az) + b.halfWidth * Math.abs(b.fz * ax - b.fx * az)
+  );
+}
+
 /**
  * Resolve planar car-to-car contact between one locally simulated car (`local`) and kinematic
  * remote proxies (`remotes`). Accumulates into `local`'s contact diagnostics (does not zero them,
@@ -168,17 +174,49 @@ export function resolveRemoteCarContacts(
       remoteBox.cz = r.z - ahead * rs;
       const lc = Math.cos(local.yaw),
         ls = Math.sin(local.yaw);
-      const relativeSpeed = Math.hypot(
-        local.vx * lc - local.vy * ls - r.vx,
-        -local.vx * ls - local.vy * lc - r.vz,
-      );
-      // A stale converging pose hides some closing distance. Reserve that distance early;
-      // the same bounded equal-mass impulse still applies, with no vertical component.
-      const allowance = Math.min(0.3, Math.max(0, r.ageSec ?? 0) * relativeSpeed);
-      remoteBox.halfLength = halfLength + allowance;
-      remoteBox.halfWidth = halfWidth + allowance;
+      remoteBox.halfLength = halfLength;
+      remoteBox.halfWidth = halfWidth;
 
-      if (!collideFootprints(localBox, remoteBox, hitScratch)) continue;
+      if (!collideFootprints(localBox, remoteBox, hitScratch)) {
+        // The proxy is already extrapolated to now. This is an approach-only prediction
+        // horizon, not another extrapolation or an isotropic pose-error margin.
+        // Find the separating face normal, then reserve at most age * normal closing speed.
+        let gap = -Infinity;
+        let nx = 0;
+        let nz = 0;
+        for (let axis = 0; axis < 4; axis++) {
+          const box = axis < 2 ? localBox : remoteBox;
+          const ax = axis % 2 === 0 ? box.fx : box.fz;
+          const az = axis % 2 === 0 ? box.fz : -box.fx;
+          const dist = (remoteBox.cx - localBox.cx) * ax + (remoteBox.cz - localBox.cz) * az;
+          const separation =
+            Math.abs(dist) - projectedRadius(localBox, ax, az) - projectedRadius(remoteBox, ax, az);
+          if (separation > gap) {
+            gap = separation;
+            nx = ax * (dist >= 0 ? 1 : -1);
+            nz = az * (dist >= 0 ? 1 : -1);
+          }
+        }
+        const closing =
+          (local.vx * lc - local.vy * ls - r.vx) * nx +
+          (-local.vx * ls - local.vy * lc - r.vz) * nz;
+        if (closing <= 0) continue;
+        const allowance = Math.min(0.3, Math.max(0, r.ageSec ?? 0) * closing);
+        if (gap >= allowance) continue;
+        // Translate only along that normal; recheck all SAT axes at the predicted face.
+        remoteBox.cx -= nx * allowance;
+        remoteBox.cz -= nz * allowance;
+        if (!collideFootprints(localBox, remoteBox, hitScratch)) continue;
+        // At a corner a different face can become limiting after translation. Leave that
+        // ambiguous speculative contact to the real overlap solver on a later step.
+        if (hitScratch.nx * nx + hitScratch.nz * nz < 1 - 1e-9) continue;
+        // Rotation at the face must also be approaching before any speculative push.
+        const pax = local.vx * lc - local.vy * ls + local.yawRate * (hitScratch.pz - local.z);
+        const paz = -local.vx * ls - local.vy * lc - local.yawRate * (hitScratch.px - local.x);
+        const pbx = r.vx + r.yawRate * (hitScratch.pz - r.z);
+        const pbz = r.vz - r.yawRate * (hitScratch.px - r.x);
+        if ((pbx - pax) * hitScratch.nx + (pbz - paz) * hitScratch.nz >= 0) continue;
+      }
       if (i < 31) hitMask |= 1 << i;
       passHit = true;
       anyContact = true;

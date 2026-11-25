@@ -202,6 +202,49 @@ describe('resolveRemoteCarContacts', () => {
 });
 
 describe('aged remote poses', () => {
+  it.each([0, Math.PI / 3])(
+    'does not contact stale parallel or separating cars at yaw %s',
+    (yaw) => {
+      for (const lateralSpeed of [0, 2]) {
+        const world = createWorld({ step: STEP, seed: 1 });
+        const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw, speed: 20 });
+        const c = Math.cos(yaw);
+        const sn = Math.sin(yaw);
+        const remote: RemoteContactBody = {
+          seat: 1,
+          x: 2.15 * sn,
+          z: 2.15 * c,
+          yaw,
+          vx: 25 * c + lateralSpeed * sn,
+          vz: -25 * sn + lateralSpeed * c,
+          yawRate: 0,
+          ageSec: 0.2,
+        };
+        const before = { ...car.state };
+        expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+        expect(car.state).toEqual(before);
+      }
+    },
+  );
+
+  it('bounds prediction by normal closing speed regardless of tangential speed', () => {
+    const world = createWorld({ step: STEP, seed: 1 });
+    const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+    const remote: RemoteContactBody = {
+      seat: 1,
+      x: 0,
+      z: 2.15,
+      yaw: 0,
+      vx: 40,
+      vz: -0.1,
+      yawRate: 0,
+      ageSec: 0.2,
+    };
+    const before = { ...car.state };
+    expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+    expect(car.state).toEqual(before);
+  });
+
   it('anticipates converging stale poses without adding vertical motion or unbounded separation', () => {
     const world = createWorld({ step: STEP, seed: 1 });
     const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
