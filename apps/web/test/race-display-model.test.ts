@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { RailRace } from '../../../packages/race/test/rails';
 import type { RaceEvent, StandingRow } from '@undercut/race';
 import {
   BLACK_WHITE_BANNER_S,
@@ -352,4 +353,24 @@ describe('race display model: message queue', () => {
     q.push('C', '3', 'invalid', 4);
     expect(q.visible(3)).toHaveLength(3);
   });
+});
+
+it('keeps the tower on the fitted compound after medium → hard → medium with two serviced stops', () => {
+  const race = new RailRace({ kind: 'race', laps: 10 }, [{ speed: 50 }]);
+  const model = createModel();
+  const c = race.control;
+  for (const compound of ['hard', 'medium'] as const) {
+    race.request(0, [{ kind: 'tyres', compound }]);
+    const events = race.run(100, (events) =>
+      events.some((e) => e.type === 'pit' && e.stage === 'serviceEnd'),
+    );
+    expect(events.some((e) => e.type === 'pit' && e.stage === 'serviceEnd')).toBe(true);
+    model.ingest(events);
+    const rows = model.buildTowerRows(c.standings(), { cars: c.cars, phase: c.phase });
+    expect(rows[0]?.compound?.code).toBe(compound === 'hard' ? 'H' : 'M');
+    expect(rows[0]?.tyreAge).toBe(0);
+    race.run(20, () => c.pitPhase(0) === 'none');
+  }
+  expect(c.cars[0]?.pitStops).toBe(2);
+  expect(c.cars[0]?.compounds).toEqual(['medium', 'hard']);
 });

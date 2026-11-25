@@ -109,6 +109,7 @@ export class TimingTower {
     this.gapBtn.className = 'hud-tower__mode';
     this.gapBtn.dataset.testid = 'tower-gap-toggle';
     this.gapBtn.title = 'Toggle gap to leader and interval';
+    this.gapBtn.setAttribute('aria-label', 'Show intervals instead of gaps to leader');
     this.gapBtn.setAttribute('aria-pressed', 'false');
     const gapLabel = el('span', '', 'Gap');
     this.gapBtnText = new Text(gapLabel);
@@ -232,11 +233,17 @@ export class TimingTower {
     }
     const showAge = c !== null && r.tyreAge !== undefined && r.tyreAge !== null;
     setHidden(n.tyreAgeEl, !showAge);
-    if (showAge) n.tyreAge.set(String(r.tyreAge));
+    if (showAge) {
+      n.tyreAge.set(String(r.tyreAge));
+      n.tyreAgeEl.setAttribute('aria-label', `${r.tyreAge} laps on tyres`);
+    }
 
     const showPits = r.pitStops !== undefined && r.pitStops !== null;
     setHidden(n.pitsEl, !showPits);
-    if (showPits) n.pits.set(String(r.pitStops));
+    if (showPits) {
+      n.pits.set(String(r.pitStops));
+      n.pitsEl.setAttribute('aria-label', `${r.pitStops} pit stops`);
+    }
   }
 
   private create(r: TowerRow): RowNodes {

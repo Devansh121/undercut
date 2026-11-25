@@ -8,7 +8,7 @@
  * - Safety indicators (blocking ghost)
  * - Short, readable race-control message queue (pit, penalties, track limits, speeding, jump start, served penalties)
  */
-import type { Phase, RaceEvent, SessionKind, StandingRow } from '@undercut/race';
+import type { CoreCar, Phase, RaceEvent, SessionKind, StandingRow } from '@undercut/race';
 import { formatLapTime } from '../../game/format';
 import type { TowerFlag } from './tower';
 import type { TowerRow, TowerTone } from './tower-rows';
@@ -508,7 +508,7 @@ export class RaceDisplayModel {
   buildTowerRows(
     standings: readonly StandingRow[],
     o: {
-      compounds?: readonly string[];
+      cars?: readonly Pick<CoreCar, 'compound'>[];
       fastestCar?: number | null;
       phase?: Phase;
     } = {},
@@ -520,7 +520,7 @@ export class RaceDisplayModel {
 
     return standings.map((row, index) => {
       const entrant = this.entrants[row.car];
-      const compoundId = o.compounds?.[row.car] ?? this.compounds[row.car] ?? 'medium';
+      const compoundId = o.cars?.[row.car]?.compound ?? this.compounds[row.car] ?? 'medium';
       const mark = compoundMark(compoundId);
       const retired = row.status === 'dnf' || row.status === 'dsq';
       let value: string;

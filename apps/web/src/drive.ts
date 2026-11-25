@@ -1363,7 +1363,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       (session.race.control.phase === 'grid' || session.race.control.phase === 'lights') &&
       !session.playerFinished &&
       session.result === null;
-    raceStatus.hidden = hideForLights;
+    raceStatus.hidden =
+      hideForLights ||
+      (session.race.control.strategy.kind === 'race' &&
+        !session.playerFinished &&
+        session.result === null);
     if (hideForLights) return;
     if (session.result) {
       // The classification: a table with a heading, the player's row marked and in view.
@@ -1654,7 +1658,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       boxButton.hidden = flagOut || inGarage;
       compoundButton.hidden = flagOut || inGarage;
       limiterButton.hidden = flagOut || inGarage;
-      pitHead.hidden = flagOut;
+      pitHead.hidden = flagOut || (!pitControl.pitRequested(0) && pitPhase === 'none');
       setButtonLabel(
         boxButton,
         pitControl.held(0)
@@ -1727,11 +1731,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
               fastestCar = row.car;
             }
           }
-          const carCompounds = pitControl.cars.map(
-            (c) => c.compounds[c.compounds.length - 1] ?? 'medium',
-          );
           towerRowsCache = raceDisplay.buildTowerRows(standings, {
-            compounds: carCompounds,
+            cars: pitControl.cars,
             fastestCar,
             phase: pitControl.phase,
           });

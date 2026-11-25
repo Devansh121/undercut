@@ -1634,6 +1634,9 @@
 .pit-panel[hidden] {
   display: none;
 }
+.pit-panel__head[hidden] {
+  display: none;
+}
 .pit-panel__head {
   display: flex;
   flex-direction: column;
@@ -1759,5 +1762,11 @@
 @media (pointer: coarse) {
   .controls__tabs .tab {
     min-height: 44px;
+  }
+}
+
+@media (max-height: 500px) {
+  .pit-panel:has(.pit-panel__head[hidden]) {
+    display: none;
   }
 }

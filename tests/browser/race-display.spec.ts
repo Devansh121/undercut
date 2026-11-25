@@ -1,5 +1,6 @@
+import { mkdir } from 'node:fs/promises';
 import { expect, test } from './base';
-import { DESKTOP, PHONES, fitEverywhere } from './fit-sweep';
+import { DESKTOP, PHONES, fitEverywhere, setTextSize } from './fit-sweep';
 import { watchProblems } from './helpers';
 
 test('race display: start lights, 20-car timing tower, yellow sector on minimap, pit & penalty messages, and classification results', async ({
@@ -9,11 +10,18 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   const problems = watchProblems(page);
   const isPhone = info.project.name === 'phone';
   const sizes = isPhone ? PHONES : DESKTOP;
+  const capture = async (stage: string) => {
+    if (!process.env.RACE_EVIDENCE) return;
+    await mkdir(process.env.RACE_EVIDENCE, { recursive: true });
+    await page.screenshot({
+      path: `${process.env.RACE_EVIDENCE}/${info.project.name}-${stage}.png`,
+    });
+  };
 
   await page.goto('/?debug=1&quality=lite&world=lite');
   await page.waitForFunction(() => !!window.__undercut);
 
-  // Start a 1-lap Quick Race from P10 so the timing tower has cars ahead and behind the player.
+  // Start a 3-lap Quick Race from P10 so the timing tower has cars ahead and behind the player.
   await page.evaluate(() => {
     const w = window as unknown as {
       lightsObserved: { lit: number; mask: number }[];
@@ -33,7 +41,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
       requestAnimationFrame(watch);
     };
     requestAnimationFrame(watch);
-    return window.__undercut!.startQuickRace(1, { gridPosition: 10 });
+    return window.__undercut!.startQuickRace(3, { gridPosition: 10 });
   });
 
   // Run through the lights ramp slowly enough to observe lit pods synced with the 3D gantry.
@@ -46,11 +54,27 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await page.waitForFunction(
     () => {
       const el = document.querySelector<HTMLElement>('[data-testid="start-lights"]');
-      return !!el && !el.hidden && Number(el.dataset.lights) >= 3;
+      if (!el || el.hidden || Number(el.dataset.lights) < 3) return false;
+      window.__undercut!.setTimeScale(0);
+      return true;
     },
     null,
     { timeout: 30_000 },
   );
+
+  await capture('start');
+  await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
+  const textPixels = async () =>
+    page
+      .locator('.hud-tower__row.is-player .hud-tower__code, .hud-lights__caption')
+      .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).fontSize)));
+  const standard = await textPixels();
+  await setTextSize(page, 'larger');
+  const larger = await textPixels();
+  expect(larger).toHaveLength(2);
+  larger.forEach((px, i) => expect(px).toBeGreaterThan(standard[i]!));
+  await setTextSize(page, 'standard');
+  expect(await fitEverywhere(page, { label: 'start lights with HUD scale', sizes })).toEqual([]);
 
   // Verify 3D start gantry bitmask matches lit pods on screen.
   const midLights = await page.evaluate(() => {
@@ -68,6 +92,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     const u = window.__undercut!;
     const st = u.state();
     u.teleport(Number(st.s) + 2, Number(st.d), 0);
+    u.setTimeScale(1);
   });
 
   // Jump-start indicator and race-control penalty message both appear before lights out.
@@ -75,6 +100,10 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(page.getByTestId('jump-start')).toContainText('+5 s');
   await expect(page.getByTestId('race-messages')).toBeVisible();
   await expect(page.getByTestId('race-messages')).toContainText(/Jump start/i);
+
+  await page.evaluate(() => window.__undercut!.setTimeScale(0));
+  await capture('penalty');
+  expect(await fitEverywhere(page, { label: 'jump start with HUD scale', sizes })).toEqual([]);
 
   // Speed through to green flag: lights go out on both UI and 3D gantry.
   await page.evaluate(() => window.__undercut!.setTimeScale(6));
@@ -104,18 +133,25 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     await expect(towerRows).toHaveCount(20);
     await expect(tower.locator('.hud-tower__row.is-player')).toHaveCount(1);
     await expect(tower.locator('.hud-tower__row .hud-tower__tyre')).toHaveCount(20);
-    await expect(tower.locator('.hud-tower__row .hud-tower__age').first()).toBeVisible();
-    await expect(tower.locator('.hud-tower__row .hud-tower__pits').first()).toBeVisible();
-
-    const gapToggle = page.getByTestId('tower-gap-toggle');
-    await expect(gapToggle).toBeVisible();
-    await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
-    await gapToggle.click();
-    await expect(gapToggle).toHaveAttribute('data-mode', 'interval');
-    await expect(gapToggle).toHaveText('Int');
-    await gapToggle.click();
-    await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
-    await expect(gapToggle).toHaveText('Gap');
+  }
+  await expect(towerRows.first().locator('.hud-tower__age')).toBeVisible();
+  await expect(towerRows.first().locator('.hud-tower__pits')).toBeVisible();
+  const gapToggle = page.getByTestId('tower-gap-toggle');
+  await expect(gapToggle).toBeVisible();
+  await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
+  if (isPhone) {
+    const box = await gapToggle.boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(48);
+    expect(box!.height).toBeGreaterThanOrEqual(48);
+  }
+  await gapToggle.click();
+  await expect(gapToggle).toHaveAttribute('data-mode', 'interval');
+  await expect(gapToggle).toHaveAttribute('aria-pressed', 'true');
+  await gapToggle.click();
+  await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
+  if (isPhone) {
+    await expect(page.getByTestId('race-status')).toBeHidden();
+    await expect(page.locator('.pit-panel__head')).toBeHidden();
   }
 
   // Stop on track in Sector 2 so a real local yellow flag triggers right after START_GRACE (4 s),
@@ -136,6 +172,8 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   const yellowSegments = page.locator('[data-testid="map-yellow-sectors"] [data-yellow="on"]');
   expect(await yellowSegments.count()).toBeGreaterThanOrEqual(1);
 
+  await capture('yellow');
+
   // Call a pit stop and verify the pit message enters the race-control message queue.
   await page.evaluate(() => {
     window.__undercut!.setTimeScale(1);
@@ -149,6 +187,8 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(page.getByTestId('race-messages')).toBeVisible();
   await expect(page.getByTestId('race-messages')).toContainText(/Box/i);
   await page.evaluate(() => window.__undercut!.setTimeScale(0));
+
+  await capture('pit-call');
 
   // Accessibility hooks (colour-blind palette, reduced motion, HUD scale) and full fit sweep
   // while the race tower, yellow flag banner, minimap yellow sector, and message queue are live.
@@ -175,12 +215,13 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     const r = document.documentElement;
     delete r.dataset.cb;
     delete r.dataset.motion;
-    r.style.removeProperty('--hud-scale');
   });
 
   expect(await fitEverywhere(page, { label: 'live race HUD (yellow + messages)', sizes })).toEqual(
     [],
   );
+
+  await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
 
   // Cancel the pit call and let the racing driver finish the 1-lap race to inspect final results.
   await page.evaluate(() => {
@@ -231,6 +272,22 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
       'Pts',
     ]);
   }
+
+  if (isPhone) {
+    const labels = await status.locator('th:visible').evaluateAll((els) =>
+      els.map((el) => ({
+        top: el.getBoundingClientRect().top,
+        bottom: el.getBoundingClientRect().bottom,
+      })),
+    );
+    const title = await status.locator('.race-status__head').boundingBox();
+    expect(labels.length).toBeGreaterThan(3);
+    for (const label of labels) {
+      expect(label.top).toBeGreaterThanOrEqual(title!.y + title!.height - 1);
+      expect(label.bottom).toBeLessThan(390);
+    }
+  }
+  await capture('finish');
 
   // Lap timer is stopped behind final results and pit panel is hidden.
   await expect(page.getByTestId('pit-panel')).toBeHidden();

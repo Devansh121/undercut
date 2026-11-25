@@ -1873,7 +1873,8 @@ body {
 
 /* 20-car broadcast timing tower (race / practice / qualifying). */
 .hud-tower[data-race-tower='on'] {
-  width: 280px;
+  font-size: var(--fs-12);
+  width: 25em;
   display: flex;
   flex-direction: column;
   max-height: calc((100dvh - var(--safe-t) - var(--safe-b)) / var(--hud-scale, 1));
@@ -1900,7 +1901,7 @@ body {
 .hud-tower[data-race-tower='on'] .hud-tower__cols {
   flex: none;
   display: grid;
-  grid-template-columns: 20px 3px minmax(0, 1fr) 64px 36px 20px;
+  grid-template-columns: 2ch 3px minmax(3ch, 1fr) 8ch 5ch 2.5ch;
   align-items: center;
   gap: 6px;
   height: 20px;
@@ -1973,9 +1974,9 @@ body {
 }
 
 .hud-tower[data-race-tower='on'] .hud-tower__row {
-  grid-template-columns: 20px 3px minmax(0, 1fr) 64px 36px 20px;
+  grid-template-columns: 2ch 3px minmax(3ch, 1fr) 8ch 5ch 2.5ch;
   gap: 6px;
-  height: 23px;
+  height: calc(var(--fs-12) * 1.6 + 4px);
   padding: 0 var(--sp-2);
 }
 
@@ -2304,10 +2305,20 @@ body {
   background: var(--c-ink-1);
   border-bottom: 1px solid var(--c-line);
   font-size: var(--fs-14);
+  line-height: 1.2;
+  z-index: 3;
   font-weight: 800;
   font-stretch: var(--wdth-semi);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
+}
+
+/* Keep column labels below the result title when the player row opens near the bottom. */
+.race-status[data-table] th {
+  position: sticky;
+  top: calc(var(--fs-14) * 1.2 + 7px);
+  z-index: 2;
+  background: var(--c-ink-1);
 }
 
 /* The player's own row in the standings: the kit's selection marker. */
@@ -2395,10 +2406,22 @@ html[data-race-finished] .ut-touch__btn--overtake {
   display: none;
 }
 
-/* Hide desktop tower column toggle button below 1000 px so phone touch-target checks stay clean. */
+/* Compact race columns retain tyre age, stops and the timing toggle on phones. */
 @media (max-width: 999px), (max-height: 500px) {
+  .hud-tower[data-race-tower='on'] {
+    font-size: var(--fs-11);
+    width: 19em;
+  }
   .hud-tower[data-race-tower='on'] .hud-tower__cols {
-    display: none;
+    height: 48px;
+    grid-template-columns: 1.5ch 3px minmax(3ch, 1fr) 6.5ch 4.5ch 2ch;
+    gap: 3px;
+    padding: 0 4px;
+    letter-spacing: 0;
+  }
+  .hud-tower__mode {
+    min-width: 48px;
+    min-height: 48px;
   }
 }
 
@@ -2419,17 +2442,18 @@ html[data-race-finished] .ut-touch__btn--overtake {
 
 @media (max-width: 600px) and (orientation: portrait) {
   .hud-tower[data-race-tower='on'] {
-    width: 164px;
+    font-size: var(--fs-11);
+    width: 19em;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__row {
-    grid-template-columns: 15px 3px minmax(0, 1fr) auto 16px;
-    gap: 4px;
-    height: 21px;
-    padding: 0 6px 0 4px;
+    grid-template-columns: 1.5ch 3px minmax(3ch, 1fr) 6.5ch 4.5ch 2ch;
+    gap: 3px;
+    height: calc(var(--fs-11) * 1.5 + 4px);
+    padding: 0 4px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__age,
   .hud-tower[data-race-tower='on'] .hud-tower__pits {
-    display: none;
+    display: inline-block;
   }
   .hud-lights {
     gap: 4px;
@@ -2664,19 +2688,20 @@ html:has(.update-bar) .pause {
     width: 132px;
   }
   .hud-tower[data-race-tower='on'] {
-    width: 158px;
+    font-size: var(--fs-11);
+    width: 19em;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__head {
-    height: 20px;
+    height: calc(var(--fs-11) * 1.5 + 4px);
   }
   .hud-tower[data-race-tower='on'] .hud-tower__status {
-    height: 16px;
+    height: calc(var(--fs-10) * 1.5 + 2px);
   }
   .hud-tower[data-race-tower='on'] .hud-tower__row {
-    grid-template-columns: 15px 3px minmax(0, 1fr) auto 16px;
-    gap: 4px;
-    height: 19px;
-    padding: 0 6px 0 4px;
+    grid-template-columns: 1.5ch 3px minmax(3ch, 1fr) 6.5ch 4.5ch 2ch;
+    gap: 3px;
+    height: calc(var(--fs-11) * 1.5 + 4px);
+    padding: 0 4px;
   }
   .hud-tower[data-race-tower='on'] .hud-tower__pos,
   .hud-tower[data-race-tower='on'] .hud-tower__code,
@@ -2685,7 +2710,7 @@ html:has(.update-bar) .pause {
   }
   .hud-tower[data-race-tower='on'] .hud-tower__age,
   .hud-tower[data-race-tower='on'] .hud-tower__pits {
-    display: none;
+    display: inline-block;
   }
   .hud-tower__status[data-flag='green'] {
     display: none;
@@ -2819,10 +2844,10 @@ html:has(.update-bar) .pause {
 
 @media (max-height: 360px) and (orientation: landscape) {
   .hud-tower[data-race-tower='on'] .hud-tower__head {
-    height: 20px;
+    height: calc(var(--fs-11) * 1.5 + 4px);
   }
   .hud-tower[data-race-tower='on'] .hud-tower__status {
-    height: 16px;
+    height: calc(var(--fs-10) * 1.5 + 2px);
   }
   .hud-tower[data-race-tower='on'] .hud-tower__row {
     height: 19px;

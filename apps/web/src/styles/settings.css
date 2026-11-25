@@ -42,6 +42,43 @@
   font-size: var(--fs-14);
 }
 
+/* Race information follows text size independently of the fixed driving controls. */
+:root[data-text='large']
+  :is(
+    .hud-tower[data-race-tower],
+    .hud-lights,
+    .hud-flag--race,
+    .hud-prompt--safety,
+    .hud-messages,
+    .race-status,
+    .race-results-actions,
+    .pit-panel__head
+  ) {
+  --fs-10: 12px;
+  --fs-11: 13px;
+  --fs-12: 14px;
+  --fs-14: 16px;
+  --fs-16: 18px;
+}
+:root[data-text='larger']
+  :is(
+    .hud-tower[data-race-tower],
+    .hud-lights,
+    .hud-flag--race,
+    .hud-prompt--safety,
+    .hud-messages,
+    .race-status,
+    .race-results-actions,
+    .pit-panel__head
+  ) {
+  --fs-10: 13px;
+  --fs-11: 14px;
+  --fs-12: 16px;
+  --fs-14: 18px;
+  --fs-16: 20px;
+  --fs-20: 22px;
+}
+
 /* ================= Colour-blind-safe flags ================= */
 
 /* Green and red differ in lightness as well as hue (cyan against vermilion); yellow and blue
