@@ -118,6 +118,8 @@ Measured on the final build (`docs/evidence/m2-render/perf.json`); "drive" is th
 
 Draw calls and triangles include every pass of a frame (three shadow cascades on High). Uncapped 1 % lows are dominated by the browser's frame pacing without vsync and are not a target. Nothing was cut to reach 60 fps on High with the full grid. A mid-range phone was not available to measure; the Mobile numbers are the laptop at phone resolution.
 
+The [Mobile prop-kit tuning report](evidence/mobile-kit-tuning/README.md) records the later full-world Grid and Lesmo comparisons, including retained uncapped samples and normal-vsync controls. Mobile Monza Grid submits 374 calls and 1,399,180 triangles; its browser test pins ceilings of 384 and 1,465,000.
+
 ## Hooks for the dressing slice
 
 - **Props** (`props/registry.ts`): define a kind once with its levels of detail, place instances, build, and the view culls and switches them per chunk:

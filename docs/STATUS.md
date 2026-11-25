@@ -392,3 +392,10 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 | Singapore | overcast | park | 1.034 | 1.033 | 1.033 | 1.033–1.034 |
 
 Raw reports and both intentional mutation failures are retained in [the evidence folder](evidence/m2-water-trees-2/README.md). The Mobile relief cost remains about +15 % uncapped frame time, with 60 fps under vsync at all three circuits, as recorded in the performance report.
+
+### Decided for you — Mobile prop-kit tuning
+
+- Keep the modelled stand treads, risers, columns, rails and roof framing close to the track on Mobile; omit individual seat pans and use the silhouette hull beyond 160 m. Use wider batches only for static props, keep the existing detailed near crowd, and hand it over to compact seated figures over 14–20 m. High keeps its structure and crowd distances.
+- Give the hill garage its own 52-triangle silhouette/shadow hull, including the cantilevered canopy and rooftop service volume. Both garage hulls still omit the thin terrace guardrails; the hill hull also omits canopy tie-rods, as recorded in `docs/render.md`.
+- Residual stand uploads came from active chunks leaving or returning to an already-packed prefix. Reuse that prefix, changing the active count and bounds without uploading identical matrices or colours. Visual and shadow regression tests compare against independently built unbatched instances across shrink, refill and non-prefix replacement.
+- Pin the full-world Mobile Monza grid at no more than 384 calls and 1,465,000 triangles in the existing browser dressing test. The measured implementation submits 374 calls and 1,399,180 triangles; no budget or tolerance was loosened.
