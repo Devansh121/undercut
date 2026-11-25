@@ -390,9 +390,7 @@ export class ReferenceDriver implements Driver {
     // falls up to in proportion to the mass. Planned as grip in proportion beyond a band the
     // driver's own margins cover (`MASS_BAND`: short races, up to about 24 kg of fuel, drive the
     // plan as before). Without it, cars at full-distance fuel ran wide at the Parabolica every lap.
-    const mass = this.params.mass.dryMass + tel.fuelMass;
-    const massGrip = Math.min(1, (plan.model.envelope.conditions.mass * (1 + MASS_BAND)) / mass);
-    const speeds = this.profileFor(tel.tyreGrip * massGrip);
+    const speeds = this.speedProfileFor(tel);
     const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + this.speedAllowance;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
@@ -500,6 +498,16 @@ export class ReferenceDriver implements Driver {
     last.targetSpeed = vTarget;
     last.phase = speeds.phase[i]!;
     return out;
+  }
+
+  /** Current tyre and fuel speed plan, shared with the racing driver's move prediction. */
+  speedProfileFor(tel: Pick<CarTelemetry, 'tyreGrip' | 'fuelMass'>): SpeedProfile {
+    const mass = this.params.mass.dryMass + tel.fuelMass;
+    const massGrip = Math.min(
+      1,
+      (this.plan.model.envelope.conditions.mass * (1 + MASS_BAND)) / mass,
+    );
+    return this.profileFor(tel.tyreGrip * massGrip);
   }
 
   /**

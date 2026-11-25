@@ -890,6 +890,7 @@ export class RaceDriver implements Driver {
     this.switchbackTime = Math.max(0, this.switchbackTime - dt);
     if (this.switchbackTime === 0) this.switchbackId = -1;
     const profV = plan.profile.v;
+    const moveV = later ? this.inner.speedProfileFor(tel).v : profV;
     const gapAhead = leader ? leaderDs - CAR_LENGTH : Number.POSITIVE_INFINITY;
     if (leader && gapAhead < 20 + v * 0.5 && v < this.at(profV, s0) - 1) this.heldTime += dt;
     // (Out beside the car in a move, it is still the car that held this one up.)
@@ -964,6 +965,7 @@ export class RaceDriver implements Driver {
             this.passDecel,
             lane,
             this.passSide,
+            moveV,
           );
       }
       // On later laps a closing move can use the remaining straight before our braking
@@ -1141,6 +1143,7 @@ export class RaceDriver implements Driver {
               this.passDecel,
               lane,
               side,
+              moveV,
             ));
         if (side !== 0 && sure) {
           this.passId = leader.id;
@@ -1382,7 +1385,10 @@ export class RaceDriver implements Driver {
     if (nq > 1 && queueOn && !this.passBypass) {
       limit = Math.min(limit, this.queueLimit(nq, v, queueStop));
     }
-    limit = Math.min(limit, this.offLineLimit(s0, v));
+    limit = Math.min(
+      limit,
+      this.offLineLimit(s0, v, this.passCommitted && later ? moveV : undefined),
+    );
     // Round a stopped car: down to a crawl by the time it gets there, on a gentle braking curve
     // (in a corner the tyres have little to spare), and at the crawl until past it. Stopped too
     // close behind it to steer out (a car turns no tighter than it is long), back up a little
@@ -1561,7 +1567,7 @@ export class RaceDriver implements Driver {
    * radius is tighter by the offset, so the speed the line allows there scales by
    * sqrt(1 - κ·o), with a small margin for leaving the grip map the line was made on.
    */
-  private offLineLimit(s0: number, v: number): number {
+  private offLineLimit(s0: number, v: number, profile = this.plan.profile.v): number {
     const o = this.o;
     if (Math.abs(o) < 0.3) return Number.POSITIVE_INFINITY;
     const plan = this.plan;
@@ -1579,7 +1585,7 @@ export class RaceDriver implements Driver {
         // the slower corner speed off line (no margin on a straight, where off line is as fast).
         if (Math.abs(k) <= 0.5 * CORNER_CURVATURE) f = attackStraight ? 1 : f / 0.985;
         if (f >= 1) continue;
-        const vMax = this.at(plan.profile.v, sx) * f;
+        const vMax = this.at(profile, sx) * f;
         if (v <= vMax) continue;
         const b = this.brakeAt(0.5 * (v + vMax)) / BRAKE_SHARE;
         const vAllowed = Math.sqrt(vMax * vMax + 2 * MOVE_BRAKE_SHARE * b * x);
@@ -1589,7 +1595,7 @@ export class RaceDriver implements Driver {
       // On the straight an attacker uses the tow and DRS to exceed the solo profile.
       // Corner samples ahead still impose their ordinary braking curve.
       if (this.attacking() && f >= 1) continue;
-      const vMax = this.at(plan.profile.v, sx) * f;
+      const vMax = this.at(profile, sx) * f;
       if (v <= vMax) continue;
       const a = x < 1 ? SPEED_GAIN * (vMax - v) : (vMax * vMax - v * v) / (2 * x);
       if (a < limit) limit = a;
@@ -1611,10 +1617,10 @@ export class RaceDriver implements Driver {
     al: number,
     laneO: number,
     side: number,
+    prof = this.plan.profile.v,
   ): boolean {
     const h = 0.05;
     const plan = this.plan;
-    const prof = plan.profile.v;
     const track = plan.track;
     const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
     // The lane may be a little tighter than the air held side by side (down to 0.3 m).

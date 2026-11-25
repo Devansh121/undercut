@@ -561,6 +561,16 @@ describe('race driver: building a run after lap one', () => {
   });
 });
 
+it('uses the available-grip speed profile for a committed off-line braking move', () => {
+  const dr = driver();
+  dr['passId'] = 1;
+  dr['passCommitted'] = true;
+  dr['o'] = -3;
+  const reference = dr['offLineLimit'](550, 70);
+  const available = dr['inner'].speedProfileFor({ tyreGrip: 0.8, fuelMass: 0 }).v;
+  expect(dr['offLineLimit'](550, 70, available)).toBeLessThan(reference);
+});
+
 it('uses straight-line speed headroom in a move while retaining the corner braking limit', () => {
   const dr = driver();
   dr['o'] = 3;
