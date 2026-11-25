@@ -115,6 +115,11 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Graphics polish (sky, grass, night road): the brief said mowing bands already existed; master had none, so the circuit's grass is mown here (3.2 m bands along the track edge). The land beyond the circuit is not mown.
+- The new overcast sky has its own id (`overcast_soil`) rather than replacing `overcast` in place. The asset build's metadata cache in `~/.cache/undercut/assets-src/skies/` is shared by every worktree, and another branch rebuilding `overcast` would have paired its old images with the new sky's numbers.
+- Singapore's dark road needed more than dimmer banks: turn 1 and the far end of the pit straight were nearly black on master too. Banks set back behind wide run-off are scaled to light the road as one by the wall would (capped at 6×), and the side opposite the pit lane takes masts at half spacing where the pit side has none.
+- The cockpit stretch items (mirrors, gloves and arms, the wheel at night, the night car shadow) go in a separate PR so #84 stays reviewable before the 28 Nov deadline.
+
 - Kit placement CPU cost: batch the selected instances of fine cells into larger visual and shadow draws. Keep each fine cell's LOD and shadow reach; recompute only when camera travel could cross a boundary. Keep hoardings and absorber blocks on their existing shadow geometry. Larger draw bounds can submit more offscreen triangles; measure actual drawn-frame time as well as GPU time.
 
 - Kit crowd: use the plain idle material for whole far-crowd chunks beyond 32 m, where the handover is already complete. The near-edge bound includes geometry reach, and a test checks that the plain material never covers a person inside the swap. The two levels share geometry; the extra level adds instance buffers.
