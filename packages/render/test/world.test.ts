@@ -351,17 +351,13 @@ describe('High-world near tree reflections', () => {
         return [p.x, p.z];
       }),
     });
-    const dressing: DressingFile = {
-      ...full,
-      authored: {},
-      mapped: {
-        ...Object.fromEntries(Object.keys(full.mapped).map((k) => [k, []])),
-        wood: [
-          wood('test-broadleaf', 5450, 'broadleaved'),
-          wood('test-conifers', 5600, 'needleleaved'),
-        ],
-      } as DressingFile['mapped'],
-    };
+    const mapped = { ...full.mapped };
+    for (const key of Object.keys(mapped) as (keyof DressingFile['mapped'])[]) mapped[key] = [];
+    mapped.wood = [
+      wood('test-broadleaf', 5450, 'broadleaved'),
+      wood('test-conifers', 5600, 'needleleaved'),
+    ];
+    const dressing: DressingFile = { ...full, authored: {}, mapped };
     let world: CircuitWorld | null = null;
     try {
       world = withStubCanvas(

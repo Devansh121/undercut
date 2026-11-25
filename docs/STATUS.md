@@ -360,3 +360,26 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Traction control on grass and gravel (both driven wheels on surface grip under 0.7, below 8 m/s): the launch throttle of 0.3 stays while the rears' slip ratio is under 0.5. From rest on Monza grass, full throttle reaches 31.9 km/h in 3.6 s instead of 22.3 (traction control off: 31.8). Asphalt launches are unchanged. Each tyre's surface grip of the last step is now part of the car state and its snapshot (`CarState.surfaceGrip`). Full lock from rest on grass barely moves, with traction control or without: that is the tyres, not the assist.
 - A slowly struck board is kept out of the car bodies while it is low (under 0.9 m): ahead of a car's centre it rides on the nose, otherwise it leaves by the nearer side or the tail, and the push carries into its settled place. This is cosmetic and depends on the cars drawn, so clients can differ slightly in where such a board lands.
 - Reference laps at all three circuits are bit-identical to master (lap times and whole-trace digests), and the open kerb-strike cases keep master's expected failures.
+
+### Decided for you — water and trees review follow-up
+
+- Merged master `7beb1c5`. Near conifers now use owned copies of the kit geometry widened by 35 % horizontally, with linear colour scale 0.65. This matches the impostor crowns' cover and tone without changing height or triangle count, or mutating the shared catalogue geometry. The previous narrow crowns left bright sky between boughs, so reducing colour alone did not fix Blanchimont.
+- The High-world reflection regression builds `CircuitWorld` with the unchanged High preset, two small wooded strips, a canvas stub and stand-in catalogue meshes, then calls the real prop registry to instantiate them. It requires both near cloud trees and both near kit conifer kinds to exist and checks every instantiated near-tree mesh's production `userData.reflect`. Removing only the cloud flag fails on `prop:tree-wood-near`; removing only the kit flag fails on `prop:tree-conifer-near-forest-spruce` (both: expected null to be `scenery`, exit 1). Restored flags: 57 focused rendering tests pass. The smaller fixture keeps the existing unit-test timeout.
+- Three real-GPU runs at every station below pass all 36 cases. Each run used `timeout 900 flock ~/.cache/undercut/gpu.lock`, muted Chromium and `nice -n 10`; render scale 1, animation time 0, 90 settle frames and 12 interleaved captures per state. Tolerance remains 0.10; no budget changed. Blanchimont improves from the review's 1.117–1.118 overcast and 1.102 in sun to the ranges below.
+
+| Circuit | Lighting | Pose | Run 1 | Run 2 | Run 3 | Range |
+| --- | --- | --- | --- | --- | --- | --- |
+| Spa | overcast | blanchimont | 1.080 | 1.080 | 1.080 | 1.080–1.080 |
+| Spa | overcast | plantation | 0.964 | 0.964 | 0.964 | 0.964–0.964 |
+| Spa | sun | blanchimont | 1.060 | 1.061 | 1.061 | 1.060–1.061 |
+| Spa | sun | plantation | 1.007 | 1.007 | 1.007 | 1.007–1.007 |
+| Monza | day | lesmo | 0.905 | 0.905 | 0.905 | 0.905–0.905 |
+| Monza | day | park | 1.013 | 1.014 | 1.014 | 1.013–1.014 |
+| Monza | night | lesmo | 1.023 | 1.023 | 1.023 | 1.023–1.023 |
+| Monza | night | park | 0.939 | 0.939 | 0.938 | 0.938–0.939 |
+| Singapore | night | esplanade | 0.931 | 0.931 | 0.932 | 0.931–0.932 |
+| Singapore | night | park | 1.002 | 1.002 | 1.002 | 1.002–1.002 |
+| Singapore | overcast | esplanade | 0.959 | 0.959 | 0.959 | 0.959–0.959 |
+| Singapore | overcast | park | 1.034 | 1.033 | 1.033 | 1.033–1.034 |
+
+Raw reports and both intentional mutation failures are retained in [the evidence folder](evidence/m2-water-trees-2/README.md). The Mobile relief cost remains about +15 % uncapped frame time, with 60 fps under vsync at all three circuits, as recorded in the performance report.

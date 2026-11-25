@@ -1,0 +1,546 @@
+{
+  "implementationCommit": "8b91cc27662b50a6116b169cd286a5903ee63cb6",
+  "note": "Reports retain checkout HEAD at capture time. The first eight runs captured the production correction before its commit; the final Singapore run captured the committed implementation.",
+  "reports": [
+    {
+      "run": 1,
+      "sha": "adb0882",
+      "circuit": "spa",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "overcast",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 105.9,
+            "cardLuma": 98,
+            "ratio": 1.08,
+            "changedPct": 6.9,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 84.2,
+            "cardLuma": 87.4,
+            "ratio": 0.964,
+            "changedPct": 3.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 54.9,
+            "cardLuma": 51.8,
+            "ratio": 1.06,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 41.5,
+            "cardLuma": 41.2,
+            "ratio": 1.007,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 2,
+      "sha": "adb0882",
+      "circuit": "spa",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "overcast",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 105.8,
+            "cardLuma": 98,
+            "ratio": 1.08,
+            "changedPct": 6.9,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 84.2,
+            "cardLuma": 87.4,
+            "ratio": 0.964,
+            "changedPct": 3.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 54.9,
+            "cardLuma": 51.8,
+            "ratio": 1.061,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 41.6,
+            "cardLuma": 41.3,
+            "ratio": 1.007,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 3,
+      "sha": "adb0882",
+      "circuit": "spa",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "overcast",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 105.9,
+            "cardLuma": 98,
+            "ratio": 1.08,
+            "changedPct": 6.9,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 84.3,
+            "cardLuma": 87.4,
+            "ratio": 0.964,
+            "changedPct": 3.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "blanchimont",
+            "swap": 95,
+            "nearLuma": 55,
+            "cardLuma": 51.8,
+            "ratio": 1.061,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "sun",
+            "pose": "plantation",
+            "swap": 95,
+            "nearLuma": 41.5,
+            "cardLuma": 41.2,
+            "ratio": 1.007,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 1,
+      "sha": "adb0882",
+      "circuit": "monza",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "day",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 48.2,
+            "cardLuma": 53.2,
+            "ratio": 0.905,
+            "changedPct": 17.4,
+            "renderScale": 1
+          },
+          {
+            "tod": "day",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 51.8,
+            "cardLuma": 51.1,
+            "ratio": 1.013,
+            "changedPct": 3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 24,
+            "cardLuma": 23.4,
+            "ratio": 1.023,
+            "changedPct": 12.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 22.9,
+            "cardLuma": 24.4,
+            "ratio": 0.939,
+            "changedPct": 2.5,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 2,
+      "sha": "adb0882",
+      "circuit": "monza",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "day",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 48.2,
+            "cardLuma": 53.2,
+            "ratio": 0.905,
+            "changedPct": 17.4,
+            "renderScale": 1
+          },
+          {
+            "tod": "day",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 51.8,
+            "cardLuma": 51.1,
+            "ratio": 1.014,
+            "changedPct": 3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 24,
+            "cardLuma": 23.4,
+            "ratio": 1.023,
+            "changedPct": 12.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 22.9,
+            "cardLuma": 24.3,
+            "ratio": 0.939,
+            "changedPct": 2.5,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 3,
+      "sha": "adb0882",
+      "circuit": "monza",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "day",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 48.2,
+            "cardLuma": 53.2,
+            "ratio": 0.905,
+            "changedPct": 17.4,
+            "renderScale": 1
+          },
+          {
+            "tod": "day",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 51.8,
+            "cardLuma": 51.1,
+            "ratio": 1.014,
+            "changedPct": 3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "lesmo",
+            "swap": 95,
+            "nearLuma": 24,
+            "cardLuma": 23.4,
+            "ratio": 1.023,
+            "changedPct": 12.3,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 22.9,
+            "cardLuma": 24.4,
+            "ratio": 0.938,
+            "changedPct": 2.5,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 1,
+      "sha": "adb0882",
+      "circuit": "singapore",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "night",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 36.5,
+            "cardLuma": 39.2,
+            "ratio": 0.931,
+            "changedPct": 4.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 47.6,
+            "cardLuma": 47.5,
+            "ratio": 1.002,
+            "changedPct": 2.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 105.2,
+            "cardLuma": 109.7,
+            "ratio": 0.959,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 106.4,
+            "cardLuma": 103,
+            "ratio": 1.034,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 2,
+      "sha": "adb0882",
+      "circuit": "singapore",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "night",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 36.5,
+            "cardLuma": 39.2,
+            "ratio": 0.931,
+            "changedPct": 4.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 47.6,
+            "cardLuma": 47.5,
+            "ratio": 1.002,
+            "changedPct": 2.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 105.2,
+            "cardLuma": 109.7,
+            "ratio": 0.959,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 106.3,
+            "cardLuma": 102.9,
+            "ratio": 1.033,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    },
+    {
+      "run": 3,
+      "sha": "8b91cc2",
+      "circuit": "singapore",
+      "shots": [],
+      "perf": [],
+      "lap": null,
+      "moving": null,
+      "errors": [],
+      "treeSwapCheck": {
+        "ok": true,
+        "tolerance": 0.1,
+        "settleFrames": 90,
+        "framesPerState": 12,
+        "animationTime": 0,
+        "cases": [
+          {
+            "tod": "night",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 36.6,
+            "cardLuma": 39.3,
+            "ratio": 0.932,
+            "changedPct": 4.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "night",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 47.6,
+            "cardLuma": 47.5,
+            "ratio": 1.002,
+            "changedPct": 2.5,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "esplanade",
+            "swap": 95,
+            "nearLuma": 105.3,
+            "cardLuma": 109.8,
+            "ratio": 0.959,
+            "changedPct": 6.1,
+            "renderScale": 1
+          },
+          {
+            "tod": "overcast",
+            "pose": "park",
+            "swap": 95,
+            "nearLuma": 106.3,
+            "cardLuma": 103,
+            "ratio": 1.033,
+            "changedPct": 2.9,
+            "renderScale": 1
+          }
+        ],
+        "problems": []
+      }
+    }
+  ]
+}
