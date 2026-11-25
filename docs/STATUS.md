@@ -115,6 +115,11 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Cockpit mirrors: one rear-view camera above the driver's eye on the centreline serves both mirrors, rather than one per mirror, so the cost is one small render every third frame. It sees past the car's own bodywork, a little more centrally than a real wing mirror would; at the glass's size that does not read. Medium uses the static reflection like Mobile, because the brief asks for the live one on High and above.
+- The mirror glass was culled from the driver's eye (the asset winds it facing forward), and that, not the material, was the flat grey: the road showed through the housing. The new material draws both sides, and the car's Mobile level keeps the glass as its own material (one more draw call, 26) so the phone gets the static reflection too.
+- The gloves' and arms' extra triangles are paid for by the brake-duct drums and scoops behind the rims (28 → 22 and 12 → 8 segments), not by raising the car's triangle budgets.
+- The night wheel's light is an emission of each material's own albedo rather than a point light: a light added to the scene would recompile every lit material and cost per pixel everywhere. The buttons are left out (their coloured caps glowing read as toy LEDs).
+
 - Kit placement CPU cost: batch the selected instances of fine cells into larger visual and shadow draws. Keep each fine cell's LOD and shadow reach; recompute only when camera travel could cross a boundary. Keep hoardings and absorber blocks on their existing shadow geometry. Larger draw bounds can submit more offscreen triangles; measure actual drawn-frame time as well as GPU time.
 
 - Kit crowd: use the plain idle material for whole far-crowd chunks beyond 32 m, where the handover is already complete. The near-edge bound includes geometry reach, and a test checks that the plain material never covers a person inside the swap. The two levels share geometry; the extra level adds instance buffers.
