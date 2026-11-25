@@ -1,5 +1,6 @@
 import {
   Color,
+  DoubleSide,
   HalfFloatType,
   LinearFilter,
   Matrix3,
@@ -144,6 +145,9 @@ export class CockpitMirrors {
         hazeColour: sky.hazeColour as { value: unknown },
         haze: sky.haze as { value: unknown },
       },
+      // The glass is wound facing forward in the asset: seen from the driver's eye its back face
+      // was culled and the road showed through the housing (the old "flat grey").
+      side: DoubleSide,
       toneMapped: true,
     });
     // Its uniforms reach only the compiled shader: list the target for the texture-memory count.

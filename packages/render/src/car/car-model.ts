@@ -61,6 +61,8 @@ export const COCKPIT_NIGHT = Object.freeze({
   fillColour: [0.86, 0.9, 1] as const,
 });
 
+const NIGHT_UNLIT = new Set(['display', 'wheel_controls']);
+
 /** Steering-wheel turns per road-wheel angle. */
 export const STEERING_RATIO = 6;
 const FRONT_TYRE_HALF = 0.18;
@@ -338,7 +340,9 @@ export class CarModel {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
       const from = mesh.material as Material;
-      if (!(from instanceof MeshStandardMaterial) || from.name === 'display') return;
+      // The screen is lit already; the buttons and switches keep their own colours unlit (their
+      // blue and red caps glowing read as toy LEDs).
+      if (!(from instanceof MeshStandardMaterial) || NIGHT_UNLIT.has(from.name)) return;
       let to = copies.get(from);
       if (!to) {
         const own = this.owned.includes(from) ? from : from.clone();

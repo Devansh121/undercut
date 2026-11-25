@@ -1,4 +1,4 @@
-import { Group, Vector3 } from 'three';
+import { DoubleSide, Group, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { COCKPIT_NIGHT } from '../src/car/car-model';
 import { CONTACT_FOOTPRINT, contactFootprint } from '../src/car/contact-shadows';
@@ -58,6 +58,8 @@ describe('cockpit mirrors', () => {
     );
     expect(mirrors.live).toBe(true);
     expect(mirrors.material.name).toBe('mirror_glass');
+    // Seen from the driver the asset's glass shows its back face: drawn from both sides.
+    expect(mirrors.material.side).toBe(DoubleSide);
     mirrors.dispose();
     expect(body.children).toHaveLength(0);
   });
