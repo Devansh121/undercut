@@ -605,8 +605,14 @@ export class PropRegistry {
         batch.mesh.count = offset;
         batch.mesh.visible = offset > 0;
         if (offset > 0) {
+          batch.mesh.instanceMatrix.clearUpdateRanges();
+          batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
           batch.mesh.instanceMatrix.needsUpdate = true;
-          if (batch.mesh.instanceColor) batch.mesh.instanceColor.needsUpdate = true;
+          if (batch.mesh.instanceColor) {
+            batch.mesh.instanceColor.clearUpdateRanges();
+            batch.mesh.instanceColor.addUpdateRange(0, offset * 3);
+            batch.mesh.instanceColor.needsUpdate = true;
+          }
         }
         batch.dirty = false;
       }
@@ -625,7 +631,11 @@ export class PropRegistry {
         }
         batch.mesh.count = offset;
         batch.mesh.visible = offset > 0;
-        if (offset > 0) batch.mesh.instanceMatrix.needsUpdate = true;
+        if (offset > 0) {
+          batch.mesh.instanceMatrix.clearUpdateRanges();
+          batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
+          batch.mesh.instanceMatrix.needsUpdate = true;
+        }
         batch.dirty = false;
       }
     }

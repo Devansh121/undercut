@@ -34,17 +34,18 @@ export function placeKitBarriers(
       const tyres = kitId === 'tyre-wall';
       const all = kit.lodsFor(kitId, { distanceCaps: [0, tyres ? 40 : 100, 1200] });
       if (!all) continue;
-      const lods = all.length > 1 ? all.slice(1) : all;
-      if (lods !== all) all[0]!.geometry.dispose();
+      // Tyre walls step down sharply (2,928 → 60 triangles) at 40 m; armco and concrete share the
+      // same lightweight mesh for mobile and far (84 and 40 triangles), so one level avoids
+      // redundant chunks and transitions while driving.
+      const lods = tyres ? (all.length > 1 ? all.slice(1) : all) : [all[all.length - 1]!];
+      for (const l of all) if (!lods.includes(l)) l.geometry.dispose();
       id = `barrier-${kitId}`;
-      // Long chunks for the cheap sleeves: each is a draw call per kind.
+      // Keep barriers unbatched so moving cameras never repack barrier buffers along the lap.
       props.define({
         id,
         lods,
-        chunkLength: tyres ? 40 : 120,
+        chunkLength: tyres ? 40 : 200,
         castShadow: false,
-        farBatchCell: 600,
-        nearBatchCell: 600,
       });
       kinds.set(kitId, id);
     }

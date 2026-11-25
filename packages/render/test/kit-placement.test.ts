@@ -528,7 +528,8 @@ describe('permanent stand banks', () => {
       () => undefined,
     );
     const distances = define.mock.calls[0]![0].lods.map((lod) => lod.maxDistance);
-    for (const [i, distance] of [8, 25, 3240].entries())
+    expect(distances).toHaveLength(4);
+    for (const [i, distance] of [8, 25, 320, 3240].entries())
       expect(distances[i]).toBeCloseTo(distance, 10);
     props.dispose();
     kit.dispose();

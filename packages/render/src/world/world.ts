@@ -49,7 +49,7 @@ import {
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
 import { placeKitStands } from './kit-stands';
-import { kitGarageKind } from './kit-garages';
+import { garageHullGeometry, kitGarageKind } from './kit-garages';
 import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
@@ -601,6 +601,18 @@ export class CircuitWorld {
         chunks: [],
         bays: built.bays.map((b) => ({ ...b, y: b.groundY + boardY })),
       };
+      const farGarage = garageLods[garageLods.length - 1]!;
+      const garageReach = farGarage.maxDistance;
+      farGarage.maxDistance = Math.min(farGarage.maxDistance, 400);
+      const garageHull = garageHullGeometry();
+      const garageHullMat = createPropKitMaterial({ key: 'garage-kit-far', grain: false });
+      this.geometries.push(garageHull);
+      this.materials.push(garageHullMat);
+      garageLods.push({
+        geometry: garageHull,
+        material: garageHullMat,
+        maxDistance: garageReach,
+      });
       props.define(kitGarageKind(garageLods, quality.sceneryShadows));
       for (const b of built.bays) {
         props.place('pit-garage', {
@@ -681,34 +693,32 @@ export class CircuitWorld {
       ],
     });
     // The kit crew's finest level (5,000 to 7,000 triangles, sub-pixel beyond a few metres) only
-    // beside the eye, as in the pit lane; none past the old crew's reach. At 20 m it cost about
-    // 3 ms at Singapore's grid under the night lights.
+    // beside the eye, as in the pit lane; mobile and far levels share the same ~460-tri geometry.
+    // 20 m cells keep the finest level tight to the camera while farBatchCell collapses the rest.
     const crewLevels = { distanceCaps: [6, 250, far * 0.7] };
+    const distinctCrewLods = (id: string, fallbackGeo: BufferGeometry) => {
+      const raw = o.propKit?.lodsFor(id, crewLevels);
+      if (!raw) return [{ geometry: fallbackGeo, material: crewMat, maxDistance: far * 0.7 }];
+      if (raw.length < 3) return raw;
+      const out = [raw[0]!, raw[raw.length - 1]!];
+      for (const l of raw) if (!out.includes(l)) l.geometry.dispose();
+      return out;
+    };
     props.define({
       id: 'pit-crew-engineer',
-      // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
-      // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
-      gridCell: 60,
-      farBatchCell: 400,
-      nearBatchCell: 400,
+      gridCell: 20,
+      farBatchCell: 200,
       castShadow: false,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('crew-engineer-seated', crewLevels) ?? [
-        { geometry: engGeo, material: crewMat, maxDistance: far * 0.7 },
-      ],
+      lods: distinctCrewLods('crew-engineer-seated', engGeo),
     });
     props.define({
       id: 'pit-crew-mechanic',
-      // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
-      // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
-      gridCell: 60,
-      farBatchCell: 400,
-      nearBatchCell: 400,
+      gridCell: 20,
+      farBatchCell: 200,
       castShadow: false,
       receiveShadow: true,
-      lods: o.propKit?.lodsFor('crew-mechanic-standing', crewLevels) ?? [
-        { geometry: mechGeo, material: crewMat, maxDistance: far * 0.7 },
-      ],
+      lods: distinctCrewLods('crew-mechanic-standing', mechGeo),
     });
 
     let crewCount = 0;
@@ -870,8 +880,6 @@ export class CircuitWorld {
             // Small cells: the levels go by a cell's near edge, and each kit conifer is
             // thousands of triangles, so a cell should not reach far past the swap distance.
             gridCell: NEAR_CONIFER_CELL,
-            farBatchCell: 400,
-            nearBatchCell: 400,
             // The cards cast every tree's shadow (see treeMaterials).
             castShadow: false,
             shadowMaxDistance: 170,
@@ -893,7 +901,6 @@ export class CircuitWorld {
           id: `${k.id}-near`,
           reflect: 'scenery',
           gridCell: 120,
-          farBatchCell: 960,
           // The cards cast every tree's shadow (see treeMaterials).
           castShadow: false,
           shadowMaxDistance: 170,
@@ -910,11 +917,27 @@ export class CircuitWorld {
           ],
         });
       }
+      if (k.id === 'tree-wood' || k.id === 'tree-conifer') {
+        props.define({
+          id: `${k.id}-skyline`,
+          reflect: 'scenery',
+          gridCell: 1200,
+          castShadow: false,
+          receiveShadow: true,
+          lods: [
+            {
+              geometry: far,
+              material: mats.material,
+              depthMaterial: mats.depth,
+              maxDistance: wq.treeFar,
+            },
+          ],
+        });
+      }
       props.define({
         id: k.id,
         reflect: 'scenery',
         gridCell: 320,
-        farBatchCell: !quality.sceneryShadows || wq.treeNear >= 170 ? 960 : undefined,
         castShadow: quality.sceneryShadows,
         shadowMaxDistance: 170,
         receiveShadow: true,
@@ -959,12 +982,16 @@ export class CircuitWorld {
         scale: size * (0.72 + 0.56 * h1),
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
       };
+      // The distant skyline ring (checkCover === false) sits beyond the mapped radius, always past
+      // treeNear, treeCloud, and shadowMaxDistance; route it to its own far-only coarse grid.
+      const skyline = !checkCover && (kind === 'tree-wood' || kind === 'tree-conifer');
       const deep =
+        !skyline &&
         kind === 'tree-conifer' &&
         nearKits.length > 0 &&
         hit.dist > this.lap.barrierAt(hit.index, hit.d) + TREE_CLEARANCE + NEAR_CONIFER_BAND;
-      props.place(deep ? 'tree-conifer-deep' : kind, placement);
-      if (cloud && !deep) {
+      props.place(skyline ? `${kind}-skyline` : deep ? 'tree-conifer-deep' : kind, placement);
+      if (cloud && !deep && !skyline) {
         if (kind === 'tree-conifer' && nearKits.length > 0) {
           const nk = nearKits[Math.floor(hash01(n, 15) * nearKits.length)] as (typeof nearKits)[0];
           props.place(nk.id, { ...placement, scale: (placement.scale ?? 1) / nk.height });
@@ -1166,6 +1193,7 @@ export class CircuitWorld {
       standFar,
     );
     const { fallback } = kitStands;
+    this.geometries.push(...kitStands.geometries);
     this.counts.kitStandModules = kitStands.modules;
     const standChunks = buildStandChunks(fallback);
     const standMat = grandstandMaterial();
@@ -1218,8 +1246,7 @@ export class CircuitWorld {
           id: `crowd-far-${v}`,
           castShadow: false,
           chunkLength: 100,
-          farBatchCell: 600,
-          nearBatchCell: 600,
+          farBatchCell: 240,
           lods: farCrowdLods(g, farMat, mats),
         });
         o.props.define({
@@ -1253,7 +1280,6 @@ export class CircuitWorld {
           // near edge is further away. Cells as wide as that reach: smaller ones multiplied draw
           // calls and per-frame chunk work (867 cells at 16 m at Monza).
           gridCell: 32,
-          farBatchCell: 600,
           lods: [{ ...level, maxDistance: Math.min(level.maxDistance, 32) }],
         });
       }

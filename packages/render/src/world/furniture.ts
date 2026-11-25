@@ -1136,16 +1136,20 @@ export function placeTracksideFurniture(options: {
   const hasKitHoarding = Boolean(kitHoarding);
   if (kitHoarding) {
     kitPropsUsed++;
+    // Mobile and far hoardings share the same 128-triangle geometry; keep distinct levels only.
+    const hoardingLods =
+      kitHoarding.length >= 3
+        ? [kitHoarding[0]!, kitHoarding[kitHoarding.length - 1]!]
+        : kitHoarding;
+    for (const l of kitHoarding) if (!hoardingLods.includes(l)) l.geometry.dispose();
     props.define({
       id: 'hoarding-front',
-      chunkLength: smallChunk,
-      // Keep the current visual level's shadow geometry when shadows are enabled.
-      farBatchCell: castShadows ? undefined : 600,
-      nearBatchCell: castShadows ? undefined : 600,
+      chunkLength: mobile ? smallChunk : 120,
+      shadowLevel: hoardingLods.length - 1,
       castShadow: castShadows,
       shadowMaxDistance: 160,
       receiveShadow: true,
-      lods: kitHoarding,
+      lods: hoardingLods,
     });
   } else {
     const hoardFrontGeo = hoardingFrontGeometry();
@@ -1195,8 +1199,6 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'catch-fence-post',
       chunkLength: smallChunk,
-      farBatchCell: 600,
-      nearBatchCell: 600,
       castShadow: false,
       receiveShadow: true,
       lods: kitFence,
@@ -1255,9 +1257,6 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'tecpro-block',
       chunkLength: smallChunk,
-      // Keep the current visual level's shadow geometry when shadows are enabled.
-      farBatchCell: castShadows ? undefined : 600,
-      nearBatchCell: castShadows ? undefined : 600,
       castShadow: castShadows,
       shadowMaxDistance: 120,
       receiveShadow: true,

@@ -180,4 +180,92 @@ describe('far and shadow batches', () => {
     geometry.dispose();
     material.dispose();
   });
+
+  it('queues narrow updateRanges on level and shadow batch repacks', () => {
+    const nearGeo = new BoxGeometry(1, 2, 1);
+    const farGeo = new BoxGeometry(1, 2, 1);
+    const material = new MeshBasicMaterial();
+    const reg = new PropRegistry(2000);
+    reg.define({
+      id: 'bank',
+      gridCell: 40,
+      farBatchCell: 400,
+      shadowBatchCell: 400,
+      castShadow: true,
+      shadowLevel: 1,
+      shadowMaxDistance: 100,
+      lods: [
+        { geometry: nearGeo, material, maxDistance: 50 },
+        { geometry: farGeo, material, maxDistance: 400 },
+      ],
+    });
+    for (let i = 0; i < 12; i++) {
+      reg.place('bank', {
+        x: i * 30,
+        y: 0,
+        z: 0,
+        s: i * 30,
+        colour: [i / 12, 0.5, 0.8],
+      });
+    }
+    reg.build();
+
+    const visualBatch = reg.group.children.find(
+      (m) =>
+        m.name === 'prop:bank' &&
+        !m.layers.isEnabled(SHADOW_CASTER_LAYER) &&
+        (m as InstancedMesh).geometry === farGeo,
+    ) as InstancedMesh;
+    const shadowBatch = reg.group.children.find((m) =>
+      m.layers.isEnabled(SHADOW_CASTER_LAYER),
+    ) as InstancedMesh;
+    expect(visualBatch).toBeDefined();
+    expect(shadowBatch).toBeDefined();
+
+    // Eye at x = 0: first cells are near LOD (and casting shadows), outer cells are far LOD.
+    reg.update(new Vector3(0, 2, 0));
+    expect(visualBatch.count).toBeGreaterThan(0);
+    expect(visualBatch.count).toBeLessThan(12);
+    expect(visualBatch.instanceMatrix.updateRanges).toEqual([
+      { start: 0, count: visualBatch.count * 16 },
+    ]);
+    expect(visualBatch.instanceColor?.updateRanges).toEqual([
+      { start: 0, count: visualBatch.count * 3 },
+    ]);
+    expect(shadowBatch.count).toBeGreaterThan(0);
+    expect(shadowBatch.count).toBeLessThan(12);
+    expect(shadowBatch.instanceMatrix.updateRanges).toEqual([
+      { start: 0, count: shadowBatch.count * 16 },
+    ]);
+
+    // Moving further in shrinks the packed range and clears prior ranges instead of appending.
+    reg.update(new Vector3(120, 2, 0));
+    expect(visualBatch.instanceMatrix.updateRanges).toEqual([
+      { start: 0, count: visualBatch.count * 16 },
+    ]);
+    expect(visualBatch.instanceColor?.updateRanges).toEqual([
+      { start: 0, count: visualBatch.count * 3 },
+    ]);
+    expect(shadowBatch.instanceMatrix.updateRanges).toEqual([
+      { start: 0, count: shadowBatch.count * 16 },
+    ]);
+
+    // Moving far away empties both batches without bumping buffer versions.
+    const visMatVer = visualBatch.instanceMatrix.version;
+    const visColVer = visualBatch.instanceColor!.version;
+    const shMatVer = shadowBatch.instanceMatrix.version;
+    reg.update(new Vector3(1500, 2, 0));
+    expect(visualBatch.visible).toBe(false);
+    expect(visualBatch.count).toBe(0);
+    expect(visualBatch.instanceMatrix.version).toBe(visMatVer);
+    expect(visualBatch.instanceColor!.version).toBe(visColVer);
+    expect(shadowBatch.visible).toBe(false);
+    expect(shadowBatch.count).toBe(0);
+    expect(shadowBatch.instanceMatrix.version).toBe(shMatVer);
+
+    reg.dispose();
+    nearGeo.dispose();
+    farGeo.dispose();
+    material.dispose();
+  });
 });
