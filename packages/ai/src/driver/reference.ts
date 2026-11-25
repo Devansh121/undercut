@@ -113,6 +113,12 @@ function wrapAngle(a: number): number {
 const GRIP_BUCKET = 0.005;
 /** Mass over the envelope's the plan is driven at unchanged, as a fraction (3 %: 834 kg). */
 const MASS_BAND = 0.03;
+/**
+ * The passing allowance is shed before a braking zone on this deceleration, m/s², after this
+ * reaction time, s (`headroom`): well inside what the brakes give at speed.
+ */
+const HEADROOM_DECEL = 15;
+const HEADROOM_REACT = 0.2;
 
 export class ReferenceDriver implements Driver {
   readonly name = 'reference';
@@ -393,7 +399,7 @@ export class ReferenceDriver implements Driver {
     // driver's own margins cover (`MASS_BAND`: short races, up to about 24 kg of fuel, drive the
     // plan as before). Without it, cars at full-distance fuel ran wide at the Parabolica every lap.
     const speeds = this.speedProfileFor(tel);
-    const allow = speeds.phase[i] !== Phase.Brake ? this.speedAllowance : 0;
+    const allow = this.headroom(speeds, i, f, v);
     const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + allow;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
@@ -564,6 +570,32 @@ export class ReferenceDriver implements Driver {
   }
 
   /** Value of a per-sample array at centreline s + ahead (linear interpolation, wraps). */
+  /**
+   * The passing allowance (`speedAllowance`) at sample `i` (and fraction `f` on to the next):
+   * all of it on the straight, none in the braking zone, and tapered before the zone so that
+   * the car begins it at the plan's speed. It sheds the extra speed on a gentle braking curve
+   * (`HEADROOM_DECEL`) after the driver's reaction (`HEADROOM_REACT`): the zone itself is planned
+   * for the slower car, and a car that begins it fast arrives at the turn-in fast.
+   */
+  private headroom(speeds: SpeedProfile, i: number, f: number, v: number): number {
+    const a = this.speedAllowance;
+    if (!(a > 0) || speeds.phase[i] === Phase.Brake) return 0;
+    const step = this.plan.track.lap.step;
+    const n = this.plan.line.count;
+    const lead = v * HEADROOM_REACT;
+    const reach = lead + ((v + a) * (v + a) - v * v) / (2 * HEADROOM_DECEL);
+    for (let k = 1; (k - f) * step <= reach; k++) {
+      const b = (i + k) % n;
+      if (speeds.phase[b] !== Phase.Brake) continue;
+      const x = Math.max(0, (k - f) * step - lead);
+      const vOn = speeds.v[b]!;
+      const cap = Math.sqrt(vOn * vOn + 2 * HEADROOM_DECEL * x);
+      const here = speeds.v[i]! + (speeds.v[(i + 1) % n]! - speeds.v[i]!) * f;
+      return Math.max(0, Math.min(a, cap - here));
+    }
+    return a;
+  }
+
   private sampleAhead(a: ArrayLike<number>, s: number, ahead: number): number {
     const step = this.plan.track.lap.step;
     const n = this.plan.line.count;
