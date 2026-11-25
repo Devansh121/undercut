@@ -331,6 +331,9 @@ const CIRCUIT_STATIONS = {
     chase('marina', 3300, 230, 3460, 'chase-far'),
     tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
     chase('promenade', 4400, 200, 4560),
+    // The cockpit at night: the wheel, its screen, the gloves and the mirrors under floodlights.
+    chase('cockpit-raffles', 650, 230, 800, 'cockpit'),
+    chase('cockpit-straight', 1500, 260, 1700, 'cockpit'),
     // From the bay's edge by the pit straight across the water to the towers beyond the river
     // mouth: waves, the reflection of sky and city (its lit windows at night). World points:
     // the view is across open water, away from the lap.
