@@ -112,6 +112,8 @@ export interface RaceRun {
 export interface RacingStats {
   /** On-track position swaps between two cars both out of the pit lane (laps included). */
   overtakes: number;
+  /** Position swaps grouped by the passing car's lap (index 0 is lap 1). */
+  overtakesByLap: number[];
   /** Closest time gap between a car and the one ahead on track at racing speed, s. */
   closestGap: number;
   /** Share of samples, over followers above 30 m/s, within 0.5 s and within 1 s of the car ahead. */
@@ -248,7 +250,13 @@ export function runSession(
   const cornerFrom = corner1 ? corner1.start - 150 : 0;
   const cornerTo = session.track.corners[1]?.end ?? (corner1 ? corner1.end : 0);
   const t0 = o.clock?.() ?? null;
-  const stats: RacingStats = { overtakes: 0, closestGap: Infinity, within05: 0, within10: 0 };
+  const stats: RacingStats = {
+    overtakes: 0,
+    overtakesByLap: [],
+    closestGap: Infinity,
+    within05: 0,
+    within10: 0,
+  };
   let racingSamples = 0;
   let nextSample = 0;
   const prevDist = new Float64Array(n);
@@ -313,7 +321,11 @@ export function runSession(
           if (!nowOn[j] || !prevOn[j]) continue;
           const before = prevDist[i]! - prevDist[j]!;
           const after = c.cars[i]!.dist - c.cars[j]!.dist;
-          if (before * after < 0) stats.overtakes++;
+          if (before * after < 0) {
+            stats.overtakes++;
+            const lap = c.timer(after > 0 ? i : j).lap;
+            stats.overtakesByLap[lap - 1] = (stats.overtakesByLap[lap - 1] ?? 0) + 1;
+          }
         }
       }
       byDist.sort((a, b) => c.cars[b]!.dist - c.cars[a]!.dist);

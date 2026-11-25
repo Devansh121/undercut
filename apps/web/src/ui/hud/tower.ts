@@ -1,16 +1,12 @@
 /**
- * The timing tower (top left of the HUD), broadcast style: a lap counter, the flag state, one
- * row per car, and a footer line. A data-in component: the caller (the time-trial HUD now, the
- * race session next) hands it ordered, formatted rows (`TowerRow`) whenever something changes;
- * the tower keeps one node per car, writes only text that changed, and when the order changes
- * slides rows to their new places with transforms (FLIP), never by fading. On a phone it shows
- * the compact window (`towerWindow`): the leader and the cars around the player.
+ * The timing tower (top left of the HUD), broadcast style: a lap counter, the flag state,
+ * optional race column header with gap/interval toggle, one row per car (position, team bar,
+ * driver code, gap/interval or state, tyre compound + age, pit-stop count), and a footer line.
  *
- *   const tower = new TimingTower({ label: 'Race' });
- *   hud.root.append(tower.root);
- *   tower.setLap(14, 53);
- *   tower.setStatus('yellow', 'Yellow flag · Sector 2');
- *   tower.update(rows); // TowerRow[] in position order
+ * A data-in component: the caller hands it ordered, formatted rows (`TowerRow`) whenever
+ * something changes; the tower keeps one node per car, writes only text that changed, and when
+ * the order changes slides rows to their new places with transforms (FLIP), never by fading. On
+ * a phone it shows the compact window (`towerWindow`): the leader and the cars around the player.
  */
 import { Text, el, setClass, setData } from '../dom';
 import { S } from '../strings';
@@ -27,6 +23,10 @@ export interface TimingTowerOptions {
   label: string;
   /** Rows on a phone (the compact window). Default 4: the leader and three around the player. */
   compactRows?: number;
+  /** Enable the 20-car race layout (column header, gap/interval toggle, tyre age, pit count). */
+  raceMode?: boolean;
+  /** Called when the player toggles gap-to-leader vs interval mode on the tower header. */
+  onToggleGapMode?: () => void;
 }
 
 interface RowNodes {
@@ -35,13 +35,22 @@ interface RowNodes {
   code: Text;
   value: Text;
   valueEl: HTMLElement;
+  tyreWrap: HTMLElement;
   compound: HTMLElement;
   compoundCode: Text;
+  tyreAge: Text;
+  tyreAgeEl: HTMLElement;
+  pits: Text;
+  pitsEl: HTMLElement;
   bar: HTMLElement;
   colour: string;
+  title: string;
+  compoundColour: string;
+  tyreAgeVal: number | null;
+  pitStopsVal: number | null;
 }
 
-const PHONE = '(max-height: 500px) and (orientation: landscape)';
+const COMPACT = '(max-height: 500px) and (orientation: landscape), (max-width: 600px)';
 
 /** Write `hidden` only when it changes: an unchanged write still costs a style recalculation. */
 function setHidden(node: HTMLElement, hidden: boolean): void {
@@ -54,6 +63,9 @@ export class TimingTower {
   private readonly total: Text;
   private readonly statusEl: HTMLElement;
   private readonly statusText: Text;
+  private readonly colsEl: HTMLElement;
+  private readonly gapBtn: HTMLButtonElement;
+  private readonly gapBtnText: Text;
   private readonly list: HTMLOListElement;
   private readonly footLabel: Text;
   private readonly footValue: Text;
@@ -61,8 +73,15 @@ export class TimingTower {
   private readonly foot: HTMLElement;
   private readonly nodes = new Map<string, RowNodes>();
   private order: string[] = [];
+  private lastRows: readonly TowerRow[] = [];
   private readonly compactRows: number;
   private readonly phone: MediaQueryList | null;
+  private readonly textObserver: MutationObserver | null;
+  private readonly onCompactChange: () => void;
+  private raceMode: boolean;
+  private showGapToggle: boolean;
+  private lastGapMode: 'gap' | 'interval' | null = null;
+  private lastGapLabel: string | undefined;
 
   constructor(o: TimingTowerOptions) {
     const root = el('section', 'hud-session hud-tower panel');
@@ -70,7 +89,10 @@ export class TimingTower {
     root.dataset.testid = 'tower';
     this.root = root;
     this.compactRows = o.compactRows ?? 4;
-    this.phone = typeof matchMedia === 'function' ? matchMedia(PHONE) : null;
+    this.raceMode = o.raceMode ?? false;
+    this.showGapToggle = this.raceMode;
+    setData(root, 'raceTower', this.raceMode ? 'on' : '');
+    this.phone = typeof matchMedia === 'function' ? matchMedia(COMPACT) : null;
 
     const head = el('header', 'hud-tower__head');
     const lap = el('span', 'hud-tower__lap');
@@ -82,9 +104,35 @@ export class TimingTower {
     head.append(lap, el('span', 'label', o.label));
 
     this.statusEl = el('div', 'hud-tower__status');
+    this.statusEl.dataset.testid = 'tower-status';
     const statusText = el('span', '');
     this.statusText = new Text(statusText);
     this.statusEl.append(el('i', 'hud-tower__flag'), statusText);
+
+    // Race column header: Pos, Driver, Gap/Int toggle button, Tyre, Pit.
+    this.colsEl = el('div', 'hud-tower__cols');
+    this.colsEl.hidden = !this.raceMode;
+    this.gapBtn = document.createElement('button');
+    this.gapBtn.type = 'button';
+    this.gapBtn.className = 'hud-tower__mode';
+    this.gapBtn.dataset.testid = 'tower-gap-toggle';
+    this.gapBtn.title = 'Toggle gap to leader and interval';
+    this.gapBtn.setAttribute('aria-label', 'Show intervals instead of gaps to leader');
+    this.gapBtn.setAttribute('aria-pressed', 'false');
+    const gapLabel = el('span', '', 'Gap');
+    this.gapBtnText = new Text(gapLabel);
+    this.gapBtn.append(gapLabel);
+    if (o.onToggleGapMode) {
+      const cb = o.onToggleGapMode;
+      this.gapBtn.addEventListener('click', () => cb());
+    }
+    this.colsEl.append(
+      el('span', 'hud-tower__col-pos', '#'),
+      el('span', 'hud-tower__col-drv', 'Driver'),
+      this.gapBtn,
+      el('span', 'hud-tower__col-tyre', 'Tyre'),
+      el('span', 'hud-tower__col-pit', 'Pit'),
+    );
 
     this.list = el('ol', 'hud-tower__rows');
 
@@ -96,8 +144,55 @@ export class TimingTower {
     this.foot.append(footLabel, this.footValueEl);
     this.foot.hidden = true;
 
-    root.append(head, this.statusEl, this.list, this.foot);
+    root.append(head, this.statusEl, this.colsEl, this.list, this.foot);
     this.setStatus('green', S.hud.greenFlag);
+
+    this.onCompactChange = () => {
+      if (this.lastRows.length > 0) this.render(this.lastRows, false);
+    };
+    this.phone?.addEventListener?.('change', this.onCompactChange);
+    if (typeof MutationObserver === 'function' && typeof document !== 'undefined') {
+      this.textObserver = new MutationObserver(this.onCompactChange);
+      this.textObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-text'],
+      });
+    } else {
+      this.textObserver = null;
+    }
+  }
+
+  /** Disconnect listeners and observers owned by the tower. */
+  destroy(): void {
+    this.phone?.removeEventListener?.('change', this.onCompactChange);
+    this.textObserver?.disconnect();
+  }
+
+  /** Switch race-tower mode (column header, tyre age, pit stops) on or off. */
+  setRaceMode(on: boolean, showGapToggle = on): void {
+    if (this.raceMode === on && this.showGapToggle === showGapToggle) return;
+    this.raceMode = on;
+    this.showGapToggle = showGapToggle;
+    setData(this.root, 'raceTower', on ? 'on' : '');
+    setHidden(this.colsEl, !on);
+    this.gapBtn.disabled = !showGapToggle;
+    setData(this.gapBtn, 'static', showGapToggle ? '' : 'on');
+  }
+
+  /** Set the gap-column toggle readout (`gap` -> "Gap", `interval` -> "Int", or custom for timed sessions). */
+  setGapMode(mode: 'gap' | 'interval', labelOverride?: string): void {
+    if (this.lastGapMode === mode && this.lastGapLabel === labelOverride) return;
+    this.lastGapMode = mode;
+    this.lastGapLabel = labelOverride;
+    this.gapBtnText.set(labelOverride ?? (mode === 'interval' ? 'Int' : 'Gap'));
+    this.gapBtn.setAttribute('aria-pressed', mode === 'interval' ? 'true' : 'false');
+    this.gapBtn.setAttribute(
+      'aria-label',
+      mode === 'interval'
+        ? 'Show gaps to leader instead of intervals'
+        : 'Show intervals instead of gaps to leader',
+    );
+    setData(this.gapBtn, 'mode', mode);
   }
 
   /** Lap counter: the lap (null: out lap) and, for a race, the total. */
@@ -119,25 +214,63 @@ export class TimingTower {
     setClass(this.footValueEl, 'is-empty', muted);
   }
 
+  /** Compact phone row budget: 4 at standard text, 3 at large/larger so the tower clears touch buttons. */
+  private compactLimit(): number {
+    const text =
+      typeof document !== 'undefined' ? document.documentElement.dataset.text : undefined;
+    return text === 'large' || text === 'larger' ? Math.min(this.compactRows, 3) : this.compactRows;
+  }
+
+  private lastLimit = -1;
+  private lastCompact = false;
+
   /** Show `rows` (in position order). Cheap when nothing changed. */
   update(rows: readonly TowerRow[]): void {
-    const shown =
-      this.phone?.matches && rows.length > this.compactRows
-        ? towerWindow(rows, this.compactRows)
-        : rows;
-    for (const r of shown) this.write(r);
+    this.render(rows, true);
+  }
+
+  private render(rows: readonly TowerRow[], animate: boolean): void {
+    const limit = this.compactLimit();
+    const compact = Boolean(this.phone?.matches) && rows.length > limit;
+    if (
+      this.raceMode &&
+      rows === this.lastRows &&
+      limit === this.lastLimit &&
+      compact === this.lastCompact
+    ) {
+      return;
+    }
+    this.lastRows = rows;
+    this.lastLimit = limit;
+    this.lastCompact = compact;
+    const shown = compact ? towerWindow(rows, limit) : rows;
+    for (let i = 0; i < shown.length; i++) {
+      const r = shown[i]!;
+      const split =
+        compact &&
+        i === 1 &&
+        shown[0]?.position !== null &&
+        r.position !== null &&
+        r.position > (shown[0]?.position ?? 1) + 1;
+      this.write(r, split);
+    }
     let same = shown.length === this.order.length;
     for (let i = 0; same && i < shown.length; i++) same = shown[i]?.id === this.order[i];
     if (same) return;
-    this.reorder(shown);
+    this.reorder(shown, animate);
   }
 
-  private write(r: TowerRow): void {
+  private write(r: TowerRow, gapSplit: boolean): void {
     let n = this.nodes.get(r.id);
     if (!n) n = this.create(r);
     n.pos.set(r.position === null ? '' : String(r.position));
     n.code.set(r.code);
     n.value.set(r.value);
+    const title = r.name ?? r.code;
+    if (n.title !== title) {
+      n.title = title;
+      n.li.title = title;
+    }
     if (n.colour !== r.teamColour) {
       n.colour = r.teamColour;
       n.li.style.setProperty('--row-team', r.teamColour);
@@ -147,11 +280,33 @@ export class TimingTower {
     setClass(n.li, 'is-player', r.player === true);
     setClass(n.li, 'is-record', r.reference === true);
     setClass(n.li, 'is-fastest', r.fastest === true);
+    setClass(n.li, 'is-in-pit', r.inPit === true);
+    setClass(n.li, 'is-retired', r.retired === true);
+    setClass(n.li, 'is-gap-split', gapSplit);
+
     const c = r.compound ?? null;
-    setHidden(n.compound, c === null);
+    setHidden(n.tyreWrap, c === null);
     if (c) {
       n.compoundCode.set(c.code);
-      n.compound.style.setProperty('--compound', c.colour);
+      if (n.compoundColour !== c.colour) {
+        n.compoundColour = c.colour;
+        n.compound.style.setProperty('--compound', c.colour);
+      }
+    }
+    const showAge = c !== null && r.tyreAge !== undefined && r.tyreAge !== null;
+    setHidden(n.tyreAgeEl, !showAge);
+    if (showAge && r.tyreAge !== n.tyreAgeVal) {
+      n.tyreAgeVal = r.tyreAge ?? null;
+      n.tyreAge.set(String(r.tyreAge));
+      n.tyreAgeEl.setAttribute('aria-label', `${r.tyreAge} laps on tyres`);
+    }
+
+    const showPits = r.pitStops !== undefined && r.pitStops !== null;
+    setHidden(n.pitsEl, !showPits);
+    if (showPits && r.pitStops !== n.pitStopsVal) {
+      n.pitStopsVal = r.pitStops ?? null;
+      n.pits.set(String(r.pitStops));
+      n.pitsEl.setAttribute('aria-label', `${r.pitStops} pit stops`);
     }
   }
 
@@ -162,42 +317,67 @@ export class TimingTower {
     const bar = el('i', 'hud-tower__bar');
     const code = el('strong', 'hud-tower__code');
     const valueEl = el('b', 'hud-tower__time num');
+
+    const tyreWrap = el('span', 'hud-tower__tyre-cell');
     const compound = el('span', 'hud-tower__tyre');
     const compoundCode = el('b', '');
     compound.append(compoundCode);
-    compound.hidden = true;
-    li.append(pos, bar, code, valueEl, compound);
+    const tyreAgeEl = el('span', 'hud-tower__age num');
+    tyreAgeEl.hidden = true;
+    tyreWrap.append(compound, tyreAgeEl);
+    tyreWrap.hidden = true;
+
+    const pitsEl = el('span', 'hud-tower__pits num');
+    pitsEl.hidden = true;
+
+    li.append(pos, bar, code, valueEl, tyreWrap, pitsEl);
     const nodes: RowNodes = {
       li,
       pos: new Text(pos),
       code: new Text(code),
       value: new Text(valueEl),
       valueEl,
+      tyreWrap,
       compound,
       compoundCode: new Text(compoundCode),
+      tyreAge: new Text(tyreAgeEl),
+      tyreAgeEl,
+      pits: new Text(pitsEl),
+      pitsEl,
       bar,
       colour: '',
+      title: '',
+      compoundColour: '',
+      tyreAgeVal: null,
+      pitStopsVal: null,
     };
     this.nodes.set(r.id, nodes);
     return nodes;
   }
 
   /** Put rows in their new order, sliding each from where it was (FLIP). */
-  private reorder(shown: readonly TowerRow[]): void {
+  private reorder(shown: readonly TowerRow[], animate: boolean): void {
     const before = new Map<string, number>();
-    for (const id of this.order) {
-      const n = this.nodes.get(id);
-      if (n?.li.isConnected) before.set(id, n.li.offsetTop);
+    if (animate) {
+      for (const id of this.order) {
+        const n = this.nodes.get(id);
+        if (n?.li.isConnected) before.set(id, n.li.offsetTop);
+      }
     }
     const keep = new Set<string>();
     for (const r of shown) {
       const n = this.nodes.get(r.id);
       if (!n) continue;
       keep.add(r.id);
+      if (!animate) {
+        n.li.style.transition = '';
+        n.li.style.transform = '';
+      }
       this.list.append(n.li);
     }
     for (const [id, n] of this.nodes) if (!keep.has(id)) n.li.remove();
     this.order = shown.map((r) => r.id);
+    if (!animate) return;
     const moved: HTMLElement[] = [];
     for (const r of shown) {
       const n = this.nodes.get(r.id);

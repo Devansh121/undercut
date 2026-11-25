@@ -35,6 +35,7 @@ import { buildResult, type EntrantInfo, type SessionResult } from '../results';
 import type { RaceRules } from '../rules';
 import type { TimingBests } from '../timing/lap-timer';
 import type { CarController, ControlContext, ControllerState } from './controllers';
+import { wakeStrength } from './wake';
 
 /**
  * Estimated grid condition after an unmodelled formation lap: every starting set (human and
@@ -359,6 +360,7 @@ export class RaceSession {
     const control = this.control;
     this.updateGhosts();
     if (this.pitStrategy) this.planStops();
+    this.updateWakes();
     for (let i = 0; i < this.cars.length; i++) {
       const wc = world.cars[i]!;
       readCarTelemetry(wc.state, this.telemetry[i]!);
@@ -390,6 +392,49 @@ export class RaceSession {
       }
     }
     return events;
+  }
+
+  /** Straight-line tow, shared by human and computer cars. No aero-load change. */
+  private updateWakes(): void {
+    const clear = this.towClear();
+    for (let i = 0; i < this.cars.length; i++) {
+      const state = this.world.cars[i]!.state;
+      const f = this.facts[i]!;
+      let exposure = 0;
+      // The opening-lap pack keeps the measured aero while it sorts through the first
+      // corners. The tow joins the racing tools from lap two, alongside race DRS.
+      if (
+        clear &&
+        this.control.racing(i) &&
+        !this.ghosts[i] &&
+        !f.inPitLane &&
+        state.vx > 35 &&
+        this.control.timer(i).lap > 1
+      ) {
+        // Release the tow well before a bend or a stopped queue. The speed plan and
+        // recovery controller then see their measured car throughout the braking zone.
+        let straight = true;
+        for (let x = 0; x <= 120 + state.vx * 2; x += 20) {
+          if (Math.abs(this.track.curvatureAt(this.track.wrap(f.s + x))) > 1 / 500) {
+            straight = false;
+            break;
+          }
+        }
+        for (let j = 0; j < this.cars.length && straight; j++) {
+          if (j === i || this.ghosts[j] || this.facts[j]!.inPitLane || !this.control.racing(j))
+            continue;
+          const other = this.facts[j]!;
+          const gap = signedGap(this.track.length, f.s, other.s);
+          if (gap > 0 && gap < 300 && other.speed < 15) {
+            exposure = 0;
+            break;
+          }
+          exposure = Math.max(exposure, wakeStrength(state, this.world.cars[j]!.state));
+        }
+      }
+      // Estimate: at most 18 % drag relief. Wakes do not stack; grip stays on its plan.
+      state.dragScale = 1 - 0.18 * exposure;
+    }
   }
 
   private planStops(): void {
@@ -450,6 +495,19 @@ export class RaceSession {
       this.pitCalls.push({ t: this.time, car: i, lap, reason: stop.reason });
       this.requestPit(i, [{ kind: 'tyres', compound: stop.compound }]);
     }
+  }
+
+  /** The tow is a green-road model; queues and a car left on the road keep it off. */
+  private towClear(): boolean {
+    if (this.control.flags.yellowSectors().some(Boolean)) return false;
+    for (let i = 0; i < this.cars.length; i++) {
+      const f = this.facts[i]!;
+      if (f.inPitLane || this.control.cars[i]!.status === 'finished' || Math.abs(f.speed) >= 1)
+        continue;
+      const edge = this.track.halfWidthAt(this.track.wrap(f.s), f.d >= 0 ? 0 : 1);
+      if (Math.abs(f.d) <= edge + ROAD_MARGIN) return false;
+    }
+    return true;
   }
 
   /** Whether a car is a ghost this tick: no car touches it (retired, or blocking). */
