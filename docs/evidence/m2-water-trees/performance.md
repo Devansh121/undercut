@@ -20,7 +20,12 @@ Performance: `npm run shots -- <circuit> --no-shots --perf`, run in the order ma
 | Singapore / Mobile / drive | 60/57.9, 60/53.9 → 60/56.7, 60/45.5 | 3.23, 3.96 → 3.95, 4.15 | 121 → 132 | 0.35 → 0.40 | 120.9 → 128 |
 
 - Every run of both builds holds 60 fps with vsync. The 1 % lows follow host load: the second branch run at Singapore (45.4 on the High grid, 49.5 on the Mobile grid) ended at load 9.4, the first at 4.8 (59.4 and 59.3).
-- Monza and Spa: draw calls and triangles change by under 0.1 M. The relief now reaches 300 m on Mobile (was 180 m) at no measurable cost.
+- Monza and Spa: draw calls and triangles change by under 0.1 M, but the Mobile frame does cost more. The relief level reaches 300 m on Mobile (master drew plain cards beyond 120 m) with a texture fetch more per tree pixel and three crossed cards instead of two. The review's paired runs on a quiet host (1-minute load 1.1 to 2.7) measured the Mobile uncapped frame about 15 % longer than master (at Monza, which has no water, that is the trees alone):
+  - Monza driving 2.12 → 2.44 ms;
+  - Monza at the grid 2.36 → 2.73 ms;
+  - Singapore driving 2.30 / 2.37 → 2.72 / 2.62 ms.
+
+  The runs above, on a busier host, do not resolve it. Every run of both builds still holds 60 fps with vsync on Mobile and High at all three circuits.
 - Singapore: the reflection pass costs 195 draw calls and 0.6 M triangles on High at the grid (it reflects the circuit, ground and trees as well as the skyline) and 34 calls on Mobile (skyline only, quarter-size target). Uncapped frame times are level with master within the host's spread.
 
 Texture memory (`renderStats().textureMiB`, now counting the textures only the compiled shaders hold: `userData.surfaceUniforms`). The column moves by up to 5 MiB between runs of the same build (master reads 132.5 and 137.9 MiB at Singapore Mobile at the same render scale), so the added textures are also listed as computed from their sizes:

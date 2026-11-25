@@ -933,10 +933,15 @@ async function lifecycle(browser, report) {
 /**
  * Near trees against the cards they replace (High, by day and under floodlights at night): the
  * same frozen poses drawn with the near trees on (the preset's swap distance) and off (0, cards
- * only), mean luma over the pixels that change. The two must be within TREE_SWAP_TOLERANCE, or
- * a band of lighter or darker trees travels with the camera.
+ * only), mean luma over the pixels that change, each state the average of TREE_SWAP_FRAMES
+ * captures taken in turn with the other's after TREE_SWAP_SETTLE frames (one capture of each
+ * varied by up to 8 % at Monza night Lesmo: wind, dither, the lamp pool settling). The two must
+ * be within TREE_SWAP_TOLERANCE, or a band of lighter or darker trees travels with the camera.
  */
 const TREE_SWAP_TOLERANCE = 0.1;
+/** Frames drawn before the first capture of a pose, and captures averaged per state. */
+const TREE_SWAP_SETTLE = 90;
+const TREE_SWAP_FRAMES = 12;
 /**
  * Per circuit: the lighting each is checked under, its own (the menu's first choice) and one
  * more. Spa is only offered overcast; the afternoon sun is the harder second case there (night
@@ -960,12 +965,13 @@ const SWAP_LIGHTING = {
 /** Per circuit: a chase pose through woods and a high view over them. */
 const SWAP_POSES = {
   monza: {
-    // Chase camera through the Lesmo woods, and a high view over the park.
+    // Chase camera through the Lesmo woods at speed, and a high view over the park. Frozen before
+    // the teleport: frozen after it, the car moved on by a different distance each session.
     lesmo: () => {
       const u = globalThis.__undercut;
       u.camera('chase-near');
-      u.teleport(1640, 0, 250);
       u.setTimeScale(0);
+      u.teleport(1640, 0, 250);
     },
     park: () => {
       const u = globalThis.__undercut;
@@ -982,8 +988,9 @@ const SWAP_POSES = {
     blanchimont: () => {
       const u = globalThis.__undercut;
       u.camera('chase-near');
-      u.teleport(5600, 0, 250);
+      // Frozen before the teleport, as at Lesmo.
       u.setTimeScale(0);
+      u.teleport(5600, 0, 250);
     },
     plantation: () => {
       const u = globalThis.__undercut;
@@ -1026,6 +1033,9 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
     await onCircuit(context);
     const page = await context.newPage();
     page.on('pageerror', (e) => problems.push(e.message));
+    page.on('console', (m) => {
+      if (m.type() === 'error') problems.push(m.text());
+    });
     await page.goto(`http://127.0.0.1:${PORT}/?debug=1&quality=high${tod}`);
     await page.waitForFunction(() => Boolean(globalThis.__undercut));
     await page.evaluate(() => globalThis.__undercut.start());
@@ -1034,13 +1044,25 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
       null,
       { timeout: 120_000 },
     );
+    // A frozen sim still uses real time for camera shake, wind and waves. Hold that
+    // animation clock too: otherwise each state moves the camera and a different tree
+    // silhouette decides the changed-pixel mask on every run. Keep real dt for settling
+    // the camera, lamp pool and exposure, and keep rendering all normal passes.
+    await page.evaluate(() => {
+      const view = globalThis.__undercut.view();
+      const render = view.render.bind(view);
+      view.render = (frame) => render({ ...frame, time: 0 });
+    });
     const poses = SWAP_POSES[circuit];
     const swap = await page.evaluate(() => globalThis.__undercut.treeSwap());
     for (const [name, set] of Object.entries(poses)) {
       await page.evaluate(set);
-      const shots = [];
-      for (const d of mode === 'swap' ? [swap, 0] : [1, 0]) {
-        await page.evaluate(
+      // Settle first (lamp pool fades, dynamic resolution, shader warm-up), then capture the two
+      // states interleaved, A B A B ..., TREE_SWAP_FRAMES each, so wind, dither and any slow drift
+      // fall on both alike; the two per-pixel averages are compared.
+      const states = mode === 'swap' ? [swap, 0] : [1, 0];
+      const apply = (d) =>
+        page.evaluate(
           ([v, m]) => {
             if (m === 'swap') globalThis.__undercut.treeSwap(v);
             else globalThis.__undercut.treeRelief(v === 1);
@@ -1048,18 +1070,28 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
           },
           [d, mode],
         );
-        await page.waitForFunction(() => (globalThis.__undercut.frameTimes().length ?? 0) >= 20);
-        const png = await page
-          .locator('#view')
-          .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
-        fs.writeFileSync(path.join(outDir, `tree-${mode}-${label}-${name}-${d}.png`), png);
-        shots.push(png.toString('base64'));
+      const frames = (n) =>
+        page.waitForFunction((k) => (globalThis.__undercut.frameTimes().length ?? 0) >= k, n);
+      await apply(states[0]);
+      await frames(TREE_SWAP_SETTLE);
+      const shots = [[], []];
+      for (let k = 0; k < TREE_SWAP_FRAMES; k++) {
+        for (const [i, d] of states.entries()) {
+          await apply(d);
+          await frames(12);
+          const png = await page
+            .locator('#view')
+            .screenshot({ style: '#app, .ut-touch { visibility: hidden; }' });
+          if (k === 0)
+            fs.writeFileSync(path.join(outDir, `tree-${mode}-${label}-${name}-${d}.png`), png);
+          shots[i].push(png.toString('base64'));
+        }
       }
       await page.evaluate((v) => {
         globalThis.__undercut.treeSwap(v);
         globalThis.__undercut.treeRelief(true);
       }, swap);
-      const m = await page.evaluate(async ([a, b]) => {
+      const m = await page.evaluate(async ([as, bs]) => {
         const read = async (b64) => {
           const img = new globalThis.Image();
           img.src = `data:image/png;base64,${b64}`;
@@ -1069,22 +1101,33 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
           ctx.drawImage(img, 0, 0);
           return ctx.getImageData(0, 0, img.width, img.height).data;
         };
-        const pa = await read(a);
-        const pb = await read(b);
+        // Mean luma per pixel over a state's captures.
+        const mean = async (list) => {
+          let acc = null;
+          for (const b64 of list) {
+            const p = await read(b64);
+            if (!acc) acc = new Float32Array(p.length / 4);
+            for (let i = 0, j = 0; i < p.length; i += 4, j++)
+              acc[j] += 0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2];
+          }
+          for (let j = 0; j < acc.length; j++) acc[j] /= list.length;
+          return acc;
+        };
+        const la = await mean(as);
+        const lb = await mean(bs);
         let sa = 0;
         let sb = 0;
         let n = 0;
-        for (let i = 0; i < pa.length; i += 4) {
-          const la = 0.2126 * pa[i] + 0.7152 * pa[i + 1] + 0.0722 * pa[i + 2];
-          const lb = 0.2126 * pb[i] + 0.7152 * pb[i + 1] + 0.0722 * pb[i + 2];
-          if (Math.abs(la - lb) < 6) continue;
-          sa += la;
-          sb += lb;
+        for (let j = 0; j < la.length; j++) {
+          if (Math.abs(la[j] - lb[j]) < 6) continue;
+          sa += la[j];
+          sb += lb[j];
           n++;
         }
-        return { near: n ? sa / n : 0, cards: n ? sb / n : 0, changed: n / (pa.length / 4) };
+        return { near: n ? sa / n : 0, cards: n ? sb / n : 0, changed: n / la.length };
       }, shots);
       const ratio = m.cards > 0 ? m.near / m.cards : 1;
+      const scale = await page.evaluate(() => globalThis.__undercut.renderStats().renderScale);
       cases.push({
         tod: label,
         pose: name,
@@ -1093,6 +1136,7 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
         cardLuma: +m.cards.toFixed(1),
         ratio: +ratio.toFixed(3),
         changedPct: +(m.changed * 100).toFixed(1),
+        renderScale: scale,
       });
     }
     await page.evaluate(() => globalThis.__undercut.quit());
@@ -1105,11 +1149,19 @@ async function treeSwapCheck(browser, report, mode = 'swap') {
       (c) => c.swap > 0 && (mode === 'relief' || Math.abs(c.ratio - 1) <= TREE_SWAP_TOLERANCE),
     );
   const key = mode === 'swap' ? 'treeSwapCheck' : 'treeReliefCheck';
-  report[key] = { ok, tolerance: mode === 'swap' ? TREE_SWAP_TOLERANCE : null, cases, problems };
+  report[key] = {
+    ok,
+    tolerance: mode === 'swap' ? TREE_SWAP_TOLERANCE : null,
+    settleFrames: TREE_SWAP_SETTLE,
+    framesPerState: TREE_SWAP_FRAMES,
+    animationTime: 0,
+    cases,
+    problems,
+  };
   const [a, b] = mode === 'swap' ? ['near', 'cards'] : ['relief', 'plain'];
   for (const c of cases)
     console.log(
-      `  tree-${mode} ${c.tod} ${c.pose}: ${a} ${c.nearLuma} vs ${b} ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change)`,
+      `  tree-${mode} ${c.tod} ${c.pose}: ${a} ${c.nearLuma} vs ${b} ${c.cardLuma} (x${c.ratio}, ${c.changedPct}% of pixels change, scale ${c.renderScale})`,
     );
   console.log(`  tree-${mode}-check (high, GPU): ${ok ? 'ok' : 'FAILED'}`);
   if (!ok) report.errors.push(`Tree ${mode} check failed: ${JSON.stringify(report[key])}`);

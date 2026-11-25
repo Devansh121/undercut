@@ -112,16 +112,21 @@ export function treeCards(planes: number, aspect = 1): BufferGeometry {
 const FOLD = 0.2;
 
 /** GLSL: pick an atlas tile per instance (hash of its position) among the kind's species. */
-function tileChunk(tiles: readonly number[]): string {
+function tilePick(tiles: readonly number[]): string {
   const list = tiles.map((t) => t.toFixed(1)).join(', ');
+  return /* glsl */ `
+    vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+    float hsh = fract(sin(dot(floor(ip * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
+    float tiles[${tiles.length}] = float[](${list});
+    float tile = tiles[int(min(hsh * ${tiles.length.toFixed(1)}, ${(tiles.length - 1).toFixed(1)}))];`;
+}
+
+function tileChunk(tiles: readonly number[]): string {
   return /* glsl */ `
 #include <uv_vertex>
 #if defined( USE_INSTANCING ) && defined( USE_MAP )
   {
-    vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
-    float hsh = fract(sin(dot(floor(ip * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
-    float tiles[${tiles.length}] = float[](${list});
-    float tile = tiles[int(min(hsh * ${tiles.length.toFixed(1)}, ${(tiles.length - 1).toFixed(1)}))];
+    ${tilePick(tiles)}
     float col = mod(tile, ${ATLAS_COLS.toFixed(1)});
     float row = floor(tile / ${ATLAS_COLS.toFixed(1)});
     // Mirror half of them so neighbours of one species differ.
@@ -572,7 +577,12 @@ export function treeCloudGeometry(shape: CloudShape, seed: number): BufferGeomet
 export function treeCloudMaterials(
   atlas: Texture,
   key: string,
-  options: { wind: boolean; coverage: boolean },
+  options: {
+    wind: boolean;
+    coverage: boolean;
+    tiles?: readonly number[];
+    clusterTints?: readonly [number, number, number][];
+  },
   time: { value: number },
   swap: TreeSwap,
 ): { material: MeshStandardMaterial; depth: MeshDepthMaterial } {
@@ -584,6 +594,23 @@ export function treeCloudMaterials(
     );
     if (options.wind)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', WIND);
+    if (options.tiles && options.clusterTints) {
+      const tones = options.clusterTints.map(
+        (t) => `vec3(${t.map((v) => v.toFixed(6)).join(', ')})`,
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <color_vertex>',
+        `
+#include <color_vertex>
+#if defined( USE_INSTANCING ) && defined( USE_COLOR )
+  if (uv.x < ${((BARK_TILE % ATLAS_COLS) / ATLAS_COLS).toFixed(2)}) {
+    ${tilePick(options.tiles)}
+    vec3 tones[${tones.length}] = vec3[](${tones.join(', ')});
+    vColor.xyz *= tones[int(tile)];
+  }
+#endif`,
+      );
+    }
     addSwap(shader, swap, true);
     leafShading(shader, LEAF_TRANSMISSION.cluster);
   };
@@ -599,7 +626,8 @@ export function treeCloudMaterials(
   });
   material.name = `tree-cloud-${key}`;
   material.onBeforeCompile = hook;
-  material.customProgramCacheKey = () => `tree-cloud-v4-${options.wind ? 1 : 0}`;
+  material.customProgramCacheKey = () =>
+    `tree-cloud-v5-${key}-${options.wind ? 1 : 0}-${options.tiles?.join(',')}-${options.clusterTints?.flat().join(',')}`;
   const depth = new MeshDepthMaterial({
     depthPacking: RGBADepthPacking,
     map: atlas,

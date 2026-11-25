@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Page } from '@playwright/test';
 import { expect, test } from './base';
 import { startTimeTrial } from './helpers';
 
@@ -9,6 +10,30 @@ import { startTimeTrial } from './helpers';
  * without console or page errors.
  */
 test.use({ viewport: { width: 480, height: 300 } });
+
+/**
+ * Every named object's `userData.reflect` (world/water.ts), keyed by name without a trailing
+ * chunk or crowd-variant number, so chunked meshes of one kind share a key.
+ */
+async function reflectFlags(page: Page): Promise<Record<string, string[]>> {
+  return page.evaluate(() => {
+    const view = window.__undercut?.view() as {
+      scene: {
+        traverse(f: (o: { name: string; userData: Record<string, unknown> }) => void): void;
+      };
+    };
+    const out: Record<string, string[]> = {};
+    view.scene.traverse((o) => {
+      if (!o.name) return;
+      const key = o.name.replace(/-\d+$/, '');
+      const r = o.userData.reflect;
+      const v = typeof r === 'string' ? r : 'none';
+      const list = (out[key] ??= []);
+      if (!list.includes(v)) list.push(v);
+    });
+    return out;
+  });
+}
 
 test('loads Monza circuit dressing and places world scenery, pit crew, and furniture', async ({
   page,
@@ -66,6 +91,26 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
   expect(counts!.hoardings).toBeGreaterThan(40);
   expect(counts!.catchFences).toBeGreaterThan(40);
   expect(counts!.bridges).toBeGreaterThanOrEqual(2);
+
+  // The water's reflection draws what each kind is flagged with where it is made
+  // (`userData.reflect`, world/water.ts), read back from the built scene kind by kind.
+  const reflect = await reflectFlags(page);
+  for (const [kind, flag] of Object.entries({
+    sky: 'skyline',
+    'world:buildings': 'skyline',
+    'world:pit-building': 'skyline',
+    'world:stands': 'skyline',
+    'world:bridges': 'skyline',
+    'world:ground': 'scenery',
+    track: 'scenery',
+    'prop:tree-wood': 'scenery',
+    'prop:tree-row': 'scenery',
+    'prop:tree-park': 'scenery',
+    // Not reflected: small props and the crowd.
+    'prop:hoarding-front': 'none',
+    'prop:crowd': 'none',
+  }))
+    expect(reflect[kind], kind).toEqual([flag]);
 
   // Exercise the addressable start-gantry lights API without throwing.
   await page.evaluate(() => {
@@ -199,6 +244,21 @@ test('loads Singapore: street walls, floodlights, temporary stands and backdrops
   expect(counts!.crowd).toBeGreaterThan(200);
   expect(counts!.lightingTrusses).toBeGreaterThan(50);
   expect(counts!.backdrops).toBeGreaterThan(5);
+  const reflect = await reflectFlags(page);
+  for (const [kind, flag] of Object.entries({
+    sky: 'skyline',
+    'world:buildings': 'skyline',
+    'prop:temporary-stand': 'skyline',
+    'prop:floodlight-mast': 'scenery',
+    'prop:lighting-truss': 'scenery',
+    'prop:street-block': 'scenery',
+    'prop:street-fence': 'scenery',
+    'world:water': 'none',
+  }))
+    expect(reflect[kind], kind).toEqual([flag]);
+  const backdrops = Object.keys(reflect).filter((k) => k.startsWith('prop:backdrop-'));
+  expect(backdrops.length).toBeGreaterThan(0);
+  for (const k of backdrops) expect(reflect[k], k).toEqual(['skyline']);
   expect(counts!.water).toBeGreaterThanOrEqual(1);
   // A street circuit has its own walls and fencing: no catch fences or barrier hoardings.
   expect(counts!.catchFences).toBe(0);

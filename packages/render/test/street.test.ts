@@ -22,7 +22,7 @@ import { buildingHeight } from '../src/world/buildings';
 import { decodeTerrain, inRing, type DressingFile } from '../src/world/dressing';
 import { LapIndex } from '../src/world/lap-index';
 import { bakeCircuitLamps, streetGround } from '../src/world/lamps';
-import { pickBackdrops, placeStreetCircuit } from '../src/world/street';
+import { pickBackdrops, placeBackdrops, placeStreetCircuit } from '../src/world/street';
 import { buildTerrain, TERRAIN_HIGH, TERRAIN_MOBILE, waterBodies } from '../src/world/terrain';
 import { worldTheme } from '../src/world/theme';
 
@@ -309,6 +309,25 @@ describe('Singapore water, backdrops and props', () => {
       expect(street.backdrops.some((d) => d.id === b.kitId)).toBe(true);
       expect(b.scale).toBeGreaterThanOrEqual(0.7);
       expect(b.scale).toBeLessThanOrEqual(1.5);
+    }
+  });
+
+  it('defines every backdrop kind for the water reflection on every preset', () => {
+    const picks = pickBackdrops(
+      dressing.mapped.building,
+      lap,
+      () => 0,
+      street,
+      fakeKit(),
+      buildingHeight,
+    );
+    const { props, placed, kinds } = recorder();
+    placeBackdrops(props, fakeKit(), picks, new MeshStandardMaterial(), true, 4000);
+    const ids = new Set(picks.map((b) => `backdrop-${b.kitId}`));
+    expect(ids.size).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(kinds.get(id)?.reflect, id).toBe('skyline');
+      expect(placed.get(id)?.length, id).toBeGreaterThan(0);
     }
   });
 
