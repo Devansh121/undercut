@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_HALF_WIDTH,
+  BODY_NOSE,
+  BODY_TAIL,
   FLAT_SURFACE,
   MAX_CONTACT_EXTRAPOLATION_S,
   MAX_REMOTE_PUSH_PER_STEP,
@@ -8,6 +10,7 @@ import {
   addCar,
   bodyCorners,
   carOverlap,
+  computeMass,
   createWorld,
   extrapolateRemoteBody,
   resolveRemoteCarContacts,
@@ -226,6 +229,36 @@ describe('aged remote poses', () => {
       }
     },
   );
+
+  it('does not contact a stale car just ahead that is pulling away or matching speed', () => {
+    for (const remoteSpeed of [20, 30]) {
+      const world = createWorld({ step: STEP, seed: 1 });
+      const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+      // Nose-to-tail with a 0.1 m gap: inside the former 0.3 m isotropic allowance.
+      const m = computeMass(car.state.model, car.state.fuelMass, {
+        total: 0,
+        sprung: 0,
+        a: 0,
+        b: 0,
+        sprungA: 0,
+        sprungB: 0,
+        yawInertia: 0,
+      });
+      const remote: RemoteContactBody = {
+        seat: 1,
+        x: m.a + BODY_NOSE + m.b + BODY_TAIL + 0.1,
+        z: 0,
+        yaw: 0,
+        vx: remoteSpeed,
+        vz: 0,
+        yawRate: 0,
+        ageSec: 0.2,
+      };
+      const before = { ...car.state };
+      expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+      expect(car.state).toEqual(before);
+    }
+  });
 
   it('bounds prediction by normal closing speed regardless of tangential speed', () => {
     const world = createWorld({ step: STEP, seed: 1 });
