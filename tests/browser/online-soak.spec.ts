@@ -8,7 +8,7 @@ for (const circuit of ['monza', 'spa', 'singapore']) {
     browser,
     baseURL,
   }, info) => {
-    test.skip(process.env.ONLINE_SOAK !== '1' || info.project.name !== 'desktop');
+    test.skip(process.env.ONLINE_SOAK !== '1' || info.project.name !== 'online');
     test.setTimeout(25 * 60_000);
     const { host, guest, close } = await onlinePair(browser, baseURL!, '&netSim=100,20,0.02,17');
     const errors: string[] = [];
@@ -30,6 +30,17 @@ for (const circuit of ['monza', 'spa', 'singapore']) {
             const [a, b] = await Promise.all([onlineState(host), onlineState(guest)]);
             samples++;
             const seconds = a.race!.elapsedRaceMs / 1000;
+            if (samples % 6 === 0)
+              console.log(
+                'Soak progress',
+                JSON.stringify({
+                  circuit,
+                  seconds: Math.round(seconds),
+                  hostLaps: a.race!.claims.length,
+                  guestLaps: b.race!.claims.length,
+                  counted: a.race!.timing.filter((t) => t.status === 'accepted').length,
+                }),
+              );
             const grid = a.state!.room!.grid!;
             const poses = [{ seat: a.state!.seat!, ...a.race!.pose }, ...a.race!.remote];
             for (const pose of poses) {

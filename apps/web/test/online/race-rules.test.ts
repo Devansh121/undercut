@@ -8,6 +8,7 @@ import {
   liveOrder,
   localProgress,
   onlineDriverName,
+  onlineLapTime,
   remoteProgress,
 } from '../../src/online/race-rules';
 
@@ -189,5 +190,18 @@ describe('room assist policy', () => {
       assists: { ...DEFAULT_SETTINGS.assists, brakingHelp: 'yes' },
     });
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('online lap clock', () => {
+  it('uses the server race clock, including time discarded by a clamped render stall', () => {
+    expect(onlineLapTime(14000, 10000, 0)).toBe(4);
+    expect(onlineLapTime(16000, 10000, 0)).toBe(6);
+    expect(onlineLapTime(16000, 10000, 4500)).toBe(1.5);
+  });
+  it('stays zero before release or before the clock is available', () => {
+    expect(onlineLapTime(9000, 10000, 0)).toBe(0);
+    expect(onlineLapTime(null, 10000, 0)).toBe(0);
+    expect(onlineLapTime(9000, null, 0)).toBe(0);
   });
 });

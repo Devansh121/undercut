@@ -141,3 +141,14 @@ export function enforceAssistPolicy(policy: Assists, session: AssistHolder): voi
   if (policy.stability === false && a.stability) session.setAssist('stability', 0);
   if (policy.brakingHelp === false && a.braking) session.setAssist('braking', 0);
 }
+
+/** Current lap seconds on the same clock as official claims, including a clamped stall. */
+export function onlineLapTime(
+  now: number | null,
+  lightsOutAt: number | null,
+  lastRaceMs: number,
+): number {
+  return now === null || lightsOutAt === null
+    ? 0
+    : Math.max(0, (now - lightsOutAt - lastRaceMs) / 1000);
+}

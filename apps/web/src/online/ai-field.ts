@@ -7,10 +7,11 @@ import {
   DEFAULT_RACE_SKILL,
   type Driver,
 } from '@undercut/ai';
-import type { AiHandover, CarSnapshot, GridSlot } from '@undercut/protocol';
+import { CAR_FLAG, type AiHandover, type CarSnapshot, type GridSlot } from '@undercut/protocol';
 import { circuitInfo } from '@undercut/race';
 import {
   addCar,
+  BODY_HALF_WIDTH,
   beginErsLap,
   createCarParams,
   createCarState,
@@ -26,9 +27,10 @@ import {
   type AeroTrim,
   type RemoteContactBody,
 } from '@undercut/sim';
-import { createPathPoint, TrackSurface, type Track } from '@undercut/track';
+import { createPathPoint, createVec3, TrackSurface, type Track } from '@undercut/track';
 import type { RaceArtefacts } from '../game/session';
 import { toSnapshot } from './car-state';
+import { BlockedCars } from './blocked-cars';
 import { LineCounter, type Crossing } from './progress';
 
 export class OnlineAiField {
@@ -39,11 +41,15 @@ export class OnlineAiField {
   private readonly lastRaceMs = new Map<number, number>();
   private readonly telemetry = createCarTelemetry();
   private readonly traffic = createTrafficView(20);
+  private readonly field = createTrafficView(20);
   private readonly hints;
   private readonly point = createPathPoint();
+  private readonly tangent = createVec3();
   private readonly launchCaps: number[];
   private readonly launching: boolean[];
   private elapsed = 0;
+  private readonly recovery = new BlockedCars();
+  private blocked: ReadonlySet<number> = new Set();
   private readonly crossings: { seat: number; crossing: Crossing }[] = [];
 
   constructor(
@@ -133,9 +139,26 @@ export class OnlineAiField {
         const q = this.track.project(s.x, s.z, this.hints[i]!, this.point);
         c.placed(q.s, this.world.time);
         this.launching[i] = Math.hypot(s.vx, s.vz) < 10;
+        if ((s.flags & CAR_FLAG.ghost) !== 0 && h.state === 'racing') {
+          this.recovery.restore({
+            seat: h.seat,
+            x: s.x,
+            z: s.z,
+            yaw: s.yaw,
+            vx: s.vx,
+            vz: s.vz,
+            yawRate: s.yawRate,
+          });
+        }
       }
       if (h.lap > 0 || h.behindLine === false) c.setLaps(h.lap);
     }
+  }
+
+  private halfWidth(s: number, yaw: number): number {
+    const tangent = this.track.tangentAt(s, this.tangent);
+    const heading = yaw - Math.atan2(-tangent.z, tangent.x);
+    return 2.8 * Math.abs(Math.sin(heading)) + BODY_HALF_WIDTH * Math.abs(Math.cos(heading));
   }
 
   /** One fixed step; human proxies are current owned poses or extrapolated peer poses. */
@@ -144,42 +167,61 @@ export class OnlineAiField {
     humans: readonly RemoteContactBody[],
   ): readonly { seat: number; crossing: Crossing }[] {
     this.crossings.length = 0;
-    if (released) this.elapsed += this.world.step;
-    const traffic = this.traffic;
-    traffic.count = 0;
+    if (released) {
+      this.elapsed += this.world.step;
+      const bodies = this.bodies();
+      this.blocked = this.recovery.update(bodies, this.world.step, [...bodies, ...humans]);
+    }
+    const field = this.field;
+    field.count = 0;
     for (let i = 0; i < this.cars.length; i++) {
+      if (this.cars[i]!.state !== 'racing') continue;
       const car = this.world.cars[i]!;
       const q = this.track.project(car.state.x, car.state.z, this.hints[i]!, this.point);
-      Object.assign(traffic.cars[traffic.count++]!, {
+      if (this.blocked.has(this.cars[i]!.seat) && Math.abs(car.state.vx) < 2) continue;
+      Object.assign(field.cars[field.count++]!, {
         id: this.cars[i]!.seat,
         s: q.s,
         d: q.d,
         speed: car.state.vx,
-        halfWidth: 1,
+        halfWidth: this.halfWidth(q.s, car.state.yaw),
       });
     }
     for (const h of humans) {
-      if (h.ghost || traffic.count >= traffic.cars.length) continue;
+      if (h.ghost || field.count >= field.cars.length) continue;
       const q = this.track.project(h.x, h.z, { index: -1 }, this.point);
-      Object.assign(traffic.cars[traffic.count++]!, {
+      Object.assign(field.cars[field.count++]!, {
         id: h.seat,
         s: q.s,
         d: q.d,
         speed: Math.hypot(h.vx, h.vz),
-        halfWidth: 1,
+        halfWidth: this.halfWidth(q.s, h.yaw),
       });
     }
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.world.cars[i]!;
       const driver = this.drivers[i]!;
-      Object.assign(traffic.self, traffic.cars[i]!);
+      const traffic = this.traffic;
+      traffic.count = 0;
+      for (let k = 0; k < this.field.count; k++) {
+        const other = this.field.cars[k]!;
+        if (other.id !== this.cars[i]!.seat) Object.assign(traffic.cars[traffic.count++]!, other);
+      }
+      const own = this.track.project(car.state.x, car.state.z, this.hints[i]!, this.point);
+      Object.assign(traffic.self, {
+        id: this.cars[i]!.seat,
+        s: own.s,
+        d: own.d,
+        speed: car.state.vx,
+        halfWidth: this.halfWidth(own.s, car.state.yaw),
+      });
       traffic.active = released;
       traffic.launching = this.launching[i]!;
       driver.sense?.(traffic);
       readCarTelemetry(car.state, this.telemetry);
       driver.drive(this.telemetry, this.world.step, car.input);
       const racing = this.cars[i]!.state === 'racing';
-      car.ghost = !racing;
+      car.ghost = !racing || this.blocked.has(this.cars[i]!.seat);
       if (!released || !racing) {
         car.input.throttle = 0;
         car.input.brake = 1;
@@ -206,7 +248,7 @@ export class OnlineAiField {
       readCarPose(car.state, car.pose);
       const q = this.track.project(car.state.x, car.state.z, this.hints[i]!, this.point);
       const crossing = this.counters[i]!.update(q.s, this.world.time);
-      if (released && !car.ghost && crossing) {
+      if (released && this.cars[i]!.state === 'racing' && crossing) {
         beginErsLap(car.state);
         car.state.fuelMass = 20;
         this.crossings.push({ seat: this.cars[i]!.seat, crossing });
@@ -232,7 +274,7 @@ export class OnlineAiField {
         vx: s.vx * c - s.vy * sin,
         vz: -s.vx * sin - s.vy * c,
         yawRate: s.yawRate,
-        ghost: g.state !== 'racing',
+        ghost: g.state !== 'racing' || this.blocked.has(g.seat),
       };
     });
   }
@@ -242,7 +284,7 @@ export class OnlineAiField {
       const car = this.world.cars[i]!;
       const t = readCarTelemetry(car.state, this.telemetry);
       const q = this.track.project(car.state.x, car.state.z, this.hints[i]!, this.point);
-      return toSnapshot({
+      const snapshot = toSnapshot({
         seat: g.seat,
         tick: this.world.tick,
         t: serverAt,
@@ -261,6 +303,8 @@ export class OnlineAiField {
         resets: 0,
         brokenCursor: Math.floor(this.world.tick / 8) % 64,
       });
+      if (g.state !== 'racing' || this.blocked.has(g.seat)) snapshot.flags |= CAR_FLAG.ghost;
+      return snapshot;
     });
   }
 }

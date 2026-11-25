@@ -518,13 +518,25 @@ a car still owes its initial grid-line crossing: migrating a back-row car must n
 The driver's internal reaction and traffic memory restarts; this is a physical warm start from
 the last received pose, not a bit-identical continuation of an unreceived physics state.
 
-Online timing uses the released simulation epoch for the current lap and the server clock for
-official crossing claims. The timing tower uses member names and AI identities, orders cars by
+Online timing uses the server race clock for both the current lap and official crossing claims,
+so a clamped render stall does not make the HUD clock under-report the lap. The timing tower uses member names and AI identities, orders cars by
 continuous progress projected from their drawn poses, and shows distance-based estimated gaps.
 Those estimates are presentation; final classification comes from the room.
 
 Browser proof: `tests/browser/online-v2.spec.ts` checks a full moving grid and AI takeover at
 every circuit, and symmetric contact at 50, 100 and 150 ms with jitter and 2% snapshot loss.
-`ONLINE_SOAK=1 npx playwright test tests/browser/online-soak.spec.ts --project=desktop --workers=1`
+`ONLINE_SOAK=1 npx playwright test tests/browser/online-soak.spec.ts --project=online --workers=1`
 runs five real-time laps with two scripted humans and eighteen host AI at each circuit, recording
 stuck cars, rejected timing, and the identical twenty-car classification in both contexts.
+
+
+A stopped AI that makes less than 6 m of useful progress over 6 s temporarily becomes a ghost,
+so another stopped car cannot pin it or hold the field indefinitely. It is shown faded and does
+not collide with cars, but still meets the track barriers and keeps racing and timing. It becomes
+solid only above 5 m/s, clear of overlapping cars and traffic closing from behind. Other drivers
+ignore it only below 2 m/s; once moving, they plan around it before it becomes solid. The existing
+no-contact snapshot bit is also named `CAR_FLAG.ghost`; room retirement still comes only from
+official grid state. This extends the offline race's stopped-queue recovery to the host field.
+
+The `online` Playwright project runs the short tests with one worker in its own CI job, using the
+build job's client artifact. The viewport suite stays separate. The long soaks remain opt-in.

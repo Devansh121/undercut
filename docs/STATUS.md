@@ -378,4 +378,5 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
   its latest physical pose, velocities, gears, snapshot tick and service-counted progress carry
   over. This avoids introducing full sim-state payloads or Worker-side physics in this slice.
 - Long two-browser races are opt-in with ONLINE_SOAK=1 to preserve the ordinary PR browser
-  job's budget. Short circuit, fill, takeover and network-contact proofs run in ordinary CI.
+  job's budget. Short circuit, fill, takeover and network-contact proofs run in a separate one-worker CI job,
+  sharing the built client artifact.

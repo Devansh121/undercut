@@ -50,6 +50,36 @@ describe('host AI field', () => {
     expect(after.filter((p) => Math.hypot(p.vx, p.vz) < 1).map((p) => p.seat)).toEqual([]);
   }, 20000);
 
+  it('clears the opening chicane with every car making progress', () => {
+    const field = new OnlineAiField(
+      track,
+      { line, envelope },
+      Array.from({ length: 20 }, (_, seat) => ({
+        seat,
+        kind: 'ai',
+        member: null,
+        aiIndex: seat,
+        state: 'racing',
+      })),
+      'low',
+    );
+    const anchors = field.snapshots(0).map((p) => ({ x: p.x, z: p.z, since: 0 }));
+    for (let tick = 0; tick < 240 * 120; tick++) {
+      field.step(true, []);
+      if (tick % (240 * 5) !== 0) continue;
+      const seconds = tick / 240;
+      const snapshots = field.snapshots(seconds * 1000);
+      for (let i = 0; i < snapshots.length; i++) {
+        const p = snapshots[i]!;
+        const a = anchors[i]!;
+        if (seconds < 20 || Math.hypot(p.x - a.x, p.z - a.z) >= 10)
+          Object.assign(a, { x: p.x, z: p.z, since: seconds });
+        expect(seconds - a.since, `seat ${p.seat} stopped`).toBeLessThan(20);
+      }
+    }
+    expect(field.snapshots(120000).every((p) => p.lap >= 1)).toBe(true);
+  }, 60000);
+
   it('takes over AI pose, velocity, gear, counted laps and race time', () => {
     const old = make();
     for (let i = 0; i < 240 * 5; i++) old.step(true, []);
@@ -69,5 +99,20 @@ describe('host AI field', () => {
     expect(moved.lap).toBe(2);
     expect(moved.tick).toBeGreaterThan(car.tick);
     expect(next.progress(1)?.raceMs).toBe(170000);
+  });
+
+  it('ignores finished AI cars parked ahead when sensing traffic', () => {
+    const twoAi = [
+      { seat: 0, kind: 'ai' as const, member: null, aiIndex: 0, state: 'finished' as const },
+      { seat: 1, kind: 'ai' as const, member: null, aiIndex: 1, state: 'racing' as const },
+    ];
+    const field = new OnlineAiField(track, { line, envelope }, twoAi, 'low');
+    const before = field.snapshots(0)[1]!;
+    for (let i = 0; i < 240 * 4; i++) field.step(true, []);
+    const after = field.snapshots(4000);
+    // Seat 0 is finished and stays parked; seat 1 accelerates cleanly past it without stopping.
+    expect(Math.hypot(after[0]!.vx, after[0]!.vz)).toBeLessThan(0.5);
+    expect(Math.hypot(after[1]!.x - before.x, after[1]!.z - before.z)).toBeGreaterThan(40);
+    expect(Math.hypot(after[1]!.vx, after[1]!.vz)).toBeGreaterThan(20);
   });
 });

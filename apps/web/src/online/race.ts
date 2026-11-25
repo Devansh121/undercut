@@ -47,6 +47,7 @@ import {
   liveOrder,
   localProgress,
   onlineDriverName,
+  onlineLapTime,
   remoteProgress,
 } from './race-rules';
 import { RemoteCarSmoother } from './smoother';
@@ -715,7 +716,7 @@ export class OnlineRace implements DriveExtension {
           code: l.code,
         },
         pose,
-        opacity: v.opacity,
+        opacity: (v.flags & CAR_FLAG.retired) !== 0 ? v.opacity * 0.45 : v.opacity,
       });
       others.push({ x: v.x, z: v.z, colour: l.primary, opacity: v.opacity });
       remote.push({ seat: v.seat, x: v.x, z: v.z, opacity: v.opacity, mode: v.mode });
@@ -850,7 +851,7 @@ export class OnlineRace implements DriveExtension {
   }
 
   /** Supply live race lap timing and multi-car timing tower rows to the drive HUD. */
-  updateHud(h: HudState, renderTime: number): void {
+  updateHud(h: HudState): void {
     const room = this.client.room;
     const grid = room?.grid ?? [];
     const laps = room?.settings.laps ?? 1;
@@ -885,7 +886,11 @@ export class OnlineRace implements DriveExtension {
       }
     } else {
       h.running = true;
-      h.lapTime = Math.max(0, renderTime - this.lapStartSimTime);
+      h.lapTime = onlineLapTime(
+        this.client.serverNow(),
+        room?.start?.lightsOutAt ?? null,
+        this.lastRaceMs,
+      );
       for (let i = 0; i < 3; i++) {
         const slot = h.sectors[i]!;
         const done = this.currentSectors[i] ?? null;

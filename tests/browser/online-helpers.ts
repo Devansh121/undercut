@@ -9,7 +9,7 @@ export async function onlinePair(browser: Browser, baseURL: string, netSim = '')
     [0, 1].map(() => browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } })),
   );
   const [host, guest] = await Promise.all(contexts.map((c) => c.newPage()));
-  const suffix = '&debug=1&quality=lite' + netSim;
+  const suffix = '&debug=1&quality=lite&world=lite' + netSim;
   await host!.goto('/?' + suffix.slice(1));
   await openMenu(host!);
   await host!.locator('[data-action=mode-online]').click();
