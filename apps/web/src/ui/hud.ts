@@ -6,6 +6,14 @@ import { Text, el, icon, setClass, setData, svg } from './dom';
 import { glyph, refreshGlyphs } from './kit/glyph';
 import { S } from './strings';
 import { TimingTower, type TowerFlag, type TowerRow } from './hud/tower';
+import { StartLightsPanel } from './hud/start-lights';
+import type {
+  RaceFlagsSnapshot,
+  RaceMessage,
+  RaceSafetyIndicator,
+  StartLightsState,
+  TowerGapMode,
+} from './hud/race-display-model';
 import {
   compoundMark,
   formatFuel,
@@ -26,6 +34,18 @@ export interface HudMessage {
   tag: string;
   text: string;
   tone: 'invalid' | 'info' | 'personal' | 'overall';
+}
+
+export interface HudRaceState {
+  lap: number;
+  totalLaps: number | null;
+  rows: readonly TowerRow[];
+  gapMode: TowerGapMode;
+  gapLabel?: string;
+  startLights: StartLightsState;
+  flags: RaceFlagsSnapshot;
+  safety: RaceSafetyIndicator | null;
+  messages: readonly RaceMessage[];
 }
 
 export interface HudSectorState {
@@ -95,6 +115,8 @@ export interface HudState {
   others?: readonly { x: number; z: number; colour: string; opacity: number }[];
   /** Custom timing tower rows and header (online races). */
   tower?: HudTowerState | null;
+  /** Race display state (start lights, 20-car tower, flags, safety, message queue). */
+  race?: HudRaceState | null;
 }
 
 /** Shared empty list for sessions with no other cars on the map. */
@@ -126,6 +148,15 @@ export class Hud {
   private readonly tower: TimingTower;
   /** The tower's two rows, reused every frame. */
   private readonly towerRows: [TowerRow, TowerRow];
+  private readonly startLights: StartLightsPanel;
+  private readonly raceFlagEl: HTMLElement;
+  private readonly raceFlagTitle: Text;
+  private readonly raceFlagDetail: Text;
+  private readonly safetyEl: HTMLElement;
+  private readonly safetyTitle: Text;
+  private readonly safetyDetail: Text;
+  private readonly raceMsgsEl: HTMLElement;
+  private readonly raceMsgSlots: { el: HTMLElement; tag: Text; text: Text; lastId: number }[] = [];
   private readonly msgEl: HTMLElement;
   private readonly msgTag: Text;
   private readonly msgText: Text;
@@ -135,6 +166,8 @@ export class Hud {
   private readonly stoppedEl: HTMLElement;
   private readonly dot: SVGCircleElement;
   private readonly ghostDot: SVGCircleElement;
+  private readonly mapSectorEls: SVGPathElement[] = [];
+  private readonly lastYellow: boolean[] = [];
   private readonly othersLayer: SVGGElement;
   private readonly otherDots: SVGCircleElement[] = [];
   private readonly plan: MinimapPlan;
@@ -158,7 +191,12 @@ export class Hud {
   private compoundShown = '';
 
   /** `mode`: the tower's session label ("Time trial", "Online race"). */
-  constructor(plan: MinimapPlan, identity?: HudIdentity, mode: string = S.hud.timeTrial) {
+  constructor(
+    plan: MinimapPlan,
+    identity?: HudIdentity,
+    mode: string = S.hud.timeTrial,
+    onToggleGapMode?: () => void,
+  ) {
     this.plan = plan;
     const root = el('div', 'hud');
     root.dataset.testid = 'hud';
@@ -172,7 +210,10 @@ export class Hud {
     };
 
     // Timing tower (top left): in time trial, the player's best and the record (the ghost's lap).
-    const tower = new TimingTower({ label: mode });
+    const tower = new TimingTower({
+      label: mode,
+      ...(onToggleGapMode ? { onToggleGapMode } : {}),
+    });
     this.tower = tower;
     this.towerRows = [
       {
@@ -198,6 +239,36 @@ export class Hud {
 
     // Control and prompt slot (top centre).
     const control = el('div', 'hud-control');
+    this.startLights = new StartLightsPanel();
+
+    this.raceFlagEl = el('div', 'hud-flag hud-flag--race');
+    this.raceFlagEl.setAttribute('role', 'status');
+    this.raceFlagEl.dataset.testid = 'race-flag';
+    this.raceFlagEl.hidden = true;
+    const rfSw = el('div', 'hud-flag__sw');
+    rfSw.append(icon('flag'));
+    const rfTxt = el('div', 'hud-flag__txt');
+    const rfTitle = el('strong', '');
+    const rfDetail = el('span', '');
+    this.raceFlagTitle = new Text(rfTitle);
+    this.raceFlagDetail = new Text(rfDetail);
+    rfTxt.append(rfTitle, rfDetail);
+    this.raceFlagEl.append(rfSw, rfTxt);
+
+    this.safetyEl = el('div', 'hud-prompt hud-prompt--safety');
+    this.safetyEl.setAttribute('role', 'status');
+    this.safetyEl.dataset.testid = 'race-safety';
+    this.safetyEl.hidden = true;
+    const sfSw = el('div', 'hud-prompt__sw');
+    sfSw.append(icon('warning'));
+    const sfTxt = el('div', 'hud-prompt__txt');
+    const sfTitle = el('strong', '');
+    const sfDetail = el('span', '');
+    this.safetyTitle = new Text(sfTitle);
+    this.safetyDetail = new Text(sfDetail);
+    sfTxt.append(sfTitle, sfDetail);
+    this.safetyEl.append(sfSw, sfTxt);
+
     this.invalidEl = el('div', 'hud-flag');
     this.invalidEl.setAttribute('role', 'status');
     const sw = el('div', 'hud-flag__sw');
@@ -237,7 +308,32 @@ export class Hud {
     this.msgTag = new Text(tag);
     this.msgText = new Text(body);
     this.msgEl.append(tag, body);
-    control.append(this.invalidEl, this.wrongWayEl, this.stoppedEl, this.msgEl);
+
+    this.raceMsgsEl = el('div', 'hud-messages');
+    this.raceMsgsEl.setAttribute('role', 'log');
+    this.raceMsgsEl.setAttribute('aria-live', 'polite');
+    this.raceMsgsEl.dataset.testid = 'race-messages';
+    this.raceMsgsEl.hidden = true;
+    for (let i = 0; i < 3; i++) {
+      const row = el('div', 'hud-msg hud-msg--queue');
+      row.hidden = true;
+      const mTag = el('span', 'hud-msg__tag');
+      const mBody = el('span', 'hud-msg__body');
+      row.append(mTag, mBody);
+      this.raceMsgsEl.append(row);
+      this.raceMsgSlots.push({ el: row, tag: new Text(mTag), text: new Text(mBody), lastId: -1 });
+    }
+
+    control.append(
+      this.startLights.root,
+      this.raceFlagEl,
+      this.invalidEl,
+      this.wrongWayEl,
+      this.stoppedEl,
+      this.safetyEl,
+      this.msgEl,
+      this.raceMsgsEl,
+    );
 
     // Lap timing (top right).
     const timing = el('section', 'hud-timing panel');
@@ -314,6 +410,23 @@ export class Hud {
         'stroke-width': 2.4,
       }),
     );
+    const sectorsLayer = svg('g', {
+      class: 'hud-map__sectors',
+      'data-testid': 'map-yellow-sectors',
+    });
+    for (let i = 0; i < plan.sectorPaths.length; i++) {
+      const seg = svg('path', {
+        d: plan.sectorPaths[i] as string,
+        fill: 'none',
+        class: 'hud-map__sector',
+        'data-sector': String(i),
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      });
+      sectorsLayer.append(seg);
+      this.mapSectorEls.push(seg);
+      this.lastYellow.push(false);
+    }
     this.ghostDot = svg('circle', {
       r: 3.4,
       fill: '#bcd3ff',
@@ -328,7 +441,7 @@ export class Hud {
       'stroke-width': 2,
     });
     this.othersLayer = svg('g', { 'data-testid': 'map-others' });
-    s.append(this.ghostDot, this.othersLayer, this.dot);
+    s.append(sectorsLayer, this.ghostDot, this.othersLayer, this.dot);
     map.append(mHead, s);
 
     // Driver cluster (bottom right): tyre panel (desktop) + drive panel.
@@ -486,6 +599,68 @@ export class Hud {
     this.invalidReason.set(text);
   }
 
+  private updateRace(r: HudRaceState | null): void {
+    this.startLights.update(r?.startLights ?? null);
+    if (!r) {
+      if (!this.raceFlagEl.hidden) this.raceFlagEl.hidden = true;
+      if (!this.safetyEl.hidden) this.safetyEl.hidden = true;
+      if (!this.raceMsgsEl.hidden) this.raceMsgsEl.hidden = true;
+      return;
+    }
+
+    const banner = r.flags.banner;
+    const showFlag = banner !== null;
+    if (this.raceFlagEl.hidden !== !showFlag) this.raceFlagEl.hidden = !showFlag;
+    setClass(this.raceFlagEl, 'is-on', showFlag);
+    if (banner) {
+      setData(this.raceFlagEl, 'flag', banner.flag);
+      this.raceFlagTitle.set(banner.title);
+      this.raceFlagDetail.set(banner.detail);
+    }
+
+    const safety = r.safety;
+    const showSafety = safety !== null;
+    if (this.safetyEl.hidden !== !showSafety) this.safetyEl.hidden = !showSafety;
+    setClass(this.safetyEl, 'is-on', showSafety);
+    if (safety) {
+      setData(this.safetyEl, 'safety', safety.kind);
+      this.safetyTitle.set(safety.title);
+      this.safetyDetail.set(safety.detail);
+    }
+
+    const ys = r.flags.yellowSectors;
+    for (let i = 0; i < this.mapSectorEls.length; i++) {
+      const on = Boolean(ys[i]);
+      if (on !== this.lastYellow[i]) {
+        this.lastYellow[i] = on;
+        const seg = this.mapSectorEls[i]!;
+        seg.classList.toggle('is-yellow', on);
+        if (on) seg.setAttribute('data-yellow', 'on');
+        else seg.removeAttribute('data-yellow');
+      }
+    }
+
+    const msgs = r.messages;
+    const hasMsgs = msgs.length > 0;
+    if (this.raceMsgsEl.hidden !== !hasMsgs) this.raceMsgsEl.hidden = !hasMsgs;
+    for (let i = 0; i < this.raceMsgSlots.length; i++) {
+      const slot = this.raceMsgSlots[i]!;
+      const m = msgs[i];
+      if (!m) {
+        if (!slot.el.hidden) slot.el.hidden = true;
+        slot.lastId = -1;
+        continue;
+      }
+      if (slot.el.hidden) slot.el.hidden = false;
+      if (slot.lastId !== m.id) {
+        slot.lastId = m.id;
+        slot.tag.set(m.tag);
+        slot.text.set(m.text);
+        setData(slot.el, 'tone', m.tone);
+      }
+    }
+  }
+
   update(h: HudState): void {
     this.updateTyres(h);
     const t = this.t;
@@ -495,7 +670,16 @@ export class Hud {
       t.mapName?.set(h.circuit);
       t.mapLen?.set(`${h.lengthKm} ${S.circuit.km}`);
     }
-    if (h.tower) {
+    const r = h.race ?? null;
+    if (r) {
+      this.tower.setRaceMode(true, r.gapLabel === undefined);
+      this.tower.setLap(r.lap > 0 ? r.lap : null, r.totalLaps);
+      this.tower.setGapMode(r.gapMode, r.gapLabel);
+      this.tower.setStatus(r.flags.towerStatus.flag, r.flags.towerStatus.text);
+      this.tower.setFooter('', '');
+      this.tower.update(r.rows);
+    } else if (h.tower) {
+      this.tower.setRaceMode(false);
       this.tower.setLap(h.tower.lap, h.tower.total);
       if (h.tower.flag) this.tower.setStatus(h.tower.flag.kind, h.tower.flag.text);
       this.tower.update(h.tower.rows);
@@ -509,6 +693,7 @@ export class Hud {
         );
       }
     } else {
+      this.tower.setRaceMode(false);
       this.tower.setLap(h.lap > 0 ? h.lap : null);
       const mine = this.towerRows[0];
       const rec = this.towerRows[1];
@@ -520,6 +705,7 @@ export class Hud {
       // The map names the circuit; the footer says whether the ghost of the record is out.
       this.tower.setFooter(S.hud.ghost, h.ghost ? S.hud.ghostOnTrack : S.hud.ghostOff, !h.ghost);
     }
+    this.updateRace(r);
     t.lapNo?.set(h.lap > 0 ? S.hud.lapN(h.lap) : S.hud.outLap);
     setClass(this.t.best?.node as HTMLElement, 'is-empty', h.best === null);
     setClass(this.lastEl, 'is-empty', h.last === null);
@@ -562,15 +748,15 @@ export class Hud {
     }
     setClass(this.root, 'is-limiter', flash);
 
-    // Compositor-only transform updates so the ERS bar never triggers layout.
+    // The fill uses a compositor transform; the two-pixel lap marker stays inside the meter.
     const ersScale = h.ers.toFixed(3);
     if (ersScale !== this.lastErs) {
       this.ersFill.style.transform = `scaleX(${ersScale})`;
       this.lastErs = ersScale;
     }
-    const markShift = `${((h.ersLap - 1) * 100).toFixed(1)}%`;
+    const markShift = `${(h.ersLap * 100).toFixed(1)}%`;
     if (markShift !== this.lastMark) {
-      this.ersMark.style.transform = `translateX(${markShift})`;
+      this.ersMark.style.left = `clamp(2px, ${markShift}, 100%)`;
       this.lastMark = markShift;
     }
     setData(this.drsEl, 'state', h.drs);
@@ -642,5 +828,10 @@ export class Hud {
       dot.setAttribute('fill', o.colour);
       dot.setAttribute('opacity', o.opacity.toFixed(2));
     }
+  }
+
+  /** Release listeners and observers held by child HUD modules. */
+  destroy(): void {
+    this.tower.destroy();
   }
 }

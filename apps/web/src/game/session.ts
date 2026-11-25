@@ -178,6 +178,7 @@ export class DriveSession {
    */
   playerFinished = false;
   readonly raceEvents: RaceEvent[] = [];
+  private readonly pendingRaceEvents: RaceEvent[] = [];
   result: SessionResult | null = null;
   readonly track: Track;
   /** The cars' aero trim: the race line's in a Quick Race, low drag in time trial. */
@@ -384,9 +385,20 @@ export class DriveSession {
     const c = this.race.control;
     if (!this.quickRace || c.strategy.duration === null || this.result || !c.racing(0)) return null;
     const events: SessionEvent[] = [];
-    for (const e of this.race.returnToGarage(0)) this.onRaceEvent(e, events);
+    for (const e of this.race.returnToGarage(0)) {
+      this.raceEvents.push(e);
+      if (this.raceEvents.length > 500) this.raceEvents.shift();
+      this.pendingRaceEvents.push(e);
+      this.onRaceEvent(e, events);
+    }
     this.assistMemory = createAssistState();
     return events;
+  }
+
+  /** Return and clear all Quick Race events emitted since the last call. */
+  drainRaceEvents(): RaceEvent[] {
+    if (this.pendingRaceEvents.length === 0) return [];
+    return this.pendingRaceEvents.splice(0, this.pendingRaceEvents.length);
   }
 
   /** The player's car is in the pit lane or held by the crew (box, garage). */
@@ -599,6 +611,7 @@ export class DriveSession {
       if (this.quickRace) {
         this.raceEvents.push(e);
         if (this.raceEvents.length > 500) this.raceEvents.shift();
+        this.pendingRaceEvents.push(e);
         if (e.type === 'sessionEnd') {
           this.result = this.race.result();
           this.end();
