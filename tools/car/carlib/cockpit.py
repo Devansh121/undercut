@@ -320,6 +320,29 @@ def sleeve_path(side):
             Vector((.37, side * .166, .630)), Vector((.455, side * .151, .617))]
 
 
+def sleeve_point(side, t):
+    """Point and unit tangent at t (0 at the shoulder, 1 at the wrist) on a Catmull-Rom curve
+    through the sleeve path: the end points are the path's own, so the wrist join is unchanged."""
+    pts = sleeve_path(side)
+    ext = [pts[0] * 2 - pts[1]] + pts + [pts[-1] * 2 - pts[-2]]
+    f = min(t, 1.0 - 1e-9) * (len(pts) - 1)
+    i = int(f)
+    u = f - i
+    p0, p1, p2, p3 = ext[i], ext[i + 1], ext[i + 2], ext[i + 3]
+    pos = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u
+                 + (-p0 + 3 * p1 - 3 * p2 + p3) * u ** 3)
+    der = 0.5 * ((-p0 + p2) + 2 * (2 * p0 - 5 * p1 + 4 * p2 - p3) * u + 3 * (-p0 + 3 * p1 - 3 * p2 + p3) * u * u)
+    if t >= 1.0:
+        pos = pts[-1]
+    return pos, der.normalized()
+
+
+def sleeve_radius(t):
+    """The sleeve's radius along the arm: full at the elbow, swelling over the forearm, narrowing
+    to the wrist where the gauntlet's cuff covers it, m."""
+    return 0.040 + 0.004 * math.sin(math.pi * min(1.0, t / 0.6)) - 0.010 * smoothstep(0.55, 1.0, t)
+
+
 def wrist_join(side):
     transform = Matrix.Rotation(math.radians(D.STEERING_COLUMN_PITCH_DEG), 3, "Y") @ Matrix.Rotation(math.pi, 3, "Z")
     sleeve = sleeve_path(-side)
@@ -384,8 +407,15 @@ def build_gloves(q):
         u = axis.cross(Vector((0, 0, 1))).normalized()
         w = axis.cross(u)
         ng = q.n(20, 10)
-        grid = [[p + (u * math.cos(2 * math.pi * k / ng) + w * math.sin(2 * math.pi * k / ng)) * r
-                 for k in range(ng)] for p, r in ((a, .031), (sleeve, .035), (inside, .026))]
+        # The gauntlet: snug at the hand, a soft fold across the middle, flaring into a cuff that
+        # sits over the sleeve's mouth, then turned in under it (the closed cap stays buried).
+        sections = ((a, .029, 0.0), (a.lerp(sleeve, .45), .031, .05), (a.lerp(sleeve, .82), .036, .03),
+                    (sleeve, .039, 0.0), (sleeve.lerp(inside, .5), .034, 0.0), (inside, .026, 0.0))
+        grid = []
+        for p, r, fold in sections:
+            grid.append([p + (u * math.cos(2 * math.pi * k / ng) + w * math.sin(2 * math.pi * k / ng))
+                         * r * (1 + fold * math.cos(5 * 2 * math.pi * k / ng + 0.7))
+                         for k in range(ng)])
         loft(m, grid, "glove", closed=True, cap0=True, cap1=True)
         tube(m, a.lerp(sleeve, .30), a.lerp(sleeve, .52), .034, ng, "dark")
     _planar_metric_uv(m, {"glove"})
@@ -508,19 +538,27 @@ def build_driver(mesh_paint, mesh_dark, q):
         rows.append([Vector((x, p.y, p.z)) for p in ring])
     loft(m, rows, "paint_edge", flip=True)
     mesh_paint.merge(m.with_mirror())
-    # forearms: from the shoulder line to the wrists beside the wheel grips
+    # forearms: from the shoulder line to the wrists beside the wheel grips, resampled along a
+    # smooth curve through the sleeve path, swelling over the forearm and tapering to the wrist,
+    # with shallow creases where the suit gathers at the elbow
     arms = Mesh()
-    na = q.n(12, 6)
+    na = q.n(18, 9)
+    nk = q.n(7, 4)
     for side in (1, -1):
-        path = sleeve_path(side)
-        radii = (0.040, 0.041, 0.036, 0.031)
         rings = []
-        for k, (p, r) in enumerate(zip(path, radii)):
-            tang = (path[min(k + 1, 3)] - path[max(k - 1, 0)]).normalized()
+        for k in range(nk + 1):
+            t = k / nk
+            p, tang = sleeve_point(side, t)
+            r = sleeve_radius(t)
             u = tang.cross(Vector((0, 0, 1))).normalized()
             w = tang.cross(u)
-            rings.append([p + (u * math.cos(2 * math.pi * i / na) * 1.05 + w * math.sin(2 * math.pi * i / na) * 0.95) * r
-                          for i in range(na)])
+            crease = 0.035 * (1 - smoothstep(0.0, 0.45, t)) * math.sin(3 * math.pi * t)
+            ring = []
+            for i in range(na):
+                a = 2 * math.pi * i / na
+                ri = r * (1 + crease * math.cos(3 * a + 1.3 * k))
+                ring.append(p + (u * math.cos(a) * 1.07 + w * math.sin(a) * 0.93) * ri)
+            rings.append(ring)
         loft(arms, rings, "paint_edge", closed=True, cap0=True, cap1=False)
     mesh_paint.merge(arms)
     # harness: two straps over the shoulders, converging at the chest

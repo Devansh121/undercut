@@ -8,8 +8,8 @@ All under `apps/web/public/assets/car/` (served at `assets/car/` from the client
 
 | File | Use | Triangles | Draw calls | Size |
 | --- | --- | --- | --- | --- |
-| `car_high.glb` | Player car and close cars on the High preset | 119,582 | 40 | 1.43 MB |
-| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,950 | 25 | 0.65 MB |
+| `car_high.glb` | Player car and close cars on the High preset | 119,954 | 40 | 1.43 MB |
+| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,820 | 25 | 0.66 MB |
 | `car_far.glb` | Distant cars on any preset | 10,296 | 11 | 0.20 MB |
 | `livery/<team id>.png` | Livery mask, 1024 × 1024, one per team (ten) | | | 26–60 KB each |
 | `livery/index.json` | Team id → mask file and the three colours (from `design/teams.json`) | | | |
