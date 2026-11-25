@@ -16,16 +16,20 @@ describe('compact timing tower window', () => {
   it('shows the leader and the cars around the player', () => {
     expect(ids(towerWindow(field(20, 6), 4))).toEqual([1, 5, 6, 7]);
     expect(ids(towerWindow(field(20, 6), 5))).toEqual([1, 5, 6, 7, 8]);
+    expect(ids(towerWindow(field(20, 10), 3))).toEqual([1, 10, 11]);
   });
 
   it('keeps the window inside the field at the back', () => {
     expect(ids(towerWindow(field(20, 20), 4))).toEqual([1, 18, 19, 20]);
+    expect(ids(towerWindow(field(20, 20), 3))).toEqual([1, 19, 20]);
   });
 
   it('shows the top rows when the player is near the front or absent', () => {
     expect(ids(towerWindow(field(20, 2), 4))).toEqual([1, 2, 3, 4]);
     expect(ids(towerWindow(field(20, 4), 4))).toEqual([1, 2, 3, 4]);
     expect(ids(towerWindow(field(20, 5), 4))).toEqual([1, 4, 5, 6]);
+    expect(ids(towerWindow(field(20, 3), 3))).toEqual([1, 2, 3]);
+    expect(ids(towerWindow(field(20, 4), 3))).toEqual([1, 4, 5]);
     expect(ids(towerWindow(field(20, null), 4))).toEqual([1, 2, 3, 4]);
     expect(ids(towerWindow(field(3, 3), 4))).toEqual([1, 2, 3]);
   });

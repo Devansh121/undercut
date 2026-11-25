@@ -14,6 +14,8 @@ export interface TowerRow {
   position: number | null;
   /** Three-letter driver code. */
   code: string;
+  /** Full driver name (tooltip / accessibility). */
+  name?: string;
   /** Team colour for the bar (design/teams.json `tower`). */
   teamColour: string;
   /** Right-hand column, formatted: gap or interval ("+1.204", "LEADER", "+1 LAP"), a lap time, "PIT". */
@@ -24,7 +26,15 @@ export interface TowerRow {
   /** A reference row (record, ghost): dashed bar, muted code. */
   reference?: boolean;
   /** Tyre compound mark, when known. */
-  compound?: { code: string; colour: string } | null;
+  compound?: { code: string; colour: string; slots?: readonly number[] } | null;
+  /** Laps completed on the current tyre set (race mode). */
+  tyreAge?: number | null;
+  /** Completed pit stops (race mode). */
+  pitStops?: number | null;
+  /** Car is currently in the pit lane or box. */
+  inPit?: boolean;
+  /** Car is retired or disqualified. */
+  retired?: boolean;
   /** Holds the session's fastest lap. */
   fastest?: boolean;
 }
