@@ -519,6 +519,61 @@ describe('RoomClient over a loopback room', () => {
     expect(a.snapshotStats.sent).toBeGreaterThan(170);
     expect(a.snapshotStats.sent).toBeLessThan(190);
   });
+
+  it('activates the service-published running order identically across clients at 150 ms RTT', () => {
+    const timers = new FakeTimers();
+    const net = new Loopback(timers, 75, 5_000_000, {
+      readyCountdownMs: 100,
+      formationMs: 200,
+      lightIntervalMs: 100,
+    });
+    const a = client(net, 'Ana');
+    const b = client(net, 'Ben');
+    a.connect();
+    b.connect();
+    timers.advance(2000);
+    a.changeSettings({ aiCount: 0 });
+    timers.advance(300);
+    a.setReady(true);
+    b.setReady(true);
+    for (let i = 0; i < 20; i++) {
+      timers.advance(50);
+      net.tick();
+    }
+    expect(a.room?.phase).toBe('grid');
+    a.markLoaded();
+    b.markLoaded();
+    let seenOrders = 0;
+    let firstOrder: { at: number; order: number[] } | null = null;
+    let swapped = false;
+    for (let ms = 0; ms < 4000; ms += 20) {
+      timers.advance(20);
+      net.tick();
+      const sa = a.serverNow()!;
+      const sb = b.serverNow()!;
+      // Both cars coast side by side at 50 m/s for the first 2 s, then seat 1 pulls ahead.
+      const tSec = ms / 1000;
+      const s0 = 100 + 50 * tSec;
+      const s1 = tSec < 2 ? 100 + 50 * tSec : 100 + 50 * tSec + 8 * (tSec - 2);
+      const tick = Math.round(ms / 20) + 1;
+      a.sendSnapshots([{ ...circle(sa, 0, tick), s: s0, vx: 50, vz: 0 }]);
+      b.sendSnapshots([{ ...circle(sb, 1, tick), s: s1, vx: 50, vz: 0 }]);
+      if (a.room?.phase === 'racing' && b.room?.phase === 'racing') {
+        const oa = a.orderAt(sa);
+        const ob = b.orderAt(sb);
+        if (oa && ob) {
+          seenOrders++;
+          firstOrder ??= { at: oa.at, order: [...oa.order] };
+          expect(oa.order).toEqual(ob.order);
+          if (oa.order[0] === 1) swapped = true;
+        }
+      }
+    }
+    expect(seenOrders).toBeGreaterThan(50);
+    expect(swapped).toBe(true);
+    expect(a.orderAt(firstOrder!.at)?.order).toEqual(firstOrder!.order);
+    expect(b.orderAt(firstOrder!.at)?.order).toEqual(firstOrder!.order);
+  });
 });
 
 describe('URLs and the HTTP API', () => {

@@ -10,20 +10,23 @@
  *   renderer's fleet and onto the map; at 240 Hz, non-ghost remote cars participate in planar
  *   symmetric contact via latency-compensated proxies, with mandatory post-contact barrier clamping.
  */
-import { circuitInfo, type CircuitInfo } from '@undercut/race';
+import { circuitInfo } from '@undercut/race';
 import { startLightMask, type CarLivery, type RaceView } from '@undercut/render';
 import {
+  carFootprint,
   createCarPose,
   extrapolateRemoteBody,
   readCarPose,
   resolveRemoteCarContacts,
+  type CarFootprint,
   type CarPose,
   type RemoteContactBody,
 } from '@undercut/sim';
-import { createPathPoint, type Track } from '@undercut/track';
+import { createPathPoint, createVec3, type Track } from '@undercut/track';
 import {
   CAR_FLAG,
   type RoomClient,
+  type OrderMessage,
   type StartSchedule,
   type TimingMessage,
 } from '@undercut/protocol';
@@ -44,17 +47,16 @@ import {
   enforceAssistPolicy,
   lapClaim,
   lightsOn,
-  liveOrder,
-  localProgress,
   onlineDriverName,
   onlineLapTime,
-  remoteProgress,
 } from './race-rules';
 import { RemoteCarSmoother } from './smoother';
 import type { OnlineSession } from './session';
 
 /** Grace period after a reset/teleport during which contact with that car is disabled, ms. */
 const RESET_GRACE_MS = 2000;
+/** Capacity of the fixed-step oriented footprint trace ring buffer (~8 s at 60 Hz). */
+const TRACE_CAPACITY = 480;
 
 const REASON_TEXT: Record<string, string> = {
   lap_too_fast: 'faster than the circuit allows',
@@ -66,6 +68,28 @@ const REASON_TEXT: Record<string, string> = {
   gap_too_fast: 'too quick for the laps skipped',
   lap_not_monotonic: 'already counted',
 };
+
+/** One fixed-step oriented footprint sample on the synced server clock (for contact proofs). */
+export interface OnlineTraceSample {
+  /** Server time of this 240 Hz sim tick, ms. */
+  t: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  s: number;
+  d: number;
+  /** Car CoG height above the track surface directly underneath, m. */
+  aboveRoad: number;
+  cx: number;
+  cz: number;
+  fx: number;
+  fz: number;
+  halfLength: number;
+  halfWidth: number;
+  /** Cumulative remote-contact ticks recorded up to this step. */
+  contacts: number;
+}
 
 /** What the start and the race looked like from this browser (debug API and tests). */
 export interface OnlineRaceReport {
@@ -91,13 +115,16 @@ export interface OnlineRaceReport {
   lapTimeSec: number;
   /** Live running order as seat numbers (leader first). */
   order: number[];
+  orderEpoch: number | null;
   claims: { lap: number; raceMs: number; lapMs: number }[];
   timing: { seat: number; lap: number; status: string; reason: string | null }[];
   snapshotsSent: number;
   remote: { seat: number; x: number; z: number; opacity: number; mode: string }[];
   smoother: { snaps: number; corrections: number; maxCorrectionM: number };
-  pose: { x: number; y: number; z: number };
+  pose: { x: number; y: number; z: number; yaw: number };
   contacts: { count: number; maxSpeed: number; maxImpulse: number };
+  /** Recent oriented footprint samples stamped with synced server time. */
+  trace: OnlineTraceSample[];
   position: number | null;
 }
 
@@ -121,7 +148,6 @@ export class OnlineRace implements DriveExtension {
   readonly livery: CarLivery;
   private readonly client: RoomClient;
   private track!: Track;
-  private circuit!: CircuitInfo;
   private readonly seat: number;
   private readonly gridPosition: number;
   private counter!: LineCounter;
@@ -132,9 +158,19 @@ export class OnlineRace implements DriveExtension {
   private readonly hud = new RaceHud();
   private readonly poses = new Map<number, CarPose>();
   private readonly finishedAt = new Map<number, number>();
-  private readonly behindLine = new Map<number, boolean>();
-  private readonly projHints = new Map<number, { index: number }>();
+  private readonly ownProjHint = { index: -1 };
   private readonly projPoint = createPathPoint();
+  private readonly groundPoint = createVec3();
+  private readonly traceBox: CarFootprint = {
+    cx: 0,
+    cz: 0,
+    fx: 1,
+    fz: 0,
+    halfLength: 0,
+    halfWidth: 0,
+  };
+  private readonly traceBuf: OnlineTraceSample[] = [];
+  private traceHead = 0;
   private readonly latestProgress = new Map<number, number>();
   private latestOrder: number[] = [];
   private ai: OnlineAiField | null = null;
@@ -215,13 +251,15 @@ export class OnlineRace implements DriveExtension {
       laps: 0,
       lapTimeSec: 0,
       order: [...this.latestOrder],
+      orderEpoch: null,
       claims: [],
       timing: [],
       snapshotsSent: 0,
       remote: [],
       smoother: this.smoother.stats,
-      pose: { x: 0, y: 0, z: 0 },
+      pose: { x: 0, y: 0, z: 0, yaw: 0 },
       contacts: { count: 0, maxSpeed: 0, maxImpulse: 0 },
+      trace: [],
       position: null,
     };
     this.unsubscribe.push(
@@ -239,7 +277,6 @@ export class OnlineRace implements DriveExtension {
   private bindTrack(track: Track): { s: number; d: number } {
     this.track = track;
     const circuit = circuitInfo(track, { timingLine: track.timingLine });
-    this.circuit = circuit;
     this.length = track.length;
     const slot = circuit.grid[this.gridPosition] ?? circuit.grid[0] ?? { s: 0, d: 0 };
     this.counter = new LineCounter({
@@ -248,13 +285,7 @@ export class OnlineRace implements DriveExtension {
       startS: slot.s,
     });
     this.sectorStarts = circuit.sectorLines.map((s) => this.counter.lineS(s));
-    this.behindLine.clear();
-    const grid = this.client.room?.grid ?? [];
-    for (let i = 0; i < grid.length; i++) {
-      const g = grid[i]!;
-      const gSlot = circuit.grid[i] ?? circuit.grid[0] ?? { s: 0, d: 0 };
-      this.behindLine.set(g.seat, this.counter.lineS(gSlot.s) > this.length / 2);
-    }
+    this.ownProjHint.index = -1;
     this.report.circuit = track.id;
     this.trackBound = true;
     return { s: slot.s, d: slot.d };
@@ -408,7 +439,10 @@ export class OnlineRace implements DriveExtension {
         }
       }
       const latest = this.client.remoteCars.latest(seat);
-      if (latest) this.contactExpires.set(seat, latest.t + 250);
+      if (latest) {
+        this.contactExpires.set(seat, latest.t + 250);
+        proxy.ageSec = Math.max(0, (serverTime - latest.t) / 1000);
+      }
       this.contactProxies.push(proxy);
     }
   }
@@ -425,33 +459,64 @@ export class OnlineRace implements DriveExtension {
     for (let i = 0; i < this.contactProxies.length; i++) {
       const p = this.contactProxies[i]!;
       extrapolateRemoteBody(p, dt, p);
+      p.ageSec = (p.ageSec ?? 0) + dt;
       if (this.gate.tickAt(ctx.session.world.time) > (this.contactExpires.get(p.seat) ?? Infinity))
         p.ghost = true;
     }
     this.stepAi();
+    const car = ctx.session.car;
+    let touched = 0;
     const now = this.client.serverNow() ?? 0;
     if (
-      this.contactProxies.length === 0 ||
-      this.finishedAt.has(this.seat) ||
-      now < this.localResetUntil
+      this.contactProxies.length > 0 &&
+      !this.finishedAt.has(this.seat) &&
+      now >= this.localResetUntil
     ) {
-      return;
-    }
-    const car = ctx.session.car;
-    const prevImpulse = car.state.carContactImpulse;
-    const touched = resolveRemoteCarContacts(
-      car.state,
-      this.contactProxies,
-      ctx.session.world.surface,
-    );
-    if (touched > 0) {
-      readCarPose(car.state, car.pose);
-      this.report.contacts.count += touched;
-      if (car.state.carContactSpeed > this.report.contacts.maxSpeed) {
-        this.report.contacts.maxSpeed = car.state.carContactSpeed;
+      const prevImpulse = car.state.carContactImpulse;
+      touched = resolveRemoteCarContacts(car.state, this.contactProxies, ctx.session.world.surface);
+      if (touched > 0) {
+        readCarPose(car.state, car.pose);
+        this.report.contacts.count += touched;
+        if (car.state.carContactSpeed > this.report.contacts.maxSpeed) {
+          this.report.contacts.maxSpeed = car.state.carContactSpeed;
+        }
+        const imp = car.state.carContactImpulse - prevImpulse;
+        if (imp > this.report.contacts.maxImpulse) this.report.contacts.maxImpulse = imp;
       }
-      const imp = car.state.carContactImpulse - prevImpulse;
-      if (imp > this.report.contacts.maxImpulse) this.report.contacts.maxImpulse = imp;
+    }
+    if (touched > 0 || ctx.session.world.tick % 4 === 0) {
+      this.recordTrace(ctx.session.world.time, car.state);
+    }
+  }
+
+  private recordTrace(simTime: number, st: DriveExtensionContext['session']['car']['state']): void {
+    const t = this.gate.tickAt(simTime);
+    if (!Number.isFinite(t)) return;
+    const box = carFootprint(st, this.traceBox);
+    const q = this.track.project(st.x, st.z, this.ownProjHint, this.projPoint);
+    const ground = this.track.pointAt(q.s, q.d, this.groundPoint).y;
+    const sample: OnlineTraceSample = {
+      t,
+      x: st.x,
+      y: st.y,
+      z: st.z,
+      yaw: st.yaw,
+      s: q.s,
+      d: q.d,
+      aboveRoad: st.y - ground,
+      cx: box.cx,
+      cz: box.cz,
+      fx: box.fx,
+      fz: box.fz,
+      halfLength: box.halfLength,
+      halfWidth: box.halfWidth,
+      contacts: this.report.contacts.count,
+    };
+    if (this.traceBuf.length < TRACE_CAPACITY) {
+      this.traceBuf.push(sample);
+    } else {
+      this.traceBuf[this.traceHead] = sample;
+      this.traceHead = (this.traceHead + 1) % TRACE_CAPACITY;
     }
   }
 
@@ -596,7 +661,12 @@ export class OnlineRace implements DriveExtension {
     const c = this.client;
     const room = c.room;
     const session = ctx.session;
-    this.report.pose = { x: session.car.pose.x, y: session.car.pose.y, z: session.car.pose.z };
+    this.report.pose = {
+      x: session.car.pose.x,
+      y: session.car.pose.y,
+      z: session.car.pose.z,
+      yaw: session.car.pose.yaw,
+    };
     const policy = room?.settings.assists;
     if (policy) enforceAssistPolicy(policy, session);
     const now = c.serverNow();
@@ -727,89 +797,54 @@ export class OnlineRace implements DriveExtension {
     view.setRemoteCars(drawn);
     this.report.remote = remote;
 
-    this.updateOverlay(now, views);
+    this.updateOverlay(now);
     return others;
   }
 
-  private updateOverlay(
-    now: number | null,
-    views: readonly { seat: number; lap: number; s: number; x: number; z: number }[],
-  ): void {
+  /** Shared order at an explicit service epoch; also used by the live HUD. */
+  orderAt(serverTime: number): (OrderMessage & { position: number }) | null {
+    const published = this.client.orderAt(serverTime);
+    if (!published) return null;
+    return { ...published, position: published.order.indexOf(this.seat) + 1 };
+  }
+
+  private syncOrder(now: number | null): void {
     const room = this.client.room;
-    const start = room?.start ?? null;
-    const phase = room?.phase ?? 'lobby';
     const grid = room?.grid ?? [];
     for (const g of grid) {
       if (g.state === 'finished' && !this.finishedAt.has(g.seat)) {
         this.finishedAt.set(g.seat, now ?? 0);
       }
     }
-    const myLineS = this.ctx ? this.counter.lineS(this.ctx.session.s) : 0;
-    const myProgress = localProgress(
-      this.length,
-      this.counter.laps,
-      myLineS,
-      this.counter.behindLine,
-    );
+    const published = this.released && now !== null ? this.orderAt(now) : null;
+    this.report.orderEpoch = published?.at ?? null;
     this.latestProgress.clear();
-    this.latestProgress.set(this.seat, myProgress);
-    const seen = new Set<number>([this.seat]);
-    const runners = [
-      {
-        seat: this.seat,
-        lap: this.counter.laps,
-        s: myLineS,
-        progress: myProgress,
-        finishedAt: this.finishedAt.get(this.seat) ?? null,
-      },
-    ];
-    for (const v of views) {
-      seen.add(v.seat);
-      if (v.lap > 0 || v.s < this.length / 2) this.behindLine.set(v.seat, false);
-      let hint = this.projHints.get(v.seat);
-      if (!hint) {
-        hint = { index: -1 };
-        this.projHints.set(v.seat, hint);
+    let order: number[];
+    if (published) {
+      const present = new Set<number>(published.order);
+      order = [...published.order];
+      for (let i = 0; i < published.order.length; i++) {
+        this.latestProgress.set(published.order[i]!, published.progress[i] ?? 0);
       }
-      const q = this.track.project(v.x, v.z, hint, this.projPoint);
-      const projLineS = this.counter.lineS(q.s);
-      const prog = remoteProgress(
-        this.length,
-        v.lap,
-        v.s,
-        projLineS,
-        this.behindLine.get(v.seat) ?? false,
-      );
-      this.latestProgress.set(v.seat, prog);
-      runners.push({
-        seat: v.seat,
-        lap: v.lap,
-        s: projLineS,
-        progress: prog,
-        finishedAt: this.finishedAt.get(v.seat) ?? null,
-      });
+      for (const g of grid) {
+        if (!present.has(g.seat)) order.push(g.seat);
+      }
+    } else {
+      order = grid.map((g) => g.seat);
     }
-    // Include grid cars without a snapshot yet (e.g. disconnected or still loading) using grid slot.
-    for (let i = 0; i < grid.length; i++) {
-      const g = grid[i]!;
-      if (seen.has(g.seat)) continue;
-      const gSlot = this.circuit.grid[i] ?? this.circuit.grid[0] ?? { s: 0, d: 0 };
-      const gLineS = this.counter.lineS(gSlot.s);
-      const prog = localProgress(this.length, 0, gLineS, this.behindLine.get(g.seat) ?? false);
-      this.latestProgress.set(g.seat, prog);
-      runners.push({
-        seat: g.seat,
-        lap: 0,
-        s: gLineS,
-        progress: prog,
-        finishedAt: this.finishedAt.get(g.seat) ?? null,
-      });
-    }
-    const order = this.released ? liveOrder(this.length, runners) : grid.map((g) => g.seat);
     this.latestOrder = order;
     this.report.order = [...order];
-    this.position = this.released ? order.indexOf(this.seat) + 1 : this.gridPosition + 1;
+    const idx = order.indexOf(this.seat);
+    this.position = this.released && idx >= 0 ? idx + 1 : this.gridPosition + 1;
     this.report.position = this.position;
+  }
+
+  private updateOverlay(now: number | null): void {
+    const room = this.client.room;
+    const start = room?.start ?? null;
+    const phase = room?.phase ?? 'lobby';
+    const grid = room?.grid ?? [];
+    this.syncOrder(now);
     const finished = this.finishedAt.has(this.seat);
     const laps = room?.settings.laps ?? 1;
 
@@ -973,7 +1008,13 @@ export class OnlineRace implements DriveExtension {
   }
 
   /** The start and the race so far, as plain data. */
-  snapshot(): OnlineRaceReport {
+  snapshot(includeTrace = false): OnlineRaceReport {
+    this.syncOrder(this.client.serverNow());
+    const trace = !includeTrace
+      ? []
+      : this.traceBuf.length < TRACE_CAPACITY
+        ? this.traceBuf.slice()
+        : [...this.traceBuf.slice(this.traceHead), ...this.traceBuf.slice(0, this.traceHead)];
     return {
       ...this.report,
       elapsedRaceMs: Math.max(
@@ -985,6 +1026,7 @@ export class OnlineRace implements DriveExtension {
       timing: [...this.report.timing],
       smoother: { ...this.smoother.stats },
       contacts: { ...this.report.contacts },
+      trace: includeTrace ? trace : [],
     };
   }
 }

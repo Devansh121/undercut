@@ -181,3 +181,94 @@ describe('bounded stalled-car recovery', () => {
     expect(next.progress(15)?.raceMs).toBe(90000);
   });
 });
+
+const SOAK_CIRCUITS = [
+  {
+    id: 'monza' as const,
+    trim: 'low' as const,
+    loadTrack: () => import('@undercut/track/data/monza.json'),
+    loadLine: () => import('../../../../packages/ai/data/monza-low.line.json'),
+    loadEnv: () => import('../../../../packages/ai/data/monza-low.envelope.json'),
+  },
+  {
+    id: 'spa' as const,
+    trim: 'medium' as const,
+    loadTrack: () => import('@undercut/track/data/spa.json'),
+    loadLine: () => import('../../../../packages/ai/data/spa-medium.line.json'),
+    loadEnv: () => import('../../../../packages/ai/data/spa-medium.envelope.json'),
+  },
+  {
+    id: 'singapore' as const,
+    trim: 'high' as const,
+    loadTrack: () => import('@undercut/track/data/singapore.json'),
+    loadLine: () => import('../../../../packages/ai/data/singapore-high.line.json'),
+    loadEnv: () => import('../../../../packages/ai/data/singapore-high.envelope.json'),
+  },
+];
+
+describe.skipIf(process.env.ONLINE_AI_SOAK !== '1')(
+  'three-circuit five-lap full-grid AI soak',
+  () => {
+    for (const cfg of SOAK_CIRCUITS) {
+      it(`completes five laps with all twenty cars at ${cfg.id} without stalls`, async () => {
+        const [{ default: trackJson }, { default: lineJson }, { default: envJson }] =
+          await Promise.all([cfg.loadTrack(), cfg.loadLine(), cfg.loadEnv()]);
+        const t = Track.fromJSON(trackJson);
+        const fullGrid = Array.from({ length: 20 }, (_, seat) => ({
+          seat,
+          kind: 'ai' as const,
+          member: null,
+          aiIndex: seat,
+          state: 'racing' as 'racing' | 'finished',
+        }));
+        const field = new OnlineAiField(
+          t,
+          { line: lineJson, envelope: envJson },
+          fullGrid,
+          cfg.trim,
+        );
+        const anchors = field.snapshots(0).map((p) => ({ x: p.x, z: p.z, since: 0 }));
+        const prevResets = new Array<number>(20).fill(0);
+        let recoveries = 0;
+        const lapsDone = new Array<number>(20).fill(0);
+        const maxTicks = 240 * 750;
+        for (let tick = 0; tick < maxTicks; tick++) {
+          const crossings = field.step(true, []);
+          for (const { seat } of crossings) {
+            lapsDone[seat] = (lapsDone[seat] ?? 0) + 1;
+            if (lapsDone[seat]! >= 5) {
+              fullGrid[seat]!.state = 'finished';
+              field.states(fullGrid);
+            }
+          }
+          if (tick % (240 * 5) !== 0) continue;
+          const seconds = tick / 240;
+          const snaps = field.snapshots(seconds * 1000);
+          for (let i = 0; i < snaps.length; i++) {
+            const p = snaps[i]!;
+            if (p.resets !== prevResets[i]) {
+              recoveries++;
+              prevResets[i] = p.resets;
+            }
+            if (lapsDone[p.seat]! >= 5) continue;
+            const a = anchors[i]!;
+            if (seconds < 20 || Math.hypot(p.x - a.x, p.z - a.z) >= 10) {
+              Object.assign(a, { x: p.x, z: p.z, since: seconds });
+            }
+            expect(seconds - a.since, `${cfg.id} seat ${p.seat} stuck at ${seconds}s`).toBeLessThan(
+              20,
+            );
+          }
+          if (lapsDone.every((l) => l >= 5)) {
+            console.log(
+              `AI 5-lap soak ${cfg.id}:`,
+              JSON.stringify({ seconds: Math.round(seconds), recoveries, finishers: 20 }),
+            );
+            break;
+          }
+        }
+        expect(lapsDone.every((l) => l >= 5)).toBe(true);
+      }, 240_000);
+    }
+  },
+);

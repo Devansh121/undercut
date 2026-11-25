@@ -1063,3 +1063,69 @@ describe('room lifetime cap', () => {
     expect(h.machine.closed).toBe(true);
   });
 });
+
+describe('authoritative live running order', () => {
+  it('evaluates seats at one shared time with hysteresis and publishes identical order to all clients', () => {
+    const h = new Harness({}, { ...TEST_SETTINGS, aiCount: 0 });
+    h.toRacing();
+    const start = h.last('c1', 'order');
+    expect(start).toBeDefined();
+    expect(start!.order).toEqual([0, 1]);
+    expect(h.last('c2', 'order')).toEqual(start);
+
+    // Both cars travel at 50 m/s from s = 100; c1's snapshots are 60 ms fresher than c2's.
+    const t0 = h.now;
+    h.now = t0 + 100;
+    h.snap('c1', [car(0, { tick: 100, resets: 1, t: t0 + 80, s: 104, vx: 50 })]);
+    h.snap('c2', [car(1, { tick: 100, resets: 1, t: t0 + 20, s: 101, vx: 50 })]);
+    h.now = t0 + 280;
+    h.snap('c1', [car(0, { tick: 110, resets: 1, t: t0 + 260, s: 113, vx: 50 })]);
+    h.snap('c2', [car(1, { tick: 110, resets: 1, t: t0 + 200, s: 110.2, vx: 50 })]);
+    // At evalAt = t0 + 250 (h.now = t0 + 450): both seats are ~112.5 m (within 2.0 m hysteresis).
+    h.now = t0 + 420;
+    h.snap('c1', [car(0, { tick: 120, resets: 1, t: t0 + 400, s: 120, vx: 50 })]);
+    h.snap('c2', [car(1, { tick: 120, resets: 1, t: t0 + 340, s: 117.2, vx: 50 })]);
+    h.advance(30);
+    const steady = h.last('c1', 'order')!;
+    expect(steady.at).toBeGreaterThan(h.now);
+    expect(steady.order).toEqual([0, 1]);
+    expect(h.last('c2', 'order')).toEqual(steady);
+
+    // Seat 1 drops packets for 400 ms while coasting at 50 m/s: bounded extrapolation keeps it from
+    // freezing or causing a spurious flip while Seat 0 continues reporting.
+    h.now = t0 + 700;
+    h.snap('c1', [car(0, { tick: 130, resets: 1, t: t0 + 680, s: 134, vx: 50 })]);
+    expect(h.last('c1', 'order')!.order).toEqual([0, 1]);
+
+    // Seat 1 accelerates and clears the 2.0 m hysteresis band -> both clients receive [1, 0].
+    h.now = t0 + 950;
+    h.snap('c1', [car(0, { tick: 140, resets: 1, t: t0 + 930, s: 146.5, vx: 50 })]);
+    h.snap('c2', [car(1, { tick: 140, resets: 1, t: t0 + 870, s: 149.5, vx: 55 })]);
+    h.now = t0 + 1200;
+    h.snap('c1', [car(0, { tick: 150, resets: 1, t: t0 + 1180, s: 159, vx: 50 })]);
+    h.snap('c2', [car(1, { tick: 150, resets: 1, t: t0 + 1120, s: 163.25, vx: 55 })]);
+    const swapped = h.last('c1', 'order')!;
+    expect(swapped.order).toEqual([1, 0]);
+    expect(h.last('c2', 'order')).toEqual(swapped);
+  });
+
+  it('sends the active authoritative order when a client resumes mid-race', () => {
+    const h = new Harness({}, { ...TEST_SETTINGS, aiCount: 0 });
+    h.toRacing();
+    const t0 = h.now;
+    h.now = t0 + 150;
+    h.snap('c1', [car(0, { tick: 100, resets: 1, t: t0 + 130, s: 120, vx: 40 })]);
+    h.snap('c2', [car(1, { tick: 100, resets: 1, t: t0 + 130, s: 150, vx: 40 })]);
+    h.advance(250);
+    expect(h.last('c1', 'order')?.order).toEqual([1, 0]);
+
+    const token = h.state.members.find((m) => m.seat === 1)!.token;
+    h.close('c2');
+    h.now += 500;
+    h.join('c2b', 'Ben', token);
+    const resumed = h.last('c2b', 'order');
+    expect(resumed).toBeDefined();
+    expect(resumed!.order).toEqual([1, 0]);
+    expect(resumed!.at).toBe(h.now);
+  });
+});

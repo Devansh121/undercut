@@ -458,10 +458,11 @@ if (debugEnabled()) {
   Object.assign(window.__undercut!, {
     /** The worklet's processing-time report with `&audioProfile=1`, or null. */
     audioProfile: () => audio.profile,
-    online: () => ({
+    online: (includeTrace = false) => ({
       state: online?.session.state ?? null,
-      race: online?.race?.snapshot() ?? null,
+      race: online?.race?.snapshot(includeTrace) ?? null,
     }),
+    onlineOrder: (serverTime: number) => online?.race?.orderAt(serverTime) ?? null,
     onlineSettings: (patch: SettingsPatch) => online?.session.changeSettings(patch) ?? false,
   });
 }

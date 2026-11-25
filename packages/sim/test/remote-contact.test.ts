@@ -200,3 +200,65 @@ describe('resolveRemoteCarContacts', () => {
     expect(car.state.carContacts).toBe(0);
   });
 });
+
+describe('aged remote poses', () => {
+  it('anticipates converging stale poses without adding vertical motion or unbounded separation', () => {
+    const world = createWorld({ step: STEP, seed: 1 });
+    const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+    car.state.vy = -1;
+    const remote: RemoteContactBody = {
+      seat: 1,
+      x: 0,
+      z: 2.15,
+      yaw: 0,
+      vx: 20,
+      vz: -1,
+      yawRate: 0,
+      ageSec: 0.2,
+    };
+    const y = car.state.y;
+    expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(1);
+    expect(car.state.z).toBeLessThan(0);
+    expect(-car.state.z).toBeLessThanOrEqual(MAX_REMOTE_PUSH_PER_STEP);
+    expect(car.state.carContactImpulse).toBeGreaterThan(0);
+    expect(car.state.y).toBe(y);
+  });
+
+  it('caps the prediction allowance even for extremely old converging poses', () => {
+    const world = createWorld({ step: STEP, seed: 1 });
+    const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+    car.state.vy = -1;
+    const remote: RemoteContactBody = {
+      seat: 1,
+      x: 0,
+      z: 2.35,
+      yaw: 0,
+      vx: 20,
+      vz: -1,
+      yawRate: 0,
+      ageSec: 100,
+    };
+    expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+    remote.ageSec = 0;
+    remote.z = 2.15;
+    expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+  });
+
+  it('does not expand fresh or equally moving remote poses', () => {
+    for (const ageSec of [0, 0.2]) {
+      const world = createWorld({ step: STEP, seed: 1 });
+      const car = addCar(world, REFERENCE_CAR, { x: 0, z: 0, yaw: 0, speed: 20 });
+      const remote: RemoteContactBody = {
+        seat: 1,
+        x: 0,
+        z: 2.15,
+        yaw: 0,
+        vx: 20,
+        vz: 0,
+        yawRate: 0,
+        ageSec,
+      };
+      expect(resolveRemoteCarContacts(car.state, [remote], FLAT_SURFACE)).toBe(0);
+    }
+  });
+});

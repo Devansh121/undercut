@@ -54,6 +54,8 @@ export interface RemoteContactBody {
   vz: number;
   /** Yaw rate about +Y, rad/s. */
   yawRate: number;
+  /** Age of the newest received pose at the contact tick, s. Zero for owned/fresh bodies. */
+  ageSec?: number;
   /** True when the remote car must not collide (held, fading, retired, reset grace). */
   ghost?: boolean;
 }
@@ -71,6 +73,7 @@ export function extrapolateRemoteBody(
   const dt =
     dtSec <= 0 ? 0 : dtSec > MAX_CONTACT_EXTRAPOLATION_S ? MAX_CONTACT_EXTRAPOLATION_S : dtSec;
   out.seat = src.seat;
+  out.ageSec = src.ageSec ?? 0;
   out.ghost = src.ghost === true;
   out.yawRate = src.yawRate;
   if (dt === 0) {
@@ -163,8 +166,17 @@ export function resolveRemoteCarContacts(
       remoteBox.fz = -rs;
       remoteBox.cx = r.x + ahead * rc;
       remoteBox.cz = r.z - ahead * rs;
-      remoteBox.halfLength = halfLength;
-      remoteBox.halfWidth = halfWidth;
+      const lc = Math.cos(local.yaw),
+        ls = Math.sin(local.yaw);
+      const relativeSpeed = Math.hypot(
+        local.vx * lc - local.vy * ls - r.vx,
+        -local.vx * ls - local.vy * lc - r.vz,
+      );
+      // A stale converging pose hides some closing distance. Reserve that distance early;
+      // the same bounded equal-mass impulse still applies, with no vertical component.
+      const allowance = Math.min(0.3, Math.max(0, r.ageSec ?? 0) * relativeSpeed);
+      remoteBox.halfLength = halfLength + allowance;
+      remoteBox.halfWidth = halfWidth + allowance;
 
       if (!collideFootprints(localBox, remoteBox, hitScratch)) continue;
       if (i < 31) hitMask |= 1 << i;
