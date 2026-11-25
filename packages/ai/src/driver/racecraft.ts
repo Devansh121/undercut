@@ -1,0 +1,160 @@
+import { BODY_HALF_WIDTH } from '@undercut/sim';
+import type { TrafficView } from './traffic';
+
+/**
+ * Clip a proposed road lane to the first closing car's corridor. Check the whole swept
+ * path, including a destination beyond that corridor. All positions and speeds are SI.
+ * The caller excludes crawling, recovery and stopped-queue manoeuvres.
+ */
+export function mirrorLane(
+  view: TrafficView,
+  target: number,
+  length: number,
+  reaction: number,
+): number {
+  return closingLane(view, target, length, reaction, true);
+}
+
+function closingLane(
+  view: TrafficView,
+  target: number,
+  length: number,
+  reaction: number,
+  behind: boolean,
+): number {
+  const current = view.self.d;
+  const direction = Math.sign(target - current);
+  let lane = target;
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    const gap = behind ? -ds : ds;
+    const closing = behind ? c.speed - view.self.speed : view.self.speed - c.speed;
+    if (gap <= 5.6 || (behind && gap > 40) || closing <= 0) continue;
+    const across = direction * (c.d - current);
+    if (across <= 0) continue;
+    const clearance = BODY_HALF_WIDTH + c.halfWidth + 0.8;
+    if (direction * (target - c.d) < -clearance) continue;
+    const time = Math.min(2, Math.max(0, across - clearance) / 1.5) + reaction + 0.6;
+    if (gap - 5.6 > closing * time) continue;
+    const edge = c.d - direction * clearance;
+    const stop = direction > 0 ? Math.max(current, edge) : Math.min(current, edge);
+    lane = direction > 0 ? Math.min(lane, stop) : Math.max(lane, stop);
+  }
+  return lane;
+}
+
+/** Intersect closing-traffic clearance ahead and behind, at the present and previewed lanes. */
+export function mirrorOffset(
+  view: TrafficView,
+  target: number,
+  length: number,
+  reaction: number,
+  lineHere: number,
+  lineNext: number,
+): number {
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (let k = 0; k < 4; k++) {
+    const line = k % 2 === 0 ? lineHere : lineNext;
+    const requested = line + target;
+    const safe = closingLane(view, requested, length, reaction, k < 2);
+    if (safe < requested) hi = Math.min(hi, safe - line);
+    else if (safe > requested) lo = Math.max(lo, safe - line);
+  }
+  // If the road sweep makes both corridors incompatible, keep the present road lane.
+  if (lo > hi) return view.self.d - lineHere;
+  return Math.max(lo, Math.min(hi, target));
+}
+
+export interface DefenceMemory {
+  lane: number;
+  used: boolean;
+}
+
+/** One early move to cover the inside, held until the corner rather than tracking the attacker. */
+export function defensiveLane(
+  view: TrafficView,
+  memory: DefenceMemory,
+  inside: number,
+  braking: boolean,
+  inCorner: boolean,
+  lo: number,
+  hi: number,
+  length = Infinity,
+): number {
+  if (inCorner) {
+    memory.used = false;
+    memory.lane = 0;
+    return 0;
+  }
+  if (!memory.used && !braking && inside !== 0) {
+    for (let k = 0; k < view.count; k++) {
+      const c = view.cars[k]!;
+      let ds = c.s - view.self.s;
+      if (ds > length / 2) ds -= length;
+      else if (ds < -length / 2) ds += length;
+      if (ds < -20 && ds > -40 && c.speed > view.self.speed + 1) {
+        memory.used = true;
+        memory.lane = inside * Math.min(2, inside > 0 ? hi : -lo);
+        break;
+      }
+    }
+  }
+  return Math.max(lo, Math.min(hi, memory.lane));
+}
+
+/**
+ * Overlap: the cars' centres within a wheelbase, so one car's front wheels are level with the
+ * other's rear wheels or further, m.
+ */
+export const OVERLAP = 3.6;
+
+/**
+ * Racing room: clip a proposed road lane so it leaves a car's width (plus a hand's width) to
+ * every car overlapping this one, whichever is ahead. The car being passed leaves room at the
+ * apex and the exit; a car giving up a move does not cut back across a car it overlapped. A
+ * car never moves toward one already closer than that; moving away is always allowed. SI.
+ */
+export function roomLane(view: TrafficView, target: number, length: number): number {
+  const current = view.self.d;
+  let lane = target;
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (Math.abs(ds) > OVERLAP) continue;
+    const side = Math.sign(c.d - current);
+    if (side === 0) continue;
+    const need = BODY_HALF_WIDTH + c.halfWidth + 0.8;
+    if (side > 0) lane = Math.min(lane, Math.max(current, c.d - need));
+    else lane = Math.max(lane, Math.min(current, c.d + need));
+  }
+  return lane;
+}
+
+/** Another moving car within `range` m ahead or behind, anywhere across the road. SI. */
+export function carNear(view: TrafficView, length: number, range: number): boolean {
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (c.speed >= 1 && Math.abs(ds) < range) return true;
+  }
+  return false;
+}
+
+/** Moving traffic behind or overlapping: a braking car cannot move across its approach. */
+export function brakingTraffic(view: TrafficView, length: number): boolean {
+  let behind = false;
+  for (let k = 0; k < view.count; k++) {
+    const c = view.cars[k]!;
+    let ds = (c.s - view.self.s + length) % length;
+    if (ds > length / 2) ds -= length;
+    if (c.speed < 1) continue;
+    if (ds > OVERLAP && ds < 20) return false;
+    if (ds > -20 && ds <= OVERLAP) behind = true;
+  }
+  return behind;
+}
