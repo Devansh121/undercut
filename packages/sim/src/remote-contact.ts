@@ -68,7 +68,8 @@ export function extrapolateRemoteBody(
   dtSec: number,
   out: RemoteContactBody,
 ): RemoteContactBody {
-  const dt = dtSec <= 0 ? 0 : dtSec > MAX_CONTACT_EXTRAPOLATION_S ? MAX_CONTACT_EXTRAPOLATION_S : dtSec;
+  const dt =
+    dtSec <= 0 ? 0 : dtSec > MAX_CONTACT_EXTRAPOLATION_S ? MAX_CONTACT_EXTRAPOLATION_S : dtSec;
   out.seat = src.seat;
   out.ghost = src.ghost === true;
   out.yawRate = src.yawRate;
@@ -200,7 +201,8 @@ export function resolveRemoteCarContacts(
       const closing = Math.min(-vn, MAX_REMOTE_CLOSING_SPEED);
       const ran = raz * nx - rax * nz;
       const rbn = rbz * nx - rbx * nz;
-      const jn = ((1 + CAR_RESTITUTION) * closing) / (wa + wb + (ran * ran) / ia + (rbn * rbn) / ib);
+      const jn =
+        ((1 + CAR_RESTITUTION) * closing) / (wa + wb + (ran * ran) / ia + (rbn * rbn) / ib);
       const jnx = nx * jn;
       const jnz = nz * jn;
       // Apply only local car's symmetric share (-j on A).

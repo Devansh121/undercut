@@ -27,12 +27,15 @@ export function parseNetSim(search: string): NetSimConfig | null {
   if (latencyMs === undefined || !Number.isFinite(latencyMs) || latencyMs < 0) return null;
   const jitterMs = parts[1] !== undefined && Number.isFinite(parts[1]) ? Math.max(0, parts[1]) : 0;
   const lossRate =
-    parts[2] !== undefined && Number.isFinite(parts[2])
-      ? Math.max(0, Math.min(0.5, parts[2]))
-      : 0;
+    parts[2] !== undefined && Number.isFinite(parts[2]) ? Math.max(0, Math.min(0.5, parts[2])) : 0;
   const seed =
     parts[3] !== undefined && Number.isFinite(parts[3]) ? Math.max(1, Math.trunc(parts[3])) : 1337;
-  return { latencyMs: Math.min(1000, latencyMs), jitterMs: Math.min(500, jitterMs), lossRate, seed };
+  return {
+    latencyMs: Math.min(1000, latencyMs),
+    jitterMs: Math.min(500, jitterMs),
+    lossRate,
+    seed,
+  };
 }
 
 /**
