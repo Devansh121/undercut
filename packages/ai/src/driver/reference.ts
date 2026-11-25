@@ -162,6 +162,10 @@ export class ReferenceDriver implements Driver {
   /** How fast that offset changes along the lap, m/m: steered for, so the car keeps up with it. */
   offsetSlope = 0;
   accelLimit = Number.POSITIVE_INFINITY;
+  /** Straight-line speed headroom for a racing move, m/s. Zero for the reference lap. */
+  speedAllowance = 0;
+  /** Use spare deployment for a racing run; the physical store and lap limits still apply. */
+  racingDeploy = false;
   /**
    * The least share of the brake pedal kept whatever the lock-up feel says (0 to 1). At walking
    * pace a wheel light on a kerb reads as locked at a touch of brake, and a car that has to stop
@@ -388,10 +392,9 @@ export class ReferenceDriver implements Driver {
     // falls up to in proportion to the mass. Planned as grip in proportion beyond a band the
     // driver's own margins cover (`MASS_BAND`: short races, up to about 24 kg of fuel, drive the
     // plan as before). Without it, cars at full-distance fuel ran wide at the Parabolica every lap.
-    const mass = this.params.mass.dryMass + tel.fuelMass;
-    const massGrip = Math.min(1, (plan.model.envelope.conditions.mass * (1 + MASS_BAND)) / mass);
-    const speeds = this.profileFor(tel.tyreGrip * massGrip);
-    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f;
+    const speeds = this.speedProfileFor(tel);
+    const allow = speeds.phase[i] !== Phase.Brake ? this.speedAllowance : 0;
+    const vTarget = speeds.v[i]! + (speeds.v[j]! - speeds.v[i]!) * f + allow;
     const aHere = speeds.ax[i]! + (speeds.ax[j]! - speeds.ax[i]!) * f;
     const aAhead = this.sampleAhead(speeds.ax, s, v * g.speedPreview);
     // Already under the speed the profile wants a moment ahead: no reason to brake early for
@@ -405,10 +408,28 @@ export class ReferenceDriver implements Driver {
     const model = plan.model;
     const drag = model.drag(v, tel.drs > 0.5);
     const full = model.drive(v, tel.drs > 0.5, deployHere);
+    const extraDeploy =
+      this.racingDeploy &&
+      !deployHere &&
+      (this.crossedLine || this.deployBeforeLine) &&
+      speeds.phase[i] !== Phase.Brake &&
+      tel.ersStore > 0 &&
+      tel.ersDeployLap < p.ers.deployPerLap &&
+      tel.gear > 0 &&
+      !tel.shifting;
+    let racingBoost = false;
     let throttle = 0;
     let brake = 0;
     if (aDemand >= -drag) {
-      throttle = (aDemand + drag) / Math.max(full + drag, 0.1);
+      if (extraDeploy) {
+        const ice = model.drive(v, tel.drs > 0.5, false);
+        const boost = Math.max(0, model.drive(v, tel.drs > 0.5, true) - ice);
+        const withBoost = (aDemand + drag - boost) / Math.max(ice + drag, 0.1);
+        // Overtake mode deploys above half throttle. Subtract its contribution from the
+        // engine request; simply adding the button would exceed the acceleration ceiling.
+        racingBoost = boost > 0 && withBoost >= 0.5;
+        throttle = (aDemand + drag - (racingBoost ? boost : 0)) / Math.max(ice + drag, 0.1);
+      } else throttle = (aDemand + drag) / Math.max(full + drag, 0.1);
     } else {
       const mass = p.mass.dryMass + tel.fuelMass;
       brake = ((-aDemand - drag) * mass * p.tyre.rollingRadius) / this.brakeTorque;
@@ -480,7 +501,14 @@ export class ReferenceDriver implements Driver {
     out.brake = brake;
     out.gearShift = sliding ? 0 : this.gear(tel, throttle);
     out.drs = drsHere && brake < 0.02;
-    out.overtake = deployHere && throttle > 0.9;
+    out.overtake = racingBoost
+      ? throttle >= 0.5 &&
+        brake < 0.02 &&
+        !saturated &&
+        spin <= 0 &&
+        slide <= 0 &&
+        this.throttleCap >= throttleWanted
+      : deployHere && throttle > 0.9;
     out.pitLimiter = false;
 
     const last = this.last;
@@ -498,6 +526,16 @@ export class ReferenceDriver implements Driver {
     last.targetSpeed = vTarget;
     last.phase = speeds.phase[i]!;
     return out;
+  }
+
+  /** Current tyre and fuel speed plan, shared with the racing driver's move prediction. */
+  speedProfileFor(tel: Pick<CarTelemetry, 'tyreGrip' | 'fuelMass'>): SpeedProfile {
+    const mass = this.params.mass.dryMass + tel.fuelMass;
+    const massGrip = Math.min(
+      1,
+      (this.plan.model.envelope.conditions.mass * (1 + MASS_BAND)) / mass,
+    );
+    return this.profileFor(tel.tyreGrip * massGrip);
   }
 
   /**

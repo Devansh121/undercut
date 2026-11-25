@@ -25,6 +25,7 @@
     "packages/race/validation/strategy-restore.test.ts": 14,
     "packages/race/validation/strategy-scenarios.test.ts": 23,
     "packages/race/validation/tyres-fuel.test.ts": 212,
+    "packages/race/validation/wake.test.ts": 20,
     "packages/sim/validation/acceleration.test.ts": 1,
     "packages/sim/validation/adversarial-surface.test.ts": 2,
     "packages/sim/validation/braking.test.ts": 1,

@@ -385,6 +385,7 @@ export class AiController implements CarController {
       c.pitPhase(ctx.car) === 'none' &&
       (out0 === null || ctx.time >= out0 + this.reaction);
     view.launching = this.launching && out0 !== null;
+    view.openingLap = c.timer(ctx.car).lap <= 1;
     driver.sense(view);
   }
 

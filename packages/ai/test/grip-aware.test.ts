@@ -55,6 +55,32 @@ function target(s: number, v: number, grip: number): number {
   return dr.last.targetSpeed;
 }
 
+for (const phase of [Phase.Brake, Phase.Throttle]) {
+  it(`applies passing speed headroom only outside braking (phase ${phase})`, () => {
+    const plain = driver();
+    const passing = driver();
+    const plan = plain.plan;
+    const i = plan.profile.phase.findIndex(
+      (value, k) => value === phase && plan.profile.v[k]! > 40,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const tel = at(i * track.lap.step, plan.profile.v[i]!, 1);
+    tel.x = plan.line.x[i]!;
+    tel.z = plan.line.z[i]!;
+    tel.yaw = plan.line.heading[i]!;
+    passing.speedAllowance = 4;
+    const normal = { ...NEUTRAL_INPUT };
+    const attack = { ...NEUTRAL_INPUT };
+    plain.drive(tel, 1 / 240, normal);
+    passing.drive(tel, 1 / 240, attack);
+    expect(passing.last.targetSpeed - plain.last.targetSpeed).toBeCloseTo(
+      phase === Phase.Brake ? 0 : 4,
+      8,
+    );
+    if (phase === Phase.Brake) expect(attack.brake).toBeCloseTo(normal.brake, 8);
+  });
+}
+
 it('drives the plan itself on the reference tyre', () => {
   const dr = driver();
   const out: ControlInput = { ...NEUTRAL_INPUT };
@@ -98,3 +124,72 @@ it('on less grip, slows where the plan is grip-limited and keeps the top speed',
   const full = target(sFlat, 75, 1);
   expect(Math.abs(target(sFlat, 75, 0.9) - full)).toBeLessThan(0.01 * full);
 });
+
+it('uses a racing energy request outside the solo deployment plan without exceeding demanded acceleration', () => {
+  const dr = driver();
+  const plan = dr.plan;
+  const i = plan.profile.deploying.findIndex(
+    (deploy, k) =>
+      deploy === 0 &&
+      plan.profile.phase[k] !== Phase.Brake &&
+      plan.profile.v[k]! > 60 &&
+      Math.abs(plan.line.curvature[k]!) < 1 / 250,
+  );
+  expect(i).toBeGreaterThanOrEqual(0);
+  const v = plan.profile.v[i]! - 10;
+  const tel = at(i * track.lap.step, v, 1);
+  tel.x = plan.line.x[i]!;
+  tel.z = plan.line.z[i]!;
+  tel.yaw = plan.line.heading[i]!;
+  tel.ersStore = params.ers.storeWindow;
+  dr['crossedLine'] = true;
+  const drag = plan.model.drag(v, false);
+  const ice = plan.model.drive(v, false, false) + drag;
+  const boost = plan.model.drive(v, false, true) - plan.model.drive(v, false, false);
+  const demand = 0.75 * ice + boost - drag;
+  dr.accelLimit = demand;
+  dr['racingDeploy'] = true;
+  const out: ControlInput = { ...NEUTRAL_INPUT };
+  dr.drive(tel, 1 / 240, out);
+  expect(out.overtake).toBe(true);
+  expect(ice * out.throttle + boost - drag).toBeCloseTo(demand, 3);
+  dr.accelLimit = -20;
+  dr.drive(tel, 1 / 240, out);
+  expect(out.brake).toBeGreaterThan(0.02);
+  expect(out.overtake).toBe(false);
+});
+
+for (const blocked of ['empty store', 'lap limit', 'gear change'] as const) {
+  it(`does not request extra racing deployment with ${blocked}`, () => {
+    const dr = driver();
+    const plan = dr.plan;
+    const i = plan.profile.deploying.findIndex(
+      (deploy, k) =>
+        deploy === 0 &&
+        plan.profile.phase[k] !== Phase.Brake &&
+        plan.profile.v[k]! > 60 &&
+        Math.abs(plan.line.curvature[k]!) < 1 / 250,
+    );
+    expect(i).toBeGreaterThanOrEqual(0);
+    const v = plan.profile.v[i]! - 10;
+    const tel = at(i * track.lap.step, v, 1);
+    tel.x = plan.line.x[i]!;
+    tel.z = plan.line.z[i]!;
+    tel.yaw = plan.line.heading[i]!;
+    tel.ersStore = params.ers.storeWindow;
+    dr['crossedLine'] = true;
+    const drag = plan.model.drag(v, false);
+    const ice = plan.model.drive(v, false, false) + drag;
+    const boost = plan.model.drive(v, false, true) - plan.model.drive(v, false, false);
+    const demand = 0.75 * ice + boost - drag;
+    dr.accelLimit = demand;
+    dr['racingDeploy'] = true;
+    const out: ControlInput = { ...NEUTRAL_INPUT };
+
+    if (blocked === 'empty store') tel.ersStore = 0;
+    if (blocked === 'lap limit') tel.ersDeployLap = params.ers.deployPerLap;
+    if (blocked === 'gear change') tel.shifting = true;
+    dr.drive(tel, 1 / 240, out);
+    expect(out.overtake).toBe(false);
+  });
+}
