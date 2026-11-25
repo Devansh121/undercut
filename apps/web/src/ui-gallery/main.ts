@@ -3,9 +3,6 @@
  * prompt glyphs across devices, and every kit component with its states. Linked from nowhere in
  * the game; used for visual review and browser tests.
  */
-import '../../../../design/mock/tokens.css';
-import '../styles/kit.css';
-import '../styles.css';
 import './gallery.css';
 import { GAME_NAME } from '@undercut/core';
 import { defaultBindings, type ActionId, type DeviceKind } from '@undercut/input';
