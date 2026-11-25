@@ -128,7 +128,12 @@ test('online running order agrees at 150 ms latency with two percent loss', asyn
 }, info) => {
   test.skip(info.project.name !== 'online');
   test.setTimeout(150000);
-  const { host, guest, close } = await pair(browser, baseURL!, '&netSim=150,20,0.02,150');
+  // Two software renderers must keep sending live snapshots during this order proof.
+  // Use the supported landscape-phone viewport to bound raster work on the shared machine.
+  const { host, guest, close } = await pair(browser, baseURL!, '&netSim=150,20,0.02,150', {
+    width: 844,
+    height: 390,
+  });
   try {
     await start(host, guest);
     // Wait for active orders and live peer snapshots before placing the moving pair.

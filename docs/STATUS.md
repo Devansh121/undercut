@@ -420,3 +420,9 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   receive it and reach activation before querying that same timestamp. Startup also waits for
   active epochs and live peer snapshots. A deterministic 900 ms guest control-message delay
   covers delivery after the scheduled activation and the former fixed look-back.
+
+- The order proof uses the supported 844×390 landscape viewport to bound two software renderers'
+  raster work. At 1440×900 on the shared machine, a 20-run series passed 14 races before the
+  alongside setup failed: both render loops stalled, snapshots became held/faded, and neither
+  peer remained fully visible. Every geometry, visibility, order, position and timeout assertion
+  is retained. Contact and soak viewports remain 1440×900.

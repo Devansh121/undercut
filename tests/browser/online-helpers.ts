@@ -4,10 +4,13 @@ import { openMenu } from './helpers';
 
 export const onlineState = (page: Page) => page.evaluate(() => window.__undercut!.online());
 
-export async function onlinePair(browser: Browser, baseURL: string, netSim = '') {
-  const contexts = await Promise.all(
-    [0, 1].map(() => browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } })),
-  );
+export async function onlinePair(
+  browser: Browser,
+  baseURL: string,
+  netSim = '',
+  viewport = { width: 1440, height: 900 },
+) {
+  const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, viewport })));
   const [host, guest] = await Promise.all(contexts.map((c) => c.newPage()));
   const suffix = '&debug=1&quality=lite&world=lite' + netSim;
   await host!.goto('/?' + suffix.slice(1));
