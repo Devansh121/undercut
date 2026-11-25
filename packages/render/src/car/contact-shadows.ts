@@ -25,8 +25,8 @@ const up = new Vector3(0, 1, 0);
 export const CONTACT_FOOTPRINT = Object.freeze({
   /** Clear margin round the outermost shadow, m. */
   margin: 0.25,
-  /** Under the floor between the axles: half width, and the penumbra of its edge, m. */
-  floorHalfWidth: 0.62,
+  /** Under the floor and sidepods between the axles: half width, and its edge's penumbra, m. */
+  floorHalfWidth: 0.74,
   floorEdge: 0.22,
   /** The floor's reach behind the front axle and ahead of the rear one, m. */
   floorFrontInset: 0.45,

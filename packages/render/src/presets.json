@@ -8,7 +8,7 @@
     "post": true,
     "shadow": { "cascades": 3, "mapSize": 4096, "maxFar": 320, "softness": 1.2 },
     "contactShadow": false,
-    "mirrors": { "width": 384, "height": 144, "every": 2 },
+    "mirrors": { "width": 384, "height": 144, "every": 3 },
     "envSize": 256,
     "skyTier": "hi",
     "textureTier": "hi",
