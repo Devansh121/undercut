@@ -30,6 +30,7 @@ import {
   RaceView,
   benchmarkPick,
   createRenderer,
+  startLightMask,
   type CameraName,
   type CarLivery,
   type CompoundLook,
@@ -96,12 +97,21 @@ import {
   type SessionEvent,
 } from './game/session';
 import { NoticeQueue } from './game/notices';
-import { Hud, type HudIdentity, type HudMessage, type HudState, type HudTyres } from './ui/hud';
+import {
+  Hud,
+  type HudIdentity,
+  type HudMessage,
+  type HudRaceState,
+  type HudState,
+  type HudTyres,
+} from './ui/hud';
+import { RaceDisplayModel, type RaceEntrantDisplay } from './ui/hud/race-display-model';
+import type { TowerRow } from './ui/hud/tower';
 import { setGlyphContext } from './ui/kit/glyph';
 import { controlsHint, takeFirstStartHint } from './ui/controls-help';
 import { PauseMenu, type PauseCommand } from './ui/pause';
 import { ResultsStrip } from './ui/results';
-import { classificationTable, sessionName, stopsText } from './ui/classification';
+import { classificationTable, orderedTeams, sessionName, stopsText } from './ui/classification';
 import { el } from './ui/dom';
 import { button, setButtonLabel } from './ui/kit/components';
 import { mountLoadingScreen, type LoadingScreen } from './ui/loading';
@@ -423,6 +433,8 @@ export interface DriveHandle {
   quit(): void;
   /** Start-up phase times, ms. */
   loadTimes(): Record<string, number>;
+  /** Current 3D start-gantry bitmask applied to the scene (bits 0..4 red). */
+  readonly startLightsMask: number;
   /**
    * Back to a known state without reloading, for tests that share one session: running,
    * player's devices, real time, near chase, rolling start, no strip or message showing.
@@ -604,7 +616,53 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   );
 
   // UI.
-  const plan = buildMinimap(track, 208, 150, 8);
+  const raceSectorCount = session.quickRace ? session.race.control.flags.sectorCount : 0;
+  const plan = buildMinimap(
+    track,
+    208,
+    150,
+    8,
+    6,
+    raceSectorCount,
+    session.quickRace ? session.race.circuit.timingLine : track.timingLine,
+  );
+  const raceTeams = orderedTeams(teamId);
+  const forwardFrom = (from: number, to: number): number => {
+    const d = (to - from) % track.length;
+    return d < 0 ? d + track.length : d;
+  };
+  const raceDisplay = session.quickRace
+    ? new RaceDisplayModel({
+        entrants: drivers.map((d, i): RaceEntrantDisplay => {
+          const livery = all[i] ?? playerLivery;
+          const team =
+            raceTeams.find((t) => t.id === livery.team) ??
+            raceTeams[Math.floor(i / 2)] ??
+            raceTeams[0];
+          return {
+            id: i === 0 ? 'player' : `ai-${i}`,
+            name: d.name,
+            code: d.code,
+            teamColour: team?.colours.tower ?? '#626c74',
+            teamName: team?.name ?? '',
+            initialCompound: o.quickRace?.compound ?? 'medium',
+          };
+        }),
+        playerCar: 0,
+        sessionKind: session.race.control.strategy.kind,
+        totalLaps: session.race.control.strategy.laps,
+        marshalSectorCount: session.race.control.flags.sectorCount,
+        timingSectorBoundaries: session.race.circuit.sectorLines
+          .slice(1)
+          .map((s) => forwardFrom(session.race.circuit.timingLine, s)),
+        trackLength: session.race.circuit.length,
+      })
+    : null;
+  const TOWER_PERIOD = 0.2;
+  let towerClock = TOWER_PERIOD;
+  let towerRowsCache: TowerRow[] = [];
+  let gantryMask = 0;
+  let gantryView: RaceView | null = null;
   const teamInfo = teams.teams.find((t) => t.id === playerLivery.team) ?? teams.teams[0];
   const mediumInfo = compounds.compounds.find((c) => c.id === 'medium') ?? compounds.compounds[0];
   const hudIdentity: HudIdentity | undefined =
@@ -627,6 +685,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           ? sessionName(o.quickRace.session.kind)
           : S.hud.quickRace
         : S.hud.timeTrial),
+    raceDisplay
+      ? () => {
+          raceDisplay.toggleGapMode();
+          towerClock = TOWER_PERIOD;
+        }
+      : undefined,
   );
   const results = new ResultsStrip();
   let quitting = false;
@@ -994,7 +1058,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           });
           break;
         case 'notice':
-          say({ tag: e.tag, text: e.text, tone: e.tone }, 4);
+          if (!raceDisplay) say({ tag: e.tag, text: e.text, tone: e.tone }, 4);
           break;
         case 'invalidated':
           invalidReason = e.reason === 'reset' ? S.hud.resetToTrack : S.hud.trackLimits;
@@ -1086,6 +1150,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const STATUS_PERIOD = 0.25;
   let statusClock = STATUS_PERIOD;
   let statusHadResult = false;
+  let statusPhase = '';
   skipResults.addEventListener('click', () => {
     skippingToResults = true;
     loop.timeScale = MAX_TIME_SCALE;
@@ -1172,10 +1237,23 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   continueButton.dataset.testid = 'continue-weekend';
   continueButton.hidden = true;
   continueButton.addEventListener('click', () => quit());
+  const restartRaceButton = button({ label: S.pause.restartRace, variant: 'primary' });
+  restartRaceButton.dataset.testid = 'results-restart';
+  restartRaceButton.hidden = true;
+  restartRaceButton.addEventListener('click', () => restartRace());
+  const resultsMenuButton = button({ label: S.pause.quit });
+  resultsMenuButton.dataset.testid = 'results-menu';
+  resultsMenuButton.hidden = true;
+  resultsMenuButton.addEventListener('click', () => quit());
+  const resultsActions = el('div', 'race-results-actions');
+  resultsActions.dataset.testid = 'race-results-actions';
+  resultsActions.hidden = true;
+  resultsActions.style.pointerEvents = 'auto';
+  resultsActions.append(continueButton, restartRaceButton, resultsMenuButton);
   const pitHead = el('div', 'pit-panel__head');
   pitHead.append(el('span', 'label', 'Pit wall'), pitMessage);
   const pitActions = el('div', 'pit-panel__actions');
-  pitActions.append(boxButton, compoundButton, limiterButton, continueButton);
+  pitActions.append(boxButton, compoundButton, limiterButton);
   pitPanel.append(pitHead, pitActions);
   /** The flag is out (or the session over) for the player: no pit call to make. */
   function pitCallsClosed(): boolean {
@@ -1190,19 +1268,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   function callBox(): void {
     if (pitCallsClosed() || session.race.control.held(0)) return;
     const requested = session.boxThisLap();
-    say(
-      {
-        tag: 'Pit crew',
-        text: requested ? `Box this lap · ${session.nextCompound} tyres` : 'Pit call cancelled',
-        tone: 'info',
-      },
-      4,
-    );
+    const text = requested ? `Box this lap · ${session.nextCompound} tyres` : 'Pit call cancelled';
+    if (raceDisplay) raceDisplay.pushMessage('Pit wall', text, 'info', 4);
+    else say({ tag: 'Pit crew', text, tone: 'info' }, 4);
   }
   let resultDelivered = false;
   if (session.quickRace) {
     const control = hud.root.querySelector('.hud-control') ?? o.host;
-    control.append(raceStatus, skipResults, simulateSession, simulateProgress);
+    control.append(raceStatus, resultsActions, skipResults, simulateSession, simulateProgress);
     // Desktop: in the right-hand column under the map, 8 px apart like the other modules.
     (hud.root.querySelector('.hud-right') ?? hud.root).append(pitPanel);
     hud.root.dataset.mode = 'race';
@@ -1230,6 +1303,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     low: 0,
     high: 0,
   };
+  const hudRaceState: HudRaceState | null = raceDisplay
+    ? {
+        lap: 1,
+        totalLaps: session.race.control.strategy.laps,
+        rows: towerRowsCache,
+        ...raceDisplay.snapshot(3),
+      }
+    : null;
   const hudState: HudState = {
     circuit: track.name,
     lengthKm: (track.length / 1000).toFixed(3),
@@ -1264,6 +1345,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     wrongWay: false,
     stopped: false,
     message: null,
+    race: hudRaceState,
   };
 
   /** The race readout as lines, and which line is the player's own (−1: none). */
@@ -1276,13 +1358,24 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   let statusPlayer = -1;
   let statusResult: SessionResult | null = null;
   function showRaceStatus(): void {
+    const hideForLights =
+      session.race.control.strategy.kind === 'race' &&
+      (session.race.control.phase === 'grid' || session.race.control.phase === 'lights') &&
+      !session.playerFinished &&
+      session.result === null;
+    raceStatus.hidden = hideForLights;
+    if (hideForLights) return;
     if (session.result) {
       // The classification: a table with a heading, the player's row marked and in view.
       if (statusResult !== session.result) {
         statusResult = session.result;
         statusKey = '';
         const kind = session.result.kind;
-        const table = classificationTable(session.result, { rowClass: 'race-status__row' });
+        const table = classificationTable(session.result, {
+          points: kind === 'race',
+          rowClass: 'race-status__row',
+          teams: raceTeams,
+        });
         raceStatus.replaceChildren(
           el('div', 'race-status__head', `${sessionName(kind)} result`),
           table,
@@ -1420,6 +1513,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           onEvents(loop.frame(1 / 30).events);
         showSimulateProgress();
       }
+      if (raceDisplay) {
+        const fresh = session.drainRaceEvents();
+        if (fresh.length > 0) {
+          raceDisplay.ingest(fresh, session.race.control.standings());
+          towerClock = TOWER_PERIOD;
+        }
+      }
       lookBack = r.lookBack;
       for (const action of r.actions) {
         if (action === 'boxThisLap') callBox();
@@ -1443,17 +1543,22 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         if (e.action === 'pause' || e.action === 'menuBack') resume();
       }
       lookBack = false;
-    } else if (session.phase === 'ended' && o.onSessionComplete) {
+    } else if (session.phase === 'ended' && session.result) {
       const frame = input.sample(dt, 0);
-      const native = frame.device === 'keyboard' && document.activeElement === continueButton;
-      if (
-        frame.events.some(
-          (e) =>
-            e.type === 'action' &&
-            (e.action === 'menuBack' || (e.action === 'menuAccept' && !native)),
-        )
-      )
-        quit();
+      const native =
+        frame.device === 'keyboard' && document.activeElement instanceof HTMLButtonElement;
+      for (const e of frame.events) {
+        if (e.type !== 'action') continue;
+        if (e.action === 'menuBack') {
+          quit();
+          break;
+        }
+        if (e.action === 'menuAccept' && !native) {
+          if (o.onSessionComplete) quit();
+          else restartRace();
+          break;
+        }
+      }
     }
 
     if (input.activeDevice !== lastHudDevice) {
@@ -1514,28 +1619,38 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         dot.opacity = fleetOpacity[i]!;
       });
       view.setRaceCars(fleetPoses, fleetDrs, fleetOpacity);
-      // The player's own car: a notice when it becomes a ghost and when it is solid again.
+      // The player's own car: safety indicator + message when it becomes a ghost or solid again.
       const playerGhost = session.race.blockingGhost(0);
       if (playerGhost !== playerWasGhost) {
         playerWasGhost = playerGhost;
-        say(
-          {
-            tag: S.hud.ghost,
-            text: playerGhost ? S.hud.blockingGhostOn : S.hud.blockingGhostOff,
-            tone: 'info',
-          },
-          3,
-        );
+        if (raceDisplay) {
+          raceDisplay.pushMessage(
+            S.hud.ghost,
+            playerGhost ? S.hud.blockingGhostOn : S.hud.blockingGhostOff,
+            playerGhost ? 'warning' : 'info',
+            3.5,
+          );
+        } else {
+          say(
+            {
+              tag: S.hud.ghost,
+              text: playerGhost ? S.hud.blockingGhostOn : S.hud.blockingGhostOff,
+              tone: 'info',
+            },
+            3,
+          );
+        }
       }
       const pitControl = session.race.control;
       const pitPhase = pitControl.pitPhase(0);
       const pitCar = pitControl.cars[0]!;
-      // After the flag there is no stop to call: the panel keeps only Continue.
+      // After the flag there is no stop to call: hide the pit panel so results have the floor.
       const flagOut = pitCallsClosed();
       // In the garage (practice and qualifying, or back in the box to simulate) there is no stop
       // to call: the pit-call controls go.
       const inGarage = pitPhase === 'garage';
       document.documentElement.toggleAttribute('data-pit-garage', inGarage);
+      pitPanel.hidden = flagOut;
       boxButton.hidden = flagOut || inGarage;
       compoundButton.hidden = flagOut || inGarage;
       limiterButton.hidden = flagOut || inGarage;
@@ -1561,16 +1676,18 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${stopsText(pitCar.pitStops)} · ${pitCar.compounds.join(' / ')}`;
       if (pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2)
         pitMessage.textContent = `Compound change required · ${pitMessage.textContent}`;
-      continueButton.hidden = !session.result || !o.onSessionComplete;
+      const hasResult = session.result !== null;
+      resultsActions.hidden = !hasResult;
+      continueButton.hidden = !hasResult || !o.onSessionComplete;
+      restartRaceButton.hidden = !hasResult || Boolean(o.onSessionComplete);
+      resultsMenuButton.hidden = !hasResult || Boolean(o.onSessionComplete);
       if (session.result && !resultDelivered) {
         resultDelivered = true;
         o.onSessionComplete?.(session.result);
-        if (o.onSessionComplete) {
-          input.setContext('menu');
-          continueButton.focus({ preventScroll: true });
-        }
+        input.setContext('menu');
+        (o.onSessionComplete ? continueButton : restartRaceButton).focus({ preventScroll: true });
       }
-      skipResults.hidden = !session.playerFinished || session.result !== null || skippingToResults;
+      skipResults.hidden = !session.playerFinished || hasResult || skippingToResults;
       simulateSession.hidden = !canSimulateSession();
       if (session.result && simulating) {
         simulating = false;
@@ -1579,17 +1696,67 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       }
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
-      const finished = session.playerFinished || session.result !== null;
+      const finished = session.playerFinished || hasResult;
       hud.root.toggleAttribute('data-finished', finished);
+      hud.root.toggleAttribute('data-race-result', hasResult);
       document.documentElement.toggleAttribute('data-race-finished', finished);
+      document.documentElement.toggleAttribute('data-race-result', hasResult);
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
       }
+      if (raceDisplay && hudRaceState) {
+        raceDisplay.tick(realDt);
+        raceDisplay.setBlockingGhost(playerGhost);
+        const snap = raceDisplay.snapshot(3);
+        const mask = startLightMask(snap.startLights.lit);
+        if (mask !== gantryMask || view !== gantryView) {
+          gantryMask = mask;
+          gantryView = view;
+          view.world?.setStartLights(mask);
+        }
+        towerClock += dt;
+        if (towerClock >= TOWER_PERIOD || towerRowsCache.length === 0) {
+          towerClock = 0;
+          const standings = pitControl.standings();
+          let fastestCar: number | null = null;
+          let fastestLap = Infinity;
+          for (const row of standings) {
+            if (row.bestLap !== null && row.bestLap < fastestLap) {
+              fastestLap = row.bestLap;
+              fastestCar = row.car;
+            }
+          }
+          const carCompounds = pitControl.cars.map(
+            (c) => c.compounds[c.compounds.length - 1] ?? 'medium',
+          );
+          towerRowsCache = raceDisplay.buildTowerRows(standings, {
+            compounds: carCompounds,
+            fastestCar,
+            phase: pitControl.phase,
+          });
+        }
+        const totalLaps = pitControl.strategy.laps;
+        hudRaceState.lap =
+          totalLaps !== null
+            ? Math.max(1, Math.min(session.timer.lap, totalLaps))
+            : Math.max(1, session.timer.lap);
+        hudRaceState.totalLaps = totalLaps;
+        hudRaceState.rows = towerRowsCache;
+        hudRaceState.gapMode = snap.gapMode;
+        if (pitControl.strategy.kind === 'race') delete hudRaceState.gapLabel;
+        else hudRaceState.gapLabel = 'BEST';
+        hudRaceState.startLights = snap.startLights;
+        hudRaceState.flags = snap.flags;
+        hudRaceState.safety = snap.safety;
+        hudRaceState.messages = snap.messages;
+      }
       statusClock += dt;
-      if (statusClock >= STATUS_PERIOD || (session.result !== null) !== statusHadResult) {
+      const phaseChanged = pitControl.phase !== statusPhase;
+      if (statusClock >= STATUS_PERIOD || hasResult !== statusHadResult || phaseChanged) {
         statusClock = 0;
-        statusHadResult = session.result !== null;
+        statusHadResult = hasResult;
+        statusPhase = pitControl.phase;
         showRaceStatus();
       }
     }
@@ -1690,7 +1857,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       if (session.quickRace) {
         // A race has no out lap, no lap invalidation (track limits are strikes, shown as
         // notices) and no time-trial record or ghost.
-        h.lap = Math.max(1, Math.min(timer.lap, o.quickRace?.laps ?? 5));
+        const totalLaps = session.race.control.strategy.laps;
+        h.lap =
+          totalLaps !== null ? Math.max(1, Math.min(timer.lap, totalLaps)) : Math.max(1, timer.lap);
         h.valid = true;
         h.record = null;
         h.liveDelta = null;
@@ -1889,6 +2058,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     ext?.detach?.();
     overlay?.destroy();
     document.documentElement.removeAttribute('data-race-finished');
+    document.documentElement.removeAttribute('data-race-result');
     document.documentElement.removeAttribute('data-pit-garage');
     phone?.destroy();
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
@@ -2015,6 +2185,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     },
     quit,
     loadTimes: () => ({ ...loadTimes }),
+    get startLightsMask() {
+      return gantryMask;
+    },
     resetForTest: () => {
       autoQuality = false;
       // Drop any key or touch press that arrived after the previous test's last frame.

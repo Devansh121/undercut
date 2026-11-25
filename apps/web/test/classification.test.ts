@@ -47,11 +47,13 @@ describe('session classification', () => {
     expect(stopsText(2)).toBe('2 stops');
   });
 
-  it('shows a race as time, gaps, pit stops and the compounds used', () => {
+  it('shows a race as time, gaps, best lap, pit stops, compounds, penalties and points', () => {
     expect(cells('race', entry({}), true)).toEqual({
       Pos: '1',
       Driver: 'Player',
+      Team: 'Aldermoor Racing',
       Time: '6:52.345',
+      'Best lap': '1:21.234',
       Pits: '1',
       Tyres: 'M / H',
       Pen: '',
@@ -60,7 +62,11 @@ describe('session classification', () => {
     expect(cells('race', entry({ position: 2, gap: { time: 1.5 } })).Time).toBe('+1.500 s');
     expect(cells('race', entry({ gap: { laps: 1 } })).Time).toBe('+1 lap');
     expect(cells('race', entry({ status: 'dnf' })).Time).toBe('Retired');
+    expect(cells('race', entry({ bestLap: null }))['Best lap']).toBe('—');
     expect(cells('race', entry({ penaltyTime: 5 })).Pen).toBe('+5 s');
+    expect(
+      cells('race', entry({ penalties: [{ reason: 'jumpStart', seconds: 5, served: true }] })).Pen,
+    ).toBe('5 s served');
     expect(compoundsText(['medium', 'hard', 'soft'])).toBe('M / H / S');
   });
 

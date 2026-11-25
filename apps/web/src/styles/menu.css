@@ -1546,6 +1546,27 @@
 .classification td:nth-child(2) {
   color: var(--c-text-1);
 }
+.classification__driver {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.classification__bar {
+  flex: none;
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--row-team, var(--c-brand));
+}
+.classification td.is-fastest {
+  color: var(--c-time-overall);
+  font-weight: 700;
+}
+.classification td.is-penalty {
+  color: var(--c-time-invalid);
+  font-weight: 700;
+}
 .classification .num {
   text-align: right;
   font-family: var(--font-num);
@@ -1572,6 +1593,28 @@
 .race-status[data-table] .race-status__head {
   text-align: center;
 }
+@media (max-width: 860px) {
+  .classification .col-team,
+  .classification .col-tyres {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .classification[data-kind='race'] .col-best {
+    display: none;
+  }
+  .classification th,
+  .classification td {
+    padding: 4px 5px;
+    font-size: var(--fs-12);
+  }
+  .classification td:nth-child(2) {
+    white-space: normal;
+  }
+  .classification__driver {
+    gap: 5px;
+  }
+}
 @media (max-height: 500px) {
   .race-status[data-table] .classification th,
   .race-status[data-table] .classification td {
@@ -1585,6 +1628,9 @@
   box-sizing: border-box;
   width: 300px;
   padding: var(--sp-3);
+}
+.pit-panel[hidden] {
+  display: none;
 }
 .pit-panel__head {
   display: flex;
