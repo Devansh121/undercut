@@ -158,6 +158,12 @@ export class TimingTower {
   setGapMode(mode: 'gap' | 'interval', labelOverride?: string): void {
     this.gapBtnText.set(labelOverride ?? (mode === 'interval' ? 'Int' : 'Gap'));
     this.gapBtn.setAttribute('aria-pressed', mode === 'interval' ? 'true' : 'false');
+    this.gapBtn.setAttribute(
+      'aria-label',
+      mode === 'interval'
+        ? 'Show gaps to leader instead of intervals'
+        : 'Show intervals instead of gaps to leader',
+    );
     setData(this.gapBtn, 'mode', mode);
   }
 

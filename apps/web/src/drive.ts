@@ -982,11 +982,33 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const tower = hud.root.querySelector<HTMLElement>('.hud-tower');
   const measureCluster = (): void => {
     // The coach sits under the timing tower, clear of the lap timer and the invalid-lap flag.
+    // When a 20-car tower at large text or HUD scale reaches the bottom edge, dock the coach
+    // beside the tower instead of pushing it past the viewport.
     const t = tower?.getBoundingClientRect();
-    if (t && t.height > 0)
-      intro.root.style.setProperty('--coach-top', `${Math.round(t.bottom + 8)}px`);
-    if (!cluster) return;
-    const r = cluster.getBoundingClientRect();
+    const r = cluster?.getBoundingClientRect();
+    if (t && t.height > 0) {
+      const cr = intro.root.getBoundingClientRect();
+      const ch = cr.height || 140;
+      const cw = cr.width || 320;
+      const margin = 12;
+      const maxTop = Math.max(margin, window.innerHeight - ch - margin);
+      if (t.bottom + 8 <= maxTop) {
+        intro.root.style.setProperty('--coach-top', `${Math.round(t.bottom + 8)}px`);
+        intro.root.style.removeProperty('--coach-left');
+      } else {
+        const besideLimit =
+          r && r.width > 0 && r.top < maxTop + ch && r.left > t.right
+            ? Math.min(window.innerWidth - margin, r.left - 12)
+            : window.innerWidth - margin;
+        intro.root.style.setProperty('--coach-top', `${Math.round(maxTop)}px`);
+        if (t.right + 12 + cw <= besideLimit) {
+          intro.root.style.setProperty('--coach-left', `${Math.round(t.right + 12)}px`);
+        } else {
+          intro.root.style.removeProperty('--coach-left');
+        }
+      }
+    }
+    if (!cluster || !r) return;
     view.setAvoidRect(
       r.width > 0 ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null,
     );
@@ -994,6 +1016,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const clusterObserver = new ResizeObserver(measureCluster);
   if (cluster) clusterObserver.observe(cluster);
   if (tower) clusterObserver.observe(tower);
+  clusterObserver.observe(intro.root);
+  const rootObserver = new MutationObserver(measureCluster);
+  rootObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['style', 'data-text-size'],
+  });
   window.addEventListener('resize', measureCluster);
   measureCluster();
   document.documentElement.dataset.screen = 'drive';
@@ -1658,7 +1686,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       boxButton.hidden = flagOut || inGarage;
       compoundButton.hidden = flagOut || inGarage;
       limiterButton.hidden = flagOut || inGarage;
-      pitHead.hidden = flagOut || (!pitControl.pitRequested(0) && pitPhase === 'none');
+      const compoundRequired = pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2;
+      const pitActive = pitControl.pitRequested(0) || pitPhase !== 'none';
+      pitHead.hidden = flagOut || (!pitActive && !compoundRequired);
       setButtonLabel(
         boxButton,
         pitControl.held(0)
@@ -1677,8 +1707,10 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       const remaining = pitControl.pitRemaining(0);
       pitMessage.textContent = pitControl.held(0)
         ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
-        : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${stopsText(pitCar.pitStops)} · ${pitCar.compounds.join(' / ')}`;
-      if (pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2)
+        : !pitActive && compoundRequired
+          ? `Compound change required · next ${session.nextCompound}`
+          : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${stopsText(pitCar.pitStops)} · ${pitCar.compounds.join(' / ')}`;
+      if (compoundRequired && pitActive)
         pitMessage.textContent = `Compound change required · ${pitMessage.textContent}`;
       const hasResult = session.result !== null;
       resultsActions.hidden = !hasResult;
@@ -2054,6 +2086,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     o.canvas.removeEventListener('webglcontextlost', onContextLost);
     o.canvas.removeEventListener('webglcontextrestored', onContextRestored);
     clusterObserver.disconnect();
+    rootObserver.disconnect();
     window.removeEventListener('resize', measureCluster);
     loop.quit();
     ext?.detach?.();

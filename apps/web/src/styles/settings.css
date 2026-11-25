@@ -45,7 +45,7 @@
 /* Race information follows text size independently of the fixed driving controls. */
 :root[data-text='large']
   :is(
-    .hud-tower[data-race-tower],
+    .hud-tower[data-race-tower='on'],
     .hud-lights,
     .hud-flag--race,
     .hud-prompt--safety,
@@ -62,7 +62,7 @@
 }
 :root[data-text='larger']
   :is(
-    .hud-tower[data-race-tower],
+    .hud-tower[data-race-tower='on'],
     .hud-lights,
     .hud-flag--race,
     .hud-prompt--safety,

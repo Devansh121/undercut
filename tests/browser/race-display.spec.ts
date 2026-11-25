@@ -75,6 +75,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   larger.forEach((px, i) => expect(px).toBeGreaterThan(standard[i]!));
   await setTextSize(page, 'standard');
   expect(await fitEverywhere(page, { label: 'start lights with HUD scale', sizes })).toEqual([]);
+  await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
 
   // Verify 3D start gantry bitmask matches lit pods on screen.
   const midLights = await page.evaluate(() => {
@@ -103,7 +104,9 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
 
   await page.evaluate(() => window.__undercut!.setTimeScale(0));
   await capture('penalty');
+  await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
   expect(await fitEverywhere(page, { label: 'jump start with HUD scale', sizes })).toEqual([]);
+  await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
 
   // Speed through to green flag: lights go out on both UI and 3D gantry.
   await page.evaluate(() => window.__undercut!.setTimeScale(6));
@@ -143,16 +146,28 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     const box = await gapToggle.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(48);
     expect(box!.height).toBeGreaterThanOrEqual(48);
+    const towerBox = await tower.boundingBox();
+    const boxBtn = await page.locator('.ut-touch__btn--boxThisLap').boundingBox();
+    const timingBox = await page.locator('.hud-timing').boundingBox();
+    expect(towerBox!.y + towerBox!.height).toBeLessThanOrEqual(boxBtn!.y + 1);
+    const apart = (
+      a: { x: number; y: number; width: number; height: number },
+      b: { x: number; y: number; width: number; height: number },
+    ) =>
+      a.x + a.width <= b.x + 1 ||
+      b.x + b.width <= a.x + 1 ||
+      a.y + a.height <= b.y + 1 ||
+      b.y + b.height <= a.y + 1;
+    expect(apart(box!, boxBtn!)).toBe(true);
+    expect(apart(box!, timingBox!)).toBe(true);
   }
   await gapToggle.click();
   await expect(gapToggle).toHaveAttribute('data-mode', 'interval');
   await expect(gapToggle).toHaveAttribute('aria-pressed', 'true');
   await gapToggle.click();
   await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
-  if (isPhone) {
-    await expect(page.getByTestId('race-status')).toBeHidden();
-    await expect(page.locator('.pit-panel__head')).toBeHidden();
-  }
+  await expect(page.getByTestId('race-status')).toBeHidden();
+  await expect(page.locator('.pit-panel__head')).toBeHidden();
 
   // Stop on track in Sector 2 so a real local yellow flag triggers right after START_GRACE (4 s),
   // highlighting the banner, timing tower status, and minimap sector overlay.
@@ -164,7 +179,17 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   });
 
   const raceFlag = page.getByTestId('race-flag');
-  await expect(raceFlag).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const flag = document.querySelector<HTMLElement>('[data-testid="race-flag"]');
+      if (!flag || flag.dataset.flag !== 'yellow') return false;
+      window.__undercut!.setTimeScale(0);
+      return true;
+    },
+    null,
+    { timeout: 30_000 },
+  );
+  await expect(raceFlag).toBeVisible();
   await expect(raceFlag).toHaveAttribute('data-flag', 'yellow');
   await expect(raceFlag).toContainText(/Yellow flag/i);
   await expect(page.getByTestId('tower-status')).toHaveAttribute('data-flag', 'yellow');
@@ -186,9 +211,8 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   }
   await expect(page.getByTestId('race-messages')).toBeVisible();
   await expect(page.getByTestId('race-messages')).toContainText(/Box/i);
+  await expect(page.locator('.pit-panel__head')).toBeVisible();
   await page.evaluate(() => window.__undercut!.setTimeScale(0));
-
-  await capture('pit-call');
 
   // Accessibility hooks (colour-blind palette, reduced motion, HUD scale) and full fit sweep
   // while the race tower, yellow flag banner, minimap yellow sector, and message queue are live.
@@ -220,22 +244,46 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   expect(await fitEverywhere(page, { label: 'live race HUD (yellow + messages)', sizes })).toEqual(
     [],
   );
-
   await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
 
-  // Cancel the pit call and let the racing driver finish the 1-lap race to inspect final results.
+  // Keep the pit call active and drive into the pit lane to verify actual pit-service messages,
+  // in-pit tower state, contextual pit panel, and fit under HUD scale.
   await page.evaluate(() => {
-    window.__undercut!.setTimeScale(1);
+    window.__undercut!.teleport(5125.675, 0, 108);
+    window.__undercut!.raceDriver(true);
+    window.__undercut!.setTimeScale(8);
   });
-  if (isPhone) {
-    await page.locator('.ut-touch__btn--boxThisLap').tap();
-  } else {
-    await page.keyboard.press('i');
-  }
+  await page.waitForFunction(
+    () => {
+      if (window.__undercut!.state().pitPhase !== 'service') return false;
+      window.__undercut!.setTimeScale(0);
+      return true;
+    },
+    null,
+    { timeout: 60_000 },
+  );
+  await expect(page.getByTestId('pit-panel')).toBeVisible();
+  await expect(page.getByTestId('pit-panel')).toContainText(/Pit service/i);
+  await expect(page.getByTestId('race-messages')).toBeVisible();
+  await expect(page.getByTestId('race-messages')).toContainText(
+    /Servicing tyres|Serving 5 s penalty|Pit stop|Pit penalty/i,
+  );
+  await expect(tower.locator('.hud-tower__row.is-player.is-in-pit')).toBeVisible();
+  await capture('pit-service');
+  await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
+  expect(await fitEverywhere(page, { label: 'pit service with HUD scale', sizes })).toEqual([]);
+  await page.evaluate(() => document.documentElement.style.removeProperty('--hud-scale'));
+
+  // Complete the pit stop and let the racing driver finish the 3-lap race to inspect final results.
   await page.evaluate(() => {
     window.__undercut!.raceDriver(true);
     window.__undercut!.setTimeScale(8);
   });
+  await page.waitForFunction(() => Number(window.__undercut!.state().pitStops) === 1, null, {
+    timeout: 45_000,
+  });
+  await expect(tower.locator('.hud-tower__row.is-player .hud-tower__tyre')).toHaveText('H');
+  await expect(tower.locator('.hud-tower__row.is-player .hud-tower__pits')).toHaveText('1');
 
   // Either provisional appears (click Skip to results atomically) or final raceResult arrives directly.
   await page.waitForFunction(
@@ -304,5 +352,55 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await page.waitForFunction(() => window.__undercut!.state().screen === 'launch', null, {
     timeout: 15_000,
   });
+
+  // Real blue flag: hold at the start in two short waits (under the 60 s stuck retirement limit)
+  // so the field comes nearly a full lap around, then drive slower than the pack with clumsyPilot
+  // so the yellow clears and approaching lapping cars cross timing boundaries within blueGap (1 s).
+  await page.evaluate(() => window.__undercut!.startQuickRace(3, { gridPosition: 20 }));
+  await page.evaluate(() => {
+    window.__undercut!.setTimeScale(8);
+    window.__undercut!.drive({ throttle: 0, brake: 1, steer: 0 });
+  });
+  await page.waitForFunction(() => window.__undercut!.state().racePhase === 'green', null, {
+    timeout: 30_000,
+  });
+  const tGreen = await page.evaluate(() => Number(window.__undercut!.state().time));
+  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 35, tGreen, {
+    timeout: 30_000,
+  });
+  await page.evaluate(() => window.__undercut!.drive({ throttle: 0.5, brake: 0, steer: 0 }));
+  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 37, tGreen, {
+    timeout: 15_000,
+  });
+  await page.evaluate(() => window.__undercut!.drive({ throttle: 0, brake: 1, steer: 0 }));
+  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 70, tGreen, {
+    timeout: 30_000,
+  });
+  await page.evaluate(() => {
+    window.__undercut!.setTimeScale(3);
+    window.__undercut!.clumsyPilot(7);
+  });
+  await page.waitForFunction(
+    () => {
+      const flag = document.querySelector<HTMLElement>('[data-testid="race-flag"]');
+      if (flag && flag.dataset.flag === 'blue') {
+        window.__undercut!.setTimeScale(0);
+        return true;
+      }
+      return false;
+    },
+    null,
+    { timeout: 60_000 },
+  );
+  await expect(page.getByTestId('race-flag')).toHaveAttribute('data-flag', 'blue');
+  await expect(page.getByTestId('race-flag')).toContainText(/Blue flag/i);
+  await expect(page.getByTestId('tower-status')).toHaveAttribute('data-flag', 'blue');
+  await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
+  expect(await fitEverywhere(page, { label: 'blue flag with HUD scale', sizes })).toEqual([]);
+  await page.evaluate(() => {
+    document.documentElement.style.removeProperty('--hud-scale');
+    window.__undercut!.quit();
+  });
+
   expect(problems).toEqual([]);
 });

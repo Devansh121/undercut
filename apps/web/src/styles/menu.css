@@ -1610,7 +1610,13 @@
     padding: 4px 5px;
     font-size: var(--fs-12);
   }
-  .classification td:nth-child(2) {
+  .race-status[data-table] .classification th,
+  .race-status[data-table] .classification td {
+    padding: 3px 4px;
+    font-size: var(--fs-11);
+  }
+  .classification td:nth-child(2),
+  .classification .col-pen {
     white-space: normal;
   }
   .classification__driver {
@@ -1766,6 +1772,12 @@
 }
 
 @media (max-height: 500px) {
+  .pit-panel__head {
+    margin-bottom: 0;
+  }
+  .pit-panel__actions:not(:has([data-testid='continue-weekend']:not([hidden]))) {
+    display: none;
+  }
   .pit-panel:has(.pit-panel__head[hidden]) {
     display: none;
   }
