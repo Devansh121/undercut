@@ -45,6 +45,9 @@ interface RowNodes {
   bar: HTMLElement;
   colour: string;
   title: string;
+  compoundColour: string;
+  tyreAgeVal: number | null;
+  pitStopsVal: number | null;
 }
 
 const COMPACT = '(max-height: 500px) and (orientation: landscape), (max-width: 600px)';
@@ -76,6 +79,9 @@ export class TimingTower {
   private readonly textObserver: MutationObserver | null;
   private readonly onCompactChange: () => void;
   private raceMode: boolean;
+  private showGapToggle: boolean;
+  private lastGapMode: 'gap' | 'interval' | null = null;
+  private lastGapLabel: string | undefined;
 
   constructor(o: TimingTowerOptions) {
     const root = el('section', 'hud-session hud-tower panel');
@@ -84,6 +90,7 @@ export class TimingTower {
     this.root = root;
     this.compactRows = o.compactRows ?? 4;
     this.raceMode = o.raceMode ?? false;
+    this.showGapToggle = this.raceMode;
     setData(root, 'raceTower', this.raceMode ? 'on' : '');
     this.phone = typeof matchMedia === 'function' ? matchMedia(COMPACT) : null;
 
@@ -163,7 +170,9 @@ export class TimingTower {
 
   /** Switch race-tower mode (column header, tyre age, pit stops) on or off. */
   setRaceMode(on: boolean, showGapToggle = on): void {
+    if (this.raceMode === on && this.showGapToggle === showGapToggle) return;
     this.raceMode = on;
+    this.showGapToggle = showGapToggle;
     setData(this.root, 'raceTower', on ? 'on' : '');
     setHidden(this.colsEl, !on);
     this.gapBtn.disabled = !showGapToggle;
@@ -172,6 +181,9 @@ export class TimingTower {
 
   /** Set the gap-column toggle readout (`gap` -> "Gap", `interval` -> "Int", or custom for timed sessions). */
   setGapMode(mode: 'gap' | 'interval', labelOverride?: string): void {
+    if (this.lastGapMode === mode && this.lastGapLabel === labelOverride) return;
+    this.lastGapMode = mode;
+    this.lastGapLabel = labelOverride;
     this.gapBtnText.set(labelOverride ?? (mode === 'interval' ? 'Int' : 'Gap'));
     this.gapBtn.setAttribute('aria-pressed', mode === 'interval' ? 'true' : 'false');
     this.gapBtn.setAttribute(
@@ -209,15 +221,28 @@ export class TimingTower {
     return text === 'large' || text === 'larger' ? Math.min(this.compactRows, 3) : this.compactRows;
   }
 
+  private lastLimit = -1;
+  private lastCompact = false;
+
   /** Show `rows` (in position order). Cheap when nothing changed. */
   update(rows: readonly TowerRow[]): void {
     this.render(rows, true);
   }
 
   private render(rows: readonly TowerRow[], animate: boolean): void {
-    this.lastRows = rows;
     const limit = this.compactLimit();
     const compact = Boolean(this.phone?.matches) && rows.length > limit;
+    if (
+      this.raceMode &&
+      rows === this.lastRows &&
+      limit === this.lastLimit &&
+      compact === this.lastCompact
+    ) {
+      return;
+    }
+    this.lastRows = rows;
+    this.lastLimit = limit;
+    this.lastCompact = compact;
     const shown = compact ? towerWindow(rows, limit) : rows;
     for (let i = 0; i < shown.length; i++) {
       const r = shown[i]!;
@@ -263,18 +288,23 @@ export class TimingTower {
     setHidden(n.tyreWrap, c === null);
     if (c) {
       n.compoundCode.set(c.code);
-      n.compound.style.setProperty('--compound', c.colour);
+      if (n.compoundColour !== c.colour) {
+        n.compoundColour = c.colour;
+        n.compound.style.setProperty('--compound', c.colour);
+      }
     }
     const showAge = c !== null && r.tyreAge !== undefined && r.tyreAge !== null;
     setHidden(n.tyreAgeEl, !showAge);
-    if (showAge) {
+    if (showAge && r.tyreAge !== n.tyreAgeVal) {
+      n.tyreAgeVal = r.tyreAge ?? null;
       n.tyreAge.set(String(r.tyreAge));
       n.tyreAgeEl.setAttribute('aria-label', `${r.tyreAge} laps on tyres`);
     }
 
     const showPits = r.pitStops !== undefined && r.pitStops !== null;
     setHidden(n.pitsEl, !showPits);
-    if (showPits) {
+    if (showPits && r.pitStops !== n.pitStopsVal) {
+      n.pitStopsVal = r.pitStops ?? null;
       n.pits.set(String(r.pitStops));
       n.pitsEl.setAttribute('aria-label', `${r.pitStops} pit stops`);
     }
@@ -317,6 +347,9 @@ export class TimingTower {
       bar,
       colour: '',
       title: '',
+      compoundColour: '',
+      tyreAgeVal: null,
+      pitStopsVal: null,
     };
     this.nodes.set(r.id, nodes);
     return nodes;

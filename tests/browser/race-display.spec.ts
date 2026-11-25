@@ -29,10 +29,6 @@ async function assertPhoneHudClearance(
     page.locator('.ut-touch__btn--pitLimiter'),
   ];
   const timing = page.locator('.hud-timing');
-  const onboarding = page.getByTestId('onboarding');
-  const steerTag = page.locator('.ut-touch__steer .ut-touch__tag');
-  const map = page.locator('.hud-map');
-  const lights = page.getByTestId('start-lights');
 
   for (const size of TEXT_SIZES) {
     await setTextSize(page, size);
@@ -64,20 +60,36 @@ async function assertPhoneHudClearance(
       expect(apart(gapBox, btnBox)).toBe(true);
     }
 
-    if (await onboarding.isVisible()) {
-      const coachBox = (await onboarding.boundingBox())!;
-      if (await steerTag.isVisible()) {
-        expect(apart(coachBox, (await steerTag.boundingBox())!)).toBe(true);
+    // Transient lights and hints can hide on the next frame: measure their visibility and
+    // bounds atomically so clearance checks always describe one rendered state.
+    const optional = await page.evaluate(() => {
+      const visibleBox = (selector: string): Box | null => {
+        const node = document.querySelector<HTMLElement>(selector);
+        if (!node || node.closest('[hidden]') || node.getClientRects().length === 0) return null;
+        if (getComputedStyle(node).visibility === 'hidden') return null;
+        const r = node.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        coach: visibleBox('[data-testid="onboarding"]'),
+        steer: visibleBox('.ut-touch__steer .ut-touch__tag'),
+        map: visibleBox('.hud-map'),
+        lights: visibleBox('[data-testid="start-lights"]'),
+        buttons: [
+          '.ut-touch__btn--boxThisLap',
+          '.ut-touch__btn--nextCompound',
+          '.ut-touch__btn--pitLimiter',
+        ].map(visibleBox),
+      };
+    });
+    if (optional.coach) {
+      if (optional.steer) expect(apart(optional.coach, optional.steer)).toBe(true);
+      for (const box of optional.buttons) {
+        expect(box).not.toBeNull();
+        expect(apart(optional.coach, box!)).toBe(true);
       }
-      for (const btn of touchBtns) {
-        expect(apart(coachBox, (await btn.boundingBox())!)).toBe(true);
-      }
-      if (await map.isVisible()) {
-        expect(apart(coachBox, (await map.boundingBox())!)).toBe(true);
-      }
-      if (await lights.isVisible()) {
-        expect(apart(coachBox, (await lights.boundingBox())!)).toBe(true);
-      }
+      if (optional.map) expect(apart(optional.coach, optional.map)).toBe(true);
+      if (optional.lights) expect(apart(optional.coach, optional.lights)).toBe(true);
     }
 
     if (size === 'larger' && o.capture && o.largerCaptureStage) {
@@ -244,6 +256,21 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(gapToggle).toHaveAttribute('aria-pressed', 'true');
   await gapToggle.click();
   await expect(gapToggle).toHaveAttribute('data-mode', 'gap');
+  // Frozen standings must not rewrite tower attributes every animation frame.
+  const idleTowerWrites = await tower.evaluate(async (root) => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const writes: string[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) writes.push(record.attributeName ?? record.type);
+    });
+    observer.observe(root, { attributes: true, subtree: true, characterData: true });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    observer.disconnect();
+    return writes;
+  });
+  expect(idleTowerWrites).toEqual([]);
   await expect(page.getByTestId('race-status')).toBeHidden();
   await expect(page.locator('.pit-panel__head')).toBeHidden();
 
@@ -466,8 +493,8 @@ test('race display: real blue flag banner, tower status, and HUD scale fit', asy
   await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 35, tGreen, {
     timeout: 30_000,
   });
-  await page.evaluate(() => window.__undercut!.drive({ throttle: 0.5, brake: 0, steer: 0 }));
-  await page.waitForFunction((t0) => Number(window.__undercut!.state().time) >= t0 + 37, tGreen, {
+  await page.evaluate(() => window.__undercut!.drive({ throttle: 0.6, brake: 0, steer: 0 }));
+  await page.waitForFunction(() => Number(window.__undercut!.telemetry().speed) > 10, null, {
     timeout: 15_000,
   });
   await page.evaluate(() => window.__undercut!.drive({ throttle: 0, brake: 1, steer: 0 }));

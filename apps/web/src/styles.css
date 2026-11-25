@@ -2701,15 +2701,12 @@ html:has(.update-bar) .pause {
   }
 }
 @media (max-height: 500px) and (min-height: 360px) and (orientation: landscape) {
-  html[data-touch]:has(.hud[data-mode='race']) .onboarding {
+  html[data-touch] .hud[data-mode='race'] ~ .onboarding {
     top: calc(var(--safe-t) + 80px);
     left: auto;
     right: var(--safe-r);
   }
-  html[data-touch]:has(
-      .hud[data-mode='race'] .pit-panel:not([hidden]) .pit-panel__head:not([hidden])
-    )
-    .onboarding {
+  html[data-touch] .hud[data-mode='race'][data-pit-open] ~ .onboarding {
     top: calc(100dvh - var(--safe-b) - 160px);
     left: var(--safe-l);
     right: auto;

@@ -1391,12 +1391,22 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       (session.race.control.phase === 'grid' || session.race.control.phase === 'lights') &&
       !session.playerFinished &&
       session.result === null;
-    raceStatus.hidden =
+    const hideStatus =
       hideForLights ||
       (session.race.control.strategy.kind === 'race' &&
         !session.playerFinished &&
         session.result === null);
+    if (raceStatus.hidden !== hideStatus) raceStatus.hidden = hideStatus;
     if (hideForLights) return;
+    if (hideStatus) {
+      // Keep the legacy readout current without rebuilding rows or measuring hidden layout.
+      const key = raceStatusLines().lines.join('\n');
+      if (key !== statusKey) {
+        statusKey = key;
+        raceStatus.textContent = key;
+      }
+      return;
+    }
     if (session.result) {
       // The classification: a table with a heading, the player's row marked and in view.
       if (statusResult !== session.result) {
@@ -1425,8 +1435,11 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       delete raceStatus.dataset.table;
       showRaceStatusLines();
     }
-    const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
-    raceStatus.toggleAttribute('data-more', more);
+    if (!raceStatus.hidden) {
+      const more = raceStatus.scrollTop + raceStatus.clientHeight < raceStatus.scrollHeight - 2;
+      if (raceStatus.hasAttribute('data-more') !== more)
+        raceStatus.toggleAttribute('data-more', more);
+    }
   }
   function showRaceStatusLines(): void {
     const { lines, player } = raceStatusLines();
@@ -1511,6 +1524,13 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           : `P${row?.position ?? 20} / 20${gapText} · Lap ${lap} / ${totalLaps}`;
     return { lines: [line], player: -1 };
   }
+
+  const setElHidden = (node: HTMLElement, hidden: boolean): void => {
+    if (node.hidden !== hidden) node.hidden = hidden;
+  };
+  const setBoolAttr = (node: Element, attr: string, on: boolean): void => {
+    if (node.hasAttribute(attr) !== on) node.toggleAttribute(attr, on);
+  };
 
   const frame = (): void => {
     const now = performance.now();
@@ -1681,14 +1701,16 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       // In the garage (practice and qualifying, or back in the box to simulate) there is no stop
       // to call: the pit-call controls go.
       const inGarage = pitPhase === 'garage';
-      document.documentElement.toggleAttribute('data-pit-garage', inGarage);
-      pitPanel.hidden = flagOut;
-      boxButton.hidden = flagOut || inGarage;
-      compoundButton.hidden = flagOut || inGarage;
-      limiterButton.hidden = flagOut || inGarage;
+      setBoolAttr(document.documentElement, 'data-pit-garage', inGarage);
+      setElHidden(pitPanel, flagOut);
+      setElHidden(boxButton, flagOut || inGarage);
+      setElHidden(compoundButton, flagOut || inGarage);
+      setElHidden(limiterButton, flagOut || inGarage);
       const compoundRequired = pitControl.strategy.twoCompoundRule && pitCar.compounds.length < 2;
       const pitActive = pitControl.pitRequested(0) || pitPhase !== 'none';
-      pitHead.hidden = flagOut || (!pitActive && !compoundRequired);
+      const pitHeadHidden = flagOut || (!pitActive && !compoundRequired);
+      setElHidden(pitHead, pitHeadHidden);
+      setBoolAttr(hud.root, 'data-pit-open', !flagOut && !pitHeadHidden);
       setButtonLabel(
         boxButton,
         pitControl.held(0)
@@ -1697,46 +1719,48 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
             ? 'Cancel pit call'
             : 'Box this lap',
       );
-      boxButton.disabled = pitControl.held(0) || session.result !== null;
+      const boxDisabled = pitControl.held(0) || session.result !== null;
+      if (boxButton.disabled !== boxDisabled) boxButton.disabled = boxDisabled;
       setButtonLabel(compoundButton, `Next tyres: ${session.nextCompound}`);
-      compoundButton.disabled = pitControl.held(0);
+      const compoundDisabled = pitControl.held(0);
+      if (compoundButton.disabled !== compoundDisabled) compoundButton.disabled = compoundDisabled;
       setButtonLabel(
         limiterButton,
         `Pit limiter: ${session.automaticLimiter ? 'automatic' : 'manual'}`,
       );
       const remaining = pitControl.pitRemaining(0);
-      pitMessage.textContent = pitControl.held(0)
+      let nextPitText = pitControl.held(0)
         ? `${pitPhase === 'waitRelease' ? 'Waiting for safe release' : pitPhase === 'garage' ? 'Garage release' : 'Pit service'} · ${remaining.toFixed(1)} s`
         : !pitActive && compoundRequired
           ? `Compound change required · next ${session.nextCompound}`
           : `${pitControl.pitRequested(0) ? `Box confirmed · ${session.nextCompound} tyres · drive into pit lane` : pitPhase === 'released' ? 'Released · pit exit clear' : pitPhase === 'lane' ? 'Pit lane · drive through' : `Pit crew ready · next ${session.nextCompound}`} · ${stopsText(pitCar.pitStops)} · ${pitCar.compounds.join(' / ')}`;
-      if (compoundRequired && pitActive)
-        pitMessage.textContent = `Compound change required · ${pitMessage.textContent}`;
+      if (compoundRequired && pitActive) nextPitText = `Compound change required · ${nextPitText}`;
+      if (pitMessage.textContent !== nextPitText) pitMessage.textContent = nextPitText;
       const hasResult = session.result !== null;
-      resultsActions.hidden = !hasResult;
-      continueButton.hidden = !hasResult || !o.onSessionComplete;
-      restartRaceButton.hidden = !hasResult || Boolean(o.onSessionComplete);
-      resultsMenuButton.hidden = !hasResult || Boolean(o.onSessionComplete);
+      setElHidden(resultsActions, !hasResult);
+      setElHidden(continueButton, !hasResult || !o.onSessionComplete);
+      setElHidden(restartRaceButton, !hasResult || Boolean(o.onSessionComplete));
+      setElHidden(resultsMenuButton, !hasResult || Boolean(o.onSessionComplete));
       if (session.result && !resultDelivered) {
         resultDelivered = true;
         o.onSessionComplete?.(session.result);
         input.setContext('menu');
         (o.onSessionComplete ? continueButton : restartRaceButton).focus({ preventScroll: true });
       }
-      skipResults.hidden = !session.playerFinished || hasResult || skippingToResults;
-      simulateSession.hidden = !canSimulateSession();
+      setElHidden(skipResults, !session.playerFinished || hasResult || skippingToResults);
+      setElHidden(simulateSession, !canSimulateSession());
       if (session.result && simulating) {
         simulating = false;
         loop.timeScale = 1;
-        simulateProgress.hidden = true;
+        setElHidden(simulateProgress, true);
       }
       // After the player's flag, or any final result (a retirement too), the standings take the
       // screen; the driving cluster is done.
       const finished = session.playerFinished || hasResult;
-      hud.root.toggleAttribute('data-finished', finished);
-      hud.root.toggleAttribute('data-race-result', hasResult);
-      document.documentElement.toggleAttribute('data-race-finished', finished);
-      document.documentElement.toggleAttribute('data-race-result', hasResult);
+      setBoolAttr(hud.root, 'data-finished', finished);
+      setBoolAttr(hud.root, 'data-race-result', hasResult);
+      setBoolAttr(document.documentElement, 'data-race-finished', finished);
+      setBoolAttr(document.documentElement, 'data-race-result', hasResult);
       if (session.result && skippingToResults) {
         skippingToResults = false;
         loop.timeScale = 1;
