@@ -96,6 +96,8 @@ describe('the cockpit at night', () => {
     expect(COCKPIT_NIGHT.displayRoughness).toBeGreaterThan(0.25);
     expect(COCKPIT_NIGHT.wheelFill).toBeGreaterThan(0);
     expect(COCKPIT_NIGHT.wheelFill).toBeLessThan(1);
+    // The light suede gloves need far less of it than the dark carbon face.
+    expect(COCKPIT_NIGHT.gloveFill).toBeLessThan(COCKPIT_NIGHT.wheelFill / 2);
   });
 });
 

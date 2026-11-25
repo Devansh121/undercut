@@ -58,6 +58,8 @@ export const COCKPIT_NIGHT = Object.freeze({
   displayEmissive: 2.2,
   displayRoughness: 0.55,
   wheelFill: 0.55,
+  /** The gloves' share of it: light suede, already the brightest thing on the wheel. */
+  gloveFill: 0.12,
   fillColour: [0.86, 0.9, 1] as const,
 });
 
@@ -345,10 +347,15 @@ export class CarModel {
       if (!(from instanceof MeshStandardMaterial) || NIGHT_UNLIT.has(from.name)) return;
       let to = copies.get(from);
       if (!to) {
-        const own = this.owned.includes(from) ? from : from.clone();
+        // The car's own materials here are the gloves' livery material, whose map is the
+        // team's mask (region codes, not colour): they glow by their colour alone.
+        const livery = this.owned.includes(from);
+        const own = livery ? from : from.clone();
         if (own !== from) this.owned.push(own);
         const m = own as MeshStandardMaterial;
-        if (m.map) {
+        if (livery) {
+          m.emissive.copy(m.color).multiply(fill).multiplyScalar(COCKPIT_NIGHT.gloveFill);
+        } else if (m.map) {
           m.emissiveMap = m.map;
           m.emissive.copy(fill);
         } else {
