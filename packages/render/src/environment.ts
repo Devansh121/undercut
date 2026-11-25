@@ -326,6 +326,14 @@ export class Environment {
         : null;
   }
 
+  /**
+   * The sky dome's uniforms (image, scale, rotation, ground bounce), shared by reference, for
+   * materials that look the sky up themselves (the cockpit mirrors' static reflection).
+   */
+  get skyUniforms(): Record<string, { value: unknown }> {
+    return this.dome.material.uniforms;
+  }
+
   /** How many times the environment map was prefiltered (once, plus once per context restore). */
   bakes = 0;
 

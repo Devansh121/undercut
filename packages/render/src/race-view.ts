@@ -23,6 +23,7 @@ import { CameraRig, type CameraName } from './cameras';
 import { CarAssets, type CarLivery } from './car/car-assets';
 import { CarModel, type CarExtras, type CarGeometry } from './car/car-model';
 import { ContactShadows, contactShadowOpacity } from './car/contact-shadows';
+import { CockpitMirrors } from './car/mirrors';
 import { CarFleet } from './car/fleet';
 import { MEDIUM_COMPOUND, type CompoundLook } from './car/livery';
 import { Environment } from './environment';
@@ -254,6 +255,7 @@ export class RaceView {
   }));
   private readonly drivingLine: DrivingLineRibbon;
   private readonly car: CarModel;
+  private readonly mirrors: CockpitMirrors;
   private readonly ghostCar: CarModel;
   private readonly fleet: CarFleet;
   /** Team and number of each remote car in the fleet, in fleet order. */
@@ -493,6 +495,7 @@ export class RaceView {
       options.car,
       'player',
       compound,
+      tod.localLightSlots > 0,
     );
     this.ghostCar = new CarModel(
       assets.car,
@@ -502,6 +505,14 @@ export class RaceView {
       options.car,
       'ghost',
     );
+    // The player's wing mirrors: the rear view on High and Ultra, a static sky and ground below.
+    this.mirrors = new CockpitMirrors(
+      q,
+      this.environment.skyUniforms,
+      this.car.cockpitEye,
+      this.car.body,
+    );
+    this.car.useMirrorMaterial(this.mirrors.material);
     this.ghostCar.root.visible = false;
     this.ghostCar.root.renderOrder = 2;
     this.fleet = new CarFleet(assets.car, q, options.car, compound);
@@ -509,7 +520,7 @@ export class RaceView {
     // A footprint under every car where the shadow map does not cover it: always on Mobile and
     // Lite, and on any preset when no key light casts shadows (night under floodlights).
     const contactOpacity = contactShadowOpacity(q, this.environment.csm !== null);
-    this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity) : null;
+    this.contact = contactOpacity > 0 ? new ContactShadows(32, contactOpacity, options.car) : null;
     if (this.contact) this.scene.add(this.contact.mesh);
     this.checkRegistration = options.checkRegistration ?? false;
     this.pipeline = new RenderPipeline(
@@ -1036,6 +1047,8 @@ export class RaceView {
       return;
     }
     this.pipeline.render(this.scene, this.camera, g);
+    if (mode.name === 'cockpit') this.mirrors.render(this.renderer, this.scene);
+    else this.mirrors.idle();
     this.gpu.end();
     this.pacer.submitted();
     this.drawnFrames++;
@@ -1169,6 +1182,7 @@ export class RaceView {
     this.pipeline.dispose();
     this.trackView.dispose();
     this.drivingLine.dispose();
+    this.mirrors.dispose();
     this.car.dispose();
     this.ghostCar.dispose();
     this.fleet.dispose();
