@@ -40,12 +40,65 @@ import {
   Scene,
   type WebGLRenderer,
 } from 'three';
-import { PropRegistry, placementMatrix, type PropPlacement } from '../src/props/registry';
+import {
+  PropRegistry,
+  SHADOW_CASTER_LAYER,
+  placementMatrix,
+  type PropPlacement,
+} from '../src/props/registry';
 import { warmPropLevels } from '../src/world/warm-props';
 import { crowdMaterial, crowdSwapMaterial, farCrowdLods } from '../src/world/crowd';
 import { Vector3, type WebGLProgramParametersWithUniforms } from 'three';
 
 describe('loading prop levels', () => {
+  it.each([false, true])(
+    'warms allocated visual and shadow buffers (shadow batch %s)',
+    (shadowBatch) => {
+      const props = new PropRegistry(1000);
+      const geometry = new BoxGeometry();
+      const material = new MeshStandardMaterial();
+      props.define({
+        id: 'batch',
+        castShadow: shadowBatch,
+        shadowLevel: 1,
+        shadowBatchCell: shadowBatch ? 200 : undefined,
+        farBatchCell: 200,
+        lods: [20, 100].map((maxDistance) => ({ geometry, material, maxDistance })),
+      });
+      props.place('batch', { x: 0, y: 0, z: 0, s: 0 });
+      props.build();
+      props.update(new Vector3());
+      const meshes = props.group.children as InstancedMesh[];
+      expect(meshes.some((m) => m.count === 0)).toBe(true);
+      const before = meshes.map((m) => [m.visible, m.count]);
+      const scene = new Scene();
+      scene.add(props.group);
+      const camera = new PerspectiveCamera();
+      const mask = camera.layers.mask;
+      const render = vi.fn(() => {
+        expect(meshes.every((m) => m.visible && m.count === 1)).toBe(true);
+        expect(camera.layers.isEnabled(SHADOW_CASTER_LAYER)).toBe(true);
+      });
+      warmPropLevels(
+        {
+          getRenderTarget: () => null,
+          setRenderTarget: vi.fn(),
+          shadowMap: { autoUpdate: true },
+          render,
+        } as unknown as WebGLRenderer,
+        scene,
+        camera,
+        props,
+      );
+      expect(render).toHaveBeenCalledOnce();
+      expect(camera.layers.mask).toBe(mask);
+      expect(meshes.map((m) => [m.visible, m.count])).toEqual(before);
+      props.dispose();
+      geometry.dispose();
+      material.dispose();
+    },
+  );
+
   it.each([false, true])('draws every level and restores state after failure=%s', (fail) => {
     const props = new PropRegistry(1000);
     const geometry = new BoxGeometry();

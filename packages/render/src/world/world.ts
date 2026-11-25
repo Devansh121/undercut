@@ -689,6 +689,8 @@ export class CircuitWorld {
       // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
       // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
       gridCell: 60,
+      farBatchCell: 400,
+      nearBatchCell: 400,
       castShadow: false,
       receiveShadow: true,
       lods: o.propKit?.lodsFor('crew-engineer-seated', crewLevels) ?? [
@@ -700,6 +702,8 @@ export class CircuitWorld {
       // Cells, not 200 m lap chunks: levels go by a cell's near edge. 60 m keeps the draw calls
       // few (each is dear under the night lights); 20 m cells cost 1.5 to 4 ms at Singapore.
       gridCell: 60,
+      farBatchCell: 400,
+      nearBatchCell: 400,
       castShadow: false,
       receiveShadow: true,
       lods: o.propKit?.lodsFor('crew-mechanic-standing', crewLevels) ?? [
@@ -866,6 +870,8 @@ export class CircuitWorld {
             // Small cells: the levels go by a cell's near edge, and each kit conifer is
             // thousands of triangles, so a cell should not reach far past the swap distance.
             gridCell: NEAR_CONIFER_CELL,
+            farBatchCell: 400,
+            nearBatchCell: 400,
             // The cards cast every tree's shadow (see treeMaterials).
             castShadow: false,
             shadowMaxDistance: 170,
@@ -887,6 +893,7 @@ export class CircuitWorld {
           id: `${k.id}-near`,
           reflect: 'scenery',
           gridCell: 120,
+          farBatchCell: 960,
           // The cards cast every tree's shadow (see treeMaterials).
           castShadow: false,
           shadowMaxDistance: 170,
@@ -907,6 +914,7 @@ export class CircuitWorld {
         id: k.id,
         reflect: 'scenery',
         gridCell: 320,
+        farBatchCell: !quality.sceneryShadows || wq.treeNear >= 170 ? 960 : undefined,
         castShadow: quality.sceneryShadows,
         shadowMaxDistance: 170,
         receiveShadow: true,
@@ -1210,6 +1218,8 @@ export class CircuitWorld {
           id: `crowd-far-${v}`,
           castShadow: false,
           chunkLength: 100,
+          farBatchCell: 600,
+          nearBatchCell: 600,
           lods: farCrowdLods(g, farMat, mats),
         });
         o.props.define({
@@ -1243,6 +1253,7 @@ export class CircuitWorld {
           // near edge is further away. Cells as wide as that reach: smaller ones multiplied draw
           // calls and per-frame chunk work (867 cells at 16 m at Monza).
           gridCell: 32,
+          farBatchCell: 600,
           lods: [{ ...level, maxDistance: Math.min(level.maxDistance, 32) }],
         });
       }

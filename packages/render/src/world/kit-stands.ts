@@ -67,6 +67,11 @@ export function placeKitStands(
       // alone (a separate kind handed over per module) measured 0.7 to 1.5 ms dearer at Monza
       // on High: every cascade drew whole 200 m cells of shadow casters.
       gridCell: 40,
+      // Batch distant, nearer and active shadow cells independently of the fine 40 m cells
+      // selecting levels and shadow reach.
+      farBatchCell: 600,
+      nearBatchCell: 600,
+      shadowBatchCell: 200,
       // The bay reflects the stands as it does the temporary ones (world/water.ts).
       reflect: 'skyline',
       castShadow: shadows,

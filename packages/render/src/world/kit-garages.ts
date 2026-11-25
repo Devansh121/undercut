@@ -9,6 +9,7 @@ export function kitGarageKind(lods: PropLod[], shadows: boolean): PropKind {
     shadowMaxDistance: 240,
     // The far level casts the same silhouette with fewer triangles.
     shadowLevel: lods.length - 1,
+    shadowBatchCell: 300,
     receiveShadow: true,
     lods,
   };

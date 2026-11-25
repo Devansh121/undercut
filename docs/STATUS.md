@@ -115,6 +115,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Kit placement CPU cost: batch the selected instances of fine cells into larger visual and shadow draws. Keep each fine cell's LOD and shadow reach; recompute only when camera travel could cross a boundary. Keep hoardings and absorber blocks on their existing shadow geometry. Larger draw bounds can submit more offscreen triangles; measure actual drawn-frame time as well as GPU time.
+
 - Kit crowd: use the plain idle material for whole far-crowd chunks beyond 32 m, where the handover is already complete. The near-edge bound includes geometry reach, and a test checks that the plain material never covers a person inside the swap. The two levels share geometry; the extra level adds instance buffers.
 
 - Kit stands: keep the detailed levels within the documented 8 m and 25 m thresholds. The catalogue scales distance caps too; compensate for its 2.7 multiplier rather than drawing the middle level to 67.5 m. Far visibility and shadow reach stay as before.

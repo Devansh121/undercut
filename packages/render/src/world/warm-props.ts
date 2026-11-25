@@ -7,7 +7,7 @@ import {
   type Scene,
   type WebGLRenderer,
 } from 'three';
-import type { PropRegistry } from '../props/registry';
+import { SHADOW_CASTER_LAYER, type PropRegistry } from '../props/registry';
 
 /**
  * Draw every registered level once during loading: uploads buffers and exercises shaders. Only the
@@ -23,6 +23,7 @@ export function warmPropLevels(
   const target = new WebGLRenderTarget(1, 1);
   const previous = renderer.getRenderTarget();
   const shadows = renderer.shadowMap.autoUpdate;
+  const layers = camera.layers.mask;
   const hidden: Object3D[] = [];
   const inProps = new Set<Object3D>();
   props.group.traverse((object) => void inProps.add(object));
@@ -49,9 +50,12 @@ export function warmPropLevels(
     });
     object.visible = true;
     object.frustumCulled = false;
-    object.count = Math.min(1, object.count);
+    // A packed batch may currently have no active cells. Its allocated slots still need upload.
+    object.count = Math.min(1, object.instanceMatrix.count);
   });
   try {
+    // Shadow batches own instance buffers too; exercise them in this loading-only pass.
+    camera.layers.enable(SHADOW_CASTER_LAYER);
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(target);
     renderer.render(scene, camera);
@@ -62,6 +66,7 @@ export function warmPropLevels(
       mesh.frustumCulled = cull;
       mesh.count = count;
     }
+    camera.layers.mask = layers;
     renderer.shadowMap.autoUpdate = shadows;
     renderer.setRenderTarget(previous);
     target.dispose();

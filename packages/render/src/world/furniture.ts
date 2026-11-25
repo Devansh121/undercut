@@ -1139,6 +1139,9 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'hoarding-front',
       chunkLength: smallChunk,
+      // Keep the current visual level's shadow geometry when shadows are enabled.
+      farBatchCell: castShadows ? undefined : 600,
+      nearBatchCell: castShadows ? undefined : 600,
       castShadow: castShadows,
       shadowMaxDistance: 160,
       receiveShadow: true,
@@ -1192,6 +1195,8 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'catch-fence-post',
       chunkLength: smallChunk,
+      farBatchCell: 600,
+      nearBatchCell: 600,
       castShadow: false,
       receiveShadow: true,
       lods: kitFence,
@@ -1250,6 +1255,9 @@ export function placeTracksideFurniture(options: {
     props.define({
       id: 'tecpro-block',
       chunkLength: smallChunk,
+      // Keep the current visual level's shadow geometry when shadows are enabled.
+      farBatchCell: castShadows ? undefined : 600,
+      nearBatchCell: castShadows ? undefined : 600,
       castShadow: castShadows,
       shadowMaxDistance: 120,
       receiveShadow: true,

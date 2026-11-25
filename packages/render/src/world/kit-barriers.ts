@@ -38,7 +38,14 @@ export function placeKitBarriers(
       if (lods !== all) all[0]!.geometry.dispose();
       id = `barrier-${kitId}`;
       // Long chunks for the cheap sleeves: each is a draw call per kind.
-      props.define({ id, lods, chunkLength: tyres ? 40 : 120, castShadow: false });
+      props.define({
+        id,
+        lods,
+        chunkLength: tyres ? 40 : 120,
+        castShadow: false,
+        farBatchCell: 600,
+        nearBatchCell: 600,
+      });
       kinds.set(kitId, id);
     }
     const pitch = kit.entries.get(kitId)?.moduleLength || 4;
