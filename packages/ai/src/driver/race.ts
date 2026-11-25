@@ -208,6 +208,8 @@ const LAUNCHED = 25;
  */
 const HAZARD_SEE = 600;
 const HAZARD_SPEED = BYPASS_SPEED + 2;
+/** A slowing pit entrant holds racing moves only this close ahead, m. */
+const ENTRANT_SEE = 200;
 /**
  * A car ahead this far under the plan's corner speeds (its pace through corners, 0 to 1.2) is
  * slow in corners, the way a new player is: it is dived on into a braking zone from behind. A
@@ -309,6 +311,7 @@ export class RaceDriver implements Driver {
   private readonly defence = { lane: 0, used: false };
   /** Stopped/crawling traffic or a slowing pit entrant ahead: set first in `planTraffic`. */
   private hazard = false;
+  private crawlAhead = false;
   /** The car being passed as last seen (speed, m/s; -1 none) and its deceleration, m/s². */
   private passSeenV = -1;
   private passSeenId = -1;
@@ -412,6 +415,7 @@ export class RaceDriver implements Driver {
     this.defence.lane = 0;
     this.defence.used = false;
     this.hazard = false;
+    this.crawlAhead = false;
     this.passSeenV = -1;
     this.passSeenId = -1;
     this.passDecel = 0;
@@ -680,7 +684,7 @@ export class RaceDriver implements Driver {
     const self = view.self;
     const v = Math.max(0, tel.speed);
     const s0 = self.s;
-    this.hazard = this.slowAhead(view, s0);
+    this.slowAhead(view, s0);
     // Other cars' lateral positions are taken against the line here, where this car is: the
     // line sweeps across the track, and an offset read against it where they are would put
     // them metres from where they are when they are a few lengths away.
@@ -1253,7 +1257,7 @@ export class RaceDriver implements Driver {
     if (
       v > HAZARD_SPEED &&
       !view.launching &&
-      !this.hazard &&
+      !this.crawlAhead &&
       this.rejoinTime <= 0 &&
       !this.passBypass &&
       !this.recovering &&
@@ -1276,7 +1280,7 @@ export class RaceDriver implements Driver {
       v > HAZARD_SPEED &&
       !view.launching &&
       view.openingLap !== true &&
-      !this.hazard &&
+      !this.crawlAhead &&
       this.rejoinTime <= 0 &&
       !this.passBypass &&
       !this.recovering
@@ -1850,17 +1854,26 @@ export class RaceDriver implements Driver {
     return this.passId >= 0 && !this.passBypass && !this.hazard;
   }
 
-  /** A stopped/crawling car, or a slower pit entrant, ahead anywhere across the road. */
-  private slowAhead(view: TrafficView, s0: number): boolean {
+  /**
+   * A stopped/crawling car, or a slower pit entrant, ahead anywhere across the road: sets
+   * `hazard` (no racing moves, tow or headroom) and `crawlAhead` (the stopped or crawling car
+   * alone, which also turns off the mirror check and racing room).
+   */
+  private slowAhead(view: TrafficView, s0: number): void {
+    this.hazard = false;
+    this.crawlAhead = false;
     for (let k = 0; k < view.count; k++) {
       const c = view.cars[k]!;
       const ds = this.ahead(s0, c.s);
+      if (ds <= 0) continue;
       // An entrant can cross the passing lane before the pit wall separates it. Do not race
-      // another car into that approach while the entrant ahead is slowing relative to us.
-      const entering = c.pitApproach === true && c.speed < view.self.speed - 2;
-      if ((c.speed < HAZARD_SPEED || entering) && ds > 0 && ds < HAZARD_SEE) return true;
+      // another car into that approach while the entrant ahead is slowing relative to us, and
+      // is close enough to be met there (further up the road it is in the lane first).
+      const entering = c.pitApproach === true && c.speed < view.self.speed - 2 && ds < ENTRANT_SEE;
+      const crawling = c.speed < HAZARD_SPEED && ds < HAZARD_SEE;
+      if (crawling) this.crawlAhead = true;
+      if (crawling || entering) this.hazard = true;
     }
-    return false;
   }
 
   /** A car standing still on the road within `range` m ahead, anywhere across it. */

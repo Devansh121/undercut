@@ -803,6 +803,31 @@ describe('race driver: a pit entrant beyond the car being passed', () => {
     expect(attempt(false)).toBe(1);
     expect(attempt(true)).toBe(-1);
   });
+
+  it('races on behind an entrant far up the road, which is in the lane before it is reached', () => {
+    const dr = driver();
+    const me = { id: 0, s: 100, d: lineD(dr, 100), speed: 80 };
+    const leader = { id: 1, s: 125, d: lineD(dr, 125), speed: 70 };
+    const entrant = { id: 2, s: 500, d: lineD(dr, 500) + 4, speed: 40, pitApproach: true };
+    for (let k = 0; k < 240; k++) tick(dr, me, [leader, entrant]);
+    expect(dr.snapshot().passId).toBe(1);
+  });
+
+  it('keeps the mirror check while an entrant ahead slows for the lane', () => {
+    const hold = (entrant: boolean) => {
+      const dr = driver({ aggression: 0.6 });
+      dr['wasActive'] = true;
+      dr['o'] = 3;
+      const me = { id: 0, s: 100, d: lineD(dr, 100) + 3, speed: 20 };
+      const rear = { id: 1, s: 86, d: lineD(dr, 100), speed: 35 };
+      const ahead = { id: 2, s: 250, d: lineD(dr, 250) + 4, speed: 15, pitApproach: true };
+      for (let k = 0; k < 240; k++)
+        tick(dr, me, entrant ? [rear, ahead] : [rear], { launching: false });
+      return dr.snapshot().o as number;
+    };
+    expect(hold(false)).toBeGreaterThan(2.5);
+    expect(hold(true)).toBeGreaterThan(2.5);
+  });
 });
 
 describe('race driver: yielding before a narrowing road', () => {
