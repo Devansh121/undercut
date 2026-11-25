@@ -61,9 +61,10 @@ describe('circuit themes', () => {
 describe('prop ids per circuit', () => {
   const catalogIds = new Set((catalogJson as { props: { id: string }[] }).props.map((p) => p.id));
 
-  it('loads only the common props at Monza, on every preset', () => {
-    expect(worldCatalogPropIds('monza', HIGH)).toEqual([...WORLD_CATALOG_PROP_IDS]);
-    expect(worldCatalogPropIds('monza', MOBILE)).toEqual([...WORLD_CATALOG_PROP_IDS]);
+  it('loads the permanent stands at Monza, on every preset', () => {
+    const expected = [...WORLD_CATALOG_PROP_IDS, 'grandstand', 'grandstand-roof'];
+    expect(worldCatalogPropIds('monza', HIGH)).toEqual(expected);
+    expect(worldCatalogPropIds('monza', MOBILE)).toEqual(expected);
   });
 
   it("adds Spa's garages everywhere and its kit conifers only where near trees are drawn", () => {

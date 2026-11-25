@@ -3,7 +3,9 @@ import {
   BufferGeometry,
   MeshStandardMaterial,
   type WebGLProgramParametersWithUniforms,
+  type Vector3,
 } from 'three';
+import type { PropLod } from '../props/registry';
 
 /** Clothing colours of the crowd (linear): realistic race-day palette with muted neutrals and team-shirt accents. */
 export const CLOTHING: readonly [number, number, number][] = [
@@ -164,4 +166,61 @@ export function crowdMaterial(time: { value: number }): MeshStandardMaterial {
   };
   m.customProgramCacheKey = () => 'crowd-v1';
   return m;
+}
+
+/**
+ * Complementary per-person handover between the near and far crowd, decided per person in the
+ * vertex stage alone: a person's distance and seeded threshold come from its instance origin, so
+ * every vertex of a person agrees and the person is drawn whole by exactly one of the two. No
+ * fragment discard: one in the shader turns off early depth testing for the whole draw, and the
+ * far crowd covers whole stands.
+ */
+export function crowdSwapMaterial(
+  material: MeshStandardMaterial,
+  eye: { value: Vector3 },
+  near: boolean,
+): void {
+  const hook = material.onBeforeCompile.bind(material);
+  const key = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    hook(shader, renderer);
+    shader.uniforms.uCrowdEye = eye;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform vec3 uCrowdEye;
+        // Arithmetic hash of a person's origin (no sin: once per vertex of the whole far crowd).
+        float crowdHash(vec2 p) {
+          vec3 q = fract(vec3(p.xyx) * 0.1031);
+          q += dot(q, q.yzx + 33.33);
+          return fract((q.x + q.y) * q.z);
+        }`,
+      )
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+        vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
+        float crowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
+        float crowdChoice = crowdHash(crowdOrigin.xz);
+        if (${near ? 'crowdChoice < crowdFar' : 'crowdChoice >= crowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
+      );
+  };
+  material.customProgramCacheKey = () => `${key}-swap-${near}`;
+}
+
+/**
+ * The handover is complete outside 32 m. The registry selects by the chunk's near edge,
+ * including its geometry reach, so a plain-idle chunk cannot contain a person in the swap.
+ * Both levels share geometry and draw the same figures, colours and motion beyond that edge.
+ */
+export function farCrowdLods(
+  geometry: BufferGeometry,
+  handover: MeshStandardMaterial,
+  idle: MeshStandardMaterial,
+): PropLod[] {
+  return [
+    { geometry, material: handover, maxDistance: 32 },
+    { geometry, material: idle, maxDistance: 650 },
+  ];
 }

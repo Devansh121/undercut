@@ -10,13 +10,19 @@ import {
 } from 'three';
 import type { MeshData, Track } from '@undercut/track';
 import { macroNoise, surfaceMaterial, type PbrSet } from '../materials/surface';
-import type { PropKitAssets } from '../props/catalog';
+import { createPropKitMaterial, type PropKitAssets } from '../props/catalog';
 import { boardMaterial, type PropPlacement, type PropRegistry } from '../props/registry';
 import type { Quality } from '../quality';
 import { brandAtlas, catchFenceTexture, signageAtlas, type BrandSpec } from './brands';
 import { buildBuildingChunks, buildingHeight, facadeMaterial } from './buildings';
 import { buildCoverMap, type CoverMap } from './cover';
-import { crowdMaterial, spectatorGeometry, CLOTHING } from './crowd';
+import {
+  crowdSwapMaterial,
+  crowdMaterial,
+  farCrowdLods,
+  spectatorGeometry,
+  CLOTHING,
+} from './crowd';
 import {
   bounds,
   decodeTerrain,
@@ -42,6 +48,9 @@ import {
 } from './grandstands';
 import { footprintOnTrack } from './corridor';
 import { streetGround } from './lamps';
+import { placeKitStands } from './kit-stands';
+import { garageHullGeometry, kitGarageKind } from './kit-garages';
+import { placeKitBarriers } from './kit-barriers';
 import { LapIndex } from './lap-index';
 import {
   buildGarageBoardsGeometry,
@@ -248,6 +257,7 @@ export class CircuitWorld {
   private readonly trees: TreeMaterials[] = [];
   /** Per-tree swap between near trees and cards (eye updated every frame). */
   private readonly treeSwap: TreeSwap = { eye: { value: new Vector3() }, distance: { value: 0 } };
+  private readonly crowdEye = { value: new Vector3() };
   private readonly crowdTime = { value: 0 };
   /** The relief cards' shared fade and weight (trees.ts, TreeRelief), and their own fade, m. */
   private readonly reliefParams = treeReliefParams(0, 0);
@@ -567,8 +577,8 @@ export class CircuitWorld {
 
     const built = buildPitBuilding(track, this.lap, teams.length);
     const garageLods =
-      this.theme.pit === 'kit-garages' && built.bays.length > 0
-        ? (o.propKit?.lodsFor('hill-pit-garage', {
+      built.bays.length > 0
+        ? (o.propKit?.lodsFor(this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage', {
             // Its own board panel stays dark behind the team boards placed on it.
             slotColors: { 'board-face': [0.018, 0.019, 0.021] },
             maxDistanceScale: 2.6,
@@ -581,7 +591,9 @@ export class CircuitWorld {
       // stretched along the row to the bay pitch, its front wall on the garage line, and the
       // team boards move onto the panel the module carries for them.
       for (const ch of built.chunks) ch.geometry.dispose();
-      const entry = o.propKit?.entries.get('hill-pit-garage');
+      const entry = o.propKit?.entries.get(
+        this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage',
+      );
       const board = entry?.attachments?.find((a) => a.name === 'team-board');
       const k = PIT_BUILDING.bay / (entry?.moduleLength || 6);
       const wallX = (board?.position[0] ?? 4.98) * k;
@@ -591,13 +603,19 @@ export class CircuitWorld {
         chunks: [],
         bays: built.bays.map((b) => ({ ...b, y: b.groundY + boardY })),
       };
-      props.define({
-        id: 'pit-garage',
-        castShadow: quality.sceneryShadows,
-        shadowMaxDistance: 240,
-        receiveShadow: true,
-        lods: garageLods,
+      const farGarage = garageLods[garageLods.length - 1]!;
+      const garageReach = farGarage.maxDistance;
+      farGarage.maxDistance = Math.min(farGarage.maxDistance, 400);
+      const garageHull = garageHullGeometry();
+      const garageHullMat = createPropKitMaterial({ key: 'garage-kit-far', grain: false });
+      this.geometries.push(garageHull);
+      this.materials.push(garageHullMat);
+      garageLods.push({
+        geometry: garageHull,
+        material: garageHullMat,
+        maxDistance: garageReach,
       });
+      props.define(kitGarageKind(garageLods, quality.sceneryShadows));
       for (const b of built.bays) {
         props.place('pit-garage', {
           x: b.x - b.nx * (0.08 + wallX),
@@ -670,19 +688,39 @@ export class CircuitWorld {
       castShadow: quality.sceneryShadows,
       shadowMaxDistance: 180,
       receiveShadow: true,
-      lods: [{ geometry: canopyGeo, material: canopyMat, maxDistance: far }],
+      // The finest level within 20 m and the middle one to 100 m: 1,556 and 720 triangles a
+      // module, a 200 m chunk of them at a time.
+      lods: o.propKit?.lodsFor('pit-wall', { distanceCaps: [20, 100, far] }) ?? [
+        { geometry: canopyGeo, material: canopyMat, maxDistance: far },
+      ],
     });
+    // The kit crew's finest level (5,000 to 7,000 triangles, sub-pixel beyond a few metres) only
+    // beside the eye, as in the pit lane; mobile and far levels share the same ~460-tri geometry.
+    // 20 m cells keep the finest level tight to the camera while farBatchCell collapses the rest.
+    const crewLevels = { distanceCaps: [6, 250, far * 0.7] };
+    const distinctCrewLods = (id: string, fallbackGeo: BufferGeometry) => {
+      const raw = o.propKit?.lodsFor(id, crewLevels);
+      if (!raw) return [{ geometry: fallbackGeo, material: crewMat, maxDistance: far * 0.7 }];
+      if (raw.length < 3) return raw;
+      const out = [raw[0]!, raw[raw.length - 1]!];
+      for (const l of raw) if (!out.includes(l)) l.geometry.dispose();
+      return out;
+    };
     props.define({
       id: 'pit-crew-engineer',
+      gridCell: 20,
+      farBatchCell: 200,
       castShadow: false,
       receiveShadow: true,
-      lods: [{ geometry: engGeo, material: crewMat, maxDistance: far * 0.7 }],
+      lods: distinctCrewLods('crew-engineer-seated', engGeo),
     });
     props.define({
       id: 'pit-crew-mechanic',
+      gridCell: 20,
+      farBatchCell: 200,
       castShadow: false,
       receiveShadow: true,
-      lods: [{ geometry: mechGeo, material: crewMat, maxDistance: far * 0.7 }],
+      lods: distinctCrewLods('crew-mechanic-standing', mechGeo),
     });
 
     let crewCount = 0;
@@ -690,21 +728,25 @@ export class CircuitWorld {
     pit.pitWallSpots.forEach((spot, idx) => {
       const team = teams[spot.teamIndex % teams.length]!;
       const tint = hexLinear(team.primary);
+      const kitWall = o.propKit?.has('pit-wall') ?? false;
+      const wallInset = kitWall ? 0.6 : 0;
       props.place('pit-wall-canopy', {
-        x: spot.x,
+        x: spot.x - spot.nx * wallInset,
         y: spot.y,
-        z: spot.z,
+        z: spot.z - spot.nz * wallInset,
         yaw: spot.yaw,
         s: spot.s,
         colour: tint,
       });
       if (!isLite) {
         // 3 seated race engineers per pit-wall canopy looking toward the track / monitors.
-        for (const offsetAlong of [-1.25, 0, 1.25]) {
+        for (const offsetAlong of kitWall ? [-1, 0, 1] : [-1.25, 0, 1.25]) {
+          const kitEngineer = o.propKit?.has('crew-engineer-seated') ?? false;
+          const behind = kitWall ? wallInset + 0.95 : 0.28;
           props.place('pit-crew-engineer', {
-            x: spot.x - spot.nx * 0.28 + spot.tx * offsetAlong,
-            y: spot.y + 0.22,
-            z: spot.z - spot.nz * 0.28 + spot.tz * offsetAlong,
+            x: spot.x - spot.nx * behind + spot.tx * offsetAlong,
+            y: spot.y + (kitEngineer ? 0 : 0.22),
+            z: spot.z - spot.nz * behind + spot.tz * offsetAlong,
             yaw: spot.yaw,
             s: spot.s,
             scale: 0.96 + hash01(idx, Math.round(offsetAlong * 10) + 20) * 0.08,
@@ -887,6 +929,23 @@ export class CircuitWorld {
           ],
         });
       }
+      if (k.id === 'tree-wood' || k.id === 'tree-conifer') {
+        props.define({
+          id: `${k.id}-skyline`,
+          reflect: 'scenery',
+          gridCell: 1200,
+          castShadow: false,
+          receiveShadow: true,
+          lods: [
+            {
+              geometry: far,
+              material: mats.material,
+              depthMaterial: mats.depth,
+              maxDistance: wq.treeFar,
+            },
+          ],
+        });
+      }
       props.define({
         id: k.id,
         reflect: 'scenery',
@@ -935,12 +994,16 @@ export class CircuitWorld {
         scale: size * (0.72 + 0.56 * h1),
         colour: [0.84 + 0.22 * h2, 0.88 + 0.16 * h3, 0.8 + 0.2 * h1],
       };
+      // The distant skyline ring (checkCover === false) sits beyond the mapped radius, always past
+      // treeNear, treeCloud, and shadowMaxDistance; route it to its own far-only coarse grid.
+      const skyline = !checkCover && (kind === 'tree-wood' || kind === 'tree-conifer');
       const deep =
+        !skyline &&
         kind === 'tree-conifer' &&
         nearKits.length > 0 &&
         hit.dist > this.lap.barrierAt(hit.index, hit.d) + TREE_CLEARANCE + NEAR_CONIFER_BAND;
-      props.place(deep ? 'tree-conifer-deep' : kind, placement);
-      if (cloud && !deep) {
+      props.place(skyline ? `${kind}-skyline` : deep ? 'tree-conifer-deep' : kind, placement);
+      if (cloud && !deep && !skyline) {
         if (kind === 'tree-conifer' && nearKits.length > 0) {
           const nk = nearKits[Math.floor(hash01(n, 15) * nearKits.length)] as (typeof nearKits)[0];
           props.place(nk.id, { ...placement, scale: (placement.scale ?? 1) / nk.height });
@@ -1096,7 +1159,30 @@ export class CircuitWorld {
     });
     this.counts.stands = this.stands.length;
     if (this.stands.length === 0) return;
-    const standChunks = buildStandChunks(this.stands);
+    const spectator = this.spectators(o);
+    const wq = o.quality.world;
+    const L = o.track.length;
+    // Busier near the start line, the top fifth of rows thinner: kit and procedural stands alike.
+    const occupancy = (fr: StandFrame, row: number): number => {
+      const ds = Math.min(Math.abs(fr.s), Math.abs(L - fr.s));
+      const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
+      return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
+    };
+    const standFar = createPropKitMaterial({ key: 'stand-kit-far', grain: false });
+    this.materials.push(standFar);
+    const kitStands = placeKitStands(
+      this.stands,
+      o.propKit,
+      o.props,
+      occupancy,
+      o.quality.sceneryShadows,
+      spectator,
+      standFar,
+    );
+    const { fallback } = kitStands;
+    this.geometries.push(...kitStands.geometries);
+    this.counts.kitStandModules = kitStands.modules;
+    const standChunks = buildStandChunks(fallback);
     const standMat = grandstandMaterial();
     this.materials.push(standMat);
     standChunks.forEach((ch, ci) => {
@@ -1112,17 +1198,10 @@ export class CircuitWorld {
     });
 
     // Crowd: fuller near the start line and the first chicane, thinner at the back of big stands.
-    const wq = o.quality.world;
     if (wq.crowd <= 0) return;
-    const L = o.track.length;
-    const seats = crowdSeats(this.stands, (fr, row) => {
-      const ds = Math.min(Math.abs(fr.s), Math.abs(L - fr.s));
-      const busy = 0.55 + 0.4 * Math.exp(-ds / 600);
-      return wq.crowd * busy * (row > fr.rows * 0.8 ? 0.75 : 1);
-    });
-    const spectator = this.spectators(o);
+    const seats = crowdSeats(fallback, occupancy);
     for (const seat of seats) spectator(seat);
-    this.counts.crowd = seats.length;
+    this.counts.crowd = seats.length + kitStands.crowd;
   }
 
   /**
@@ -1131,7 +1210,15 @@ export class CircuitWorld {
    */
   private spectators(
     o: CircuitWorldOptions,
-  ): (seat: { x: number; y: number; z: number; yaw: number; s: number; k: number }) => void {
+  ): (seat: {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    s: number;
+    k: number;
+    near?: boolean;
+  }) => void {
     const variants = 3;
     if (this.crowdKinds === 0) {
       const mats = crowdMaterial(this.crowdTime);
@@ -1139,11 +1226,48 @@ export class CircuitWorld {
       for (let v = 0; v < variants; v++) {
         const g = spectatorGeometry(v);
         this.geometries.push(g);
+        const farMat = crowdMaterial(this.crowdTime);
+        crowdSwapMaterial(farMat, this.crowdEye, false);
+        this.materials.push(farMat);
+        o.props.define({
+          id: `crowd-far-${v}`,
+          castShadow: false,
+          chunkLength: 100,
+          farBatchCell: 240,
+          lods: farCrowdLods(g, farMat, mats),
+        });
         o.props.define({
           id: `crowd-${v}`,
           castShadow: false,
           receiveShadow: true,
           lods: [{ geometry: g, material: mats, maxDistance: 650 }],
+        });
+      }
+      // Without the kit's grain: clothes are flat-coloured, and the grain's per-fragment hashes were
+      // the near crowd's dearest part.
+      const nearMat = createPropKitMaterial({ swayTime: this.crowdTime, grain: false });
+      crowdSwapMaterial(nearMat, this.crowdEye, true);
+      this.materials.push(nearMat);
+      for (let v = 0; v < variants; v++) {
+        const lods = o.propKit?.lodsFor(`crowd-seated-${v}`, {
+          baseMaterial: nearMat,
+          slotColors: { clothing: [1, 1, 1] },
+        });
+        if (!lods) continue;
+        // The kit's middle level (368 triangles a person, half the finest): every person in a
+        // cell within reach is drawn, and the vertex stage then drops those past 32 m, so the
+        // finest level's vertices cost about 1 ms at Monza's grid on High.
+        const level = lods[1] ?? lods[0]!;
+        for (const l of lods) if (l !== level) l.geometry.dispose();
+        level.geometry.translate(0, -0.5, 0);
+        o.props.define({
+          id: `crowd-near-${v}`,
+          castShadow: false,
+          // Nobody beyond 32 m draws near (crowdSwapMaterial), so one level, and no cell whose
+          // near edge is further away. Cells as wide as that reach: smaller ones multiplied draw
+          // calls and per-frame chunk work (867 cells at 16 m at Monza).
+          gridCell: 32,
+          lods: [{ ...level, maxDistance: Math.min(level.maxDistance, 32) }],
         });
       }
       this.crowdKinds = variants;
@@ -1154,7 +1278,7 @@ export class CircuitWorld {
         number,
         number,
       ];
-      o.props.place(`crowd-${seat.k % variants}`, {
+      const placement = {
         x: seat.x,
         y: seat.y,
         z: seat.z,
@@ -1162,7 +1286,13 @@ export class CircuitWorld {
         yaw: seat.yaw + (hash01(seat.k, 4) - 0.5) * 0.5,
         scale: 0.94 + hash01(seat.k, 5) * 0.12,
         colour: c,
-      });
+      };
+      const v = seat.k % variants;
+      const near = seat.near !== false && o.propKit?.has(`crowd-seated-${v}`);
+      if (near) {
+        o.props.place(`crowd-near-${v}`, placement);
+        o.props.place(`crowd-far-${v}`, placement);
+      } else o.props.place(`crowd-${v}`, placement);
     };
   }
 
@@ -1183,14 +1313,14 @@ export class CircuitWorld {
     this.textures.push(brandTex, signTex, fenceTex);
 
     // Start gantry at s = 0 with 5 individually addressable start lights.
-    const gantry = buildStartGantry(track, brandTex, 0);
+    const gantry = buildStartGantry(track, brandTex, 0, o.propKit, props);
     this.startGantry = gantry;
     this.geometries.push(...gantry.geometries);
     this.materials.push(...gantry.materials);
     this.group.add(gantry.group);
 
     // Over-track bridges from OSM + authored config (chunked per bridge).
-    const bridges = buildTrackBridges(track, dressing, this.lap, brandTex);
+    const bridges = buildTrackBridges(track, dressing, this.lap, brandTex, o.propKit, props);
     this.geometries.push(...bridges.geometries);
     this.materials.push(...bridges.materials);
     if (bridges.count > 0) {
@@ -1212,6 +1342,15 @@ export class CircuitWorld {
       }
     }
     this.counts.bridges = bridges.count;
+
+    if (o.propKit)
+      this.counts.kitBarriers = placeKitBarriers(
+        track,
+        this.lap,
+        o.propKit,
+        props,
+        this.theme.street !== null,
+      );
 
     // Historic banked oval concrete where mapped (e.g., Monza's Sopraelevata).
     const banking = buildHistoricBanking(dressing.mapped.raceway, this.heightAt, this.lap);
@@ -1306,6 +1445,7 @@ export class CircuitWorld {
     if (eye) this.treeSwap.eye.value.copy(eye);
     this.crowdTime.value = time;
     this.waterSurface?.update(time);
+    if (eye) this.crowdEye.value.copy(eye);
     if (!eye) return;
     for (const c of this.worldChunks) {
       const dist = c.centre.distanceTo(eye) - c.radius;
