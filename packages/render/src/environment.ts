@@ -25,6 +25,7 @@ import {
 import { CSM } from 'three/addons/csm/CSM.js';
 import { LightPool, type LocalLight } from './lighting/light-pool';
 import { isLitMaterial } from './lighting/registration';
+import { SHADOW_CASTER_LAYER } from './props/registry';
 import { groundBounce, skyRotation, type SkyMeta, type TimeOfDay } from './lighting/time-of-day';
 import type { Quality } from './quality';
 
@@ -297,6 +298,8 @@ export class Environment {
           // PCF radius in this three.js spreads wide: 0.5 is a slightly soft sun edge.
           light.shadow.radius = quality.shadow.softness * softness * 0.45;
           light.shadow.blurSamples = 12;
+          // Shadow-only prop proxies (PropKind.shadowLevel) are drawn by these cameras alone.
+          light.shadow.camera.layers.enable(SHADOW_CASTER_LAYER);
         }
         this.csm = csm;
       } else {

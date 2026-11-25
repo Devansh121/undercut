@@ -63,6 +63,7 @@ import {
 } from './props/catalog';
 import type { BrandSpec } from './world/brands';
 import type { GarageTeam } from './world/pit-building';
+import { warmPropLevels } from './world/warm-props';
 import { CircuitWorld } from './world/world';
 
 /**
@@ -548,6 +549,11 @@ export class RaceView {
       addLampLight([this.trackView.group, this.world.group, this.props.group], this.lampMap);
     }
     this.environment.register(this.scene);
+    if (this.world) {
+      const started = performance.now();
+      warmPropLevels(this.renderer, this.scene, this.camera, this.props);
+      this.loadTimes.propWarm = performance.now() - started;
+    }
     // No upfront renderer.compile: three.js deletes a program's shaders on its first use, so
     // programs compiled for objects that are never drawn (levels of detail not reached, a
     // session quit early) would leave their shaders behind (lifecycle test).
