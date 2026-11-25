@@ -122,162 +122,171 @@ for (const circuit of ['monza', 'spa', 'singapore']) {
   });
 }
 
-test('online running order agrees at 150 ms latency with two percent loss', async ({
-  browser,
-  baseURL,
-}, info) => {
-  test.skip(info.project.name !== 'online');
-  test.setTimeout(150000);
-  // Two software renderers must keep sending live snapshots during this order proof.
-  // Use the supported landscape-phone viewport to bound raster work on the shared machine.
-  const { host, guest, close } = await pair(browser, baseURL!, '&netSim=150,20,0.02,150', {
-    width: 844,
-    height: 390,
-  });
-  try {
-    await start(host, guest);
-    // Wait for active orders and live peer snapshots before placing the moving pair.
-    // A fixed post-start sleep can expire while either renderer is still warming up.
-    await expect
-      .poll(
-        async () => {
-          const snapshots = await Promise.all([state(host), state(guest)]);
-          return snapshots.every(
-            ({ race }) =>
-              race?.orderEpoch !== undefined &&
-              race.orderEpoch !== null &&
-              race.remote[0]?.opacity === 1 &&
-              race.remote[0]?.mode !== 'held',
-          );
-        },
-        { timeout: 6000 },
-      )
-      .toBe(true);
-    await Promise.all(
-      [host, guest].map((page, i) =>
-        page.evaluate((i) => {
-          window.__undercut!.teleport(250, i === 0 ? 1.8 : -1.8, 180);
-          window.__undercut!.drive({ throttle: 0, brake: 0, steer: 0 });
-        }, i),
-      ),
+// The order proof runs at both supported layouts: desktop and landscape phone.
+for (const [layout, viewport] of [
+  ['desktop', { width: 1440, height: 900 }],
+  ['phone', { width: 844, height: 390 }],
+] as const) {
+  test(`online running order agrees at 150 ms latency with two percent loss (${layout})`, async ({
+    browser,
+    baseURL,
+  }, info) => {
+    test.skip(info.project.name !== 'online');
+    test.setTimeout(150000);
+    const { host, guest, close } = await pair(
+      browser,
+      baseURL!,
+      '&netSim=150,20,0.02,150',
+      viewport,
     );
-    // Wait until both browsers render the teleported peer alongside them at full opacity.
-    await expect
-      .poll(
-        async () => {
-          const [h, g] = await Promise.all([state(host), state(guest)]);
-          const hr = h.race?.remote[0];
-          const gr = g.race?.remote[0];
-          const hp = h.race?.pose;
-          const gp = g.race?.pose;
-          if (!hr || !gr || !hp || !gp) return false;
-          return (
-            Math.hypot(hr.x - hp.x, hr.z - hp.z) < 60 &&
-            Math.hypot(gr.x - gp.x, gr.z - gp.z) < 60 &&
-            hr.opacity === 1 &&
-            gr.opacity === 1 &&
-            hr.mode !== 'held' &&
-            gr.mode !== 'held'
-          );
-        },
-        { timeout: 6000 },
-      )
-      .toBe(true)
-      .catch(async (error: unknown) => {
-        console.log(
-          'Order setup state',
-          JSON.stringify(await Promise.all([state(host), state(guest)])),
-        );
-        throw error;
-      });
-    const readSharedOrder = async () => {
-      const [h, g] = await Promise.all([state(host), state(guest)]);
-      // Freeze one active epoch, then wait for receipt AND activation on both clients.
-      // A renderer stall may delay reliable control messages past their scheduled activation.
-      const at = h.race!.orderEpoch;
-      expect(at).not.toBeNull();
+    try {
+      await start(host, guest);
+      // Wait for active orders and live peer snapshots before placing the moving pair.
+      // A fixed post-start sleep can expire while either renderer is still warming up.
       await expect
         .poll(
           async () => {
             const snapshots = await Promise.all([state(host), state(guest)]);
-            const orders = await Promise.all(
-              [host, guest].map((page) =>
-                page.evaluate((at) => window.__undercut!.onlineOrder(at!), at),
-              ),
-            );
-            return orders.every(
-              (order, i) =>
-                order?.at === at && (snapshots[i]!.race!.orderEpoch ?? -Infinity) >= at!,
+            return snapshots.every(
+              ({ race }) =>
+                race?.orderEpoch !== undefined &&
+                race.orderEpoch !== null &&
+                race.remote[0]?.opacity === 1 &&
+                race.remote[0]?.mode !== 'held',
             );
           },
           { timeout: 6000 },
         )
         .toBe(true);
-      const [ho, go] = await Promise.all(
-        [host, guest].map((page) => page.evaluate((at) => window.__undercut!.onlineOrder(at!), at)),
-      );
-      expect(ho).not.toBeNull();
-      expect(go).not.toBeNull();
-      expect(ho!.at).toBe(go!.at);
-      expect(ho!.order).toEqual(go!.order);
-      if (h.race!.orderEpoch === g.race!.orderEpoch) expect(h.race!.order).toEqual(g.race!.order);
-      return { h, g, ho: ho!, go: go! };
-    };
-    const paired: {
-      hostOrder: number[];
-      guestOrder: number[];
-      hostPos: number;
-      guestPos: number;
-    }[] = [];
-    for (let k = 0; k < 20; k++) {
-      const { h, g, ho, go } = await readSharedOrder();
-      expect(h.state!.room!.members.every((m) => m.connected)).toBe(true);
-      expect(g.state!.room!.members.every((m) => m.connected)).toBe(true);
-      expect([...ho.order].sort((a, b) => a - b)).toEqual([0, 1]);
-      expect([ho.position, go.position].sort((a, b) => a - b)).toEqual([1, 2]);
-      paired.push({
-        hostOrder: ho.order,
-        guestOrder: go.order,
-        hostPos: ho.position,
-        guestPos: go.position,
-      });
-      await host.waitForTimeout(100);
-    }
-
-    // Now make the trailing car overtake cleanly and verify both clients flip together.
-    const initialLeader = paired[paired.length - 1]!.hostOrder[0]!;
-    const trailer = initialLeader === 0 ? 1 : 0;
-    await Promise.all(
-      [host, guest].map((page, i) =>
-        page.evaluate(
-          (accel) => window.__undercut!.drive({ throttle: accel ? 1 : 0, brake: 0, steer: 0 }),
-          i === trailer,
+      await Promise.all(
+        [host, guest].map((page, i) =>
+          page.evaluate((i) => {
+            window.__undercut!.teleport(250, i === 0 ? 1.8 : -1.8, 180);
+            window.__undercut!.drive({ throttle: 0, brake: 0, steer: 0 });
+          }, i),
         ),
-      ),
-    );
-    await expect
-      .poll(
-        async () => {
-          const [h, g] = await Promise.all([state(host), state(guest)]);
-          return h.race!.order[0] === trailer && g.race!.order[0] === trailer;
-        },
-        { timeout: 10000 },
-      )
-      .toBe(true);
-    for (let k = 0; k < 10; k++) {
-      const { ho, go } = await readSharedOrder();
-      expect(ho.order[0]).toBe(trailer);
-      expect([ho.position, go.position].sort((a, b) => a - b)).toEqual([1, 2]);
-      await host.waitForTimeout(100);
+      );
+      // Wait until both browsers render the teleported peer alongside them at full opacity.
+      await expect
+        .poll(
+          async () => {
+            const [h, g] = await Promise.all([state(host), state(guest)]);
+            const hr = h.race?.remote[0];
+            const gr = g.race?.remote[0];
+            const hp = h.race?.pose;
+            const gp = g.race?.pose;
+            if (!hr || !gr || !hp || !gp) return false;
+            return (
+              Math.hypot(hr.x - hp.x, hr.z - hp.z) < 60 &&
+              Math.hypot(gr.x - gp.x, gr.z - gp.z) < 60 &&
+              hr.opacity === 1 &&
+              gr.opacity === 1 &&
+              hr.mode !== 'held' &&
+              gr.mode !== 'held'
+            );
+          },
+          { timeout: 6000 },
+        )
+        .toBe(true)
+        .catch(async (error: unknown) => {
+          console.log(
+            'Order setup state',
+            JSON.stringify(await Promise.all([state(host), state(guest)])),
+          );
+          throw error;
+        });
+      const readSharedOrder = async () => {
+        const [h, g] = await Promise.all([state(host), state(guest)]);
+        // Freeze one active epoch, then wait for receipt AND activation on both clients.
+        // A renderer stall may delay reliable control messages past their scheduled activation.
+        const at = h.race!.orderEpoch;
+        expect(at).not.toBeNull();
+        await expect
+          .poll(
+            async () => {
+              const snapshots = await Promise.all([state(host), state(guest)]);
+              const orders = await Promise.all(
+                [host, guest].map((page) =>
+                  page.evaluate((at) => window.__undercut!.onlineOrder(at!), at),
+                ),
+              );
+              return orders.every(
+                (order, i) =>
+                  order?.at === at && (snapshots[i]!.race!.orderEpoch ?? -Infinity) >= at!,
+              );
+            },
+            { timeout: 6000 },
+          )
+          .toBe(true);
+        const [ho, go] = await Promise.all(
+          [host, guest].map((page) =>
+            page.evaluate((at) => window.__undercut!.onlineOrder(at!), at),
+          ),
+        );
+        expect(ho).not.toBeNull();
+        expect(go).not.toBeNull();
+        expect(ho!.at).toBe(go!.at);
+        expect(ho!.order).toEqual(go!.order);
+        if (h.race!.orderEpoch === g.race!.orderEpoch) expect(h.race!.order).toEqual(g.race!.order);
+        return { h, g, ho: ho!, go: go! };
+      };
+      const paired: {
+        hostOrder: number[];
+        guestOrder: number[];
+        hostPos: number;
+        guestPos: number;
+      }[] = [];
+      for (let k = 0; k < 20; k++) {
+        const { h, g, ho, go } = await readSharedOrder();
+        expect(h.state!.room!.members.every((m) => m.connected)).toBe(true);
+        expect(g.state!.room!.members.every((m) => m.connected)).toBe(true);
+        expect([...ho.order].sort((a, b) => a - b)).toEqual([0, 1]);
+        expect([ho.position, go.position].sort((a, b) => a - b)).toEqual([1, 2]);
+        paired.push({
+          hostOrder: ho.order,
+          guestOrder: go.order,
+          hostPos: ho.position,
+          guestPos: go.position,
+        });
+        await host.waitForTimeout(100);
+      }
+
+      // Now make the trailing car overtake cleanly and verify both clients flip together.
+      const initialLeader = paired[paired.length - 1]!.hostOrder[0]!;
+      const trailer = initialLeader === 0 ? 1 : 0;
+      await Promise.all(
+        [host, guest].map((page, i) =>
+          page.evaluate(
+            (accel) => window.__undercut!.drive({ throttle: accel ? 1 : 0, brake: 0, steer: 0 }),
+            i === trailer,
+          ),
+        ),
+      );
+      await expect
+        .poll(
+          async () => {
+            const [h, g] = await Promise.all([state(host), state(guest)]);
+            return h.race!.order[0] === trailer && g.race!.order[0] === trailer;
+          },
+          { timeout: 10000 },
+        )
+        .toBe(true);
+      for (let k = 0; k < 10; k++) {
+        const { ho, go } = await readSharedOrder();
+        expect(ho.order[0]).toBe(trailer);
+        expect([ho.position, go.position].sort((a, b) => a - b)).toEqual([1, 2]);
+        await host.waitForTimeout(100);
+      }
+      console.log(
+        'Order proof 150ms',
+        layout,
+        JSON.stringify({ samples: paired.length, initialLeader, overtakenBy: trailer }),
+      );
+    } finally {
+      await close();
     }
-    console.log(
-      'Order proof 150ms',
-      JSON.stringify({ samples: paired.length, initialLeader, overtakenBy: trailer }),
-    );
-  } finally {
-    await close();
-  }
-});
+  });
+}
 
 for (const latency of [50, 100, 150]) {
   test(`online contact at ${latency} ms with two percent loss`, async ({
