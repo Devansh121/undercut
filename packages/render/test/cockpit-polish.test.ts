@@ -76,7 +76,10 @@ describe('cockpit mirrors', () => {
   });
 
   it('have their own glass on the levels a player drives (High and Mobile), not the far one', () => {
-    const stats = carStats as unknown as Record<string, { nodes: { body: { materials: string[] } } }>;
+    const stats = carStats as unknown as Record<
+      string,
+      { nodes: { body: { materials: string[] } } }
+    >;
     expect(stats.high?.nodes.body.materials).toContain('mirror_glass');
     expect(stats.mobile?.nodes.body.materials).toContain('mirror_glass');
     expect(stats.far?.nodes.body.materials).not.toContain('mirror_glass');
