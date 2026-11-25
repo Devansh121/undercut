@@ -695,6 +695,7 @@ export class RaceDriver implements Driver {
     // The opening lap: no change of lane under braking, and into the first corner no move that
     // is not already alongside (the field arrives there together).
     const opening = view.openingLap === true && !view.launching;
+    const later = view.openingLap === false && !view.launching && !this.hazard;
     const firstEnd = plan.track.corners[0]?.end ?? 0;
     const firstCorner =
       opening &&
@@ -965,12 +966,18 @@ export class RaceDriver implements Driver {
             this.passSide,
           );
       }
+      // On later laps a closing move can use the remaining straight before our braking
+      // point. It still gives up before braking without overlap; lap one keeps its early hold.
+      const approach =
+        later && passCar !== null && v > passCar.speed + 0.5 && !this.slowInCorners(passCar.id)
+          ? toCorner < 15 + v * 0.15 || midCorner
+          : cornering;
       const late =
         passCar !== null &&
         !this.passBypass &&
         (this.passCommitted
           ? midCorner && passDs >= ALONGSIDE
-          : cornering && passDs >= 0.6 * CAR_LENGTH);
+          : approach && passDs >= 0.6 * CAR_LENGTH);
       // (Round an obstacle the car ahead in the gap is followed through it, not a reason to stop.)
       const blockedByOther =
         !this.passBypass && leader !== null && leader.id !== this.passId && gapAhead < 25;
@@ -1095,7 +1102,10 @@ export class RaceDriver implements Driver {
       leader !== yieldTo
     ) {
       const faster = this.at(profV, leader.s) > leader.speed + 2 - 1.5 * aggression;
-      if ((brakingMove || gapAhead < 25 + v * 0.25) && (faster || held)) {
+      // A solo-profile speed deficit can mean the leader is still accelerating. Stay in
+      // its tow until actually closing, unless it has already shown a slow corner pace.
+      const gaining = !later || v > leader.speed + 0.5 || this.slowInCorners(leader.id);
+      if ((brakingMove || gapAhead < 25 + v * 0.25) && (faster || held) && gaining) {
         const od = leader.d - ldHere;
         const sep = passSideBySide(v) + leader.halfWidth - BODY_HALF_WIDTH;
         // A side on the track, and not a lane another car is already in, beside or just behind
@@ -1411,7 +1421,9 @@ export class RaceDriver implements Driver {
     // lock-up feel backs the pedal off further than the demand would have.
     limit = Math.max(limit, -this.brakeAt(v) / BRAKE_SHARE);
     this.inner.accelLimit = limit;
-    this.inner.speedAllowance = !cornering && this.attacking() && v > LAUNCHED ? 4 : 0;
+    const drafting = later && leader !== null && gapAhead < 90 && leader.speed > 30;
+    this.inner.speedAllowance =
+      !cornering && v > LAUNCHED && (this.attacking() || drafting) ? 4 : 0;
     // Stopping for traffic at walking pace: the brakes stay on (see `brakeFloor`).
     this.inner.brakeFloor = limit < -2 && v < SLOW_STOP_BELOW ? SLOW_STOP_BRAKE : 0;
     // Pulling away at walking pace (from a queue, back from the run-off): the throttle stays

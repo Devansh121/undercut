@@ -511,6 +511,56 @@ describe('race driver: switchback', () => {
   });
 });
 
+describe('race driver: building a run after lap one', () => {
+  it('uses straight-line headroom while still drafting, before choosing a passing lane', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: s + 60, d: lineD(dr, s + 60), speed: 80 };
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['inner'].speedAllowance).toBeGreaterThan(0);
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr['inner'].speedAllowance).toBe(0);
+  });
+
+  it('carries a closing move to the braking point after lap one', () => {
+    const dr = driver();
+    const s = 400;
+    const me = { id: 0, s, d: lineD(dr, s) - 3, speed: 70 };
+    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 68 };
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -3;
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(1);
+    tick(dr, me, [ahead], { openingLap: true });
+    expect(dr.last.passing).toBe(-1);
+  });
+
+  it('releases drafting headroom for braking or stopped traffic', () => {
+    for (const s of [0, 520]) {
+      const dr = driver();
+      const me = { id: 0, s, d: lineD(dr, s), speed: 70 };
+      const ahead = { id: 1, s: s + 60, d: lineD(dr, s + 60), speed: 70 };
+      const stopped = { id: 2, s: s + 180, d: 0, speed: 0 };
+      tick(dr, me, s === 0 ? [ahead, stopped] : [ahead], { openingLap: false });
+      expect(dr['inner'].speedAllowance).toBe(0);
+    }
+  });
+
+  it('stays in the tow when close but still slower than the car ahead', () => {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s), speed: 80 };
+    const ahead = { id: 1, s: s + 25, d: lineD(dr, s + 25), speed: 81 };
+    dr['heldTime'] = 5;
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['inner'].speedAllowance).toBeGreaterThan(0);
+  });
+});
+
 it('uses straight-line speed headroom in a move while retaining the corner braking limit', () => {
   const dr = driver();
   dr['o'] = 3;
