@@ -4,11 +4,12 @@ import spa from '@undercut/track/data/spa.json';
 import singapore from '@undercut/track/data/singapore.json';
 import dressing from '../data/monza.dressing.json';
 import singaporeDressing from '../data/singapore.dressing.json';
-import { kitGarageKind } from '../src/world/kit-garages';
+import { garageHullGeometry, kitGarageKind } from '../src/world/kit-garages';
 import { buildPitBuilding } from '../src/world/pit-building';
 import { markReflected, REFLECT_LAYER } from '../src/world/water';
 import catalog from '../data/props.catalog.json';
 import { createPropKitMaterial, type PropCatalogEntry, PropKitAssets } from '../src/props/catalog';
+import { spectatorGeometry } from '../src/world/crowd';
 import type { DressingFile } from '../src/world/dressing';
 import { buildStartGantry, buildTrackBridges } from '../src/world/furniture';
 import { placeKitStands, type KitSpectator } from '../src/world/kit-stands';
@@ -766,4 +767,91 @@ describe('replacement structure reflections', () => {
       material.dispose();
     },
   );
+
+  it('builds low-triangle pit-garage and hill-pit-garage hulls covering the hill canopy and roof volume', () => {
+    const bounds = (geo: ReturnType<typeof garageHullGeometry>) => {
+      const pos = geo.getAttribute('position');
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        maxX = Math.max(maxX, pos.getX(i));
+        maxY = Math.max(maxY, pos.getY(i));
+      }
+      return { maxX, maxY, tris: (geo.index?.count ?? pos.count) / 3 };
+    };
+    const flat = garageHullGeometry(false);
+    const hill = garageHullGeometry(true);
+    const fb = bounds(flat);
+    const hb = bounds(hill);
+    expect(fb.tris).toBe(28);
+    expect(fb.maxX).toBeCloseTo(5.33, 2);
+    expect(fb.maxY).toBeCloseTo(7.24, 2);
+    expect(hb.tris).toBe(52);
+    expect(hb.maxX).toBeCloseTo(7.5, 2);
+    expect(hb.maxY).toBeCloseTo(8.1, 2);
+    flat.dispose();
+    hill.dispose();
+  });
+
+  it('drops the seat-pan stand level and batches wider on Mobile', () => {
+    const levels = [200, 1200].map((maxDistance) => ({
+      scene: new Mesh(new BoxGeometry(), new MeshStandardMaterial()),
+      maxDistance,
+    }));
+    const kit = PropKitAssets.fromScenes(catalog as never, new Map([['grandstand', levels]]));
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    placeKitStands(
+      [
+        {
+          id: 'stand',
+          ox: 0,
+          oz: 0,
+          ax: 0,
+          az: 1,
+          bx: -1,
+          bz: 0,
+          base: 0,
+          roof: false,
+          s: 100,
+          seat: [0.1, 0.2, 0.3],
+          length: 20,
+          depth: 9.47,
+          rows: 10,
+        },
+      ],
+      kit,
+      props,
+      () => 0,
+      false,
+      () => undefined,
+      undefined,
+      true,
+    );
+    const kind = define.mock.calls[0]![0];
+    expect(kind.lods.map((l) => l.maxDistance)).toEqual([160, 3240]);
+    expect(kind.nearBatchCell).toBe(360);
+    expect(kind.farBatchCell).toBe(800);
+    props.dispose();
+    kit.dispose();
+  });
+
+  it('builds compact Mobile far spectators and supports custom crowd swap ranges', () => {
+    const full = spectatorGeometry(0, false);
+    const compact = spectatorGeometry(0, true);
+    expect(full.index!.count / 3).toBe(70);
+    expect(compact.index!.count / 3).toBe(40);
+    const eye = { value: new Vector3() };
+    const mDefault = crowdMaterial({ value: 0 });
+    const mMobile = crowdMaterial({ value: 0 });
+    crowdSwapMaterial(mDefault, eye, false);
+    crowdSwapMaterial(mMobile, eye, false, 14, 20);
+    expect(mMobile.customProgramCacheKey()).not.toBe(mDefault.customProgramCacheKey());
+    const lods = farCrowdLods(compact, mMobile, mDefault, 20, 320);
+    expect(lods.map((l) => l.maxDistance)).toEqual([20, 320]);
+    full.dispose();
+    compact.dispose();
+    mDefault.dispose();
+    mMobile.dispose();
+  });
 });

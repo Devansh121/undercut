@@ -37,7 +37,7 @@ const SKIN: readonly [number, number, number][] = [
  * instance's clothing colour (vertex colour white marks it), head in a skin tone, legs and arms in
  * dark trousers and the shirt colour.
  */
-export function spectatorGeometry(variant: number): BufferGeometry {
+export function spectatorGeometry(variant: number, compact = false): BufferGeometry {
   const pos: number[] = [];
   const nor: number[] = [];
   const col: number[] = [];
@@ -117,13 +117,20 @@ export function spectatorGeometry(variant: number): BufferGeometry {
   };
   const shirt = [1, 1, 1];
   const trousers = [0.045, 0.05, 0.065];
-  // Thighs forward on the seat, shins down in front of it.
-  box(-0.04, 0.38, 0.0, 0.14, -0.16, 0.16, trousers);
-  box(0.28, 0.42, -0.4, 0.0, -0.15, 0.15, trousers);
-  // Slimmer reclined torso + shoulders + head with hair/cap crown.
-  box(-0.18, 0.06, 0.12, 0.64, -0.18, 0.18, shirt);
-  box(-0.02, 0.2, 0.36, 0.52, -0.23, -0.15, shirt);
-  box(-0.02, 0.2, 0.36, 0.52, 0.15, 0.23, shirt);
+  if (compact) {
+    // Mobile far crowd (beyond 14..20 m): one lower-body block and arm-width torso keep all four
+    // colour cues (trousers, shirt, skin, hair) in 40 triangles instead of 70.
+    box(-0.04, 0.4, -0.36, 0.14, -0.16, 0.16, trousers);
+    box(-0.18, 0.08, 0.12, 0.64, -0.22, 0.22, shirt);
+  } else {
+    // Thighs forward on the seat, shins down in front of it.
+    box(-0.04, 0.38, 0.0, 0.14, -0.16, 0.16, trousers);
+    box(0.28, 0.42, -0.4, 0.0, -0.15, 0.15, trousers);
+    // Slimmer reclined torso + shoulders + head with hair/cap crown.
+    box(-0.18, 0.06, 0.12, 0.64, -0.18, 0.18, shirt);
+    box(-0.02, 0.2, 0.36, 0.52, -0.23, -0.15, shirt);
+    box(-0.02, 0.2, 0.36, 0.52, 0.15, 0.23, shirt);
+  }
   box(-0.13, 0.05, 0.66, 0.85, -0.085, 0.085, skin);
   box(-0.14, 0.05, 0.82, 0.89, -0.09, 0.09, hair);
   const g = new BufferGeometry();
@@ -179,9 +186,13 @@ export function crowdSwapMaterial(
   material: MeshStandardMaterial,
   eye: { value: Vector3 },
   near: boolean,
+  swapStart = 24,
+  swapEnd = 32,
 ): void {
   const hook = material.onBeforeCompile.bind(material);
   const key = material.customProgramCacheKey();
+  const s0 = swapStart.toFixed(1);
+  const s1 = swapEnd.toFixed(1);
   material.onBeforeCompile = (shader, renderer) => {
     hook(shader, renderer);
     shader.uniforms.uCrowdEye = eye;
@@ -201,16 +212,17 @@ export function crowdSwapMaterial(
         '#include <project_vertex>',
         `#include <project_vertex>
         vec3 crowdOrigin = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
-        float crowdFar = smoothstep(24.0, 32.0, distance(crowdOrigin, uCrowdEye));
+        float crowdFar = smoothstep(${s0}, ${s1}, distance(crowdOrigin, uCrowdEye));
         float crowdChoice = crowdHash(crowdOrigin.xz);
         if (${near ? 'crowdChoice < crowdFar' : 'crowdChoice >= crowdFar'}) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);`,
       );
   };
-  material.customProgramCacheKey = () => `${key}-swap-${near}`;
+  const rangeTag = swapStart === 24 && swapEnd === 32 ? '' : `-${s0}-${s1}`;
+  material.customProgramCacheKey = () => `${key}-swap-${near}${rangeTag}`;
 }
 
 /**
- * The handover is complete outside 32 m. The registry selects by the chunk's near edge,
+ * The handover is complete outside `swapEnd` m. The registry selects by the chunk's near edge,
  * including its geometry reach, so a plain-idle chunk cannot contain a person in the swap.
  * Both levels share geometry and draw the same figures, colours and motion beyond that edge.
  */
@@ -218,9 +230,11 @@ export function farCrowdLods(
   geometry: BufferGeometry,
   handover: MeshStandardMaterial,
   idle: MeshStandardMaterial,
+  swapEnd = 32,
+  maxDistance = 650,
 ): PropLod[] {
   return [
-    { geometry, material: handover, maxDistance: 32 },
-    { geometry, material: idle, maxDistance: 650 },
+    { geometry, material: handover, maxDistance: swapEnd },
+    { geometry, material: idle, maxDistance },
   ];
 }

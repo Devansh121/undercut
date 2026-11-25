@@ -122,6 +122,31 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
     window.__undercut?.setStartLights(0);
   });
 
+  // Pin Mobile Monza grid headroom (844x390, last grid slot, 20 cars, chase-far): stay at or
+  // below the pre-kit-batching baseline (384 calls / 1.465M triangles).
+  const monzaTrack = JSON.parse(
+    fs.readFileSync(path.resolve('packages/track/data/monza.json'), 'utf8'),
+  ) as { grid: { s: number; d: number }[] };
+  const lastSlot = monzaTrack.grid.at(-1)!;
+  await page.setViewportSize({ width: 844, height: 390 });
+  const gridStats = await page.evaluate(async (slot) => {
+    const u = window.__undercut!;
+    u.autopilot(false);
+    u.drive(null);
+    u.teleport(slot.s, slot.d, 0);
+    u.setTimeScale(0);
+    u.gridCars(19);
+    u.camera('chase-far');
+    u.drive({ throttle: 0, brake: 1, steer: 0 });
+    for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
+    const stats = u.renderStats();
+    u.gridCars(0);
+    return stats;
+  }, lastSlot);
+  expect(gridStats.cars).toBe(20);
+  expect(gridStats.calls, 'Mobile Monza grid draw calls').toBeLessThanOrEqual(384);
+  expect(gridStats.triangles, 'Mobile Monza grid triangles').toBeLessThanOrEqual(1_465_000);
+
   // Quitting releases the world without errors (GL balance with the full world is checked on
   // the GPU by npm run shots -- monza --lifecycle).
   await page.evaluate(() => window.__undercut?.quit());

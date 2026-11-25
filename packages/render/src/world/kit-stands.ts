@@ -197,6 +197,8 @@ export function placeKitStands(
   spectator: (seat: KitSpectator) => void,
   /** Material for the far level (the kit's without its sub-pixel grain); owned by the caller. */
   farMaterial?: Material,
+  /** Mobile preset: skip individual seat pans, hand over to the hull at 160 m, and batch wider. */
+  mobile = false,
 ): { fallback: StandFrame[]; modules: number; crowd: number; geometries: BufferGeometry[] } {
   const result = {
     fallback: [] as StandFrame[],
@@ -211,16 +213,21 @@ export function placeKitStands(
     const key = `${kitId}-${bank}`;
     let id = kinds.get(key);
     if (id) return id;
-    const lods = kit!.lodsFor(kitId, {
+    const rawLods = kit!.lodsFor(kitId, {
       maxDistanceScale: 2.7,
       // The middle level (4,900 to 5,100 triangles a module) only within 25 m, the modelled far
       // level (1,080 to 1,288) to 320 m, and the silhouette hull beyond to 3,240 m.
       distanceCaps: [8 / 2.7, 25 / 2.7, 1200],
       slotColors: { seat: [1, 1, 1] },
     })!;
+    // On Mobile, drop the seat-pan middle level (4,880 to 5,088 tris) and draw the modelled far
+    // level (1,080 to 1,288 tris: treads, risers, columns, handrails and roof framing intact) up
+    // close, handing over to the hull at 160 m.
+    const lods = mobile && rawLods.length > 1 ? [rawLods[rawLods.length - 1]!] : rawLods;
+    for (const l of rawLods) if (!lods.includes(l)) l.geometry.dispose();
     const far = lods[lods.length - 1]!;
     const skylineReach = far.maxDistance;
-    far.maxDistance = Math.min(far.maxDistance, 320);
+    far.maxDistance = Math.min(far.maxDistance, mobile ? 160 : 320);
     if (farMaterial && !Array.isArray(far.material)) far.material = farMaterial;
     const hull = standHullGeometry(kitId.endsWith('roof'));
     result.geometries.push(hull);
@@ -254,8 +261,8 @@ export function placeKitStands(
       gridCell: 40,
       // Batch distant hull cells, mid-range stand banks, and active shadow cells independently of
       // the fine 40 m cells selecting levels and shadow reach.
-      farBatchCell: 360,
-      nearBatchCell: 160,
+      farBatchCell: mobile ? 800 : 360,
+      nearBatchCell: mobile ? 360 : 160,
       shadowBatchCell: 160,
       // The bay reflects the stands as it does the temporary ones (world/water.ts).
       reflect: 'skyline',
