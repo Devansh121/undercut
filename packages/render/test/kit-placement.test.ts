@@ -33,6 +33,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AmbientLight,
   BoxGeometry,
+  Group,
   Mesh,
   PointLight,
   type InstancedMesh,
@@ -836,11 +837,117 @@ describe('replacement structure reflections', () => {
     kit.dispose();
   });
 
+  it('turns each row seat band into a bench under the seated crowd on Mobile', () => {
+    const entry = (catalog.props as unknown as PropCatalogEntry[]).find(
+      (p) => p.id === 'grandstand',
+    )!;
+    const rows = entry.attachments!.filter((a) => a.name.startsWith('crowd-row-'));
+    expect(rows.length).toBe(10);
+    // The far level's seat band, as tools/props/props.py builds it: 0.42 m deep, 0.36 m tall,
+    // centred on the row 0.03 m above the seat surface; plus a tread that must not move.
+    const scene = new Group();
+    const seat = new MeshStandardMaterial({ name: 'seat' });
+    const concrete = new MeshStandardMaterial({ name: 'concrete', color: 0x575550 });
+    for (const r of rows) {
+      const [x, y] = r.position as [number, number, number];
+      const band = new Mesh(new BoxGeometry(0.42, 0.36, 9.2), seat);
+      band.position.set(x, y + 0.03, 0);
+      const tread = new Mesh(new BoxGeometry(0.86, 0.18, 10), concrete);
+      tread.position.set(x, y - 0.51, 0);
+      scene.add(band, tread);
+    }
+    scene.updateMatrixWorld(true);
+    const kit = PropKitAssets.fromScenes(
+      catalog as never,
+      new Map([['grandstand', [{ scene, maxDistance: 1200 }]]]),
+    );
+    const props = new PropRegistry(1000);
+    const define = vi.spyOn(props, 'define');
+    const frame = {
+      id: 'stand',
+      ox: 0,
+      oz: 0,
+      ax: 0,
+      az: 1,
+      bx: -1,
+      bz: 0,
+      base: 0,
+      roof: false,
+      s: 100,
+      seat: [0.1, 0.2, 0.3] as [number, number, number],
+      length: 10,
+      depth: 9.47,
+      rows: 10,
+    };
+    placeKitStands(
+      [frame],
+      kit,
+      props,
+      () => 0,
+      false,
+      () => undefined,
+      undefined,
+      true,
+    );
+    const geometry = define.mock.calls[0]![0].lods[0]!.geometry;
+    const pos = geometry.getAttribute('position');
+    const col = geometry.getAttribute('color');
+    const tris = (geometry.index?.count ?? pos.count) / 3;
+    for (const r of rows) {
+      const [x, y] = r.position as [number, number, number];
+      const bench = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+      for (let v = 0; v < pos.count; v++) {
+        if (col.getX(v) !== 1 || Math.abs(pos.getX(v) - x) > 0.5) continue;
+        if (Math.abs(pos.getY(v) - y) > 0.5) continue;
+        bench.x0 = Math.min(bench.x0, pos.getX(v));
+        bench.x1 = Math.max(bench.x1, pos.getX(v));
+        bench.y0 = Math.min(bench.y0, pos.getY(v));
+        bench.y1 = Math.max(bench.y1, pos.getY(v));
+      }
+      // Top at the seat surface, under the thighs to just behind the shins, down to the tread.
+      expect(bench.y1, r.name).toBeCloseTo(y, 5);
+      expect(bench.y0, r.name).toBeCloseTo(y - 0.42, 5);
+      expect(bench.x1, r.name).toBeCloseTo(x + 0.26, 5);
+      expect(bench.x0, r.name).toBeCloseTo(x - 0.16, 5);
+    }
+    // Every other slot is untouched (compared with the High build of the same level), and the
+    // bench costs no triangles.
+    const highProps = new PropRegistry(1000);
+    const highDefine = vi.spyOn(highProps, 'define');
+    placeKitStands(
+      [frame],
+      kit,
+      highProps,
+      () => 0,
+      false,
+      () => undefined,
+      undefined,
+      false,
+    );
+    const high = highDefine.mock.calls[0]![0].lods[0]!.geometry.getAttribute('position');
+    expect(high.count).toBe(pos.count);
+    let others = 0;
+    for (let v = 0; v < pos.count; v++) {
+      if (col.getX(v) === 1) continue;
+      others++;
+      expect([pos.getX(v), pos.getY(v), pos.getZ(v)]).toEqual([
+        high.getX(v),
+        high.getY(v),
+        high.getZ(v),
+      ]);
+    }
+    expect(others).toBeGreaterThan(0);
+    highProps.dispose();
+    expect(tris).toBe(rows.length * 2 * 12);
+    props.dispose();
+    kit.dispose();
+  });
+
   it('builds compact Mobile far spectators and supports custom crowd swap ranges', () => {
     const full = spectatorGeometry(0, false);
     const compact = spectatorGeometry(0, true);
     expect(full.index!.count / 3).toBe(70);
-    expect(compact.index!.count / 3).toBe(40);
+    expect(compact.index!.count / 3).toBe(50);
     const eye = { value: new Vector3() };
     const mDefault = crowdMaterial({ value: 0 });
     const mMobile = crowdMaterial({ value: 0 });

@@ -118,10 +118,12 @@ export function spectatorGeometry(variant: number, compact = false): BufferGeome
   const shirt = [1, 1, 1];
   const trousers = [0.045, 0.05, 0.065];
   if (compact) {
-    // Mobile far crowd (beyond 14..20 m): one lower-body block and arm-width torso keep all four
-    // colour cues (trousers, shirt, skin, hair) in 40 triangles instead of 70.
+    // Mobile far crowd (beyond 14..20 m), 50 triangles instead of 70: one lower-body block (on the
+    // Mobile stand's bench only its thighs' tops and shins show) and a torso as slim as the full
+    // figure's under one shoulder bar, which keeps a person's silhouette rather than a block's.
     box(-0.04, 0.4, -0.36, 0.14, -0.16, 0.16, trousers);
-    box(-0.18, 0.08, 0.12, 0.64, -0.22, 0.22, shirt);
+    box(-0.18, 0.06, 0.12, 0.64, -0.18, 0.18, shirt);
+    box(-0.02, 0.2, 0.36, 0.52, -0.23, 0.23, shirt);
   } else {
     // Thighs forward on the seat, shins down in front of it.
     box(-0.04, 0.38, 0.0, 0.14, -0.16, 0.16, trousers);

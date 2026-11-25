@@ -187,6 +187,49 @@ function standHullGeometry(roof: boolean): BufferGeometry {
 }
 
 /** Tile human-scale ten-row banks into the mapped footprint; rear banks step up by ten risers. */
+/** Seat surface to the front of a bench, behind a seated figure's shins (row origin = seat). */
+const BENCH_FRONT = 0.26;
+/** Seat surface to the back of a bench: the seat pan's rear edge on the middle level. */
+const BENCH_BACK = 0.16;
+/** Seat surface above the tread's top, the dressing stand's row constant. */
+const SEAT_HEIGHT = 0.42;
+
+/**
+ * Reshape the far level's seat band in each row (a block standing proud of the seat surface,
+ * drawn for distance) into a solid bench whose top is the seat surface, in place. Mobile draws
+ * the far level up close: on the band, seated figures sank to the hips with their legs over bare
+ * treads; on the bench they sit on it, feet on the tread. Same vertices and triangles.
+ * `rows` are the kit's `crowd-row-*` attachments, whose origins are seat surfaces.
+ */
+export function benchSeatRows(
+  geometry: BufferGeometry,
+  rows: readonly { name: string; position: readonly number[] }[],
+): number {
+  const seats = rows
+    .filter((a) => a.name.startsWith('crowd-row-'))
+    .map((a) => ({ x: a.position[0]!, y: a.position[1]! }));
+  const pos = geometry.getAttribute('position');
+  const col = geometry.getAttribute('color');
+  if (!col || seats.length === 0) return 0;
+  let moved = 0;
+  for (let v = 0; v < pos.count; v++) {
+    // The seat slot is white (slotColors), tinted per stand; no other slot is.
+    if (col.getX(v) !== 1 || col.getY(v) !== 1 || col.getZ(v) !== 1) continue;
+    const x = pos.getX(v),
+      y = pos.getY(v);
+    const row = seats.find((r) => Math.abs(x - r.x) < 0.3 && y > r.y - 0.3 && y < r.y + 0.3);
+    if (!row) continue;
+    pos.setX(v, x > row.x ? row.x + BENCH_FRONT : row.x - BENCH_BACK);
+    // Down to the tread's top (inside the tread, never below it: a raised bank's columns stretch
+    // only under 1.6 m), up to the seat surface.
+    pos.setY(v, y > row.y ? row.y : row.y - SEAT_HEIGHT);
+    moved++;
+  }
+  pos.needsUpdate = true;
+  geometry.computeBoundingSphere();
+  return moved;
+}
+
 export function placeKitStands(
   frames: readonly StandFrame[],
   kit: PropKitAssets | null | undefined,
@@ -226,6 +269,7 @@ export function placeKitStands(
     const lods = mobile && rawLods.length > 1 ? [rawLods[rawLods.length - 1]!] : rawLods;
     for (const l of rawLods) if (!lods.includes(l)) l.geometry.dispose();
     const far = lods[lods.length - 1]!;
+    if (mobile) benchSeatRows(far.geometry, kit!.entries.get(kitId)?.attachments ?? []);
     const skylineReach = far.maxDistance;
     far.maxDistance = Math.min(far.maxDistance, mobile ? 160 : 320);
     if (farMaterial && !Array.isArray(far.material)) far.material = farMaterial;
