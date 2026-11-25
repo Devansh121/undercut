@@ -131,8 +131,23 @@ test('online running order agrees at 150 ms latency with two percent loss', asyn
   const { host, guest, close } = await pair(browser, baseURL!, '&netSim=150,20,0.02,150');
   try {
     await start(host, guest);
-    // Let post-start shader/GC activity settle before measuring steady side-by-side running order.
-    await host.waitForTimeout(1500);
+    // Wait for active orders and live peer snapshots before placing the moving pair.
+    // A fixed post-start sleep can expire while either renderer is still warming up.
+    await expect
+      .poll(
+        async () => {
+          const snapshots = await Promise.all([state(host), state(guest)]);
+          return snapshots.every(
+            ({ race }) =>
+              race?.orderEpoch !== undefined &&
+              race.orderEpoch !== null &&
+              race.remote[0]?.opacity === 1 &&
+              race.remote[0]?.mode !== 'held',
+          );
+        },
+        { timeout: 6000 },
+      )
+      .toBe(true);
     await Promise.all(
       [host, guest].map((page, i) =>
         page.evaluate((i) => {
@@ -162,21 +177,39 @@ test('online running order agrees at 150 ms latency with two percent loss', asyn
         },
         { timeout: 6000 },
       )
-      .toBe(true);
-    // Wait past the server order evaluation lag + publish interval + shared activation lead (700 ms)
-    // so the post-teleport order has activated on both browsers before paired sampling starts.
-    await host.waitForTimeout(900);
+      .toBe(true)
+      .catch(async (error: unknown) => {
+        console.log(
+          'Order setup state',
+          JSON.stringify(await Promise.all([state(host), state(guest)])),
+        );
+        throw error;
+      });
     const readSharedOrder = async () => {
       const [h, g] = await Promise.all([state(host), state(guest)]);
-      // Browser processes may be scheduled at different times under software rendering.
-      // Compare their HUD order lookup at the exact same server epoch, never two instants.
-      const at =
-        Math.min(
-          h.race!.start!.lightsOutAt + h.race!.elapsedRaceMs,
-          g.race!.start!.lightsOutAt + g.race!.elapsedRaceMs,
-        ) - 300;
+      // Freeze one active epoch, then wait for receipt AND activation on both clients.
+      // A renderer stall may delay reliable control messages past their scheduled activation.
+      const at = h.race!.orderEpoch;
+      expect(at).not.toBeNull();
+      await expect
+        .poll(
+          async () => {
+            const snapshots = await Promise.all([state(host), state(guest)]);
+            const orders = await Promise.all(
+              [host, guest].map((page) =>
+                page.evaluate((at) => window.__undercut!.onlineOrder(at!), at),
+              ),
+            );
+            return orders.every(
+              (order, i) =>
+                order?.at === at && (snapshots[i]!.race!.orderEpoch ?? -Infinity) >= at!,
+            );
+          },
+          { timeout: 6000 },
+        )
+        .toBe(true);
       const [ho, go] = await Promise.all(
-        [host, guest].map((page) => page.evaluate((at) => window.__undercut!.onlineOrder(at), at)),
+        [host, guest].map((page) => page.evaluate((at) => window.__undercut!.onlineOrder(at!), at)),
       );
       expect(ho).not.toBeNull();
       expect(go).not.toBeNull();
@@ -226,7 +259,6 @@ test('online running order agrees at 150 ms latency with two percent loss', asyn
         { timeout: 10000 },
       )
       .toBe(true);
-    await host.waitForTimeout(400);
     for (let k = 0; k < 10; k++) {
       const { ho, go } = await readSharedOrder();
       expect(ho.order[0]).toBe(trailer);

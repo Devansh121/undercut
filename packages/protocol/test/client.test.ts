@@ -520,6 +520,71 @@ describe('RoomClient over a loopback room', () => {
     expect(a.snapshotStats.sent).toBeLessThan(190);
   });
 
+  it('waits for a matching epoch when control delivery misses activation and the old look-back', () => {
+    const timers = new FakeTimers();
+    const net = new Loopback(timers, 75, 5_000_000, {
+      readyCountdownMs: 100,
+      formationMs: 200,
+      lightIntervalMs: 100,
+    });
+    const a = client(net, 'Ana');
+    let delayOrders = false;
+    const b = new RoomClient({
+      url: 'wss://example.test/rooms/BCDFGH/ws',
+      name: 'Ben',
+      timers,
+      random: () => 0.5,
+      transport: {
+        open: (url, handlers) =>
+          net.open(url, {
+            ...handlers,
+            onText: (text) => {
+              if (delayOrders && JSON.parse(text).type === 'order')
+                timers.setTimeout(() => handlers.onText(text), 900);
+              else handlers.onText(text);
+            },
+          }),
+      },
+    });
+    a.connect();
+    b.connect();
+    timers.advance(2000);
+    a.changeSettings({ aiCount: 0 });
+    timers.advance(300);
+    a.setReady(true);
+    b.setReady(true);
+    for (let i = 0; i < 20; i++) {
+      timers.advance(50);
+      net.tick();
+    }
+    a.markLoaded();
+    b.markLoaded();
+    for (let i = 0; i < 100; i++) {
+      timers.advance(20);
+      net.tick();
+    }
+    expect(a.room?.phase).toBe('racing');
+    expect(b.room?.phase).toBe('racing');
+    delayOrders = true;
+    for (let i = 0; i < 40; i++) {
+      timers.advance(20);
+      net.tick();
+    }
+    const target = a.orderAt(net.serverNow() - 300)!;
+    expect(target).not.toBeNull();
+    // The same query time alone cannot establish receipt: the guest still has an older epoch.
+    expect(b.orderAt(target.at)!.at).toBeLessThan(target.at);
+    const received = () =>
+      [a, b].every(
+        (c) => c.orderAt(target.at)?.at === target.at && c.orderAt(c.serverNow()!)!.at >= target.at,
+      );
+    expect(received()).toBe(false);
+    // Bound delivery using deterministic timers, with no new publication to move the target.
+    timers.advance(900);
+    expect(received()).toBe(true);
+    expect(a.orderAt(target.at)).toEqual(b.orderAt(target.at));
+  });
+
   it('activates the service-published running order identically across clients at 150 ms RTT', () => {
     const timers = new FakeTimers();
     const net = new Loopback(timers, 75, 5_000_000, {

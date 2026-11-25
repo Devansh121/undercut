@@ -412,5 +412,11 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   the existing reset counter and two-second ghost grace, including after migration.
 - Running positions use a service-published order with 200 ms evaluation lag and 300 ms shared
   activation lead, at most 5 Hz. This adds presentation delay while leaving driving immediate.
-- A prediction allowance capped at 0.3 m accounts for closing motion hidden by aged snapshots;
-  fresh or equally moving poses have none. Existing physical safety limits are retained.
+- Speculative contact uses a directional prediction horizon capped at 0.3 m and bounded by
+  snapshot age times closing speed along the separating face normal. The proxy is already
+  extrapolated; this reserves approaching distance only. Tangential or separating motion cannot
+  trigger contact across a gap. Ambiguous corner normals fall back to actual-overlap contact.
+- Browser order comparisons freeze one active epoch and wait up to 6 s for both clients to
+  receive it and reach activation before querying that same timestamp. Startup also waits for
+  active epochs and live peer snapshots. A deterministic 900 ms guest control-message delay
+  covers delivery after the scheduled activation and the former fixed look-back.

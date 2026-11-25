@@ -564,13 +564,20 @@ Worker, and order computation does not write room storage.
 The order regression compares both HUD order lookups at identical server epochs under 150 ms
 latency and 2% loss, then verifies a live overtake on both clients. Epochs are explicit because two
 browser processes can answer simultaneous requests at different times under software rendering.
+Each comparison freezes an active epoch and waits, bounded to 6 s, until both clients have received
+that exact epoch and activated it or a later one. It then queries both histories at the frozen
+timestamp. A deterministic transport test delays guest order delivery by 900 ms, beyond both the
+activation lead and the former 300 ms look-back, and checks receipt before comparing orders.
 Contact proof samples both oriented footprints on the same server timestamps throughout the
 touch, checks side ordering and the unchanged penetration and height limits, and requires zero
 final penetration. Trace payloads are fetched explicitly with the debug API; ordinary status
 queries do not serialize the footprint history.
 
-A remote contact proxy also carries its snapshot age. For converging aged poses the solver
-reserves `age * relativeSpeed` of closing distance, capped at 0.3 m (an estimated prediction
-allowance). Fresh and equally moving poses have no allowance. This starts a bounded planar
-response before hidden closing motion creates a deep overlap. Existing impulse, push-out,
-extrapolation and barrier limits are unchanged.
+A remote contact proxy also carries its snapshot age. The proxy is already extrapolated to
+the current tick. For non-overlapping footprints, an approach-only prediction horizon reserves
+at most `min(0.3 m, age * normalClosingSpeed)` along the separating face normal. Tangential
+speed does not enter the bound; parallel, separating and fresh poses get no speculative contact.
+The solver translates the predicted face along that normal and checks every SAT axis again.
+It requires the same contact normal and approaching contact-point velocities before any push.
+Actual overlaps retain the ordinary solver. Existing impulse, push-out, extrapolation and barrier
+limits are unchanged.
