@@ -469,6 +469,12 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   compositing of the full-window HUD), so both pages sent 2.5–3.6 snapshots a second and saw
   each other held; master failed the desktop order proof and the 100 ms contact proof that way.
   60 Hz frames are never late, and single-player sessions are unchanged.
+- Simulation and presentation keep separate timestamps. Timer steps consume only simulation
+  elapsed time; animation frames give the camera, HUD and frame pacing the full interval since
+  the previous animation frame. The 250 ms simulation stall cap stays in place. Resume resets
+  both clocks so paused time is not caught up. Interleaving tests cover a 10 s, 5 fps schedule
+  with timer callbacks on and around frame boundaries: 10 s presentation and 2,400 sim ticks.
+
 
 ### Decided for you — Mobile prop-kit tuning
 

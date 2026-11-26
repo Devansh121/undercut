@@ -34,3 +34,28 @@ export function stepWithoutFrame(
 ): boolean {
   return visible && lastFrameMs !== null && nowMs - lastFrameMs >= LATE_FRAME_MS;
 }
+
+/** Independent presentation and simulation clocks for interleaved timer/rAF callbacks. */
+export class DriveFrameClock {
+  private lastStepAt: number | null = null;
+  lastFrameAt: number | null = null;
+
+  /** Advance simulation once, whichever callback gets here first. */
+  stepDt(nowMs: number): number {
+    const dt = physicsDt(this.lastStepAt === null ? 0 : nowMs - this.lastStepAt);
+    this.lastStepAt = nowMs;
+    return dt;
+  }
+
+  /** Full interval since the preceding animation frame; timer steps never consume it. */
+  frameElapsedMs(nowMs: number): number {
+    const elapsedMs = this.lastFrameAt === null ? 0 : nowMs - this.lastFrameAt;
+    this.lastFrameAt = nowMs;
+    return elapsedMs;
+  }
+
+  reset(): void {
+    this.lastStepAt = null;
+    this.lastFrameAt = null;
+  }
+}

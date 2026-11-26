@@ -128,7 +128,7 @@ import {
 import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
-import { BACKUP_STEP_MS, physicsDt, stepWithoutFrame } from './frame-timing';
+import { BACKUP_STEP_MS, DriveFrameClock, stepWithoutFrame } from './frame-timing';
 import { speedUnit, setSpeedUnit } from './ui/player-settings';
 import { Onboarding } from './ui/onboarding';
 import { phoneSession } from './ui/phone-session';
@@ -1150,7 +1150,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     input.setContext('driving');
     loop.resume();
     o.audio?.setActive(true);
-    last = null;
+    frameClock.reset();
   }
 
   const onVisibility = (): void => {
@@ -1340,7 +1340,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
   const drawLog: number[] = [];
   let drawnSeen = -1;
-  let last: number | null = null;
+  const frameClock = new DriveFrameClock();
   let clock = 0;
   let handle = 0;
   let lookBack = false;
@@ -1584,7 +1584,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
 
   // Online only: keep the sim, car contact and snapshots going when animation frames are late
   // (frame-timing.ts). The timer runs a frame's CPU work without drawing or touching the HUD.
-  let lastFrameAt: number | null = null;
   let lateTimer: ReturnType<typeof setTimeout> | null = null;
   const stepLate = (): void => {
     lateTimer = null;
@@ -1592,10 +1591,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const now = performance.now();
     if (
       session.phase === 'running' &&
-      stepWithoutFrame(now, lastFrameAt, document.visibilityState === 'visible')
+      stepWithoutFrame(now, frameClock.lastFrameAt, document.visibilityState === 'visible')
     ) {
-      const dt = physicsDt(last === null ? 0 : now - last);
-      last = now;
+      const dt = frameClock.stepDt(now);
       stepRunning(dt);
       if (session.phase === 'running') {
         interpolateCarPose(session.car.previousPose, session.car.pose, loop.alpha, pose);
@@ -1608,19 +1606,19 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const frame = (): void => {
     const now = performance.now();
     if (quitting) return;
-    const elapsedMs = last === null ? 0 : now - last;
-    const dt = physicsDt(elapsedMs);
+    const lastFrameAt = frameClock.lastFrameAt;
+    const elapsedMs = frameClock.frameElapsedMs(now);
+    const dt = Math.max(0, elapsedMs) / 1000;
+    const simDt = frameClock.stepDt(now);
     // The frame log is animation-frame intervals, whatever stepped in between.
     if (lastFrameAt !== null) {
       frameLog.push(now - lastFrameAt);
       if (frameLog.length > FRAME_LOG) frameLog.shift();
     }
-    lastFrameAt = now;
-    last = now;
     if (ext && lateTimer === null) lateTimer = setTimeout(stepLate, BACKUP_STEP_MS);
 
     if (session.phase === 'running') {
-      stepRunning(dt);
+      stepRunning(simDt);
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
       // The controls list follows the device before that device's first press is read.
@@ -1683,7 +1681,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const t = session.readTelemetry();
     const renderTime = loop.renderTime;
     const ghostOn = !ext && session.ghostPoseAt(renderTime, ghostPose);
-    const others = ext?.frame?.({ dt, pose, paused: !playing });
+    const others = ext?.frame?.({ dt: simDt, pose, paused: !playing });
     const revLights =
       t.engineRpm >= REV_FLASH
         ? 16
