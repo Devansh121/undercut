@@ -469,6 +469,29 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   assertions. An earlier commit on this branch moved it to the phone viewport alone after a
   desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
   phone is added rather than substituted.
+- An online session steps its simulation, car contact and snapshots from a timer when no
+  animation frame has come for one snapshot interval (33 ms), without drawing. On the 4-core CI
+  runner the browser presented frames every 150–400 ms with the main thread idle (software
+  compositing of the full-window HUD), so both pages sent 2.5–3.6 snapshots a second and saw
+  each other held; master failed the desktop order proof and the 100 ms contact proof that way.
+  60 Hz frames are never late, and single-player sessions are unchanged.
+- Simulation and presentation keep separate timestamps. Timer steps consume only simulation
+  elapsed time; animation frames give the camera, HUD and frame pacing the full interval since
+  the previous animation frame. The 250 ms simulation stall cap stays in place. Resume resets
+  both clocks so paused time is not caught up. Interleaving tests cover a 10 s, 5 fps schedule
+  with timer callbacks on and around frame boundaries: 10 s presentation and 2,400 sim ticks.
+- Single-player retains the original capped frame delta for presentation as well as simulation;
+  the independent, uncapped presentation delta applies only to online sessions with timer steps.
+- The local rooms proxy opens a fresh upstream HTTP connection for each request. Pooling a
+  health-check socket can race its idle close and make the next room-creation POST return 502.
+  The regression closes reused connections and requires one successful POST without retries.
+- Pit and compound keyboard actions apply before their fixed simulation tick. Previously they
+  waited until the whole catch-up batch completed: at 8× speed, a 250 ms frame advanced two
+  seconds before applying a pit request. Camera actions still return to the presentation path.
+  First-tick regressions cover both normal and stalled frames; browser pit-service assertions
+  and their 50 s deadline are unchanged.
+
+
 
 ### Decided for you — Mobile prop-kit tuning
 
