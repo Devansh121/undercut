@@ -15,6 +15,13 @@ import type { Track } from '@undercut/track';
 import { resolveRules, type RaceRules } from '../rules';
 import { AiController } from './controllers';
 
+/**
+ * Quick Race's grid noise (`AiFieldOptions.gridNoise`): pace shuffled against the grid about as
+ * much as a qualifying session would leave it, so faster cars start behind slower ones and have
+ * to pass them.
+ */
+export const QUICK_RACE_GRID_NOISE = 0.5;
+
 /** Chance per car of a jump start, by default. Small: the field should start cleanly. */
 export const JUMP_START_CHANCE = 0.005;
 
