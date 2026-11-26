@@ -17,11 +17,12 @@ test('race distance has a label, value and reachable options in every race mode'
   await page.goto('/?debug=1&quality=lite&world=lite');
   await openMenu(page);
   const phone = info.project.name === 'phone';
+  // The distance reads in the summary: the card on a phone, the action bar on a desktop.
+  const summary = page.locator(phone ? '.settings-summary__vals' : '.actionbar__summary');
   for (const mode of ['quickRace', 'weekend', 'championship']) {
     await page.locator(`[data-action=mode-${mode}]`).click();
-    await expect(page.locator('.conditions')).toContainText('5 laps');
+    await expect(summary).toContainText('5 laps');
     if (phone) {
-      await expect(page.locator('.settings-summary__vals')).toContainText('5 laps');
       await page.locator('[data-action=edit-settings]').tap();
     } else {
       await expect(page.locator('.settings [data-setting=raceLaps]')).toBeVisible();
@@ -29,7 +30,6 @@ test('race distance has a label, value and reachable options in every race mode'
       await expect(
         page.locator('.settings [data-setting=raceLaps] [aria-checked=true]'),
       ).toHaveText('5 laps');
-      await expect(page.locator('.actionbar__summary')).toContainText('5 laps');
       const options = page.locator('[data-action=edit-race-settings]');
       await expect(options).toHaveText('Race options');
       await options.focus();
@@ -40,7 +40,7 @@ test('race distance has a label, value and reachable options in every race mode'
     await expect(dialog.locator('[data-setting=raceLaps]')).toBeVisible();
     await expect(dialog.locator('[data-setting=automaticPitLimiter]')).toBeVisible();
     await dialog.locator('[data-setting=raceLaps] [data-value="15"]').click();
-    await expect(page.locator('.conditions')).toContainText('15 laps');
+    await expect(summary).toContainText('15 laps');
     await dialog.locator('[data-setting=raceLaps] [data-value="5"]').click();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();

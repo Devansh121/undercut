@@ -322,7 +322,7 @@ export class HubScreen implements Screen {
     const c = this.circuit();
     this.o.onStart({
       mode: p.mode,
-      laps: Math.max(5, Math.min(c.raceLaps, p.race.laps)),
+      laps: this.raceLaps(c),
       circuit: c.id,
       team: p.team,
       driver: p.driver,
@@ -337,6 +337,11 @@ export class HubScreen implements Screen {
     this.start.disabled = loading || !this.canStart(p.mode, this.circuit().id);
     this.root.setAttribute('aria-busy', String(loading));
     setButtonLabel(this.start, loading ? S.menu.loading : S.modes[this.o.prefs.get().mode].start);
+  }
+
+  /** The race distance chosen for this circuit: the menu shows it and a started race runs it. */
+  private raceLaps(c: CircuitSummary): number {
+    return Math.max(5, Math.min(c.raceLaps, this.o.prefs.get().race.laps));
   }
 
   private circuit(): CircuitSummary {
@@ -461,8 +466,6 @@ export class HubScreen implements Screen {
       chip('route', c.direction === 'clockwise' ? S.circuit.clockwise : S.circuit.anticlockwise),
       chip('drop', S.circuit.dry),
     );
-    if (mode === 'quickRace' || mode === 'weekend' || mode === 'championship')
-      chips.append(chip('flag', lapsText(Math.max(5, Math.min(c.raceLaps, p.race.laps)))));
     if (!c.raceReady) chips.append(chip('stopwatch', S.circuit.timeTrialOnly));
     else if (mode === 'quickRace' && c.raceTrim)
       chips.append(chip('car', S.circuit.raceDownforce[c.raceTrim] ?? c.raceTrim));
@@ -506,7 +509,7 @@ export class HubScreen implements Screen {
     this.presetLabel.textContent = S.setup.preset(S.menu.deviceNames[this.device]);
     this.resetInline.hidden = p.assists[this.device] === undefined;
     const raceMode = mode === 'quickRace' || mode === 'weekend' || mode === 'championship';
-    const distance = lapsText(Math.max(5, Math.min(c.raceLaps, p.race.laps)));
+    const distance = lapsText(this.raceLaps(c));
     this.summaryText.textContent = [raceMode ? distance : '', settingsSummary(p, c, this.device)]
       .filter(Boolean)
       .join(' · ');
