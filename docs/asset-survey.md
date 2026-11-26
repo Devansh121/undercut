@@ -18,7 +18,7 @@ Shipped as 1k Radiance `.hdr` for image-based lighting (prefiltered at load), wi
 | Use | Asset | 1k / 2k `.hdr` | Sample URL | Check |
 |---|---|---|---|---|
 | Monza afternoon | `kloofendal_48d_partly_cloudy_puresky` (Poly Haven) | 1.4 MB / 5.5 MB | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr | 206 |
-| Spa overcast | `kloofendal_overcast_puresky` (Poly Haven) | 1.2 MB / 4.3 MB | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_overcast_puresky_2k.hdr | 206 |
+| Spa overcast | `overcast_soil_puresky` (Poly Haven, CC0; replaced `kloofendal_overcast_puresky`, which read as a flat grey sky in the game) | 4k `.hdr` 16.9 MB | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/overcast_soil_puresky_4k.hdr | 200 |
 | Singapore night | `kloppenheim_07_puresky` (Poly Haven; overcast night sky lit by city glow) | 1.3 MB / 5.0 MB | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_07_puresky_2k.hdr | 206 |
 | Night reflections (option) | `shanghai_bund` (Poly Haven; urban night, for reflection probes only, never shown as background because the skyline is recognisable) | 1.6 MB / 6.5 MB | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/shanghai_bund_2k.hdr | 206 |
 | Studio (car renders, menus) | `studio_small_09` (Poly Haven) | 6.3 MB at 2k | https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr | 200 |

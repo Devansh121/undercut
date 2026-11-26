@@ -51,6 +51,62 @@ export interface TrackViewOptions {
 }
 
 /**
+ * How the grass varies between the texture's grain and the large lush-to-dry patches, and how the
+ * verges are mown. Multipliers on linear albedo; widths in metres.
+ */
+export const GRASS = Object.freeze({
+  /** Darkest and lightest clump, about two metres across. */
+  clump: [0.8, 1.14] as const,
+  /** Darkest and lightest tuft, about half a metre across. */
+  tuft: [0.9, 1.07] as const,
+  /** Clover and weeds: deeper, bluer green, and how much of the lawn they cover (0–1). */
+  clover: { tint: [0.8, 0.93, 0.9] as const, cover: 0.22 },
+  /** Thin, dry patches where straw shows, and their cover (0–1). */
+  thin: { tint: [1.14, 1.06, 0.8] as const, cover: 0.14 },
+  /** Mowing: band width (one pass of a ride-on deck), m. */
+  mowWidth: 3.2,
+  /** Albedo difference between the two directions of cut, seen across the lay of the blades. */
+  mowBase: 0.04,
+  /** Extra brightness seen along the lay (blades leaning away), darker against it. */
+  mowSheen: 0.085,
+});
+
+const v3 = (c: readonly number[]): string => `vec3(${c.map((x) => x.toFixed(3)).join(', ')})`;
+
+/** Metre-scale variation of the sward (inside GRASS_COLOUR's block; uses `macro`, `macroFine`). */
+const GRASS_SWARD = `
+        diffuseColor.rgb *= mix(${GRASS.clump[0].toFixed(3)}, ${GRASS.clump[1].toFixed(3)}, macroFine.a);
+        diffuseColor.rgb *= mix(${GRASS.tuft[0].toFixed(3)}, ${GRASS.tuft[1].toFixed(3)}, texture2D(uMacro, macroUv * 0.23 + 0.71).a);
+        float clover = smoothstep(${(1 - GRASS.clover.cover).toFixed(3)} - 0.12, ${(1 - GRASS.clover.cover).toFixed(3)} + 0.08, macroFine.r * 0.65 + macro.b * 0.35);
+        diffuseColor.rgb *= mix(vec3(1.0), ${v3(GRASS.clover.tint)}, clover);
+        float thin = smoothstep(${(1 - GRASS.thin.cover).toFixed(3)} - 0.1, ${(1 - GRASS.thin.cover).toFixed(3)} + 0.08, macroFine.g * 0.45 + macro.g * 0.55);
+        diffuseColor.rgb *= mix(vec3(1.0), ${v3(GRASS.thin.tint)}, thin * (1.0 - clover));`;
+
+/**
+ * Mowing stripes on the circuit's own grass (track UVs: u is d across, v is s along the lap):
+ * bands parallel to the track edge, cut in alternate directions. A band whose blades lean away
+ * from the eye shows their lit sides and reads lighter, one leaning toward it darker, so the
+ * stripes swap as the camera turns, as they do on a real lawn. The band edge is antialiased and
+ * the stripes fade out where a band shrinks toward a pixel.
+ */
+export const GRASS_MOWING = `
+      {
+        float bandX = vSurfUv.x / ${GRASS.mowWidth.toFixed(2)};
+        float fw = fwidth(bandX);
+        float tri = abs(fract(bandX) - 0.5) * 4.0 - 1.0;
+        float cut = clamp(tri / max(2.0 * fw, 1e-4), -1.0, 1.0);
+        float keep = 1.0 - smoothstep(0.12, 0.45, fw);
+        // Direction of increasing s on the surface (gradient of v, cotangent frame).
+        vec3 dpx = dFdx(vSurfWorld);
+        vec3 dpy = dFdy(vSurfWorld);
+        vec3 sn = cross(dpx, dpy);
+        vec3 along = cross(dpy, sn) * dFdx(vSurfUv.y) + cross(sn, dpx) * dFdy(vSurfUv.y);
+        vec2 eye = cameraPosition.xz - vSurfWorld.xz;
+        float lay = dot(along.xz, eye) / max(length(along.xz) * length(eye), 1e-6);
+        diffuseColor.rgb *= 1.0 + cut * keep * (${GRASS.mowBase.toFixed(3)} + ${GRASS.mowSheen.toFixed(3)} * lay);
+      }`;
+
+/**
  * Grass colour variation (shader chunk for the surface material): a coarser sample of the same
  * texture faded in with distance so the tile never repeats toward the horizon, lush-to-dry
  * patches. Shared with the world's ground so the verges and the land match.
@@ -63,6 +119,10 @@ export const GRASS_COLOUR = `
         vec3 lush = vec3(0.84, 0.86, 0.66);
         vec3 dry = vec3(1.12, 1.0, 0.72);
         diffuseColor.rgb *= mix(lush, dry, smoothstep(0.25, 0.88, macro.r)) * mix(0.8, 1.1, macro.g);
+        // Metre-scale sward: clumps a shade darker or lighter, clover and weed patches (deeper,
+        // bluer green) and thin, dry patches (straw showing), so the lawn is not one even green
+        // between the texture's 1.4 m grain and the 20 m lush-to-dry patches.
+        ${GRASS_SWARD}
       }`;
 
 const MAX_GRID = 24;
@@ -299,14 +359,15 @@ export class TrackView {
     map.set(MeshSurface.Kerb, kerb('kerb', '#a8221d', '#e6e3dc', 2.0));
     map.set(MeshSurface.KerbHigh, kerb('kerb-high', '#d9ab1a', '#1b1c1e', 1.2));
 
-    // Grass: real grass, its colour broken by two noise scales, and a coarser sample of the same
-    // texture faded in with distance so the tile never repeats visibly toward the horizon.
+    // Grass: real grass, its colour broken by noise at three scales, and a coarser sample of the
+    // same texture faded in with distance so the tile never repeats visibly toward the horizon.
+    // The verges are mown in stripes along the track; the land beyond is not.
     const grassColour = GRASS_COLOUR;
     const grass = this.keep(
       surfaceMaterial(
         sets.grass,
         macro,
-        { key: 'grass', colour: grassColour },
+        { key: 'grass', colour: grassColour + GRASS_MOWING },
         { aoMapIntensity: 1 },
       ),
     );
