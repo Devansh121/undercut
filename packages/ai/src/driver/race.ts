@@ -238,6 +238,8 @@ const HAZARD_SEE = 600;
 const HAZARD_SPEED = BYPASS_SPEED + 2;
 /** A car within this distance behind puts the driver under pressure (more errors), m. */
 const PRESSURE_BEHIND = 30;
+/** From lap two the car's centre goes no further than this past the white line, m. */
+const LINE_EDGE_SLACK = 0.3;
 /** No error starts with a car closer than this behind, m. */
 const ERROR_CLEAR_BEHIND = 12;
 /** A slowing pit entrant holds racing moves only this close ahead, m. */
@@ -1456,8 +1458,16 @@ export class RaceDriver implements Driver {
     if (this.rejoinTime <= 0 && !this.recovering) {
       const ld0 = this.at(line.d, s0);
       const margin = BODY_HALF_WIDTH + EDGE_MARGIN;
-      const eLo = Math.min(0, -(this.at(plan.track.halfWidth[1], s0) - margin) - ld0);
-      const eHi = Math.max(0, this.at(plan.track.halfWidth[0], s0) - margin - ld0);
+      let eLo = Math.min(0, -(this.at(plan.track.halfWidth[1], s0) - margin) - ld0);
+      let eHi = Math.max(0, this.at(plan.track.halfWidth[0], s0) - margin - ld0);
+      // From lap two, where the line itself runs the car's centre more than `LINE_EDGE_SLACK`
+      // past the white line (Singapore's turn 7 and its other kerbs, two places at Spa), the car
+      // keeps that close: a few tenths wider there and all four wheels were off. (Lap one keeps
+      // the line, as the starts were proved on it.)
+      if (later) {
+        eLo = Math.max(eLo, -(this.at(plan.track.halfWidth[1], s0) + LINE_EDGE_SLACK) - ld0);
+        eHi = Math.min(eHi, this.at(plan.track.halfWidth[0], s0) + LINE_EDGE_SLACK - ld0);
+      }
       this.o = Math.max(eLo, Math.min(eHi, this.o));
     }
     // In a move the lane is held against the line sweeping under it, and the controller
