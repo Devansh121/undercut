@@ -1060,22 +1060,25 @@ describe('race driver: a move given up under braking', () => {
 });
 
 describe('race driver: moves from lap two', () => {
-  function dive(gap: number, openingLap = false) {
+  function dive(gap: number, openingLap = false, across = 3.7, side = -1) {
     const dr = driver();
     const s = 370;
-    const me = { id: 0, s, d: lineD(dr, s) - 3.7, speed: 85 };
+    const me = { id: 0, s, d: lineD(dr, s) + side * across, speed: 85 };
     const ahead = { id: 1, s: s + gap, d: lineD(dr, s + gap), speed: 80 };
     dr['wasActive'] = true;
     dr['heldTime'] = 5;
     dr['passId'] = 1;
-    dr['passSide'] = -1;
-    dr['o'] = -3.7;
+    dr['passSide'] = side;
+    dr['o'] = side * across;
     tick(dr, me, [ahead], { openingLap });
     return dr;
   }
 
-  it('commits to a braking-zone move from up to a length behind an overlap', () => {
+  it('commits to a braking-zone move from up to a length behind an overlap, once out of its path', () => {
     expect(dive(8)['passCommitted']).toBe(true);
+    expect(dive(8, false, 1.2)['passCommitted']).toBe(false);
+    // Never round the outside from lap two (the first chicane turns right).
+    expect(dive(8, false, 3.7, 1)['passCommitted']).toBe(false);
     expect(dive(8, true)['passCommitted']).toBe(false);
     expect(dive(14)['passCommitted']).toBe(false);
   });

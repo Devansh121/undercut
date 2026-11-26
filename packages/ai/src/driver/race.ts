@@ -1043,14 +1043,23 @@ export class RaceDriver implements Driver {
         !this.passCommitted &&
         passCar !== null &&
         passDs >= 0.6 * CAR_LENGTH &&
-        (passDs < OVERLAP + (later ? LATE_DIVE : 0) || this.slowInCorners(passCar.id)) &&
+        // (From lap two, up to a length behind an overlap once out of the car's path.)
+        (passDs < OVERLAP ||
+          (later &&
+            passDs < OVERLAP + LATE_DIVE &&
+            Math.abs(passCar.d - ldHere - myO) >= CAR_WIDTH + PASS_CLEARANCE) ||
+          this.slowInCorners(passCar.id)) &&
         this.heldTime > 1.5 - aggression
       ) {
         const lane =
           passCar.d -
           ldHere +
           this.passSide * (passSideBySide(v) + passCar.halfWidth - BODY_HALF_WIDTH);
+        // (From lap two only on the inside of the corner: round the outside of La Source the
+        // line runs to the edge, the lane closed, and the two cars met.)
+        const inside = this.cornerSign(s0, true);
         this.passCommitted =
+          (!later || inside === 0 || inside === this.passSide) &&
           this.laneClear(view, s0, lane, passCar.id) &&
           this.levelInTime(
             s0,
@@ -1286,9 +1295,11 @@ export class RaceDriver implements Driver {
         }
         const lane = od + side * sep;
         // A move started in the braking zone is committed from the start, or not made.
+        const insideHere = this.cornerSign(s0, true);
         const sure =
           !cornering ||
           (side !== 0 &&
+            (!later || insideHere === 0 || insideHere === side) &&
             this.laneClear(view, s0, lane, leader.id) &&
             this.levelInTime(
               s0,
