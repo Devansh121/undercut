@@ -5,7 +5,7 @@
  * edit button, and secondary text drops out.
  */
 import type { DeviceKind } from '@undercut/input';
-import { formatLapTime } from '../../game/format';
+import { lapsText, formatLapTime } from '../../game/format';
 import type { RecordStore } from '../../game/records';
 import { el } from '../dom';
 import type { CircuitSummary } from '../data/circuit-summary';
@@ -177,9 +177,9 @@ export class HubScreen implements Screen {
         this.settingsDialog.show();
       },
     });
-    const raceEdit = iconButton({
-      icon: 'edit',
-      label: 'Race distance and pit limiter',
+    const raceEdit = button({
+      label: 'Race options',
+      variant: 'quiet',
       action: 'edit-race-settings',
       onClick: () => {
         this.inDialog.sync();
@@ -461,6 +461,8 @@ export class HubScreen implements Screen {
       chip('route', c.direction === 'clockwise' ? S.circuit.clockwise : S.circuit.anticlockwise),
       chip('drop', S.circuit.dry),
     );
+    if (mode === 'quickRace' || mode === 'weekend' || mode === 'championship')
+      chips.append(chip('flag', lapsText(Math.max(5, Math.min(c.raceLaps, p.race.laps)))));
     if (!c.raceReady) chips.append(chip('stopwatch', S.circuit.timeTrialOnly));
     else if (mode === 'quickRace' && c.raceTrim)
       chips.append(chip('car', S.circuit.raceDownforce[c.raceTrim] ?? c.raceTrim));
@@ -503,7 +505,11 @@ export class HubScreen implements Screen {
     }
     this.presetLabel.textContent = S.setup.preset(S.menu.deviceNames[this.device]);
     this.resetInline.hidden = p.assists[this.device] === undefined;
-    this.summaryText.textContent = settingsSummary(p, c, this.device);
+    const raceMode = mode === 'quickRace' || mode === 'weekend' || mode === 'championship';
+    const distance = lapsText(Math.max(5, Math.min(c.raceLaps, p.race.laps)));
+    this.summaryText.textContent = [raceMode ? distance : '', settingsSummary(p, c, this.device)]
+      .filter(Boolean)
+      .join(' · ');
 
     // Team and driver.
     const team = teamById(p.team);
@@ -558,7 +564,7 @@ export class HubScreen implements Screen {
       ...(settings
         ? [
             this.summaryPart(
-              S.timeOfDay[tod] ?? '',
+              [raceMode ? distance : '', S.timeOfDay[tod] ?? ''].filter(Boolean).join(' · '),
               S.setup.assistsFor(S.menu.deviceNames[this.device]),
             ),
           ]

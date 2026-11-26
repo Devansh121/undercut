@@ -311,6 +311,12 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     });
   }
 
+  if (isPhone) {
+    await page.getByTestId('onboarding').evaluate((el) => {
+      (el as HTMLElement).hidden = false;
+    });
+  }
+
   // Call a pit stop and verify the pit message enters the race-control message queue.
   await page.evaluate(() => {
     window.__undercut!.setTimeScale(1);
@@ -324,6 +330,7 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(page.getByTestId('race-messages')).toBeVisible();
   await expect(page.getByTestId('race-messages')).toContainText(/Box/i);
   await expect(page.locator('.pit-panel__head')).toBeVisible();
+  if (isPhone) await expect(page.getByTestId('onboarding')).toBeHidden();
   await page.evaluate(() => window.__undercut!.setTimeScale(0));
 
   // Accessibility hooks (colour-blind palette, reduced motion, HUD scale) and full fit sweep
@@ -381,6 +388,8 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
     /Servicing tyres|Serving 5 s penalty|Pit stop|Pit penalty/i,
   );
   await expect(tower.locator('.hud-tower__row.is-player.is-in-pit')).toBeVisible();
+  await expect(raceFlag).toBeHidden();
+  await expect(raceFlag).not.toHaveAttribute('data-flag');
   await capture('pit-service');
   await page.evaluate(() => document.documentElement.style.setProperty('--hud-scale', '1.1'));
   expect(await fitEverywhere(page, { label: 'pit service with HUD scale', sizes })).toEqual([]);
@@ -396,6 +405,9 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   });
   await expect(tower.locator('.hud-tower__row.is-player .hud-tower__tyre')).toHaveText('H');
   await expect(tower.locator('.hud-tower__row.is-player .hud-tower__pits')).toHaveText('1');
+
+  // The first completed lap is visible in race modes, as it already was in Time Trial.
+  await expect(page.getByTestId('last-lap')).toHaveText(/\d+:\d{2}\.\d{3}/);
 
   // Either provisional appears (click Skip to results atomically) or final raceResult arrives directly.
   await page.waitForFunction(

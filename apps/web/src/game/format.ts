@@ -49,3 +49,8 @@ export function formatRaceStatus(
       return 'Not classified';
   }
 }
+
+/** A lap count in session options, standings and results. */
+export function lapsText(laps: number): string {
+  return `${laps} ${laps === 1 ? 'lap' : 'laps'}`;
+}

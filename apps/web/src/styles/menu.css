@@ -1736,8 +1736,9 @@
   }
 }
 
-/* The inline assist card keeps its established height; the edit button opens race options. */
-.settings .race-setting,
+/* Race distance takes the inline stability row's space; full options stay in the dialog. */
+.settings .race-setting:not(.race-distance-setting),
+.hub:not([data-mode='timeTrial']) .settings .stability-setting,
 .hub[data-mode='timeTrial'] .race-setup-edit {
   display: none;
 }
@@ -1758,14 +1759,15 @@
 }
 
 .settings__aside .race-setup-edit {
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
+  width: auto;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
 }
 
 /* The device tabs are touch targets on a phone. */
 @media (pointer: coarse) {
+  .settings__aside .race-setup-edit,
   .controls__tabs .tab {
     min-height: 44px;
   }

@@ -151,8 +151,11 @@ test('two players race, rematch, leave and migrate the host', async ({
       if (page === host)
         expect([await programs(host), await programs(guest)]).toEqual(programsAtStart);
     }
-    for (const page of [host, guest])
+    for (const page of [host, guest]) {
       await expect(page.getByTestId('online-results')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('online-results')).toContainText('1 lap ·');
+      await expect(page.getByTestId('online-results')).not.toContainText('1 laps');
+    }
     expect((await state(host)).state?.results).toEqual((await state(guest)).state?.results);
     expect((await state(host)).state?.results?.rows.map((r) => r.name)).toEqual(['Host', 'Guest']);
     await host.getByRole('button', { name: 'Rematch', exact: true }).click();

@@ -1,3 +1,4 @@
+import { lapsText } from '../game/format';
 import { el } from '../ui/dom';
 import { displayCode, inviteLink, networkOrigin } from './invite';
 import type { OnlineSession } from './session';
@@ -123,8 +124,8 @@ export class RoomScreens {
               '',
               r.name +
                 ' · ' +
-                r.laps +
-                ' laps · ' +
+                lapsText(r.laps) +
+                ' · ' +
                 r.status +
                 ' · ' +
                 (r.timeMs === null ? '—' : (r.timeMs / 1000).toFixed(3) + ' s'),
