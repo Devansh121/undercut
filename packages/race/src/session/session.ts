@@ -38,6 +38,13 @@ import type { CarController, ControlContext, ControllerState } from './controlle
 import { wakeStrength } from './wake';
 
 /**
+ * The tow is released before any bend tighter than this, 1/m (a 150 m radius: the racing
+ * drivers' own corner): through a straight's kinks the wake still lines up, and only braking
+ * zones and corners need the measured car.
+ */
+const TOW_BEND = 1 / 150;
+
+/**
  * Estimated grid condition after an unmodelled formation lap: every starting set (human and
  * AI) is 5 K inside its window. Blankets alone cool further on the run to Monza turn one
  * (seed 5: 16/20 clean); the grid warm-up represents work before the start, not extra grip.
@@ -415,7 +422,7 @@ export class RaceSession {
         // recovery controller then see their measured car throughout the braking zone.
         let straight = true;
         for (let x = 0; x <= 120 + state.vx * 2; x += 20) {
-          if (Math.abs(this.track.curvatureAt(this.track.wrap(f.s + x))) > 1 / 500) {
+          if (Math.abs(this.track.curvatureAt(this.track.wrap(f.s + x))) > TOW_BEND) {
             straight = false;
             break;
           }
