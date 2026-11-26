@@ -1,12 +1,12 @@
 {
   "high": {
     "file": "car_high.glb",
-    "bytes": 1427732,
-    "triangles": 119582,
+    "bytes": 1431612,
+    "triangles": 119954,
     "draw_calls": 40,
     "nodes": {
       "body": {
-        "triangles": 74726,
+        "triangles": 75098,
         "primitives": 7,
         "materials": [
           "paint",
@@ -53,7 +53,7 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 3690,
+        "triangles": 3930,
         "primitives": 7,
         "materials": [
           "carbon",
@@ -67,7 +67,7 @@
         "morph_targets": 0
       },
       "upright_FL": {
-        "triangles": 1296,
+        "triangles": 1236,
         "primitives": 2,
         "materials": [
           "carbon",
@@ -86,7 +86,7 @@
         "morph_targets": 0
       },
       "upright_FR": {
-        "triangles": 1296,
+        "triangles": 1236,
         "primitives": 2,
         "materials": [
           "carbon",
@@ -113,7 +113,7 @@
         "morph_targets": 6
       },
       "upright_RL": {
-        "triangles": 944,
+        "triangles": 884,
         "primitives": 2,
         "materials": [
           "carbon",
@@ -132,7 +132,7 @@
         "morph_targets": 0
       },
       "upright_RR": {
-        "triangles": 944,
+        "triangles": 884,
         "primitives": 2,
         "materials": [
           "carbon",
@@ -231,17 +231,18 @@
   },
   "mobile": {
     "file": "car_mobile.glb",
-    "bytes": 654436,
-    "triangles": 39950,
-    "draw_calls": 25,
+    "bytes": 657576,
+    "triangles": 39820,
+    "draw_calls": 26,
     "nodes": {
       "body": {
-        "triangles": 21814,
-        "primitives": 3,
+        "triangles": 21892,
+        "primitives": 4,
         "materials": [
           "paint",
           "dark",
-          "carbon"
+          "carbon",
+          "mirror_glass"
         ],
         "morph_targets": 0
       },
@@ -279,7 +280,7 @@
         "morph_targets": 0
       },
       "steering_wheel": {
-        "triangles": 1474,
+        "triangles": 1594,
         "primitives": 4,
         "materials": [
           "carbon",
@@ -290,7 +291,7 @@
         "morph_targets": 0
       },
       "upright_FL": {
-        "triangles": 708,
+        "triangles": 626,
         "primitives": 1,
         "materials": [
           "brake_disc"
@@ -307,7 +308,7 @@
         "morph_targets": 0
       },
       "upright_FR": {
-        "triangles": 708,
+        "triangles": 626,
         "primitives": 1,
         "materials": [
           "brake_disc"
@@ -332,7 +333,7 @@
         "morph_targets": 6
       },
       "upright_RL": {
-        "triangles": 612,
+        "triangles": 530,
         "primitives": 1,
         "materials": [
           "brake_disc"
@@ -349,7 +350,7 @@
         "morph_targets": 0
       },
       "upright_RR": {
-        "triangles": 612,
+        "triangles": 530,
         "primitives": 1,
         "materials": [
           "brake_disc"
@@ -611,5 +612,5 @@
       "bytes": 24276
     }
   },
-  "total_bytes": 2675421
+  "total_bytes": 2682441
 }
