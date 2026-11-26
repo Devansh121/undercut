@@ -1080,3 +1080,37 @@ describe('race driver: moves from lap two', () => {
     expect(dive(14)['passCommitted']).toBe(false);
   });
 });
+
+describe('race driver: a racing line past the white line', () => {
+  it('keeps the car within 0.3 m of the white line from lap two, and drives the line on lap one', () => {
+    const circuit = SINGAPORE.track();
+    const offset = (openingLap: boolean) => {
+      const dr = createRaceDriver({
+        track: circuit,
+        line: loadLine(SINGAPORE),
+        envelope: loadEnvelope(SINGAPORE),
+        params: createCarParams(SINGAPORE.trim),
+        skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
+      });
+      const s = 2850;
+      const ld = dr['at'](dr.plan.line.d, s) as number;
+      dr['wasActive'] = true;
+      const v = createTrafficView(0);
+      Object.assign(v.self, { id: 0, s, d: ld, speed: 50 });
+      v.active = true;
+      v.openingLap = openingLap;
+      dr.sense(v);
+      const tel = createCarTelemetry();
+      const p = circuit.pointAt(s, ld, createVec3());
+      const tangent = circuit.tangentAt(s, createVec3());
+      Object.assign(tel, { x: p.x, z: p.z, yaw: Math.atan2(-tangent.z, tangent.x), speed: 50 });
+      dr.drive(tel, DT, { ...NEUTRAL_INPUT });
+      return { o: dr.last.offset, line: ld, edge: -(dr['at'](circuit.halfWidth[1], s) as number) };
+    };
+    const later = offset(false);
+    // The line runs the car's centre 0.67 m past the right-hand white line here.
+    expect(later.line).toBeLessThan(later.edge - 0.5);
+    expect(later.line + later.o).toBeGreaterThanOrEqual(later.edge - 0.3 - 1e-6);
+    expect(Math.abs(offset(true).o)).toBeLessThan(0.05);
+  });
+});
