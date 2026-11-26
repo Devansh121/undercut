@@ -208,6 +208,8 @@ const LATE_DIVE = CAR_LENGTH;
 const LATE_COOLDOWN = 1.5;
 /** From lap two, a move ends once the car being passed is this far ahead, m. */
 const DROPPED_BACK = 60;
+/** From lap two, a move out of the wake that has not gained for this long is given up, s. */
+const PASS_STALL = 1.5;
 /** A car ahead cornering under this share of this car's plan is a car to press (`quicker`). */
 const PRESS_PACE = 0.997;
 /** Pressing a slower car from lap two: the most headway kept through corners, s. */
@@ -318,6 +320,8 @@ export class RaceDriver implements Driver {
   private passSide = 0;
   private passTime = 0;
   private passBlocked = 0;
+  /** A later-lap move out of the wake: time it has gone without gaining, s. */
+  private passStall = 0;
   private cooldown = 0;
   private heldTime = 0;
   private switchbackId = -1;
@@ -431,6 +435,7 @@ export class RaceDriver implements Driver {
     this.passSide = 0;
     this.passTime = 0;
     this.passBlocked = 0;
+    this.passStall = 0;
     this.cooldown = 0;
     this.heldTime = 0;
     this.switchbackId = -1;
@@ -480,6 +485,7 @@ export class RaceDriver implements Driver {
     out.passSide = this.passSide;
     out.passTime = this.passTime;
     out.passBlocked = this.passBlocked;
+    out.passStall = this.passStall;
     out.cooldown = this.cooldown;
     out.heldTime = this.heldTime;
     out.switchbackId = this.switchbackId;
@@ -546,6 +552,7 @@ export class RaceDriver implements Driver {
     this.passSide = num('passSide');
     this.passTime = num('passTime');
     this.passBlocked = num('passBlocked');
+    this.passStall = typeof m.passStall === 'number' ? m.passStall : 0;
     this.cooldown = num('cooldown');
     this.heldTime = num('heldTime');
     this.switchbackId = typeof m.switchbackId === 'number' ? m.switchbackId : -1;
@@ -1111,9 +1118,17 @@ export class RaceDriver implements Driver {
         // for cars side by side keep the air between them, and the line comes back once clear.
         if (this.passCommitted && passDs < ALONGSIDE && (cornering || midCorner)) base = this.o;
         if (towHold) base = od;
-        if (this.passBlocked > 0.6) {
+        // From lap two, out of the wake and not gaining on the car: given up here, on the
+        // straight. Kept on beside it at the same speed, the move ended under braking and the car
+        // came back across to the line there, off the road at Ascari.
+        this.passStall =
+          later && !this.passCommitted && !towHold && v < passCar!.speed + 0.5
+            ? this.passStall + dt
+            : 0;
+        if (this.passBlocked > 0.6 || this.passStall > PASS_STALL) {
           this.passId = -1;
           this.cooldown = 3;
+          this.passStall = 0;
           base = 0;
         } else if (this.passBypass) {
           // Round a stopped car the lane is the one beside it on the road; a car already further
@@ -1181,6 +1196,7 @@ export class RaceDriver implements Driver {
         this.passSide = side;
         this.passTime = 0;
         this.passBlocked = 0;
+        this.passStall = 0;
         this.passCommitted = false;
         this.passBypass = true;
         base = ob.d - ldHere + side * (BYPASS_SIDE_BY_SIDE + ob.halfWidth - BODY_HALF_WIDTH);
@@ -1256,6 +1272,7 @@ export class RaceDriver implements Driver {
           this.passSide = side;
           this.passTime = 0;
           this.passBlocked = 0;
+          this.passStall = 0;
           this.passCommitted = cornering;
           base = lane;
         } else this.cooldown = 1;

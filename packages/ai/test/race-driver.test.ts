@@ -1007,6 +1007,34 @@ describe('race driver: small errors', () => {
   });
 });
 
+describe('race driver: a move that stops gaining', () => {
+  function beside(faster: number) {
+    const dr = driver();
+    const s = 0;
+    const me = { id: 0, s, d: lineD(dr, s) + 3.7, speed: 80 + faster };
+    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 80 };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = 1;
+    dr['o'] = 3.7;
+    // Scripted: both cars hold their speeds and lanes for 1.7 s.
+    for (let k = 0; k < Math.round(1.7 / DT); k++) {
+      tick(dr, me, [ahead], { openingLap: false });
+      me.s += me.speed * DT;
+      me.d = lineD(dr, me.s) + 3.7;
+      ahead.s += ahead.speed * DT;
+      ahead.d = lineD(dr, ahead.s);
+    }
+    return dr.last.passing;
+  }
+
+  it('is given up on the straight from lap two, and goes on while it gains', () => {
+    expect(beside(0)).toBe(-1);
+    expect(beside(3)).toBe(1);
+  });
+});
+
 describe('race driver: moves from lap two', () => {
   function dive(gap: number, openingLap = false) {
     const dr = driver();
