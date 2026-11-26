@@ -152,6 +152,8 @@ interface Chunk {
 interface LevelBatch {
   mesh: InstancedMesh;
   chunks: Chunk[];
+  /** Chunks currently stored at the start of `mesh.instanceMatrix` (and `instanceColor`). */
+  packed: Chunk[];
   level: number;
   dirty: boolean;
 }
@@ -159,6 +161,8 @@ interface LevelBatch {
 interface ShadowBatch {
   mesh: InstancedMesh;
   chunks: Chunk[];
+  /** Chunks currently stored at the start of `mesh.instanceMatrix`. */
+  packed: Chunk[];
   level: number;
   dirty: boolean;
 }
@@ -433,7 +437,13 @@ export class PropRegistry {
                 mesh.instanceColor!.array.set(source.instanceColor.array, offset * 3);
               offset += source.count;
             }
-            const batch: LevelBatch = { mesh, chunks: members, level, dirty: true };
+            const batch: LevelBatch = {
+              mesh,
+              chunks: members,
+              packed: members.slice(),
+              level,
+              dirty: true,
+            };
             for (const c of members) {
               c.levelBatches ??= new Array<LevelBatch | undefined>(kind.lods.length);
               c.levelBatches[level] = batch;
@@ -470,7 +480,13 @@ export class PropRegistry {
             mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
             offset += source.count;
           }
-          const shadowBatch: ShadowBatch = { mesh, chunks: members, level, dirty: true };
+          const shadowBatch: ShadowBatch = {
+            mesh,
+            chunks: members,
+            packed: members.slice(),
+            level,
+            dirty: true,
+          };
           for (const c of members) c.shadowBatch = shadowBatch;
           this.shadowBatches.push(shadowBatch);
           this.group.add(mesh);
@@ -591,20 +607,37 @@ export class PropRegistry {
       for (const batch of this.levelBatches) {
         if (!batch.dirty) continue;
         let offset = 0;
+        let activeCount = 0;
+        let prefixMatches = movement !== Infinity;
         for (const c of batch.chunks) {
           if (c.lod !== batch.level) continue;
           const source = c.meshes[batch.level]!;
           if (offset === 0) batch.mesh.boundingSphere!.copy(source.boundingSphere!);
           else batch.mesh.boundingSphere!.union(source.boundingSphere!);
-          batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
-          if (source.instanceColor)
-            batch.mesh.instanceColor!.array.set(source.instanceColor.array, offset * 3);
-          else batch.mesh.instanceColor?.array.fill(1, offset * 3, (offset + source.count) * 3);
+          if (
+            prefixMatches &&
+            (activeCount >= batch.packed.length || batch.packed[activeCount] !== c)
+          ) {
+            prefixMatches = false;
+          }
+          activeCount++;
           offset += source.count;
         }
         batch.mesh.count = offset;
         batch.mesh.visible = offset > 0;
-        if (offset > 0) {
+        if (offset > 0 && !prefixMatches) {
+          let write = 0;
+          batch.packed.length = 0;
+          for (const c of batch.chunks) {
+            if (c.lod !== batch.level) continue;
+            const source = c.meshes[batch.level]!;
+            batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, write * 16);
+            if (source.instanceColor)
+              batch.mesh.instanceColor!.array.set(source.instanceColor.array, write * 3);
+            else batch.mesh.instanceColor?.array.fill(1, write * 3, (write + source.count) * 3);
+            batch.packed.push(c);
+            write += source.count;
+          }
           batch.mesh.instanceMatrix.clearUpdateRanges();
           batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
           batch.mesh.instanceMatrix.needsUpdate = true;
@@ -621,17 +654,34 @@ export class PropRegistry {
       for (const batch of this.shadowBatches) {
         if (!batch.dirty) continue;
         let offset = 0;
+        let activeCount = 0;
+        let prefixMatches = movement !== Infinity;
         for (const c of batch.chunks) {
           if (!c.casting || c.lod < 0) continue;
           const source = c.meshes[batch.level]!;
           if (offset === 0) batch.mesh.boundingSphere!.copy(source.boundingSphere!);
           else batch.mesh.boundingSphere!.union(source.boundingSphere!);
-          batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, offset * 16);
+          if (
+            prefixMatches &&
+            (activeCount >= batch.packed.length || batch.packed[activeCount] !== c)
+          ) {
+            prefixMatches = false;
+          }
+          activeCount++;
           offset += source.count;
         }
         batch.mesh.count = offset;
         batch.mesh.visible = offset > 0;
-        if (offset > 0) {
+        if (offset > 0 && !prefixMatches) {
+          let write = 0;
+          batch.packed.length = 0;
+          for (const c of batch.chunks) {
+            if (!c.casting || c.lod < 0) continue;
+            const source = c.meshes[batch.level]!;
+            batch.mesh.instanceMatrix.array.set(source.instanceMatrix.array, write * 16);
+            batch.packed.push(c);
+            write += source.count;
+          }
           batch.mesh.instanceMatrix.clearUpdateRanges();
           batch.mesh.instanceMatrix.addUpdateRange(0, offset * 16);
           batch.mesh.instanceMatrix.needsUpdate = true;

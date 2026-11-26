@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from './base';
-import { startTimeTrial } from './helpers';
+import { startTimeTrial, waitForDraws } from './helpers';
 
 /**
  * Verifies that circuit dressing loads cleanly in a real browser race session and populates the
@@ -121,6 +121,36 @@ test('loads Monza circuit dressing and places world scenery, pit crew, and furni
     window.__undercut?.setStartLights(32);
     window.__undercut?.setStartLights(0);
   });
+
+  // Pin Mobile Monza grid headroom (844x390, last grid slot, 20 cars, chase-far): stay at or
+  // below the pre-kit-batching baseline (384 calls / 1.465M triangles).
+  const monzaTrack = JSON.parse(
+    fs.readFileSync(path.resolve('packages/track/data/monza.json'), 'utf8'),
+  ) as { grid: { s: number; d: number }[] };
+  const lastSlot = monzaTrack.grid.at(-1)!;
+  await page.setViewportSize({ width: 844, height: 390 });
+  const setupDrawn = await page.evaluate((slot) => {
+    const u = window.__undercut!;
+    u.autopilot(false);
+    u.drive(null);
+    u.teleport(slot.s, slot.d, 0);
+    u.setTimeScale(0);
+    u.gridCars(19);
+    u.camera('chase-far');
+    u.drive({ throttle: 0, brake: 1, steer: 0 });
+    return u.renderStats().drawnFrames as number;
+  }, lastSlot);
+  // Read the stats of frames actually drawn after the setup: on software WebGL most animation
+  // frames skip their draw, so a fixed number of them can still report the previous view.
+  await waitForDraws(page, 3);
+  const gridStats = await page.evaluate(() => window.__undercut!.renderStats());
+  await page.evaluate(() => window.__undercut!.gridCars(0));
+  expect(gridStats.drawnFrames, 'frames drawn after the grid setup').toBeGreaterThanOrEqual(
+    setupDrawn + 3,
+  );
+  expect(gridStats.cars).toBe(20);
+  expect(gridStats.calls, 'Mobile Monza grid draw calls').toBeLessThanOrEqual(384);
+  expect(gridStats.triangles, 'Mobile Monza grid triangles').toBeLessThanOrEqual(1_465_000);
 
   // Quitting releases the world without errors (GL balance with the full world is checked on
   // the GPU by npm run shots -- monza --lifecycle).
