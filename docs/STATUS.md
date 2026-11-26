@@ -459,6 +459,12 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   assertions. An earlier commit on this branch moved it to the phone viewport alone after a
   desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
   phone is added rather than substituted.
+- An online session steps its simulation, car contact and snapshots from a timer when no
+  animation frame has come for one snapshot interval (33 ms), without drawing. On the 4-core CI
+  runner the browser presented frames every 150–400 ms with the main thread idle (software
+  compositing of the full-window HUD), so both pages sent 2.5–3.6 snapshots a second and saw
+  each other held; master failed the desktop order proof and the 100 ms contact proof that way.
+  60 Hz frames are never late, and single-player sessions are unchanged.
 
 ### Decided for you — Mobile prop-kit tuning
 
