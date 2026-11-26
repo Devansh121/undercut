@@ -139,6 +139,31 @@ describe('positions', () => {
     expect(failures).toEqual([]);
   });
 
+  it('keeps live leader gaps ordered while the opening pack changes speed', () => {
+    const r = new RailRace({ kind: 'race', laps: 8 }, [
+      { speed: (t) => (t < 12 ? 60 : 5) },
+      { speed: (t) => (t < 12 ? 60 : 5) },
+      { speed: (t) => (t < 12 ? 60 : 5) },
+    ]);
+    r.run(12, () => r.control.lightsOutAt !== null);
+    const inversions: number[][] = [];
+    let compared = 0;
+    for (let i = 0; i < 240 * 20; i++) {
+      r.step();
+      if (i % 24 !== 0) continue;
+      const gaps = r.control
+        .standings()
+        .slice(1)
+        .map((row) => row.gap);
+      if (gaps[0] !== null && gaps[1] !== null) {
+        compared++;
+        if (gaps[0]! < 0 || gaps[1]! < gaps[0]!) inversions.push(gaps as number[]);
+      }
+    }
+    expect(compared).toBeGreaterThan(100);
+    expect(inversions).toEqual([]);
+  });
+
   it('gives gaps to the leader and intervals at mini-sectors, and laps down', () => {
     const r = new RailRace({ kind: 'race', laps: 8 }, [
       { speed: 60 },
