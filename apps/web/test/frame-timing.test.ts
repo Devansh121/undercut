@@ -77,6 +77,20 @@ describe('DriveFrameClock', () => {
     },
   );
 
+  it('preserves frame-only deltas for single-player, including stalls and resume', () => {
+    const clock = new DriveFrameClock();
+    let previous: number | null = null;
+    for (const now of [0, 16, 33, 233, 633, 1633]) {
+      const originalDt = physicsDt(previous === null ? 0 : now - previous);
+      expect(physicsDt(clock.frameElapsedMs(now))).toBe(originalDt);
+      expect(clock.stepDt(now)).toBe(originalDt);
+      previous = now;
+    }
+    clock.reset();
+    expect(physicsDt(clock.frameElapsedMs(10_000))).toBe(0);
+    expect(clock.stepDt(10_000)).toBe(0);
+  });
+
   it('caps a stalled simulation without capping presentation elapsed time', () => {
     const clock = new DriveFrameClock();
     clock.frameElapsedMs(0);

@@ -474,6 +474,17 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   the previous animation frame. The 250 ms simulation stall cap stays in place. Resume resets
   both clocks so paused time is not caught up. Interleaving tests cover a 10 s, 5 fps schedule
   with timer callbacks on and around frame boundaries: 10 s presentation and 2,400 sim ticks.
+- Single-player retains the original capped frame delta for presentation as well as simulation;
+  the independent, uncapped presentation delta applies only to online sessions with timer steps.
+- The local rooms proxy opens a fresh upstream HTTP connection for each request. Pooling a
+  health-check socket can race its idle close and make the next room-creation POST return 502.
+  The regression closes reused connections and requires one successful POST without retries.
+- Pit and compound keyboard actions apply before their fixed simulation tick. Previously they
+  waited until the whole catch-up batch completed: at 8× speed, a 250 ms frame advanced two
+  seconds before applying a pit request. Camera actions still return to the presentation path.
+  First-tick regressions cover both normal and stalled frames; browser pit-service assertions
+  and their 50 s deadline are unchanged.
+
 
 
 ### Decided for you — Mobile prop-kit tuning

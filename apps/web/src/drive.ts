@@ -128,7 +128,7 @@ import {
 import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
-import { BACKUP_STEP_MS, DriveFrameClock, stepWithoutFrame } from './frame-timing';
+import { BACKUP_STEP_MS, DriveFrameClock, physicsDt, stepWithoutFrame } from './frame-timing';
 import { speedUnit, setSpeedUnit } from './ui/player-settings';
 import { Onboarding } from './ui/onboarding';
 import { phoneSession } from './ui/phone-session';
@@ -620,6 +620,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     session,
     wrap(human),
     ext?.afterStep ? (dt) => ext.afterStep!(dt) : undefined,
+    (action) => {
+      if (action === 'boxThisLap') callBox();
+      else if (action === 'nextCompound') session.cycleCompound();
+      else return false;
+      return true;
+    },
   );
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
@@ -1572,8 +1578,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     }
     lookBack = r.lookBack;
     for (const action of r.actions) {
-      if (action === 'boxThisLap') callBox();
-      if (action === 'nextCompound') session.cycleCompound();
       if (action === 'nextCamera') {
         const name = view.nextCamera();
         say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
@@ -1608,7 +1612,9 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (quitting) return;
     const lastFrameAt = frameClock.lastFrameAt;
     const elapsedMs = frameClock.frameElapsedMs(now);
-    const dt = Math.max(0, elapsedMs) / 1000;
+    // Single-player keeps its original capped frame delta. Only online presentation needs
+    // an independent wall-time delta when timer callbacks have consumed simulation time.
+    const dt = ext ? Math.max(0, elapsedMs) / 1000 : physicsDt(elapsedMs);
     const simDt = frameClock.stepDt(now);
     // The frame log is animation-frame intervals, whatever stepped in between.
     if (lastFrameAt !== null) {
