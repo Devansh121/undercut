@@ -123,6 +123,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Browser CI: use two weighted shards, balancing desktop and phone independently from per-test durations in the completed and timed-out 26 Nov master runs. Keep the 15-minute budgets and the required `browser` check as an aggregate. Refresh `tools/ci/browser-weights.json` when timings change substantially; new specs still run at the median weight.
+
 - Graphics polish (sky, grass, night road): the brief said mowing bands already existed; master had none, so the circuit's grass is mown here (3.2 m bands along the track edge). The land beyond the circuit is not mown.
 - The new overcast sky has its own id (`overcast_soil`) rather than replacing `overcast` in place. The asset build's metadata cache in `~/.cache/undercut/assets-src/skies/` is shared by every worktree, and another branch rebuilding `overcast` would have paired its old images with the new sky's numbers.
 - Singapore's dark road needed more than dimmer banks: turn 1 and the far end of the pit straight were nearly black on master too. Banks set back behind wide run-off are scaled to light the road as one by the wall would (capped at 6×), and the side opposite the pit lane takes masts at half spacing where the pit side has none.
