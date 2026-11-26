@@ -116,8 +116,12 @@ for (const device of ['keyboard', 'gamepad'] as const) {
     await explore();
     await page.getByLabel('Driver name').fill('Alex Rivers');
     await page.getByRole('button', { name: 'Create room', exact: true }).focus();
+    await page.locator('.online-screen__content').evaluate((n) => {
+      n.scrollTop = n.scrollHeight;
+    });
     await press('Enter');
     await expect(page.getByTestId('invite')).toBeVisible();
+    expect(await page.locator('.online-screen__content').evaluate((n) => n.scrollTop)).toBe(0);
     await expect(page.locator('.online-members')).toContainText('Alex Rivers');
     await expect(page.locator('.online-members')).toContainText('You · Host');
     await expect(page.locator('.online-members')).not.toContainText('ASH');

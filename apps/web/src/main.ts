@@ -251,8 +251,8 @@ function currentChoice(circuit?: string): SessionChoice {
 
 /**
  * The online screens (apps/web/src/online) on the shared menu input: the focused control takes
- * accept, up and down step through the screen's buttons and fields, a pad's left and right step a
- * number field. A keyboard's Enter on a button, field or link is already native.
+ * accept and spatial kit navigation. A pad's left and right adjust a number field; keyboard
+ * editing and Enter on a button or link remain native.
  */
 function onlineAction(a: MenuButton, device: DeviceKind): void {
   online?.action(a, device);

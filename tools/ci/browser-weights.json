@@ -1,5 +1,5 @@
 {
-  "source": "Maximum observed duration per passed test, summed by project/file, from master CI jobs 139935219275 (e0b7dcf, timed out) and 139741074915 (e80e850, complete), 2026-11-26. Skipped-only files use the median fallback. Refresh when browser timings change substantially.",
+  "source": "Maximum observed duration per passed test, summed by project/file, from master CI jobs 139935219275 (e0b7dcf, timed out) and 139741074915 (e80e850, complete), 2026-11-26. Skipped-only files use the median fallback. Refresh when browser timings change substantially. Online lobby reachability additions measured locally at 1440\u00d7900 and 844\u00d7390 on 2026-11-27.",
   "seconds": {
     "desktop/audio.spec.ts": 17.7,
     "desktop/cold-start.spec.ts": 27.7,
@@ -10,7 +10,7 @@
     "desktop/loading.spec.ts": 25.5,
     "desktop/menus.spec.ts": 30.769,
     "desktop/mobile-onboarding.spec.ts": 6.3,
-    "desktop/online-lobby.spec.ts": 6.7,
+    "desktop/online-lobby.spec.ts": 12.7,
     "desktop/online.spec.ts": 39.8,
     "desktop/phone-fit.spec.ts": 13.0,
     "desktop/quick-race.spec.ts": 204.0,
@@ -39,6 +39,7 @@
     "phone/settings.spec.ts": 3.4,
     "phone/sky.spec.ts": 2.0,
     "phone/storage.spec.ts": 8.1,
-    "phone/weekend.spec.ts": 28.1
+    "phone/weekend.spec.ts": 28.1,
+    "phone/online-lobby.spec.ts": 11.0
   }
 }

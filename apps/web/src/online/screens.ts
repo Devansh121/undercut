@@ -16,6 +16,7 @@ export class RoomScreens {
   private name = 'Driver';
   private code: string;
   private notice = '';
+  private view = '';
   private origins: string[] = [];
   setNetworkOrigins(origins: string[]): void {
     this.origins = origins;
@@ -62,8 +63,11 @@ export class RoomScreens {
             direction: active.selectionDirection ?? 'none',
           }
         : null;
-    const scroll = this.root.querySelector('.online-screen__content')?.scrollTop ?? 0;
     const s = this.session.state;
+    const view = s.results ? 'results' : s.room && !s.ended ? 'room' : 'entry';
+    const scroll =
+      this.view === view ? (this.root.querySelector('.online-screen__content')?.scrollTop ?? 0) : 0;
+    this.view = view;
     const title = el(
       'h1',
       '',
