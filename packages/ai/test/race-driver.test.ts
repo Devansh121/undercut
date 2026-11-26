@@ -545,7 +545,9 @@ describe('race driver: building a run after lap one', () => {
     const s = i * track.lap.step;
     const d = lineD(dr, s);
     const out: ControlInput = { ...NEUTRAL_INPUT };
-    const ahead = { id: 1, s: s + 36, d, speed: 69 };
+    // (Close enough to lift even in the wake on a straight, where a later-lap attack follows
+    // as close as the driver reacts.)
+    const ahead = { id: 1, s: s + 17, d, speed: 69 };
     dr.sense(view({ id: 0, s, d, speed: 70 }, [ahead], { openingLap: false }));
     dr.drive(at(s, d, 70), DT, out);
     expect(out.brake).toBeLessThan(0.02);
@@ -895,5 +897,150 @@ describe('race driver: room while the bodies overlap under braking', () => {
     dr.drive(tel, DT, { ...NEUTRAL_INPUT });
     expect(dr.last.yielding).toBe(true);
     expect(dr.last.target + ld).toBeGreaterThanOrEqual(me.d - 0.1);
+  });
+});
+
+describe('race driver: attacking from lap two', () => {
+  /** A move on the car ahead on the main straight, decided already (this car behind it). */
+  function attack(gap: number, s = 0, speed = 85, openingLap = false) {
+    const dr = driver();
+    const d = lineD(dr, s);
+    const me = { id: 0, s, d, speed };
+    const ahead = { id: 1, s: s + CAR_LENGTH + gap, d: lineD(dr, s + CAR_LENGTH + gap), speed };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = 1;
+    tick(dr, me, [ahead], { openingLap });
+    return { dr, ahead };
+  }
+
+  it('stays in the wake of the car ahead until close, then pulls out', () => {
+    const far = attack(30);
+    const lane = (r: ReturnType<typeof attack>) => r.dr.last.target - (r.ahead.d - lineD(r.dr, 0));
+    expect(far.dr.last.passing).toBe(1);
+    expect(Math.abs(lane(far))).toBeLessThan(0.5);
+    const close = attack(12);
+    expect(close.dr.last.passing).toBe(1);
+    expect(lane(close)).toBeGreaterThan(SIDE_BY_SIDE);
+    // Two seconds from the braking zone it pulls out from further back.
+    const late = attack(30, 300);
+    expect(lane(late)).toBeGreaterThan(SIDE_BY_SIDE);
+  });
+
+  it('follows as close as it reacts in the wake, far from the braking zone, and keeps the full margin near it', () => {
+    // 15 m behind at 85 m/s: held there (not braked off) on the straight from lap two.
+    expect(attack(15).dr.last.accelLimit).toBeGreaterThan(-1);
+    expect(attack(15, 0, 85, true).dr.last.accelLimit).toBeLessThan(-5);
+    // Within the last second and a half before the zone, the full margins.
+    expect(attack(15, 330).dr.last.accelLimit).toBeLessThan(-5);
+  });
+
+  it('presses a car it is held up by on the straights from lap two, not through the corners', () => {
+    const limit = (s: number, speed: number, gap: number, openingLap: boolean) => {
+      const dr = driver();
+      const me = { id: 0, s, d: lineD(dr, s), speed };
+      const ahead = { id: 1, s: s + CAR_LENGTH + gap, d: lineD(dr, s + CAR_LENGTH + gap), speed };
+      dr['wasActive'] = true;
+      dr['heldTime'] = 5;
+      dr['cooldown'] = 1e9;
+      tick(dr, me, [ahead], { openingLap });
+      return dr.last.accelLimit;
+    };
+    // 20 m behind at 85 m/s on the main straight: held there from lap two, braked off on lap one.
+    expect(limit(0, 85, 20, false)).toBeGreaterThan(-1);
+    expect(limit(0, 85, 20, true)).toBeLessThan(-3);
+    // In the first chicane (12 m behind at 30 m/s) the corner headway stands on every lap.
+    expect(limit(700, 30, 12, false)).toBe(limit(700, 30, 12, true));
+  });
+});
+
+describe('race driver: small errors', () => {
+  function lapAlone(openingLap: boolean, consistency: number, laps = 2) {
+    const dr = createRaceDriver({
+      track,
+      line,
+      envelope,
+      params,
+      skill: { ...DEFAULT_RACE_SKILL, consistency, senseNoise: 0, seed: 3 },
+    });
+    dr['wasActive'] = true;
+    let s = 0;
+    let limited = 0;
+    const step = 40 * DT;
+    for (let k = 0; s < laps * track.length; k++) {
+      const out: ControlInput = { ...NEUTRAL_INPUT };
+      const me = { id: 0, s, d: lineD(dr, s) + dr['o'], speed: 40 };
+      dr.sense(view(me, [], { openingLap }));
+      dr.drive(at(s, me.d, me.speed), DT, out);
+      if (dr.mistakes.active !== null) limited++;
+      s += step;
+    }
+    return { count: dr.mistakes.count, limited, memory: dr.snapshot() };
+  }
+
+  it('makes none on the opening lap, and some from lap two for a rough driver', () => {
+    expect(lapAlone(true, 0.3).count).toBe(0);
+    const later = lapAlone(false, 0.3);
+    expect(later.count).toBeGreaterThan(0);
+    expect(later.limited).toBeGreaterThan(0);
+    expect(lapAlone(false, 1).count).toBe(0);
+  });
+
+  it('keeps its errors in the driver memory', () => {
+    const { memory } = lapAlone(false, 0.3, 1);
+    expect(Array.isArray(memory['err.rng'])).toBe(true);
+    const dr = driver({ consistency: 0.3, seed: 3 });
+    dr.restore(memory);
+    expect(dr.mistakes.count).toBe(memory['err.count']);
+  });
+
+  it('makes none beside another car', () => {
+    const dr = driver({ consistency: 0.1, seed: 3 });
+    dr['wasActive'] = true;
+    for (let s = 0; s < track.length; s += 40 * DT) {
+      const me = { id: 0, s, d: lineD(dr, s), speed: 40 };
+      const beside = { id: 1, s: s + 1, d: lineD(dr, s) + SIDE_BY_SIDE + 0.2, speed: 40 };
+      tick(dr, me, [beside], { openingLap: false });
+    }
+    expect(dr.mistakes.count).toBe(0);
+  });
+});
+
+describe('race driver: moves from lap two', () => {
+  function dive(gap: number, openingLap = false) {
+    const dr = driver();
+    const s = 370;
+    const me = { id: 0, s, d: lineD(dr, s) - 3.7, speed: 85 };
+    const ahead = { id: 1, s: s + gap, d: lineD(dr, s + gap), speed: 80 };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -3.7;
+    tick(dr, me, [ahead], { openingLap });
+    return dr;
+  }
+
+  it('commits to a braking-zone move from up to a length behind an overlap', () => {
+    expect(dive(8)['passCommitted']).toBe(true);
+    expect(dive(8, true)['passCommitted']).toBe(false);
+    expect(dive(14)['passCommitted']).toBe(false);
+  });
+
+  it('takes the other side when the road runs out on the side picked', () => {
+    const dr = driver();
+    const s = 0;
+    const edge = dr['at'](track.halfWidth[0], s) as number;
+    const me = { id: 0, s, d: edge - 2, speed: 85 };
+    const ahead = { id: 1, s: s + 18, d: edge - 2, speed: 85 };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = 1;
+    dr['o'] = me.d - lineD(dr, s);
+    tick(dr, me, [ahead], { openingLap: false });
+    expect(dr.last.passing).toBe(1);
+    expect(dr['passSide']).toBe(-1);
   });
 });
