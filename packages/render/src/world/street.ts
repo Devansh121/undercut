@@ -54,8 +54,37 @@ export interface StreetResult {
   lights: LocalLight[];
 }
 
-/** Light of one mast's lamp bank: warm white, candela, reach (m). Set by eye under NIGHT_FLOODLIT. */
-export const MAST_LIGHT = { colour: '#fff0d8', intensity: 900, distance: 70 };
+/**
+ * Light of one mast's lamp bank: warm white, candela, reach (m). Sized so the asphalt (albedo
+ * about 0.08) under NIGHT_FLOODLIT's exposure reads as dark road in pools of light, brightest
+ * under each bank and falling off between them, not as daylight concrete; the reach is short
+ * enough that banks 40 m apart do not fill each other's gaps.
+ */
+export const MAST_LIGHT = { colour: '#fff0d8', intensity: 420, distance: 50 };
+/** Lateral distance of a bank from the centreline that MAST_LIGHT is sized for, m. */
+const MAST_REF_LATERAL = 8;
+/** The most a set-back bank is scaled up by. */
+const MAST_MAX_GAIN = 6;
+
+/**
+ * The light of a mast's bank `lateral` metres from the centreline and `height` above the road. A
+ * bank set back behind a wide run-off is sized to put the same light on the road as one by the
+ * wall (inverse square over the extra distance, up to MAST_MAX_GAIN), with its reach stretched to
+ * match, as a circuit's lighting design would: otherwise the corners with the widest run-off are
+ * the darkest on the lap.
+ */
+export function mastLight(
+  lateral: number,
+  height: number,
+): { colour: string; intensity: number; distance: number } {
+  const ref = MAST_REF_LATERAL ** 2 + height ** 2;
+  const gain = Math.min(MAST_MAX_GAIN, Math.max(1, (lateral ** 2 + height ** 2) / ref));
+  return {
+    colour: MAST_LIGHT.colour,
+    intensity: MAST_LIGHT.intensity * gain,
+    distance: MAST_LIGHT.distance * Math.sqrt(gain),
+  };
+}
 /**
  * Where a bank's point light stands: ahead of the lamps (toward the track) and below them, m.
  * At the lamps themselves their own housing, centimetres away, would take the inverse-square
@@ -65,7 +94,7 @@ const LIGHT_AHEAD = 1.5;
 const LIGHT_DROP = 0.5;
 /** One local light per this length of lighting truss, m, and its light. */
 const TRUSS_LIGHT_EVERY = 12;
-export const TRUSS_LIGHT = { colour: '#fff4e4', intensity: 500, distance: 45 };
+export const TRUSS_LIGHT = { colour: '#fff4e4', intensity: 200, distance: 32 };
 /** The kit mast's lamps stand this high on the model, m (attachments `lamp-*`). */
 const MAST_LAMP_FALLBACK = 13.15;
 /** Clear ground between the back of the wall and a stand's front, m. */
@@ -290,16 +319,26 @@ export function placeStreetCircuit(o: StreetOptions): StreetResult {
   if (hasMast) {
     for (const side of [0, 1] as const) {
       const offset = side === 1 ? rule.stagger : 0;
+      // Where the pit side has no masts (the pit lane is in the way), the other side carries
+      // them at half the spacing, so the road between banks is not left dark.
+      const stations: number[] = [];
       for (let s = offset; s < L; s += rule.spacing) {
+        stations.push(s);
+        const mid = s + rule.spacing / 2;
+        if (side !== pitSide && mid < L && inPitReach(mid)) stations.push(mid);
+      }
+      for (const s of stations) {
         if (side === pitSide && inPitReach(s)) continue;
         const b = behind(s, side, BLOCK_WIDTH + rule.setback + 0.4);
         if (b.folded) continue;
         props.place('floodlight-mast', { x: b.x, y: b.y, z: b.z, yaw: b.yaw, s, scale: mastScale });
+        const ahead = lampX * mastScale + LIGHT_AHEAD;
+        const lampHeight = lampY * mastScale - LIGHT_DROP;
         lights.push({
-          x: b.x + b.ix * (lampX * mastScale + LIGHT_AHEAD),
-          y: b.y + lampY * mastScale - LIGHT_DROP,
-          z: b.z + b.iz * (lampX * mastScale + LIGHT_AHEAD),
-          ...MAST_LIGHT,
+          x: b.x + b.ix * ahead,
+          y: b.y + lampHeight,
+          z: b.z + b.iz * ahead,
+          ...mastLight(b.bar + BLOCK_WIDTH + rule.setback + 0.4 - ahead, lampHeight),
         });
         masts++;
       }

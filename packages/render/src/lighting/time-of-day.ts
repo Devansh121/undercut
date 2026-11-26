@@ -27,6 +27,12 @@ export interface TimeOfDay {
   readonly fogDensity: number;
   /** Haze colour: from the sky's horizon (null) or fixed (sRGB hex, multiplied by skyIntensity). */
   readonly fogColour: string | null;
+  /**
+   * How far the sky dome's horizon band (up to about 9°) melts into the haze colour, 0–1. Strong
+   * for a clear sky's milky horizon; weaker under a cloud deck, whose structure low on the horizon
+   * is what the chase cameras see.
+   */
+  readonly skyHaze: number;
   /** Floodlights: shader slots for local lights near the camera (0: none). */
   readonly localLightSlots: number;
 }
@@ -44,21 +50,27 @@ export const MONZA_AFTERNOON: TimeOfDay = Object.freeze({
   fogDensity: 0.00028,
   // Warm afternoon haze over the Lombardy plain (was a near-neutral grey).
   fogColour: '#dad0bd',
+  skyHaze: 0.85,
   localLightSlots: 0,
 });
 
-/** Overcast (for Spa): no sun disc, a weak diffuse key so cars keep soft contact shadows. */
+/**
+ * Overcast (for Spa): a broken stratocumulus deck, darker low on the horizon than overhead, no
+ * sun disc, a weak diffuse key so cars keep soft contact shadows. The haze takes the deck's grey
+ * low on the horizon and is thin enough that the far hills keep their shape.
+ */
 export const OVERCAST_DAY: TimeOfDay = Object.freeze({
   id: 'overcast-day',
-  sky: 'overcast',
+  sky: 'overcast_soil',
   skyIntensity: 1,
   sunAzimuthDeg: 200,
   sunScale: 0,
   sunFallback: 0.9,
   shadowSoftness: 5,
   exposure: 0.9,
-  fogDensity: 0.0009,
+  fogDensity: 0.00055,
   fogColour: null,
+  skyHaze: 0.45,
   localLightSlots: 0,
 });
 
@@ -74,6 +86,7 @@ export const NIGHT_FLOODLIT: TimeOfDay = Object.freeze({
   exposure: 1.6,
   fogDensity: 0.0006,
   fogColour: '#2a2620',
+  skyHaze: 0.85,
   localLightSlots: 8,
 });
 

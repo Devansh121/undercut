@@ -22,7 +22,14 @@ import { buildingHeight } from '../src/world/buildings';
 import { decodeTerrain, inRing, type DressingFile } from '../src/world/dressing';
 import { LapIndex } from '../src/world/lap-index';
 import { bakeCircuitLamps, streetGround } from '../src/world/lamps';
-import { pickBackdrops, placeBackdrops, placeStreetCircuit } from '../src/world/street';
+import {
+  MAST_LIGHT,
+  mastLight,
+  pickBackdrops,
+  placeBackdrops,
+  placeStreetCircuit,
+} from '../src/world/street';
+import { NIGHT_FLOODLIT } from '../src/lighting/time-of-day';
 import { buildTerrain, TERRAIN_HIGH, TERRAIN_MOBILE, waterBodies } from '../src/world/terrain';
 import { worldTheme } from '../src/world/theme';
 
@@ -144,10 +151,15 @@ describe('Singapore street circuit', () => {
       lap.nearest(m.x, m.z, hit);
       expect(hit.dist).toBeGreaterThan(lap.barrierAt(hit.index, hit.d) + 1);
     }
-    // One light per mast (its lamps' height on a 10 m rule) and the trusses' lights.
-    const mastLights = res.lights.filter((l) => l.intensity === res.lights[0]!.intensity);
+    // One light per mast (its lamps' height on a 10 m rule) and the trusses' lights. A bank set
+    // back behind wide run-off is stronger (mastLight), so the masts' lights are told apart from
+    // the trusses' by their height.
+    const mastLights = res.lights.filter((l) => Math.abs(l.y - (rule.height - 0.5)) < 1e-6);
     expect(mastLights.length).toBe(masts.length);
-    for (const l of mastLights) expect(l.y).toBeCloseTo(rule.height - 0.5, 5);
+    for (const l of mastLights) {
+      expect(l.intensity).toBeGreaterThanOrEqual(MAST_LIGHT.intensity);
+      expect(l.intensity).toBeLessThanOrEqual(MAST_LIGHT.intensity * 6 + 1e-9);
+    }
     expect(res.lights.length).toBeGreaterThan(masts.length);
   });
 
@@ -345,5 +357,60 @@ describe('Singapore water, backdrops and props', () => {
         expect(ids).toContain(id);
       for (const b of street.backdrops) expect(ids).toContain(b.id);
     }
+  });
+});
+
+describe('Singapore at night: the road under its floodlights', () => {
+  const { res } = streetAt(true);
+  /** Light on the road surface across the width (d −4, 0, 4) every 5 m of lap, lux-like units. */
+  const p = new Vector3();
+  const profile: number[] = [];
+  const edge: number[] = [];
+  for (let s = 0; s < track.length; s += 5) {
+    let row = 0;
+    for (const d of [-4, 0, 4]) {
+      track.lap.pointAt(s, d, p);
+      let e = 0;
+      for (const l of res.lights) e += lampOnGround(l, p.x, 0, p.z);
+      row += e / 3;
+      if (d === 4) edge.push(e);
+    }
+    profile.push(row);
+  }
+  const sorted = [...profile].sort((a, b) => a - b);
+  const pct = (f: number): number => sorted[Math.floor(f * (sorted.length - 1))] as number;
+  /** Asphalt (albedo 0.08) as displayed before the tone map, at the night exposure. */
+  const shown = (e: number): number => ((0.08 * e) / Math.PI) * NIGHT_FLOODLIT.exposure;
+
+  it('reads as dark asphalt, well below the tone map shoulder, not as lit concrete', () => {
+    expect(shown(pct(0.5))).toBeLessThan(0.15);
+    expect(shown(pct(0.95))).toBeLessThan(0.3);
+    // Still visibly lit, the paint and racing line legible.
+    expect(shown(pct(0.5))).toBeGreaterThan(0.06);
+  });
+
+  it('leaves no stretch of the lap dark between banks', () => {
+    expect(pct(0.05)).toBeGreaterThan(0.6 * pct(0.5));
+  });
+
+  it('falls off between banks into pools along the edge of the road', () => {
+    // A long run of masts by the wall: the brightest point under a bank against the darkest
+    // between two.
+    const run = edge.slice(1100 / 5, 1500 / 5);
+    expect(Math.max(...run) / Math.min(...run)).toBeGreaterThan(1.5);
+  });
+
+  it('sizes a set-back bank to light the road as one by the wall would, within a cap', () => {
+    const h = 9.5;
+    expect(mastLight(8, h).intensity).toBe(MAST_LIGHT.intensity);
+    expect(mastLight(4, h).intensity).toBe(MAST_LIGHT.intensity);
+    const far = mastLight(26, h);
+    // The same light straight across the road as the reference bank gives.
+    expect(far.intensity / (26 ** 2 + h ** 2)).toBeCloseTo(
+      MAST_LIGHT.intensity / (8 ** 2 + h ** 2),
+      6,
+    );
+    expect(far.distance).toBeGreaterThan(MAST_LIGHT.distance);
+    expect(mastLight(200, h).intensity).toBe(MAST_LIGHT.intensity * 6);
   });
 });

@@ -21,6 +21,8 @@
 //   npm run shots -- monza --sky-check                 also full-frame High sky comparison: direct
 //                                                      path (float targets hidden) vs HDR path
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
+//   npm run shots -- monza --no-shots --perf --perf-desktop 1440x900
+//                                                      the same with High at 1440x900
 //
 // Output: artifacts/screenshots/<git-sha>/<station>-<w>x<h>.png and report.json. The GPU is
 // shared by every agent on the machine, so the script re-runs itself under
@@ -627,10 +629,12 @@ function summarise(times) {
  * on Mobile; once with vsync (does it hold 60 fps) and once without (the headroom; its 1 % lows
  * are dominated by the browser's uncapped frame pacing and are not a target).
  */
+// `--perf-desktop 1440x900` measures High at another desktop size (the browser tests' size).
+const [perfW, perfH] = (option('perf-desktop') ?? '1920x1080').split('x').map(Number);
 const PERF_VIEWPORTS = [
   {
-    label: '1920x1080',
-    viewport: { width: 1920, height: 1080 },
+    label: `${perfW}x${perfH}`,
+    viewport: { width: perfW, height: perfH },
     deviceScaleFactor: 1,
     isMobile: false,
     hasTouch: false,

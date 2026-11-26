@@ -104,9 +104,9 @@
       "quality": 95
     },
     {
-      "id": "overcast",
-      "asset": "kloofendal_overcast_puresky",
-      "author": "Greg Zaal (Poly Haven)",
+      "id": "overcast_soil",
+      "asset": "overcast_soil_puresky",
+      "author": "Sergej Majboroda and Jarod Guest (Poly Haven)",
       "sizes": [2048, 1024],
       "quality": 92
     },
