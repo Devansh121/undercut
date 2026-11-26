@@ -1152,9 +1152,13 @@ describe('race driver: a racing line past the white line', () => {
 });
 
 describe('race driver: a road bound beside overlapping traffic', () => {
-  it.each([1, 0.6])(
-    'keeps the actual lane beside a car at corner pace %s when future road bounds squeeze it',
-    (pace) => {
+  it.each([
+    { pace: 1, hazard: false },
+    { pace: 0.6, hazard: false },
+    { pace: 1, hazard: true },
+  ])(
+    'keeps the actual lane beside a car at pace $pace with hazard $hazard when road bounds squeeze it',
+    ({ pace, hazard }) => {
       const dr = createRaceDriver({
         track: SPA.track(),
         line: loadLine(SPA),
@@ -1167,7 +1171,8 @@ describe('race driver: a road bound beside overlapping traffic', () => {
       dr['aheadPaceId'] = 18;
       dr['aheadPace'] = pace;
       dr['wasActive'] = true;
-      tick(dr, me, [rear], { openingLap: false });
+      const others = hazard ? [rear, { id: 19, s: me.s + 200, d: 0, speed: 0 }] : [rear];
+      tick(dr, me, others, { openingLap: false });
       const lane = dr['at'](dr.plan.line.d, me.s) + dr.last.target;
       expect(lane).toBeLessThanOrEqual(me.d + 0.1);
     },

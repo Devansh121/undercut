@@ -958,7 +958,7 @@ export class RaceDriver implements Driver {
     }
     // Once a band has to be dropped, hold the lane on that car's side while the longitudinal
     // yield opens room. This includes the car yielded to: braking does not clear its body.
-    const protectBodies = laterLap && !this.hazard;
+    const protectBodies = laterLap && !this.passBypass && !this.recovering;
     let droppedOverlap = false;
     for (let k = 0; k < ns; k++) {
       const e = side[k]!;
@@ -973,8 +973,8 @@ export class RaceDriver implements Driver {
         (droppedOverlap ||
           (yieldTo !== null &&
             (!cornering || yieldDs < CAR_LENGTH + 2) &&
-            yieldTo.speed >= HAZARD_SPEED)) &&
-        !this.hazard &&
+            yieldTo.speed >= HAZARD_SPEED &&
+            !this.hazard)) &&
         !this.passBypass &&
         !this.recovering
       ) {
