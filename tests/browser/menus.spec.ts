@@ -269,6 +269,10 @@ test.describe('menus, keyboard only', () => {
     const hub = await explore(page, 'keyboard');
     expect(hub.reached).toEqual(hub.all);
     expect(hub.all.length).toBeGreaterThan(20);
+    await page.keyboard.press('e');
+    await expect(page.locator('.settings [data-setting=raceLaps]')).toBeVisible();
+    const race = await explore(page, 'keyboard');
+    expect(race.reached).toEqual(race.all);
     expect(problems).toEqual([]);
   });
 
@@ -362,6 +366,10 @@ test.describe('menus, gamepad only', () => {
     const hub = await explore(page, 'gamepad');
     expect(hub.reached).toEqual(hub.all);
     expect(hub.all.length).toBeGreaterThan(20);
+    await padPress(page, PAD.rb);
+    await expect(page.locator('.settings [data-setting=raceLaps]')).toBeVisible();
+    const race = await explore(page, 'gamepad');
+    expect(race.reached).toEqual(race.all);
     expect(problems).toEqual([]);
   });
 

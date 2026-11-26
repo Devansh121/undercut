@@ -117,6 +117,12 @@ test('two players race, rematch, leave and migrate the host', async ({
       expect(r.releasedServerAt! - r.start!.lightsOutAt).toBeLessThan(1000 / 240);
     }
     console.log('Online clock agreement', JSON.stringify({ host: a, guest: b }));
+    for (const page of [host, guest]) {
+      await expect.poll(async () => (await state(page)).race?.lapTimeSec ?? 0).toBeGreaterThan(0.5);
+      await expect(page.locator('.hud')).toContainText('Host');
+      await expect(page.locator('.hud')).toContainText('Guest');
+      await expect(page.locator('.hud')).not.toContainText('Out lap');
+    }
     // Every shader is compiled before the lights: a first compile mid-race holds the page (a
     // synchronous link check waits for the GPU queue) for seconds on software WebGL. Checked again
     // once the host's lap is in: the cars are far apart by then (the remote car is at `far`), and
@@ -151,8 +157,11 @@ test('two players race, rematch, leave and migrate the host', async ({
       if (page === host)
         expect([await programs(host), await programs(guest)]).toEqual(programsAtStart);
     }
-    for (const page of [host, guest])
+    for (const page of [host, guest]) {
       await expect(page.getByTestId('online-results')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('online-results')).toContainText('1 lap ·');
+      await expect(page.getByTestId('online-results')).not.toContainText('1 laps');
+    }
     expect((await state(host)).state?.results).toEqual((await state(guest)).state?.results);
     expect((await state(host)).state?.results?.rows.map((r) => r.name)).toEqual(['Host', 'Guest']);
     await host.getByRole('button', { name: 'Rematch', exact: true }).click();

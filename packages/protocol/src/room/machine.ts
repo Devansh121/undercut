@@ -16,6 +16,7 @@ import {
   type ClientMessageType,
   type GridSlot,
   type LapMessage,
+  type OrderMessage,
   type Phase,
   type RoomView,
   type ServerMessage,
@@ -70,12 +71,35 @@ export interface RoomInfo {
   joinable: boolean;
 }
 
+interface ProgressSample {
+  t: number;
+  progress: number;
+  resets: number;
+  sRate: number;
+}
+
 /** Per-seat snapshot bookkeeping. Memory only: lost on eviction, rebuilt within a tick. */
 interface SeatTrack {
+  behindLine: boolean;
   tick: number;
   snap: CarSnapshot;
   at: number;
+  /** Forward progress rate along the lap, m/s (estimated from consecutive snapshots). */
+  sRate: number;
+  /** Recent progress samples sorted by sender timestamp for common-time interpolation. */
+  history: ProgressSample[];
 }
+
+/** How often the room broadcasts the authoritative live running order while on track, ms. */
+const ORDER_INTERVAL_MS = 200;
+/** Shared future activation lead time so clients with different latencies flip together, ms. */
+const ORDER_LEAD_MS = 300;
+/** Evaluation lag behind server now so normal-latency seats interpolate instead of extrapolate, ms. */
+const ORDER_EVAL_LAG_MS = 200;
+/** Max forward extrapolation past a seat's newest snapshot during packet loss or stalls, ms. */
+const ORDER_MAX_EXTRAP_MS = 300;
+/** Deadband against the previous live order so dead-even side-by-side cars do not flicker, m. */
+const ORDER_HYSTERESIS_M = 2.0;
 
 /** Which client messages each phase accepts (join, ping and leave are always accepted). */
 export const PHASE_ACCEPTS: { readonly [P in Phase]: ReadonlySet<ClientMessageType> } = {
@@ -116,6 +140,8 @@ export class RoomMachine {
   private out: Outbound[] = [];
   private now = 0;
   private dirty = true;
+  private lastOrderAt = Number.NEGATIVE_INFINITY;
+  private lastOrder: OrderMessage | null = null;
 
   private constructor(
     readonly state: RoomState,
@@ -225,6 +251,12 @@ export class RoomMachine {
         break;
     }
     this.advance();
+    if (
+      (this.state.phase === 'racing' || this.state.phase === 'finished') &&
+      this.now - this.lastOrderAt >= ORDER_INTERVAL_MS
+    ) {
+      this.publishOrder(false);
+    }
     return this.out;
   }
 
@@ -431,6 +463,7 @@ export class RoomMachine {
         s.phaseEndsAt = (s.start?.lightsOutAt ?? this.now) + cap;
         this.broadcastRoom();
         this.checkRaceEnd();
+        if (s.phase === 'racing') this.publishOrder(true);
         break;
       }
       case 'racing':
@@ -483,6 +516,8 @@ export class RoomMachine {
     s.phaseEndsAt = this.now + this.timings.gridTimeoutMs;
     for (const m of s.members) m.loaded = false;
     this.seats.clear();
+    this.lastOrderAt = Number.NEGATIVE_INFINITY;
+    this.lastOrder = null;
     this.broadcastRoom();
   }
 
@@ -592,6 +627,8 @@ export class RoomMachine {
       if (m.conn !== null) m.status = 'active';
     }
     this.seats.clear();
+    this.lastOrderAt = Number.NEGATIVE_INFINITY;
+    this.lastOrder = null;
     this.ensureHost();
     this.broadcastRoom();
   }
@@ -641,6 +678,7 @@ export class RoomMachine {
         raceMs: c.raceMs,
         state: c.state,
         car: this.seats.get(c.seat)?.snap ?? null,
+        behindLine: this.seats.get(c.seat)?.behindLine ?? true,
       }));
   }
 
@@ -944,6 +982,9 @@ export class RoomMachine {
           car.state = 'dnf';
           this.broadcastRoom();
           this.checkRaceEnd();
+          if (this.state.phase === 'racing' || this.state.phase === 'finished') {
+            this.publishOrder(false);
+          }
         }
         return;
       }
@@ -1070,6 +1111,12 @@ export class RoomMachine {
     if (this.state.host === m.id && this.state.cars && ON_TRACK.has(this.state.phase)) {
       this.sendTo(c.id, { type: 'host', member: m.id, ai: this.aiHandover() });
     }
+    if (this.state.phase === 'racing' || this.state.phase === 'finished') {
+      const order = this.lastOrder
+        ? { ...this.lastOrder, at: this.now }
+        : this.computeOrder(this.now);
+      if (order) this.sendTo(c.id, order);
+    }
     // Coming back during the results: the classification is part of what they missed.
     if (this.state.phase === 'results' && this.state.results) {
       this.sendTo(c.id, { type: 'results', results: this.state.results });
@@ -1117,8 +1164,116 @@ export class RoomMachine {
     deriveProgress(car);
     this.dirty = true;
     this.broadcast(timingMessage(msg, verdict.status, verdict.reason));
-    if (this.resolveFlag()) this.broadcastRoom();
+    const flagChanged = this.resolveFlag();
+    if (flagChanged) this.broadcastRoom();
     this.checkRaceEnd();
+    if (flagChanged && (this.state.phase === 'racing' || this.state.phase === 'finished')) {
+      this.publishOrder(false);
+    }
+  }
+
+  // ---- Authoritative live order ------------------------------------------------
+
+  private progressAt(tr: SeatTrack, evalAt: number, racing: boolean): number {
+    const h = tr.history;
+    if (h.length === 0) return 0;
+    const last = h[h.length - 1]!;
+    if (!racing) return last.progress;
+    const first = h[0]!;
+    if (evalAt <= first.t) return first.progress;
+    if (evalAt >= last.t) {
+      const extraMs = Math.min(ORDER_MAX_EXTRAP_MS, evalAt - last.t);
+      return last.progress + (last.sRate * extraMs) / 1000;
+    }
+    let i = h.length - 1;
+    while (i > 0 && h[i - 1]!.t > evalAt) i--;
+    const a = h[i - 1]!;
+    const b = h[i]!;
+    if (a.resets !== b.resets) {
+      return evalAt < b.t ? a.progress + (a.sRate * (evalAt - a.t)) / 1000 : b.progress;
+    }
+    const span = b.t - a.t;
+    const u = span > 0 ? (evalAt - a.t) / span : 1;
+    return a.progress + (b.progress - a.progress) * u;
+  }
+
+  /**
+   * Compute one shared running order from every car's state evaluated at the same server time
+   * `evalAt = this.now - ORDER_EVAL_LAG_MS` (interpolated for normal-latency seats, extrapolated
+   * up to 300 ms under packet loss or frame stalls). Finished cars are ordered by laps and race time
+   * + penalties (matching `classify`), racing cars by continuous distance with a hysteresis band
+   * against the previous order so dead-even side-by-side cars do not flutter, and retired cars
+   * last.
+   */
+  private computeOrder(activateAt: number): OrderMessage | null {
+    const cars = this.state.cars;
+    if (!cars || cars.length === 0) return null;
+    const L = this.state.settings.circuit.lengthM;
+    const evalAt = this.now - ORDER_EVAL_LAG_MS;
+    const finished: { car: CarRecord; progress: number }[] = [];
+    const racing: { car: CarRecord; progress: number }[] = [];
+    const dnf: { car: CarRecord; progress: number }[] = [];
+    for (const car of cars) {
+      const tr = this.seats.get(car.seat);
+      const progress = tr
+        ? this.progressAt(tr, evalAt, car.state === 'racing')
+        : -L - car.gridPosition;
+      const entry = { car, progress };
+      if (car.state === 'finished') finished.push(entry);
+      else if (car.state === 'racing') racing.push(entry);
+      else dnf.push(entry);
+    }
+
+    finished.sort((a, b) => {
+      const ta = a.car.lap > 0 ? a.car.raceMs + a.car.penaltyMs : Number.POSITIVE_INFINITY;
+      const tb = b.car.lap > 0 ? b.car.raceMs + b.car.penaltyMs : Number.POSITIVE_INFINITY;
+      const byTime = ta === tb ? 0 : ta < tb ? -1 : 1;
+      return b.car.lap - a.car.lap || byTime || a.car.gridPosition - b.car.gridPosition;
+    });
+
+    if (this.lastOrder) {
+      const rank = new Map<number, number>();
+      this.lastOrder.order.forEach((seat, idx) => rank.set(seat, idx));
+      racing.sort(
+        (a, b) =>
+          (rank.get(a.car.seat) ?? Number.MAX_SAFE_INTEGER) -
+            (rank.get(b.car.seat) ?? Number.MAX_SAFE_INTEGER) ||
+          a.car.gridPosition - b.car.gridPosition,
+      );
+      // Insertion pass: a trailing car moves ahead only once it clears the hysteresis band.
+      for (let i = 1; i < racing.length; i++) {
+        const cur = racing[i]!;
+        let j = i;
+        while (j > 0 && cur.progress > racing[j - 1]!.progress + ORDER_HYSTERESIS_M) {
+          racing[j] = racing[j - 1]!;
+          j--;
+        }
+        racing[j] = cur;
+      }
+    } else {
+      racing.sort((a, b) => b.progress - a.progress || a.car.gridPosition - b.car.gridPosition);
+    }
+
+    dnf.sort(
+      (a, b) =>
+        b.car.lap - a.car.lap || b.progress - a.progress || a.car.gridPosition - b.car.gridPosition,
+    );
+
+    const combined = [...finished, ...racing, ...dnf];
+    return {
+      type: 'order',
+      at: Math.round(activateAt),
+      order: combined.map((e) => e.car.seat),
+      progress: combined.map((e) => Math.round(e.progress * 100) / 100),
+    };
+  }
+
+  private publishOrder(immediate: boolean): void {
+    const msg = this.computeOrder(immediate ? this.now : this.now + ORDER_LEAD_MS);
+    if (!msg) return;
+    this.lastOrderAt = this.now;
+    this.lastOrder = msg;
+    this.broadcast(msg);
   }
 
   // ---- Snapshots ---------------------------------------------------------------
@@ -1147,6 +1302,7 @@ export class RoomMachine {
     if (!SNAPSHOT_PHASES.has(this.state.phase)) return;
     const accepted: CarSnapshot[] = [];
     let foreign = false;
+    const L = this.state.settings.circuit.lengthM;
     for (const snap of decoded.frame.cars) {
       if (!this.owns(m, snap.seat)) {
         foreign = true;
@@ -1154,7 +1310,43 @@ export class RoomMachine {
       }
       const track = this.seats.get(snap.seat);
       if (track && snap.tick <= track.tick) continue; // stale or duplicate: drop
-      this.seats.set(snap.seat, { tick: snap.tick, snap, at: this.now });
+      const behindLine = (track?.behindLine ?? true) && snap.lap === 0 && snap.s > L / 2;
+      const speed = Math.min(120, snapshotSpeed(snap));
+      let sRate = speed;
+      if (track && snap.resets === track.snap.resets) {
+        const dt = (snap.t - track.snap.t) / 1000;
+        if (dt > 0.005 && dt < 1) {
+          let ds = snap.s - track.snap.s;
+          if (ds < -L / 2) ds += L;
+          else if (ds > L / 2) ds -= L;
+          const raw = Math.max(0, Math.min(Math.max(speed * 1.05, 1), ds / dt));
+          sRate = track.sRate > 0 ? track.sRate * 0.5 + raw * 0.5 : raw;
+        }
+      }
+      const baseLap = behindLine && snap.lap === 0 && snap.s > L / 2 ? -1 : snap.lap;
+      const sample: ProgressSample = {
+        t: snap.t,
+        progress: baseLap * L + snap.s,
+        resets: snap.resets,
+        sRate,
+      };
+      const history = track ? track.history : [];
+      if (history.length > 0 && history[history.length - 1]!.t === sample.t) {
+        history[history.length - 1] = sample;
+      } else {
+        let hi = history.length;
+        while (hi > 0 && history[hi - 1]!.t > sample.t) hi--;
+        history.splice(hi, 0, sample);
+        if (history.length > 16) history.shift();
+      }
+      this.seats.set(snap.seat, {
+        tick: snap.tick,
+        snap,
+        at: this.now,
+        behindLine,
+        sRate,
+        history,
+      });
       accepted.push(snap);
       const start = this.state.start;
       if (start && this.now < start.lightsOutAt && snapshotSpeed(snap) > LIMITS.jumpSpeed) {
