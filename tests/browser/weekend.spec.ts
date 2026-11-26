@@ -104,9 +104,22 @@ test('weekend: practice (simulated to the flag on desktop, skipped on a phone), 
   await page.keyboard.press('i');
   await page.evaluate(() => window.__undercut!.setTimeScale(8));
   await expect(page.getByTestId('pit-panel')).toContainText('Box confirmed');
-  await page.waitForFunction(() => Number(window.__undercut!.state().pitStops) === 1, null, {
-    timeout: 50_000,
-  });
+  await page
+    .waitForFunction(() => Number(window.__undercut!.state().pitStops) === 1, null, {
+      timeout: 50_000,
+    })
+    .catch(async (error: unknown) => {
+      console.log(
+        'Pit-stop timeout',
+        JSON.stringify(
+          await page.evaluate(() => ({
+            state: window.__undercut!.state(),
+            telemetry: window.__undercut!.telemetry(),
+          })),
+        ),
+      );
+      throw error;
+    });
   await expect(page.getByTestId('pit-panel')).toContainText('1 stop');
   await expect(page.getByTestId('pit-panel')).toHaveAttribute('data-saw-service', 'true');
   await expect(page.getByTestId('pit-panel')).toHaveAttribute('data-saw-crew-hold', 'true');

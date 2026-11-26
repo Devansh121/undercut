@@ -128,6 +128,8 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - The mirror glass was culled from the driver's eye (the asset winds it facing forward), and that, not the material, was the flat grey: the road showed through the housing. The new material draws both sides, and the car's Mobile level keeps the glass as its own material (one more draw call, 26) so the phone gets the static reflection too.
 - The gloves' and arms' extra triangles are paid for by the brake-duct drums and scoops behind the rims (28 → 22 and 12 → 8 segments), not by raising the car's triangle budgets.
 - The night wheel's light is an emission of each material's own albedo rather than a point light: a light added to the scene would recompile every lit material and cost per pixel everywhere. The buttons are left out (their coloured caps glowing read as toy LEDs).
+- Browser CI: use two weighted shards, balancing desktop and phone independently from per-test durations in the completed and timed-out 26 Nov master runs. Keep the 15-minute budgets and the required `browser` check as an aggregate. Refresh `tools/ci/browser-weights.json` when timings change substantially; new specs still run at the median weight.
+
 - Graphics polish (sky, grass, night road): the brief said mowing bands already existed; master had none, so the circuit's grass is mown here (3.2 m bands along the track edge). The land beyond the circuit is not mown.
 - The new overcast sky has its own id (`overcast_soil`) rather than replacing `overcast` in place. The asset build's metadata cache in `~/.cache/undercut/assets-src/skies/` is shared by every worktree, and another branch rebuilding `overcast` would have paired its old images with the new sky's numbers.
 - Singapore's dark road needed more than dimmer banks: turn 1 and the far end of the pit straight were nearly black on master too. Banks set back behind wide run-off are scaled to light the road as one by the wall would (capped at 6×), and the side opposite the pit lane takes masts at half spacing where the pit side has none.
@@ -472,6 +474,29 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   assertions. An earlier commit on this branch moved it to the phone viewport alone after a
   desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
   phone is added rather than substituted.
+- An online session steps its simulation, car contact and snapshots from a timer when no
+  animation frame has come for one snapshot interval (33 ms), without drawing. On the 4-core CI
+  runner the browser presented frames every 150–400 ms with the main thread idle (software
+  compositing of the full-window HUD), so both pages sent 2.5–3.6 snapshots a second and saw
+  each other held; master failed the desktop order proof and the 100 ms contact proof that way.
+  60 Hz frames are never late, and single-player sessions are unchanged.
+- Simulation and presentation keep separate timestamps. Timer steps consume only simulation
+  elapsed time; animation frames give the camera, HUD and frame pacing the full interval since
+  the previous animation frame. The 250 ms simulation stall cap stays in place. Resume resets
+  both clocks so paused time is not caught up. Interleaving tests cover a 10 s, 5 fps schedule
+  with timer callbacks on and around frame boundaries: 10 s presentation and 2,400 sim ticks.
+- Single-player retains the original capped frame delta for presentation as well as simulation;
+  the independent, uncapped presentation delta applies only to online sessions with timer steps.
+- The local rooms proxy opens a fresh upstream HTTP connection for each request. Pooling a
+  health-check socket can race its idle close and make the next room-creation POST return 502.
+  The regression closes reused connections and requires one successful POST without retries.
+- Pit and compound keyboard actions apply before their fixed simulation tick. Previously they
+  waited until the whole catch-up batch completed: at 8× speed, a 250 ms frame advanced two
+  seconds before applying a pit request. Camera actions still return to the presentation path.
+  First-tick regressions cover both normal and stalled frames; browser pit-service assertions
+  and their 50 s deadline are unchanged.
+
+
 
 ### Decided for you — Mobile prop-kit tuning
 

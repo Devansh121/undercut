@@ -377,3 +377,39 @@ describe('GameLoop and DriveSession', () => {
     expect(session.timer.valid).toBe(false);
   });
 });
+
+it.each([1 / 60, 0.25])(
+  'applies a queued pit call before the first tick of an 8x frame (%s s)',
+  (elapsed) => {
+    const session = new DriveSession({ track, seed: 7, quickRace: { laps: 5 } });
+    session.start();
+    // Start from an already-green rules snapshot; this test exercises action dispatch.
+    session.race.control.restore({
+      ...session.race.control.snapshot(),
+      phase: 'green',
+      lightsOutAt: 0,
+      greenAt: 0,
+    });
+    session.teleport(5125.675, 0, 30);
+    const source = new Scripted();
+    source.pending = ['boxThisLap'];
+    const at = session.world.time;
+    const observed: boolean[] = [];
+    const loop = new GameLoop(
+      session,
+      source,
+      () => observed.push(session.race.control.pitRequested(0)),
+      (action: string) => {
+        if (action !== 'boxThisLap') return false;
+        expect(session.world.time).toBe(at);
+        session.boxThisLap();
+        return true;
+      },
+    );
+    loop.timeScale = 8;
+    const result = loop.frame(elapsed);
+    expect(observed.length).toBeGreaterThan(0);
+    expect(observed.every(Boolean)).toBe(true);
+    expect(result.actions).not.toContain('boxThisLap');
+  },
+);

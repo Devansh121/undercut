@@ -10,3 +10,52 @@ export const PHYSICS_DT_CAP = 0.25;
 export function physicsDt(elapsedMs: number): number {
   return Math.min(PHYSICS_DT_CAP, Math.max(0, elapsedMs) / 1000);
 }
+
+/**
+ * An online session keeps stepping when animation frames come late. The browser can hold
+ * `requestAnimationFrame` back while the compositor is slow to present (software compositing of
+ * a large window) even with the main thread idle; the simulation, car contact and the snapshots
+ * other players see run in that frame, so without this a slow screen starves the room.
+ */
+/** Between timer steps while frames are late, ms: the 30 Hz snapshot cadence. */
+export const BACKUP_STEP_MS = 1000 / 30;
+/** A frame is late once a snapshot interval has passed without one (60 Hz frames never are). */
+export const LATE_FRAME_MS = BACKUP_STEP_MS;
+
+/**
+ * True when the timer should run a frame's simulation and network work without drawing: the
+ * page is visible and the last animation frame (`lastFrameMs`, null before the first) is at
+ * least `LATE_FRAME_MS` old.
+ */
+export function stepWithoutFrame(
+  nowMs: number,
+  lastFrameMs: number | null,
+  visible: boolean,
+): boolean {
+  return visible && lastFrameMs !== null && nowMs - lastFrameMs >= LATE_FRAME_MS;
+}
+
+/** Independent presentation and simulation clocks for interleaved timer/rAF callbacks. */
+export class DriveFrameClock {
+  private lastStepAt: number | null = null;
+  lastFrameAt: number | null = null;
+
+  /** Advance simulation once, whichever callback gets here first. */
+  stepDt(nowMs: number): number {
+    const dt = physicsDt(this.lastStepAt === null ? 0 : nowMs - this.lastStepAt);
+    this.lastStepAt = nowMs;
+    return dt;
+  }
+
+  /** Full interval since the preceding animation frame; timer steps never consume it. */
+  frameElapsedMs(nowMs: number): number {
+    const elapsedMs = this.lastFrameAt === null ? 0 : nowMs - this.lastFrameAt;
+    this.lastFrameAt = nowMs;
+    return elapsedMs;
+  }
+
+  reset(): void {
+    this.lastStepAt = null;
+    this.lastFrameAt = null;
+  }
+}

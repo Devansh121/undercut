@@ -128,7 +128,7 @@ import {
 import { assistsFor, type AssistConfig } from './game/assists';
 import type { DeviceKind } from '@undercut/input';
 import { S } from './ui/strings';
-import { physicsDt } from './frame-timing';
+import { BACKUP_STEP_MS, DriveFrameClock, physicsDt, stepWithoutFrame } from './frame-timing';
 import { speedUnit, setSpeedUnit } from './ui/player-settings';
 import { Onboarding } from './ui/onboarding';
 import { phoneSession } from './ui/phone-session';
@@ -620,6 +620,12 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     session,
     wrap(human),
     ext?.afterStep ? (dt) => ext.afterStep!(dt) : undefined,
+    (action) => {
+      if (action === 'boxThisLap') callBox();
+      else if (action === 'nextCompound') session.cycleCompound();
+      else return false;
+      return true;
+    },
   );
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
@@ -1150,7 +1156,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     input.setContext('driving');
     loop.resume();
     o.audio?.setActive(true);
-    last = null;
+    frameClock.reset();
   }
 
   const onVisibility = (): void => {
@@ -1340,7 +1346,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   /** Intervals between drawn frames (the pacer may skip draws while rAF keeps time), ms. */
   const drawLog: number[] = [];
   let drawnSeen = -1;
-  let last: number | null = null;
+  const frameClock = new DriveFrameClock();
   let clock = 0;
   let handle = 0;
   let lookBack = false;
@@ -1540,56 +1546,85 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (node.hasAttribute(attr) !== on) node.toggleAttribute(attr, on);
   };
 
+  /** One frame's worth of a running session: input, fixed sim steps, events and actions. */
+  const stepRunning = (dt: number): void => {
+    ext?.beforeFrame?.(dt);
+    const r = loop.frame(dt);
+    impacts.observe(r.wallImpact, dt);
+    haptics.update({
+      dt,
+      speed: Math.hypot(session.car.state.vx, session.car.state.vy),
+      kerb: session.kerbUnderWheels(),
+      wallImpact: r.wallImpact,
+      carImpact: r.carImpact,
+    });
+    onEvents(r.events);
+    // Simulating the rest of a timed session: more steps in this frame, within a budget that
+    // keeps the page responsive.
+    if (simulating && !session.result) {
+      // The car is in its box and the view is mostly skipped (below), so most of the frame
+      // goes to the simulation; 40 ms keeps the page answering input.
+      const until = performance.now() + SIMULATE_BUDGET_MS;
+      while (performance.now() < until && session.phase === 'running' && !session.result)
+        onEvents(loop.frame(1 / 30).events);
+      showSimulateProgress();
+    }
+    if (raceDisplay) {
+      const fresh = session.drainRaceEvents();
+      if (fresh.length > 0) {
+        raceDisplay.ingest(fresh, session.race.control.standings());
+        towerClock = TOWER_PERIOD;
+      }
+    }
+    lookBack = r.lookBack;
+    for (const action of r.actions) {
+      if (action === 'nextCamera') {
+        const name = view.nextCamera();
+        say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
+      }
+    }
+    if (loop.paused) openPause();
+  };
+
+  // Online only: keep the sim, car contact and snapshots going when animation frames are late
+  // (frame-timing.ts). The timer runs a frame's CPU work without drawing or touching the HUD.
+  let lateTimer: ReturnType<typeof setTimeout> | null = null;
+  const stepLate = (): void => {
+    lateTimer = null;
+    if (quitting || !ext) return;
+    const now = performance.now();
+    if (
+      session.phase === 'running' &&
+      stepWithoutFrame(now, frameClock.lastFrameAt, document.visibilityState === 'visible')
+    ) {
+      const dt = frameClock.stepDt(now);
+      stepRunning(dt);
+      if (session.phase === 'running') {
+        interpolateCarPose(session.car.previousPose, session.car.pose, loop.alpha, pose);
+        ext.frame?.({ dt, pose, paused: false });
+      }
+    }
+    lateTimer = setTimeout(stepLate, BACKUP_STEP_MS);
+  };
+
   const frame = (): void => {
     const now = performance.now();
     if (quitting) return;
-    const elapsedMs = last === null ? 0 : now - last;
-    const dt = physicsDt(elapsedMs);
-    if (last !== null) {
-      frameLog.push(now - last);
+    const lastFrameAt = frameClock.lastFrameAt;
+    const elapsedMs = frameClock.frameElapsedMs(now);
+    // Single-player keeps its original capped frame delta. Only online presentation needs
+    // an independent wall-time delta when timer callbacks have consumed simulation time.
+    const dt = ext ? Math.max(0, elapsedMs) / 1000 : physicsDt(elapsedMs);
+    const simDt = frameClock.stepDt(now);
+    // The frame log is animation-frame intervals, whatever stepped in between.
+    if (lastFrameAt !== null) {
+      frameLog.push(now - lastFrameAt);
       if (frameLog.length > FRAME_LOG) frameLog.shift();
     }
-    last = now;
+    if (ext && lateTimer === null) lateTimer = setTimeout(stepLate, BACKUP_STEP_MS);
 
     if (session.phase === 'running') {
-      ext?.beforeFrame?.(dt);
-      const r = loop.frame(dt);
-      impacts.observe(r.wallImpact, dt);
-      haptics.update({
-        dt,
-        speed: Math.hypot(session.car.state.vx, session.car.state.vy),
-        kerb: session.kerbUnderWheels(),
-        wallImpact: r.wallImpact,
-        carImpact: r.carImpact,
-      });
-      onEvents(r.events);
-      // Simulating the rest of a timed session: more steps in this frame, within a budget that
-      // keeps the page responsive.
-      if (simulating && !session.result) {
-        // The car is in its box and the view is mostly skipped (below), so most of the frame
-        // goes to the simulation; 40 ms keeps the page answering input.
-        const until = performance.now() + SIMULATE_BUDGET_MS;
-        while (performance.now() < until && session.phase === 'running' && !session.result)
-          onEvents(loop.frame(1 / 30).events);
-        showSimulateProgress();
-      }
-      if (raceDisplay) {
-        const fresh = session.drainRaceEvents();
-        if (fresh.length > 0) {
-          raceDisplay.ingest(fresh, session.race.control.standings());
-          towerClock = TOWER_PERIOD;
-        }
-      }
-      lookBack = r.lookBack;
-      for (const action of r.actions) {
-        if (action === 'boxThisLap') callBox();
-        if (action === 'nextCompound') session.cycleCompound();
-        if (action === 'nextCamera') {
-          const name = view.nextCamera();
-          say({ tag: S.hud.camera, text: CAMERA_LABELS[name], tone: 'info' }, 1.4);
-        }
-      }
-      if (loop.paused) openPause();
+      stepRunning(simDt);
     } else if (session.phase === 'paused') {
       const f = input.sample(dt, 0);
       // The controls list follows the device before that device's first press is read.
@@ -1652,7 +1687,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const t = session.readTelemetry();
     const renderTime = loop.renderTime;
     const ghostOn = !ext && session.ghostPoseAt(renderTime, ghostPose);
-    const others = ext?.frame?.({ dt, pose, paused: !playing });
+    const others = ext?.frame?.({ dt: simDt, pose, paused: !playing });
     const revLights =
       t.engineRpm >= REV_FLASH
         ? 16
@@ -2132,6 +2167,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     o.audio?.setActive(false);
     haptics.stop();
     cancelAnimationFrame(handle);
+    if (lateTimer !== null) clearTimeout(lateTimer);
     document.removeEventListener('visibilitychange', onVisibility);
     document.removeEventListener('gesturestart', noPinch);
     o.canvas.removeEventListener('webglcontextlost', onContextLost);
