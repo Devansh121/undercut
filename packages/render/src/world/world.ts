@@ -576,13 +576,16 @@ export class CircuitWorld {
         : [{ name: 'Kestrel Grand Prix', code: 'KST', primary: '#1F4FBF', secondary: '#C3C8D0' }];
 
     const built = buildPitBuilding(track, this.lap, teams.length);
+    const mobile = quality.world.terrain !== 'high';
+    const hill = this.theme.pit === 'kit-garages';
+    const garageId = hill ? 'hill-pit-garage' : 'pit-garage';
     const garageLods =
       built.bays.length > 0
-        ? (o.propKit?.lodsFor(this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage', {
+        ? (o.propKit?.lodsFor(garageId, {
             // Its own board panel stays dark behind the team boards placed on it.
             slotColors: { 'board-face': [0.018, 0.019, 0.021] },
             maxDistanceScale: 2.6,
-            distanceCaps: [80, 300, FAR_STANDS],
+            distanceCaps: [80, mobile ? 120 / 2.6 : 300, FAR_STANDS],
           }) ?? null)
         : null;
     let pit = built;
@@ -591,9 +594,7 @@ export class CircuitWorld {
       // stretched along the row to the bay pitch, its front wall on the garage line, and the
       // team boards move onto the panel the module carries for them.
       for (const ch of built.chunks) ch.geometry.dispose();
-      const entry = o.propKit?.entries.get(
-        this.theme.pit === 'kit-garages' ? 'hill-pit-garage' : 'pit-garage',
-      );
+      const entry = o.propKit?.entries.get(garageId);
       const board = entry?.attachments?.find((a) => a.name === 'team-board');
       const k = PIT_BUILDING.bay / (entry?.moduleLength || 6);
       const wallX = (board?.position[0] ?? 4.98) * k;
@@ -605,8 +606,8 @@ export class CircuitWorld {
       };
       const farGarage = garageLods[garageLods.length - 1]!;
       const garageReach = farGarage.maxDistance;
-      farGarage.maxDistance = Math.min(farGarage.maxDistance, 400);
-      const garageHull = garageHullGeometry();
+      farGarage.maxDistance = Math.min(farGarage.maxDistance, mobile ? 220 : 400);
+      const garageHull = garageHullGeometry(hill);
       const garageHullMat = createPropKitMaterial({ key: 'garage-kit-far', grain: false });
       this.geometries.push(garageHull);
       this.materials.push(garageHullMat);
@@ -701,7 +702,12 @@ export class CircuitWorld {
     const distinctCrewLods = (id: string, fallbackGeo: BufferGeometry) => {
       const raw = o.propKit?.lodsFor(id, crewLevels);
       if (!raw) return [{ geometry: fallbackGeo, material: crewMat, maxDistance: far * 0.7 }];
-      if (raw.length < 3) return raw;
+      if (raw.length < 3) {
+        if (!mobile || raw.length < 2) return raw;
+        const out = [raw[raw.length - 1]!];
+        for (const l of raw) if (!out.includes(l)) l.geometry.dispose();
+        return out;
+      }
       const out = [raw[0]!, raw[raw.length - 1]!];
       for (const l of raw) if (!out.includes(l)) l.geometry.dispose();
       return out;
@@ -1170,6 +1176,7 @@ export class CircuitWorld {
     };
     const standFar = createPropKitMaterial({ key: 'stand-kit-far', grain: false });
     this.materials.push(standFar);
+    const mobile = o.quality.world.terrain !== 'high';
     const kitStands = placeKitStands(
       this.stands,
       o.propKit,
@@ -1178,6 +1185,7 @@ export class CircuitWorld {
       o.quality.sceneryShadows,
       spectator,
       standFar,
+      mobile,
     );
     const { fallback } = kitStands;
     this.geometries.push(...kitStands.geometries);
@@ -1221,32 +1229,36 @@ export class CircuitWorld {
   }) => void {
     const variants = 3;
     if (this.crowdKinds === 0) {
+      const mobile = o.quality.world.terrain !== 'high';
+      const swapStart = mobile ? 14 : 24;
+      const swapEnd = mobile ? 20 : 32;
+      const farMax = mobile ? 320 : 650;
       const mats = crowdMaterial(this.crowdTime);
       this.materials.push(mats);
       for (let v = 0; v < variants; v++) {
-        const g = spectatorGeometry(v);
+        const g = spectatorGeometry(v, mobile);
         this.geometries.push(g);
         const farMat = crowdMaterial(this.crowdTime);
-        crowdSwapMaterial(farMat, this.crowdEye, false);
+        crowdSwapMaterial(farMat, this.crowdEye, false, swapStart, swapEnd);
         this.materials.push(farMat);
         o.props.define({
           id: `crowd-far-${v}`,
           castShadow: false,
           chunkLength: 100,
-          farBatchCell: 240,
-          lods: farCrowdLods(g, farMat, mats),
+          farBatchCell: mobile ? 600 : 240,
+          lods: farCrowdLods(g, farMat, mats, swapEnd, farMax),
         });
         o.props.define({
           id: `crowd-${v}`,
           castShadow: false,
           receiveShadow: true,
-          lods: [{ geometry: g, material: mats, maxDistance: 650 }],
+          lods: [{ geometry: g, material: mats, maxDistance: farMax }],
         });
       }
       // Without the kit's grain: clothes are flat-coloured, and the grain's per-fragment hashes were
       // the near crowd's dearest part.
       const nearMat = createPropKitMaterial({ swayTime: this.crowdTime, grain: false });
-      crowdSwapMaterial(nearMat, this.crowdEye, true);
+      crowdSwapMaterial(nearMat, this.crowdEye, true, swapStart, swapEnd);
       this.materials.push(nearMat);
       for (let v = 0; v < variants; v++) {
         const lods = o.propKit?.lodsFor(`crowd-seated-${v}`, {
@@ -1255,7 +1267,7 @@ export class CircuitWorld {
         });
         if (!lods) continue;
         // The kit's middle level (368 triangles a person, half the finest): every person in a
-        // cell within reach is drawn, and the vertex stage then drops those past 32 m, so the
+        // cell within reach is drawn, and the vertex stage then drops those past swapEnd m, so the
         // finest level's vertices cost about 1 ms at Monza's grid on High.
         const level = lods[1] ?? lods[0]!;
         for (const l of lods) if (l !== level) l.geometry.dispose();
@@ -1263,11 +1275,11 @@ export class CircuitWorld {
         o.props.define({
           id: `crowd-near-${v}`,
           castShadow: false,
-          // Nobody beyond 32 m draws near (crowdSwapMaterial), so one level, and no cell whose
+          // Nobody beyond swapEnd m draws near (crowdSwapMaterial), so one level, and no cell whose
           // near edge is further away. Cells as wide as that reach: smaller ones multiplied draw
           // calls and per-frame chunk work (867 cells at 16 m at Monza).
-          gridCell: 32,
-          lods: [{ ...level, maxDistance: Math.min(level.maxDistance, 32) }],
+          gridCell: swapEnd,
+          lods: [{ ...level, maxDistance: Math.min(level.maxDistance, swapEnd) }],
         });
       }
       this.crowdKinds = variants;
