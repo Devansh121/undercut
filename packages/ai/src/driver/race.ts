@@ -1105,7 +1105,7 @@ export class RaceDriver implements Driver {
           this.cooldown = this.passBypass ? 1 : later && late ? LATE_COOLDOWN : 3;
         // Given up off the line in or just before a braking zone from lap two: the car keeps its
         // lane on the road through the corner, as a committed move does. Swinging back to the
-        // line under braking slid a car, its brakes eased, and it ran off the road at Ascari.
+        // line under braking slid a car, its brakes eased, and it ran off the road at Monza's third chicane.
         if (
           later &&
           !done &&
@@ -1150,7 +1150,7 @@ export class RaceDriver implements Driver {
         if (towHold) base = od;
         // From lap two, out of the wake and not gaining on the car: given up here, on the
         // straight. Kept on beside it at the same speed, the move ended under braking and the car
-        // came back across to the line there, off the road at Ascari.
+        // came back across to the line there, off the road at Monza's third chicane.
         this.passStall =
           later && !this.passCommitted && !towHold && v < passCar!.speed + 0.5
             ? this.passStall + dt
@@ -1530,7 +1530,7 @@ export class RaceDriver implements Driver {
       // From lap two, held up behind a car it is quicker than, the driver presses: it follows
       // closer through the corners, to be on the car's gearbox at the exit for the run to the
       // next braking zone (the kinematic limit below is unchanged).
-      // (Not through braking zones and corners: pressing through Ascari, a car braking
+      // (Not through braking zones and corners: pressing through Monza's third chicane, a car braking
       // harder mid-corner for the car ahead ran off both sides and into the barrier.)
       const pressing = later && (held || quicker) && !queueStop && !cornering;
       const tFollow = tC + (tS - tC) * straightness;
