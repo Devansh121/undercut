@@ -82,6 +82,7 @@ A valid message in a phase that does not take it gets `wrong_phase` (no strike).
 | `limits` | each track-limits report | seat, lap, warnings so far |
 | `pit` | relayed pit events | seat, event, lap, time |
 | `host` | host change, or more AI for the host | new host, and every AI car with its laps, race time, state and last snapshot |
+| `order` | while racing, at most 5 Hz | shared future activation time, seat order and continuous progress at one common evaluation time |
 | `results` | race end | the final classification, identical for everyone |
 | `error` | a refused message | stable `code` and a human-readable `detail` |
 
@@ -457,3 +458,126 @@ state later. When a clamped stall spans lights-out, stationary pre-start time is
 first so the surviving interval retains the release tick at the boundary. Physics still
 runs at most 250 ms of catch-up; excess race time is lost as on any other stall. The
 report keeps the wall-clock observation separately from the released simulation tick.
+
+### Car-to-car contact online
+
+Online play uses **symmetric local contact resolution against latency-compensated remote
+proxies** (`packages/sim/src/remote-contact.ts`), matching the state-sync architecture where each
+browser runs its own 240 Hz physics and the rooms service relays snapshots without simulating cars.
+
+- **AI vs AI on the host** uses the normal two-way contact solver (`resolveCarContacts`).
+  Human vs AI uses the same bounded symmetric proxy solver on both cars, including when the
+  human is the host, so being the host does not change the human's contact response.
+- **Owned vs remote cars**: colliding against the delayed render pose (`serverNow - delayMs`,
+  ~140–190 ms behind) would place a side-by-side car 7–15 m behind at racing speed and cause
+  pass-through on both clients. Instead, before each frame's fixed steps, every active non-ghost
+  remote car is sampled at current server time `serverNow` via `RemoteCarBuffer.sampleSeat`,
+  extrapolated forward from its newest snapshot along a constant-yaw-rate circular arc up to
+  `MAX_CONTACT_EXTRAPOLATION_S` (250 ms, matching the buffer's extrapolation window), and stepped
+  in lockstep at 240 Hz across the frame's substeps.
+- **Fairness and stability under 50–150 ms latency and 1–2 % loss**:
+  - Narrow-phase geometry reuses the exact oriented-box SAT (`collideFootprints`) and planar
+    restitution/friction constants (`CAR_RESTITUTION = 0.1`, `CAR_FRICTION = 0.3`) from
+    `car-contact.ts`.
+  - Normal and Coulomb friction impulses use the combined equal-mass two-car denominator
+    (`wa + wb + ran²/ia + rbn²/ib`), applying only the local car's symmetric share. Both browsers
+    independently apply their own half when their cars touch.
+  - Closing speed entering a remote impulse is capped (`MAX_REMOTE_CLOSING_SPEED = 40 m/s`) and
+    positional separation is capped per 240 Hz step (`MAX_REMOTE_PUSH_PER_STEP = 0.06 m`, taking
+    half the overlap above `CONTACT_SLOP`), so a sudden latency-induced overlap separates smoothly
+    over a few ticks instead of teleporting or oscillating.
+  - Contact is strictly planar (`x, z, vx, vy, yawRate` only): zero vertical impulse, so cars can
+    never be launched into the air.
+  - **Barrier safety**: immediately after any remote contact modifies an owned car,
+    `resolveWallContact` runs against the track barriers. A car pinned between a remote peer and a
+    barrier can never be pushed through the wall.
+- **Ghosting**: remote contact is disabled before lights out, for cars that are `held` or fading
+  (`opacity < 1`, i.e., silent past 250 ms), retired or in the pit lane (`CAR_FLAG.retired` /
+  `CAR_FLAG.pitLane`), finished, or within a 2 s reset grace window after either car teleports onto
+  the track.
+
+
+### Host AI field and circuit selection
+
+The lobby offers the three shipped circuits and their matching race trim and sky. The host can
+set AI cars from zero to the remaining grid capacity, or press Fill grid. New rooms default to
+zero; room updates and host migration preserve the chosen fill.
+
+`apps/web/src/online/ai-field.ts` runs only on the current host. It uses the shipped racing
+line, envelope and racing driver for the selected circuit, a seeded driver per AI identity, and
+the same 240 Hz sim as the humans. AI cars read both the other AI cars and extrapolated human
+poses as traffic. A slip-limited launch hands over to the racing driver; AI snapshots share the
+host's existing 30 Hz batch with its human car. Each line crossing is claimed on the room clock,
+through the same plausibility checks as human crossings. The browser does no extra Worker-side
+physics or per-car timers. Online cars use reference tyres and a 20 kg fuel load topped up on
+crossings; tyre strategy remains the offline race mode's responsibility.
+
+On takeover, the new host restores each AI car's latest pose, world velocity, yaw rate, gear,
+engine and wheel speeds, counted laps and last race time. Snapshot ticks continue above the old
+host's tick, so the service accepts the new stream immediately. The service also retains whether
+a car still owes its initial grid-line crossing: migrating a back-row car must not drop a lap.
+The driver's internal reaction and traffic memory restarts; this is a physical warm start from
+the last received pose, not a bit-identical continuation of an unreceived physics state.
+
+Online timing uses the server race clock for both the current lap and official crossing claims,
+so a clamped render stall does not make the HUD clock under-report the lap. The timing tower uses
+member names and AI identities, and reads the room's shared running order and progress for
+positions and distance-based estimated gaps. Those estimates are presentation; final classification
+comes from the room.
+
+Browser proof: `tests/browser/online-v2.spec.ts` checks a full moving grid and AI takeover at
+every circuit, and symmetric contact at 50, 100 and 150 ms with jitter and 2% snapshot loss.
+`ONLINE_SOAK=1 npx playwright test tests/browser/online-soak.spec.ts --project=online --workers=1`
+runs five real-time laps with two scripted humans and eighteen host AI at each circuit, recording
+stuck cars, rejected timing, and the identical twenty-car classification in both contexts.
+
+A stopped AI that makes less than 6 m of useful progress over 6 s temporarily becomes a ghost,
+so another stopped car cannot pin it or hold the field indefinitely. It is shown faded and does
+not collide with cars, but still meets the track barriers and keeps racing and timing. It becomes
+solid only above 5 m/s, clear of overlapping cars and traffic closing from behind. Other drivers
+ignore it only below 2 m/s; once moving, they plan around it before it becomes solid. The existing
+no-contact snapshot bit is also named `CAR_FLAG.ghost`; room retirement still comes only from
+official grid state. This extends the offline race's stopped-queue recovery to the host field.
+
+The `online` Playwright project runs the short tests with one worker in its own CI job, using the
+build job's client artifact. The viewport suite stays separate. The long soaks remain opt-in.
+
+### Review follow-up: bounded recovery and shared running order
+
+If an AI gains less than 6 m along the lap over 8 s, ghosting has not restored useful progress.
+The host places it at the same centreline s, aligned with the road, at 8 m/s, and resets its driver.
+No lap or longitudinal distance is awarded by the move. Its line counter and last counted race
+time are retained; its reset counter advances on the wire and survives host migration. Two
+seconds of contact grace protect the recovering car. The seat-15 regression pins a previously
+counted car at Monza s 677.17 m, d -2.26 m even after ghosting, then checks recovery and migration
+without changing its lap or counted time.
+
+The room evaluates every seat at server now minus 200 ms from at most sixteen recent progress
+samples per seat. It interpolates normally and caps extrapolation at 300 ms. It publishes at
+most five orders per second, with a shared activation time 300 ms ahead. Finishers use official
+counted laps and race time; running cars use common-time progress, retaining their previous
+order within a 2 m deadband. The client keeps at most thirty-two orders and applies the latest
+due one to every row, including itself. Positions and gaps therefore use one authority rather
+than comparing a current local pose with delayed remote poses. No extra physics runs in the
+Worker, and order computation does not write room storage.
+
+The order regression compares both HUD order lookups at identical server epochs under 150 ms
+latency and 2% loss, then verifies a live overtake on both clients. Epochs are explicit because two
+browser processes can answer simultaneous requests at different times under software rendering.
+Each comparison freezes an active epoch and waits, bounded to 6 s, until both clients have received
+that exact epoch and activated it or a later one. It then queries both histories at the frozen
+timestamp. A deterministic transport test delays guest order delivery by 900 ms, beyond both the
+activation lead and the former 300 ms look-back, and checks receipt before comparing orders.
+Contact proof samples both oriented footprints on the same server timestamps throughout the
+touch, checks side ordering and the unchanged penetration and height limits, and requires zero
+final penetration. Trace payloads are fetched explicitly with the debug API; ordinary status
+queries do not serialize the footprint history.
+
+A remote contact proxy also carries its snapshot age. The proxy is already extrapolated to
+the current tick. For non-overlapping footprints, an approach-only prediction horizon reserves
+at most `min(0.3 m, age * normalClosingSpeed)` along the separating face normal. Tangential
+speed does not enter the bound; parallel, separating and fresh poses get no speculative contact.
+The solver translates the predicted face along that normal and checks every SAT axis again.
+It requires the same contact normal and approaching contact-point velocities before any push.
+Actual overlaps retain the ordinary solver. Existing impulse, push-out, extrapolation and barrier
+limits are unchanged.

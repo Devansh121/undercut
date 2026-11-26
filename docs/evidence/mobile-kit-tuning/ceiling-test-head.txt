@@ -1,0 +1,5 @@
+# head: same command
+Running 1 test using 1 worker
+[1/1] [desktop] › tests/browser/world-dressing.spec.ts:38:1 › loads Monza circuit dressing and places world scenery, pit crew, and furniture
+  1 passed (27.5s)
+head exit 0

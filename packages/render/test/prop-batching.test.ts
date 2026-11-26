@@ -268,4 +268,132 @@ describe('far and shadow batches', () => {
     farGeo.dispose();
     material.dispose();
   });
+
+  it('reuses already-packed prefixes without bumping buffer versions on shrink or reactivation', () => {
+    const nearGeo = new BoxGeometry(1, 2, 1);
+    const farGeo = new BoxGeometry(1, 2, 1);
+    const material = new MeshBasicMaterial();
+    const make = (batch: boolean) => {
+      const reg = new PropRegistry(2000);
+      reg.define({
+        id: 'roof-stand',
+        gridCell: 40,
+        castShadow: false,
+        ...(batch && { nearBatchCell: 160, farBatchCell: 360 }),
+        lods: [
+          { geometry: nearGeo, material, maxDistance: 100 },
+          { geometry: farGeo, material, maxDistance: 600 },
+        ],
+      });
+      // Two 40 m cells inside one farBatchCell: chunk 0 at x=0, chunk 1 at x=60.
+      reg.place('roof-stand', { x: 0, y: 0, z: 0, s: 0, colour: [0.2, 0.4, 0.8] });
+      reg.place('roof-stand', { x: 60, y: 0, z: 0, s: 60, colour: [0.8, 0.3, 0.2] });
+      reg.place('roof-stand', { x: 65, y: 0, z: 0, s: 65, colour: [0.3, 0.7, 0.4] });
+      reg.build();
+      return reg;
+    };
+    const batch = make(true);
+    const farBatch = batch.group.children.find(
+      (m) => m.name === 'prop:roof-stand' && (m as InstancedMesh).geometry === farGeo,
+    ) as InstancedMesh;
+    expect(farBatch).toBeDefined();
+
+    // First update (both chunks in far LOD) packs [chunk0, chunk1].
+    batch.update(new Vector3(-200, 2, 0));
+    expect(farBatch.visible).toBe(true);
+    expect(farBatch.count).toBe(3);
+    const matVer = farBatch.instanceMatrix.version;
+    const colVer = farBatch.instanceColor!.version;
+
+    // Move camera near chunk 1 (x = 140): chunk 1 moves to near LOD, chunk 0 stays in far LOD
+    // — prefix [chunk0] of [chunk0, chunk1] reuses the existing buffer with zero version bumps.
+    const checkCold = (eye: Vector3) => {
+      const cold = make(false);
+      cold.update(eye);
+      expect(instances(batch)).toEqual(instances(cold));
+      cold.dispose();
+    };
+    batch.update(new Vector3(140, 2, 0));
+    expect(farBatch.visible).toBe(true);
+    expect(farBatch.count).toBe(1);
+    expect(farBatch.instanceMatrix.version).toBe(matVer);
+    expect(farBatch.instanceColor!.version).toBe(colVer);
+    checkCold(new Vector3(140, 2, 0));
+
+    // Move away so both chunks return to far LOD: [chunk0, chunk1] still matches the packed prefix.
+    batch.update(new Vector3(-200, 2, 0));
+    expect(farBatch.visible).toBe(true);
+    expect(farBatch.count).toBe(3);
+    expect(farBatch.instanceMatrix.version).toBe(matVer);
+    expect(farBatch.instanceColor!.version).toBe(colVer);
+    checkCold(new Vector3(-200, 2, 0));
+
+    // Move far out so batch empties, then return: reactivation of the same prefix bumps nothing.
+    batch.update(new Vector3(1500, 2, 0));
+    expect(farBatch.visible).toBe(false);
+    batch.update(new Vector3(-200, 2, 0));
+    expect(farBatch.visible).toBe(true);
+    expect(farBatch.count).toBe(3);
+    expect(farBatch.instanceMatrix.version).toBe(matVer);
+    expect(farBatch.instanceColor!.version).toBe(colVer);
+
+    // Move near chunk 0 (x = -50): only chunk 1 stays in far LOD — non-prefix, must repack.
+    batch.update(new Vector3(-50, 2, 0));
+    expect(farBatch.visible).toBe(true);
+    expect(farBatch.count).toBe(2);
+    expect(farBatch.instanceMatrix.version).toBeGreaterThan(matVer);
+    expect(farBatch.instanceColor!.version).toBeGreaterThan(colVer);
+    checkCold(new Vector3(-50, 2, 0));
+
+    batch.dispose();
+    nearGeo.dispose();
+    farGeo.dispose();
+    material.dispose();
+  });
+
+  it('reuses shadow prefixes and repacks when a different chunk becomes the prefix', () => {
+    const geometry = new BoxGeometry(1, 2, 1);
+    const material = new MeshBasicMaterial();
+    const make = (batched: boolean) => {
+      const reg = new PropRegistry(2000);
+      reg.define({
+        id: 'shadow-bank',
+        gridCell: 40,
+        castShadow: true,
+        shadowLevel: 0,
+        shadowMaxDistance: 100,
+        ...(batched && { shadowBatchCell: 360 }),
+        lods: [{ geometry, material, maxDistance: 600 }],
+      });
+      for (const x of [0, 60, 65]) reg.place('shadow-bank', { x, y: 0, z: 0, s: x });
+      reg.build();
+      return reg;
+    };
+    const batch = make(true);
+    const shadow = batch.group.children.find(
+      (m) => m.name === 'prop-shadow:shadow-bank',
+    ) as InstancedMesh;
+    batch.update(new Vector3(-20, 2, 0));
+    const version = shadow.instanceMatrix.version;
+    expect(shadow.count).toBe(3);
+    for (const x of [-60, -20, 1500, -20]) {
+      const eye = new Vector3(x, 2, 0);
+      batch.update(eye);
+      const cold = make(false);
+      cold.update(eye);
+      expect(instances(batch, true)).toEqual(instances(cold, true));
+      expect(shadow.instanceMatrix.version).toBe(version);
+      cold.dispose();
+    }
+    batch.update(new Vector3(140, 2, 0));
+    expect(shadow.count).toBe(2);
+    expect(shadow.instanceMatrix.version).toBeGreaterThan(version);
+    const cold = make(false);
+    cold.update(new Vector3(140, 2, 0));
+    expect(instances(batch, true)).toEqual(instances(cold, true));
+    cold.dispose();
+    batch.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
 });

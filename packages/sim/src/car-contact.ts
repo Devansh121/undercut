@@ -38,7 +38,17 @@ export const CONTACT_SLOP = 0.005;
 /** Passes over the touching pairs per step. */
 export const CONTACT_PASSES = 4;
 /** Largest distance from a car's CoG to a footprint corner, m, with margin (broad phase). */
-const REACH = 3.6;
+export const CAR_REACH = 3.6;
+const REACH = CAR_REACH;
+
+/** Narrow-phase SAT contact manifold between two car footprints (normal points from A to B). */
+export interface FootprintHit {
+  depth: number;
+  nx: number;
+  nz: number;
+  px: number;
+  pz: number;
+}
 
 /** A car's footprint box in the world: centre, unit forward axis, half length and width. */
 export interface CarFootprint {
@@ -239,6 +249,17 @@ function radius(b: CarFootprint, ax: number, az: number): number {
   return (
     b.halfLength * Math.abs(b.fx * ax + b.fz * az) + b.halfWidth * Math.abs(b.fz * ax - b.fx * az)
   );
+}
+
+/** Separating-axis test of two car footprints; fills `out` when overlapping (normal A → B). */
+export function collideFootprints(A: CarFootprint, B: CarFootprint, out: FootprintHit): boolean {
+  if (!collide(A, B)) return false;
+  out.depth = hit.depth;
+  out.nx = hit.nx;
+  out.nz = hit.nz;
+  out.px = hit.px;
+  out.pz = hit.pz;
+  return true;
 }
 
 /** Depth of overlap of two cars' footprints, m (0 when apart). For tests and diagnostics. */

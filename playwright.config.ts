@@ -29,6 +29,8 @@ const PHONE_FIT = /\/phone-fit\.spec\.ts$/;
 const PHONE_DEVICE = /\/phone-device\.spec\.ts$/;
 /** The opt-in ten-minute phone soak (PHONE_SOAK=1), on the Pixel 8 only. */
 const PHONE_SOAK = /\/phone-soak\.spec\.ts$/;
+/** Two-context network tests run separately so they do not crowd the viewport suite. */
+const ONLINE = /\/online-(v2|soak)\.spec\.ts$/;
 
 // Muted: the game's audio still runs (the audio tests read its state and cost), but nothing
 // plays out of the shared laptop's speakers.
@@ -61,7 +63,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK],
+      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK, ONLINE],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -71,7 +73,7 @@ export default defineConfig({
     },
     {
       name: 'phone',
-      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK],
+      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK, ONLINE],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },
@@ -93,6 +95,16 @@ export default defineConfig({
       testMatch: [PHONE_DEVICE, PHONE_SOAK],
       use: {
         ...devices['Pixel 8 landscape'],
+        launchOptions,
+      },
+    },
+    {
+      name: 'online',
+      testMatch: ONLINE,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
         launchOptions,
       },
     },

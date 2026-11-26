@@ -187,6 +187,49 @@ function standHullGeometry(roof: boolean): BufferGeometry {
 }
 
 /** Tile human-scale ten-row banks into the mapped footprint; rear banks step up by ten risers. */
+/** Seat surface to the front of a bench, behind a seated figure's shins (row origin = seat). */
+const BENCH_FRONT = 0.26;
+/** Seat surface to the back of a bench: the seat pan's rear edge on the middle level. */
+const BENCH_BACK = 0.16;
+/** Seat surface above the tread's top, the dressing stand's row constant. */
+const SEAT_HEIGHT = 0.42;
+
+/**
+ * Reshape the far level's seat band in each row (a block standing proud of the seat surface,
+ * drawn for distance) into a solid bench whose top is the seat surface, in place. Mobile draws
+ * the far level up close: on the band, seated figures sank to the hips with their legs over bare
+ * treads; on the bench they sit on it, feet on the tread. Same vertices and triangles.
+ * `rows` are the kit's `crowd-row-*` attachments, whose origins are seat surfaces.
+ */
+export function benchSeatRows(
+  geometry: BufferGeometry,
+  rows: readonly { name: string; position: readonly number[] }[],
+): number {
+  const seats = rows
+    .filter((a) => a.name.startsWith('crowd-row-'))
+    .map((a) => ({ x: a.position[0]!, y: a.position[1]! }));
+  const pos = geometry.getAttribute('position');
+  const col = geometry.getAttribute('color');
+  if (!col || seats.length === 0) return 0;
+  let moved = 0;
+  for (let v = 0; v < pos.count; v++) {
+    // The seat slot is white (slotColors), tinted per stand; no other slot is.
+    if (col.getX(v) !== 1 || col.getY(v) !== 1 || col.getZ(v) !== 1) continue;
+    const x = pos.getX(v),
+      y = pos.getY(v);
+    const row = seats.find((r) => Math.abs(x - r.x) < 0.3 && y > r.y - 0.3 && y < r.y + 0.3);
+    if (!row) continue;
+    pos.setX(v, x > row.x ? row.x + BENCH_FRONT : row.x - BENCH_BACK);
+    // Down to the tread's top (inside the tread, never below it: a raised bank's columns stretch
+    // only under 1.6 m), up to the seat surface.
+    pos.setY(v, y > row.y ? row.y : row.y - SEAT_HEIGHT);
+    moved++;
+  }
+  pos.needsUpdate = true;
+  geometry.computeBoundingSphere();
+  return moved;
+}
+
 export function placeKitStands(
   frames: readonly StandFrame[],
   kit: PropKitAssets | null | undefined,
@@ -197,6 +240,8 @@ export function placeKitStands(
   spectator: (seat: KitSpectator) => void,
   /** Material for the far level (the kit's without its sub-pixel grain); owned by the caller. */
   farMaterial?: Material,
+  /** Mobile preset: skip individual seat pans, hand over to the hull at 160 m, and batch wider. */
+  mobile = false,
 ): { fallback: StandFrame[]; modules: number; crowd: number; geometries: BufferGeometry[] } {
   const result = {
     fallback: [] as StandFrame[],
@@ -211,16 +256,22 @@ export function placeKitStands(
     const key = `${kitId}-${bank}`;
     let id = kinds.get(key);
     if (id) return id;
-    const lods = kit!.lodsFor(kitId, {
+    const rawLods = kit!.lodsFor(kitId, {
       maxDistanceScale: 2.7,
       // The middle level (4,900 to 5,100 triangles a module) only within 25 m, the modelled far
       // level (1,080 to 1,288) to 320 m, and the silhouette hull beyond to 3,240 m.
       distanceCaps: [8 / 2.7, 25 / 2.7, 1200],
       slotColors: { seat: [1, 1, 1] },
     })!;
+    // On Mobile, drop the seat-pan middle level (4,880 to 5,088 tris) and draw the modelled far
+    // level (1,080 to 1,288 tris: treads, risers, columns, handrails and roof framing intact) up
+    // close, handing over to the hull at 160 m.
+    const lods = mobile && rawLods.length > 1 ? [rawLods[rawLods.length - 1]!] : rawLods;
+    for (const l of rawLods) if (!lods.includes(l)) l.geometry.dispose();
     const far = lods[lods.length - 1]!;
+    if (mobile) benchSeatRows(far.geometry, kit!.entries.get(kitId)?.attachments ?? []);
     const skylineReach = far.maxDistance;
-    far.maxDistance = Math.min(far.maxDistance, 320);
+    far.maxDistance = Math.min(far.maxDistance, mobile ? 160 : 320);
     if (farMaterial && !Array.isArray(far.material)) far.material = farMaterial;
     const hull = standHullGeometry(kitId.endsWith('roof'));
     result.geometries.push(hull);
@@ -254,8 +305,8 @@ export function placeKitStands(
       gridCell: 40,
       // Batch distant hull cells, mid-range stand banks, and active shadow cells independently of
       // the fine 40 m cells selecting levels and shadow reach.
-      farBatchCell: 360,
-      nearBatchCell: 160,
+      farBatchCell: mobile ? 800 : 360,
+      nearBatchCell: mobile ? 360 : 160,
       shadowBatchCell: 160,
       // The bay reflects the stands as it does the temporary ones (world/water.ts).
       reflect: 'skyline',
