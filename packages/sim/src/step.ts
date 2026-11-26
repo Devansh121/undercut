@@ -645,6 +645,16 @@ function wallContact(
   }
 }
 
+/**
+ * Clamp a car against track barriers after an external planar contact (e.g. online remote car
+ * contact) so no contact resolution can push a car through a barrier.
+ */
+export function resolveWallContact(state: CarState, surface: SurfaceSampler): void {
+  if (!surface.wall) return;
+  computeMass(state.model, state.fuelMass, mass);
+  wallContact(state, surface, mass.total, mass.yawInertia, mass.a, mass.b);
+}
+
 /** Whether a corner resting on a barrier lets the car drive off along or away from it. */
 function wallRelease(s: CarState, nx: number, nz: number, vn: number): boolean {
   if (-vn > WALL_RELEASE_SPEED || s.throttleApplied <= 0 || s.gear === 0) return false;

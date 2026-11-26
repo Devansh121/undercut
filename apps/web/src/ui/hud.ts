@@ -5,7 +5,7 @@ import type { MinimapPlan } from '../game/minimap';
 import { Text, el, icon, setClass, setData, svg } from './dom';
 import { glyph, refreshGlyphs } from './kit/glyph';
 import { S } from './strings';
-import { TimingTower, type TowerRow } from './hud/tower';
+import { TimingTower, type TowerFlag, type TowerRow } from './hud/tower';
 import { StartLightsPanel } from './hud/start-lights';
 import type {
   RaceFlagsSnapshot,
@@ -24,6 +24,7 @@ import {
 } from './hud/tyres';
 
 export type { HudTyres } from './hud/tyres';
+export type { TowerFlag, TowerRow } from './hud/tower';
 
 export type SectorState = DeltaClass | 'run' | 'none';
 export type DrsState = 'off' | 'available' | 'open';
@@ -61,6 +62,16 @@ export interface HudIdentity {
   compoundCode: string;
   compoundColour: string;
   compoundSlots: readonly number[];
+}
+
+/** Optional timing-tower override for multi-car sessions (online races). */
+export interface HudTowerState {
+  lap: number | null;
+  total: number | null;
+  rows: readonly TowerRow[];
+  /** Null hides the footer line completely. */
+  footer?: { label: string; value: string; muted?: boolean } | null;
+  flag?: { kind: TowerFlag; text: string };
 }
 
 /** Everything the HUD shows, updated each frame by the drive screen. */
@@ -102,6 +113,8 @@ export interface HudState {
   fuel?: number | null;
   /** Other cars on the map (online): world position, team colour and opacity. Optional. */
   others?: readonly { x: number; z: number; colour: string; opacity: number }[];
+  /** Custom timing tower rows and header (online races). */
+  tower?: HudTowerState | null;
   /** Race display state (start lights, 20-car tower, flags, safety, message queue). */
   race?: HudRaceState | null;
 }
@@ -669,6 +682,20 @@ export class Hud {
       this.tower.setStatus(r.flags.towerStatus.flag, r.flags.towerStatus.text);
       this.tower.setFooter('', '');
       this.tower.update(r.rows);
+    } else if (h.tower) {
+      this.tower.setRaceMode(false);
+      this.tower.setLap(h.tower.lap, h.tower.total);
+      if (h.tower.flag) this.tower.setStatus(h.tower.flag.kind, h.tower.flag.text);
+      this.tower.update(h.tower.rows);
+      if (h.tower.footer === null || h.tower.footer === undefined) {
+        this.tower.setFooter('', '', true);
+      } else {
+        this.tower.setFooter(
+          h.tower.footer.label,
+          h.tower.footer.value,
+          h.tower.footer.muted ?? false,
+        );
+      }
     } else {
       this.tower.setRaceMode(false);
       this.tower.setLap(h.lap > 0 ? h.lap : null);

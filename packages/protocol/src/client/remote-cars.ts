@@ -111,6 +111,7 @@ function interpolate(a: CarSnapshot, b: CarSnapshot, t: number): CarSnapshot {
     throttle: lerp(a.throttle, b.throttle, t),
     brake: lerp(a.brake, b.brake, t),
     rpm: lerp(a.rpm, b.rpm, t),
+    s: a.lap === b.lap ? lerp(a.s, b.s, t) : near.s,
     wheelSpin: [
       lerp(a.wheelSpin[0], b.wheelSpin[0], t),
       lerp(a.wheelSpin[1], b.wheelSpin[1], t),
@@ -257,6 +258,13 @@ export class RemoteCarBuffer {
       if (view) out.push(view);
     }
     return out;
+  }
+
+  /** Newest raw snapshot received for `seat`, or null when none has arrived. */
+  latest(seat: number): CarSnapshot | null {
+    const h = this.seats.get(seat)?.history;
+    if (!h || h.length === 0) return null;
+    return h[h.length - 1] ?? null;
   }
 
   /** One car at an explicit server time (no delay applied). */

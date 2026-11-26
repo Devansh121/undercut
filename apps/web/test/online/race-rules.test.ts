@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, checkSettings, type StartSchedule } from '@undercut/protocol';
 import type { AssistConfig } from '../../src/game/assists';
-import { enforceAssistPolicy, lapClaim, lightsOn, liveOrder } from '../../src/online/race-rules';
+import {
+  enforceAssistPolicy,
+  lapClaim,
+  lightsOn,
+  liveOrder,
+  localProgress,
+  onlineDriverName,
+  onlineLapTime,
+  remoteProgress,
+} from '../../src/online/race-rules';
 
 const START: StartSchedule = {
   lightsStartAt: 10_000,
@@ -57,7 +66,7 @@ describe('lapClaim', () => {
   });
 });
 
-describe('liveOrder', () => {
+describe('liveOrder and continuous progress', () => {
   it('orders finished cars first by finishing order, then by distance run', () => {
     const order = liveOrder(1000, [
       { seat: 0, lap: 1, s: 900, finishedAt: null },
@@ -66,6 +75,45 @@ describe('liveOrder', () => {
       { seat: 3, lap: 2, s: 40, finishedAt: 4000 },
     ]);
     expect(order).toEqual([3, 2, 1, 0]);
+  });
+
+  it('keeps grid slots starting behind the timing line behind pole', () => {
+    // Spa: length 7004 m, timing line 128.6 m before s = 0. P1 starts at lineS = 128.6;
+    // P18 starts 144 m behind P1 (behind the timing line, lineS = 6988.6).
+    const p1 = localProgress(7004, 0, 128.6, false);
+    const p18 = localProgress(7004, 0, 6988.6, true);
+    expect(p1).toBeCloseTo(128.6, 5);
+    expect(p18).toBeCloseTo(-15.4, 5);
+    expect(
+      liveOrder(7004, [
+        { seat: 17, lap: 0, s: 6988.6, progress: p18, finishedAt: null },
+        { seat: 0, lap: 0, s: 128.6, progress: p1, finishedAt: null },
+      ]),
+    ).toEqual([0, 17]);
+  });
+
+  it('anchors remote drawn-pose projection continuously across timing-line wraps', () => {
+    const L = 5793;
+    // Extrapolated 20 m forward across the timing line (snap was 8 m before, drawn is 12 m after).
+    expect(remoteProgress(L, 0, 5785, 12, false)).toBeCloseTo(5805, 5);
+    // Smoothed 8 m backward across the timing line (snap is lap 1 + 5 m, drawn is 5790 m).
+    expect(remoteProgress(L, 1, 5, 5790, false)).toBeCloseTo(5790, 5);
+    // Remote car extrapolated 25 m ahead of local car ranks ahead of local car.
+    const hostProg = localProgress(L, 0, 500, false);
+    const guestProg = remoteProgress(L, 0, 500, 525, false);
+    expect(
+      liveOrder(L, [
+        { seat: 0, lap: 0, s: 500, progress: hostProg, finishedAt: null },
+        { seat: 1, lap: 0, s: 525, progress: guestProg, finishedAt: null },
+      ]),
+    ).toEqual([1, 0]);
+  });
+
+  it('formats human member names and AI labels cleanly', () => {
+    expect(onlineDriverName('Host', null, 0)).toBe('Host');
+    expect(onlineDriverName(null, 0, 3)).toBe('AI 1');
+    expect(onlineDriverName(null, 17, 19)).toBe('AI 18');
+    expect(onlineDriverName('', null, 2)).toBe('AI 3');
   });
 });
 
@@ -142,5 +190,18 @@ describe('room assist policy', () => {
       assists: { ...DEFAULT_SETTINGS.assists, brakingHelp: 'yes' },
     });
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('online lap clock', () => {
+  it('uses the server race clock, including time discarded by a clamped render stall', () => {
+    expect(onlineLapTime(14000, 10000, 0)).toBe(4);
+    expect(onlineLapTime(16000, 10000, 0)).toBe(6);
+    expect(onlineLapTime(16000, 10000, 4500)).toBe(1.5);
+  });
+  it('stays zero before release or before the clock is available', () => {
+    expect(onlineLapTime(9000, 10000, 0)).toBe(0);
+    expect(onlineLapTime(null, 10000, 0)).toBe(0);
+    expect(onlineLapTime(9000, null, 0)).toBe(0);
   });
 });

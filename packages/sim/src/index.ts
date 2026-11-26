@@ -86,17 +86,30 @@ export {
 } from './invariants';
 export {
   CAR_FRICTION,
+  CAR_REACH,
   CAR_RESTITUTION,
   CONTACT_PASSES,
   CONTACT_SLOP,
   carFootprint,
   carOverlap,
+  collideFootprints,
   createCarContacts,
   resolveCarContacts,
   type CarContacts,
   type CarFootprint,
   type ContactBody,
+  type FootprintHit,
 } from './car-contact';
+export {
+  MAX_CONTACT_CLOCK_ERROR_S,
+  MAX_CONTACT_EXTRAPOLATION_S,
+  MAX_REMOTE_CLOSING_SPEED,
+  MAX_REMOTE_PUSH_PER_STEP,
+  REMOTE_CONTACT_PASSES,
+  extrapolateRemoteBody,
+  resolveRemoteCarContacts,
+  type RemoteContactBody,
+} from './remote-contact';
 export {
   PATCH_ACROSS,
   PATCH_ALONG,
@@ -113,6 +126,7 @@ export {
   bodyCorners,
   engineFullLoadTorque,
   fuelFlow,
+  resolveWallContact,
   stepCar,
 } from './step';
 export {

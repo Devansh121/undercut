@@ -146,6 +146,8 @@ export interface DriveSessionOptions {
   limits?: WheelsOffCounter;
   /** Initial active input device (defaults to keyboard). */
   device?: DeviceKind;
+  /** Aero trim when not running Quick Race (e.g. online races match the circuit's race trim). */
+  trim?: AeroTrim;
   /** Advised speeds round the circuit (the driving line), for the braking help. */
   guide?: SpeedGuide;
 }
@@ -229,14 +231,14 @@ export class DriveSession {
     this.guidePosition = options.guide ? { guide: options.guide, s: 0 } : null;
     const artefacts = this.quickRace
       ? raceArtefactsFor(options.track, options.raceArtefacts)
-      : null;
+      : (options.raceArtefacts ?? null);
     const line = artefacts ? decodeRacingLine(artefacts.line) : null;
     if (line && (line.circuit !== options.track.id || line.count !== options.track.lap.count)) {
       throw new Error(`the racing line for ${line.circuit} does not fit ${options.track.id}`);
     }
     // A race: every car in the trim the field's line and envelope were measured for (Monza low,
     // Spa medium, Singapore high). Time trial: the low-drag car, as its records were set in.
-    this.trim = line ? raceTrim(line.trim) : 'low';
+    this.trim = line ? raceTrim(line.trim) : (options.trim ?? 'low');
     this.params = options.params ?? createCarParams(this.trim);
     this.today = options.today ?? '';
     this.initialDevice = options.device ?? 'keyboard';
@@ -266,7 +268,7 @@ export class DriveSession {
             // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
             gridNoise: options.quickRace?.gridNoise ?? 0.5,
             envelope: decodeEnvelope(artefacts.envelope),
-            count: 20,
+            count: this.quickRace ? 20 : 1,
             seed: options.seed,
             ...(options.quickRace?.skillSpread !== undefined
               ? { spread: options.quickRace.skillSpread }
