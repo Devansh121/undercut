@@ -1152,21 +1152,26 @@ describe('race driver: a racing line past the white line', () => {
 });
 
 describe('race driver: a road bound beside overlapping traffic', () => {
-  it('keeps the actual lane when future road bounds squeeze a car overlapping from behind', () => {
-    const dr = createRaceDriver({
-      track: SPA.track(),
-      line: loadLine(SPA),
-      envelope: loadEnvelope(SPA),
-      params: createCarParams(SPA.trim),
-      skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
-    });
-    const me = { id: 17, s: 902.2, d: -1.66, speed: 84 };
-    const rear = { id: 18, s: 900.5, d: 1.32, speed: 79.9 };
-    dr['wasActive'] = true;
-    tick(dr, me, [rear], { openingLap: false });
-    const lane = dr['at'](dr.plan.line.d, me.s) + dr.last.target;
-    expect(lane).toBeLessThanOrEqual(me.d + 0.1);
-  });
+  it.each([1, 0.6])(
+    'keeps the actual lane beside a car at corner pace %s when future road bounds squeeze it',
+    (pace) => {
+      const dr = createRaceDriver({
+        track: SPA.track(),
+        line: loadLine(SPA),
+        envelope: loadEnvelope(SPA),
+        params: createCarParams(SPA.trim),
+        skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
+      });
+      const me = { id: 17, s: 902.2, d: -1.66, speed: 84 };
+      const rear = { id: 18, s: 900.5, d: 1.32, speed: 79.9 };
+      dr['aheadPaceId'] = 18;
+      dr['aheadPace'] = pace;
+      dr['wasActive'] = true;
+      tick(dr, me, [rear], { openingLap: false });
+      const lane = dr['at'](dr.plan.line.d, me.s) + dr.last.target;
+      expect(lane).toBeLessThanOrEqual(me.d + 0.1);
+    },
+  );
 });
 
 describe('race driver: established slow-car avoidance', () => {
