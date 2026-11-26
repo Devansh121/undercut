@@ -992,11 +992,13 @@ describe('race driver: small errors', () => {
     (kind) => {
       const dr = driver();
       dr['wasActive'] = true;
-      const memory = dr.snapshot();
-      memory['err.kind'] = 2;
-      memory['err.from'] = 0;
-      memory['err.to'] = 1000;
-      memory['err.severity'] = 0.5;
+      const memory = {
+        ...dr.snapshot(),
+        'err.kind': 2,
+        'err.from': 0,
+        'err.to': 1000,
+        'err.severity': 0.5,
+      };
       dr.restore(memory);
       const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 40 };
       tick(dr, me, [], { openingLap: false });
@@ -1179,7 +1181,7 @@ describe('race driver: established slow-car avoidance', () => {
       dr['passSide'] = -1;
       dr['aheadPaceId'] = 1;
       dr['aheadPace'] = 0.6;
-      tick(dr, me, [ahead], { openingLap });
+      tick(dr, me, [ahead], openingLap === undefined ? {} : { openingLap });
       return dr.last;
     }
     expect(approach(false)).toEqual(approach());
