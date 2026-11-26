@@ -112,20 +112,20 @@
     "sha256": "0cb7495645a1840aa969e6a1b5856797a11f728bf86e81e6dec2f4e7f8d18f6f"
   },
   {
-    "file": "apps/web/public/assets/env/overcast/sky_1024.webp",
-    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_overcast_puresky_4k.hdr",
-    "author": "Greg Zaal (Poly Haven)",
+    "file": "apps/web/public/assets/env/overcast_soil/sky_1024.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/overcast_soil_puresky_4k.hdr",
+    "author": "Sergej Majboroda and Jarod Guest (Poly Haven)",
     "licence": "CC0-1.0",
-    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 1024 x 512, divided by 5.99971, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
-    "sha256": "19a5839c8bc0dfebf91f1e10a713791d3c1c5353cc10bb02aaf6fda26e93f32f"
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 1024 x 512, divided by 3.65749, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "873c6c36b4be1ae26b1f78fd9190746b66e083997d397e0ee4cc6a9d4eaf8530"
   },
   {
-    "file": "apps/web/public/assets/env/overcast/sky_2048.webp",
-    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/kloofendal_overcast_puresky_4k.hdr",
-    "author": "Greg Zaal (Poly Haven)",
+    "file": "apps/web/public/assets/env/overcast_soil/sky_2048.webp",
+    "source_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/overcast_soil_puresky_4k.hdr",
+    "author": "Sergej Majboroda and Jarod Guest (Poly Haven)",
     "licence": "CC0-1.0",
-    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 2048 x 1024, divided by 5.99971, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
-    "sha256": "6b2621d5dcc9cabaef1b9efceaad16c4e8a5d0b8992a47fbb25e9f7e869960cc"
+    "changes": "4k HDR read, sun measured and painted out, area-downsampled to 2048 x 1024, divided by 3.65749, sRGB-encoded with a one-code-value triangular dither, WebP quality 92, by tools/assets/build_textures.py",
+    "sha256": "467738404de4504a2def5040829c1229cff1d3f7f665b478b8f0f938ffa4dcdd"
   },
   {
     "file": "apps/web/public/assets/index.json",
@@ -133,7 +133,7 @@
     "author": "Project contributors",
     "licence": "MIT",
     "changes": "Generated index of the environment textures and skies",
-    "sha256": "f2dbdcefcf827b99d441372d144e4f82a36000f7f117592e4faeaa44df1c411d"
+    "sha256": "0dd20aa51d12f0fe62ffbff3fa4a8be0fba7e7e487ae078888a46c5c03cb2be6"
   },
   {
     "file": "apps/web/public/assets/tex/asphalt/arm_1024.webp",

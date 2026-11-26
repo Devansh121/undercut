@@ -193,6 +193,7 @@ export class Environment {
   private readonly registered = new WeakSet<Material>();
   private readonly quality: Quality;
   readonly exposure: number;
+  private readonly skyHaze: number;
   /** Directional sun irradiance (sky units) and colour, for tests and the dashboard of lights. */
   readonly sunIrradiance: number;
 
@@ -206,6 +207,7 @@ export class Environment {
     installHeightFog();
     this.quality = quality;
     this.exposure = tod.exposure;
+    this.skyHaze = tod.skyHaze;
     const meta = sky.meta;
     const { rotationY, sunDirection } = skyRotation(meta, tod.sunAzimuthDeg);
     this.sunDirection.set(...sunDirection);
@@ -251,7 +253,7 @@ export class Environment {
         sunRadiance: { value: discRadiance },
         sunCos: { value: sunCos },
         hazeColour: { value: haze },
-        haze: { value: 0.85 },
+        haze: { value: tod.skyHaze },
         groundRadiance: { value: new Color(...groundBounce(meta, tod)) },
       },
       defines: lum > 1e-4 ? { SUN_DISC: '' } : {},
@@ -361,7 +363,7 @@ export class Environment {
     const skyScene = new Scene();
     const mat = this.dome.material.clone();
     delete mat.defines.SUN_DISC;
-    (mat.uniforms.haze as { value: number }).value = 0.6;
+    (mat.uniforms.haze as { value: number }).value = Math.min(0.6, this.skyHaze);
     mat.uniforms.tSky = this.dome.material.uniforms.tSky as { value: Texture };
     const dome = new Mesh(this.dome.geometry, mat);
     dome.frustumCulled = false;

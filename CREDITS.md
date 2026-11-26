@@ -101,7 +101,7 @@ Built by `npm run assets:build` (`tools/assets/build_textures.py`): resized and 
 | Grass001 | Grass, verges, terrain | Lennart Demes, ambientCG | https://ambientcg.com/view?id=Grass001 |
 | Rubber004 | Tyre walls | Lennart Demes, ambientCG | https://ambientcg.com/view?id=Rubber004 |
 | Kloofendal 48d Partly Cloudy (Pure Sky) | Monza afternoon sky and light | Greg Zaal and Jarod Guest, Poly Haven | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky |
-| Kloofendal Overcast (Pure Sky) | Overcast time of day | Greg Zaal, Poly Haven | https://polyhaven.com/a/kloofendal_overcast_puresky |
+| Overcast Soil (Pure Sky) | Overcast time of day (Spa), CC0 | Sergej Majboroda and Jarod Guest, Poly Haven | https://polyhaven.com/a/overcast_soil_puresky |
 | Kloppenheim 07 (Pure Sky) | Night time of day | Greg Zaal and Jarod Guest, Poly Haven | https://polyhaven.com/a/kloppenheim_07_puresky |
 
 Created using Grass001 and Rubber004 from ambientCG.com, licensed under the Creative Commons CC0 1.0 Universal License.

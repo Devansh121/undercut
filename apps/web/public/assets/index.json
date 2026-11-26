@@ -5,8 +5,8 @@
     "env/monza_afternoon/sky_4096.webp": 212330,
     "env/night/sky_1024.webp": 20856,
     "env/night/sky_2048.webp": 54178,
-    "env/overcast/sky_1024.webp": 13212,
-    "env/overcast/sky_2048.webp": 34264,
+    "env/overcast_soil/sky_1024.webp": 17882,
+    "env/overcast_soil/sky_2048.webp": 45568,
     "tex/asphalt/arm_1024.webp": 11404,
     "tex/asphalt/arm_2048.webp": 68454,
     "tex/asphalt/diff_1024.webp": 184216,
@@ -166,14 +166,14 @@
       ],
       "peak": 74608.84
     },
-    "overcast": {
-      "hi": "env/overcast/sky_2048.webp",
-      "lo": "env/overcast/sky_1024.webp",
-      "scale": 5.99971,
+    "overcast_soil": {
+      "hi": "env/overcast_soil/sky_2048.webp",
+      "lo": "env/overcast_soil/sky_1024.webp",
+      "scale": 3.65749,
       "sun": {
         "present": false,
-        "elevationDeg": 23.071,
-        "u": 0.58191,
+        "elevationDeg": 34.673,
+        "u": 0.46692,
         "irradiance": [
           0.0,
           0.0,
@@ -182,11 +182,11 @@
         "solidAngleSr": 0.0
       },
       "skyIrradiance": [
-        3.7323,
-        4.0497,
-        4.7703
+        4.7012,
+        4.6595,
+        4.6806
       ],
-      "peak": 6.0
+      "peak": 5.28
     },
     "night": {
       "hi": "env/night/sky_2048.webp",

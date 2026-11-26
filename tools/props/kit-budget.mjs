@@ -8,7 +8,7 @@ const kit = catalog.props.filter((p) =>
   /^(street-|floodlight-|lighting-|temporary-|marina-|hill-|forest-)/.test(p.id),
 );
 const bytes = kit.flatMap((p) => p.lods).reduce((n, l) => n + l.bytes, 0);
-const skies = ['overcast', 'night'].flatMap((id) =>
+const skies = ['overcast_soil', 'night'].flatMap((id) =>
   ['hi', 'lo'].map((tier) => index.skies[id][tier]),
 );
 const skyBytes = [...new Set(skies)].reduce(
