@@ -1083,20 +1083,7 @@ export class RaceDriver implements Driver {
         const od = passCar!.d - ldHere;
         const sideBySide = this.passBypass ? BYPASS_SIDE_BY_SIDE : passSideBySide(v);
         base = od + this.passSide * (sideBySide + passCar!.halfWidth - BODY_HALF_WIDTH);
-        let fits = this.passBypass || (this.passSide > 0 ? base <= oMax : base >= oMin);
-        // From lap two, on a straight, the road narrowing on the side picked: the other side, if
-        // it has the room and nobody is in it, before the move is given up.
-        if (!fits && later && !this.passCommitted && !midCorner) {
-          const other = od - this.passSide * (sideBySide + passCar!.halfWidth - BODY_HALF_WIDTH);
-          if (
-            (this.passSide > 0 ? other >= oMin : other <= oMax) &&
-            this.laneFree(view, s0, other, passCar!.id)
-          ) {
-            this.passSide = -this.passSide;
-            base = other;
-            fits = true;
-          }
-        }
+        const fits = this.passBypass || (this.passSide > 0 ? base <= oMax : base >= oMin);
         // From lap two, on a straight and still well back: stay in the other car's wake, in its
         // lane, and pull out once close (or with the braking zone two seconds off). Pulled out
         // early, the tow is gone and the move dies with the straight.
@@ -1201,15 +1188,6 @@ export class RaceDriver implements Driver {
     }
     // Into a braking zone (not the corner itself): held up behind a car that has begun braking
     // and is being caught, a move may start here too, but only one that is sure (below).
-    // From lap two, on a corner's exit with the next braking zone well off: the run out of a
-    // corner, where a car that ran wide or got on the power late is passed. (The lane holds
-    // through the bend, `towHold`, until the road straightens.)
-    const exiting =
-      later &&
-      cornering &&
-      !midCorner &&
-      this.at(this.brakingAhead, s0) > 30 + v * 0.8 &&
-      Math.abs(this.at(line.curvature, s0 + v * 0.5)) <= CORNER_CURVATURE;
     const brakingMove =
       cornering &&
       !midCorner &&
@@ -1225,7 +1203,7 @@ export class RaceDriver implements Driver {
       !(this.hazard && leader.speed >= HAZARD_SPEED) &&
       !(firstCorner && leaderDs >= OVERLAP) &&
       this.cooldown <= 0 &&
-      (!cornering || brakingMove || exiting) &&
+      (!cornering || brakingMove) &&
       launched &&
       leader !== yieldTo
     ) {

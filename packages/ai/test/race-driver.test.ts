@@ -1027,20 +1027,4 @@ describe('race driver: moves from lap two', () => {
     expect(dive(8, true)['passCommitted']).toBe(false);
     expect(dive(14)['passCommitted']).toBe(false);
   });
-
-  it('takes the other side when the road runs out on the side picked', () => {
-    const dr = driver();
-    const s = 0;
-    const edge = dr['at'](track.halfWidth[0], s) as number;
-    const me = { id: 0, s, d: edge - 2, speed: 85 };
-    const ahead = { id: 1, s: s + 18, d: edge - 2, speed: 85 };
-    dr['wasActive'] = true;
-    dr['heldTime'] = 5;
-    dr['passId'] = 1;
-    dr['passSide'] = 1;
-    dr['o'] = me.d - lineD(dr, s);
-    tick(dr, me, [ahead], { openingLap: false });
-    expect(dr.last.passing).toBe(1);
-    expect(dr['passSide']).toBe(-1);
-  });
 });
