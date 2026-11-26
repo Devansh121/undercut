@@ -41,10 +41,11 @@ export function placeKitBarriers(
       for (const l of all) if (!lods.includes(l)) l.geometry.dispose();
       id = `barrier-${kitId}`;
       // Keep barriers unbatched so moving cameras never repack barrier buffers along the lap.
+      // Single-LOD tyre walls (Mobile drops high, leaving only far) need no 40 m LOD chunks.
       props.define({
         id,
         lods,
-        chunkLength: tyres ? 40 : 200,
+        chunkLength: tyres && lods.length > 1 ? 40 : 200,
         castShadow: false,
       });
       kinds.set(kitId, id);

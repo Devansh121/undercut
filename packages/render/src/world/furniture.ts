@@ -1140,11 +1140,13 @@ export function placeTracksideFurniture(options: {
     const hoardingLods =
       kitHoarding.length >= 3
         ? [kitHoarding[0]!, kitHoarding[kitHoarding.length - 1]!]
-        : kitHoarding;
+        : mobile && kitHoarding.length === 2
+          ? [kitHoarding[kitHoarding.length - 1]!]
+          : kitHoarding;
     for (const l of kitHoarding) if (!hoardingLods.includes(l)) l.geometry.dispose();
     props.define({
       id: 'hoarding-front',
-      chunkLength: mobile ? smallChunk : 120,
+      chunkLength: mobile ? 400 : 120,
       shadowLevel: hoardingLods.length - 1,
       castShadow: castShadows,
       shadowMaxDistance: 160,
@@ -1176,14 +1178,14 @@ export function placeTracksideFurniture(options: {
   geometries.push(vergeFrontGeo, vergeFrameGeo);
   props.define({
     id: 'verge-board-front',
-    chunkLength: SMALL_PROP_CHUNK,
+    chunkLength: smallChunk,
     castShadow: false,
     receiveShadow: true,
     lods: [{ geometry: vergeFrontGeo, material: hoardMat, maxDistance: farDist * 0.9 }],
   });
   props.define({
     id: 'verge-board-frame',
-    chunkLength: SMALL_PROP_CHUNK,
+    chunkLength: smallChunk,
     castShadow: castShadows,
     shadowMaxDistance: 140,
     receiveShadow: true,
@@ -1192,6 +1194,7 @@ export function placeTracksideFurniture(options: {
 
   const kitFence = propKit?.lodsFor('catch-fence', {
     maxDistanceScale: distScale,
+    ...(mobile && { distanceCaps: [60 / distScale, farDist / distScale] }),
   });
   const hasKitFence = Boolean(kitFence);
   if (kitFence) {
