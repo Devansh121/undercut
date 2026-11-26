@@ -766,7 +766,19 @@ export class RaceDriver implements Driver {
     // is not already alongside (the field arrives there together).
     const opening = view.openingLap === true && !view.launching;
     const laterLap = view.openingLap === false && !view.launching;
-    const later = laterLap && !this.hazard;
+    // A car well off the corner pace uses the established slow-car passing rules. The
+    // competitive tow/press/dive policy is for cars racing at comparable pace, not avoidance.
+    let slowTraffic = false;
+    if (this.slowInCorners(this.aheadPaceId)) {
+      for (let k = 0; k < view.count; k++) {
+        const c = view.cars[k]!;
+        if (c.id !== this.aheadPaceId) continue;
+        const ds = this.ahead(s0, c.s);
+        slowTraffic = ds > -(CAR_LENGTH + 2) && ds < SEE_AHEAD;
+        break;
+      }
+    }
+    const later = laterLap && !this.hazard && !slowTraffic;
     const firstEnd = plan.track.corners[0]?.end ?? 0;
     const firstCorner =
       opening &&
@@ -946,17 +958,21 @@ export class RaceDriver implements Driver {
     }
     // Once a band has to be dropped, hold the lane on that car's side while the longitudinal
     // yield opens room. This includes the car yielded to: braking does not clear its body.
+    let droppedOverlap = false;
     for (let k = 0; k < ns; k++) {
       const e = side[k]!;
       if (e.ds > skipBelow) continue;
-      if (e.left) lo = Math.max(lo, Math.min(myO, this.o));
-      else hi = Math.min(hi, Math.max(myO, this.o));
+      if (later && Math.abs(e.ds) < CAR_LENGTH + 2 && e.car.speed >= HAZARD_SPEED)
+        droppedOverlap = true;
+      if (e.left) lo = Math.max(lo, later ? Math.max(myO, this.o) : Math.min(myO, this.o));
+      else hi = Math.min(hi, later ? Math.min(myO, this.o) : Math.max(myO, this.o));
     }
     if (lo > hi) {
       if (
-        yieldTo !== null &&
-        (!cornering || yieldDs < CAR_LENGTH + 2) &&
-        yieldTo.speed >= HAZARD_SPEED &&
+        (droppedOverlap ||
+          (yieldTo !== null &&
+            (!cornering || yieldDs < CAR_LENGTH + 2) &&
+            yieldTo.speed >= HAZARD_SPEED)) &&
         !this.hazard &&
         !this.passBypass &&
         !this.recovering
@@ -1658,6 +1674,7 @@ export class RaceDriver implements Driver {
         // (Not with a car right behind: too close to react, it ran into a car going wide out
         // of the first chicane.)
         !this.carApproaching(view, s0, self.d, ERROR_CLEAR_BEHIND);
+      if (!mayErr) this.mistakes.cancel();
       const u = plan.track.wrap(s0) / plan.track.lap.step;
       limit = Math.min(
         limit,

@@ -62,10 +62,10 @@ function lineD(dr: RaceDriver, s: number): number {
 }
 
 /** Telemetry of a car at lap (s, d) moving at `v` along the lap. */
-function at(s: number, d: number, v: number, yawOffset = 0, gear = 6): CarTelemetry {
+function at(s: number, d: number, v: number, yawOffset = 0, gear = 6, on = track): CarTelemetry {
   const t = createCarTelemetry();
-  const p = track.pointAt(track.wrap(s), d, createVec3());
-  const tan = track.tangentAt(track.wrap(s), createVec3());
+  const p = on.pointAt(on.wrap(s), d, createVec3());
+  const tan = on.tangentAt(on.wrap(s), createVec3());
   t.x = p.x;
   t.z = p.z;
   t.yaw = Math.atan2(-tan.z, tan.x) + yawOffset;
@@ -99,7 +99,7 @@ function view(self: Car, others: Car[], o: Partial<TrafficView> = {}): TrafficVi
 function tick(dr: RaceDriver, self: Car, others: Car[], o: Partial<TrafficView> = {}) {
   const out: ControlInput = { ...NEUTRAL_INPUT };
   dr.sense(view(self, others, o));
-  dr.drive(at(self.s, self.d, self.speed), DT, out);
+  dr.drive(at(self.s, self.d, self.speed, 0, 6, dr.plan.track), DT, out);
   return out;
 }
 
@@ -987,6 +987,29 @@ describe('race driver: small errors', () => {
     expect(lapAlone(false, 1).count).toBe(0);
   });
 
+  it.each(['hazard', 'overlap'])(
+    'cancels an ongoing error when %s avoidance takes priority',
+    (kind) => {
+      const dr = driver();
+      dr['wasActive'] = true;
+      const memory = dr.snapshot();
+      memory['err.kind'] = 2;
+      memory['err.from'] = 0;
+      memory['err.to'] = 1000;
+      memory['err.severity'] = 0.5;
+      dr.restore(memory);
+      const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 40 };
+      tick(dr, me, [], { openingLap: false });
+      expect(dr.mistakes.active).not.toBeNull();
+      const other =
+        kind === 'hazard'
+          ? { id: 1, s: STRAIGHT + 200, d: me.d, speed: 0 }
+          : { id: 1, s: STRAIGHT + 1, d: me.d + SIDE_BY_SIDE + 0.2, speed: 40 };
+      tick(dr, me, [other], { openingLap: false });
+      expect(dr.mistakes.active).toBeNull();
+    },
+  );
+
   it('keeps its errors in the driver memory', () => {
     const { memory } = lapAlone(false, 0.3, 1);
     expect(Array.isArray(memory['err.rng'])).toBe(true);
@@ -1123,5 +1146,42 @@ describe('race driver: a racing line past the white line', () => {
     expect(later.line).toBeLessThan(later.edge - 0.5);
     expect(later.line + later.o).toBeGreaterThanOrEqual(later.edge - 0.3 - 1e-6);
     expect(Math.abs(offset(true).o)).toBeLessThan(0.05);
+  });
+});
+
+describe('race driver: a road bound beside overlapping traffic', () => {
+  it('keeps the actual lane when future road bounds squeeze a car overlapping from behind', () => {
+    const dr = createRaceDriver({
+      track: SPA.track(),
+      line: loadLine(SPA),
+      envelope: loadEnvelope(SPA),
+      params: createCarParams(SPA.trim),
+      skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
+    });
+    const me = { id: 17, s: 902.2, d: -1.66, speed: 84 };
+    const rear = { id: 18, s: 900.5, d: 1.32, speed: 79.9 };
+    dr['wasActive'] = true;
+    tick(dr, me, [rear], { openingLap: false });
+    const lane = dr['at'](dr.plan.line.d, me.s) + dr.last.target;
+    expect(lane).toBeLessThanOrEqual(me.d + 0.1);
+  });
+});
+
+describe('race driver: established slow-car avoidance', () => {
+  it('keeps the legacy slow-car approach when ordinary later-lap attacks are enabled', () => {
+    function approach(openingLap?: boolean) {
+      const dr = driver();
+      const me = { id: 0, s: 0, d: lineD(dr, 0), speed: 85 };
+      const ahead = { id: 1, s: 30, d: lineD(dr, 30), speed: 80 };
+      dr['wasActive'] = true;
+      dr['heldTime'] = 5;
+      dr['passId'] = 1;
+      dr['passSide'] = -1;
+      dr['aheadPaceId'] = 1;
+      dr['aheadPace'] = 0.6;
+      tick(dr, me, [ahead], { openingLap });
+      return dr.last;
+    }
+    expect(approach(false)).toEqual(approach());
   });
 });
