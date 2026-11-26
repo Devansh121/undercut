@@ -107,3 +107,40 @@ describe('static server', () => {
     expect((await rawGet('/assets/locked.js')).status).toBe(403);
   });
 });
+
+describe('rooms HTTP proxy', () => {
+  it('does not reuse a health-check connection for a room-creation POST', async () => {
+    const seen = new WeakSet();
+    let posts = 0;
+    const upstream = http.createServer((req, res) => {
+      if (seen.has(req.socket)) {
+        // A local Worker may close an idle connection as the proxy tries to reuse it.
+        req.socket.destroy();
+        return;
+      }
+      seen.add(req.socket);
+      if (req.method === 'POST') posts++;
+      res.writeHead(req.method === 'POST' ? 201 : 200, { 'content-type': 'application/json' });
+      res.end(req.method === 'POST' ? '{"code":"BCDFGH"}' : '{"ok":true}');
+    });
+    await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const handlers = createHandlers({ root, roomsPort: upstream.address().port });
+    const proxy = http.createServer(handlers.http);
+    await new Promise((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    try {
+      const url = `http://127.0.0.1:${proxy.address().port}/rooms`;
+      expect((await fetch(url + '/health')).status).toBe(200);
+      const created = await fetch(url, { method: 'POST' });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toEqual({ code: 'BCDFGH' });
+      expect(posts).toBe(1);
+    } finally {
+      proxy.closeAllConnections();
+      upstream.closeAllConnections();
+      await Promise.all([
+        new Promise((r) => proxy.close(r)),
+        new Promise((r) => upstream.close(r)),
+      ]);
+    }
+  });
+});

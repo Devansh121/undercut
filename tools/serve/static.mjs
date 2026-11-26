@@ -126,6 +126,9 @@ export function createHandlers({ root, roomsPort, networkOrigins = [] }) {
       {
         host: '127.0.0.1',
         port: roomsPort,
+        // Do not pool Worker sockets: an idle health-check connection can close just as a
+        // room-creation POST reuses it. A fresh connection avoids replaying non-idempotent work.
+        agent: false,
         method: req.method,
         path: req.url,
         headers: {
