@@ -882,7 +882,15 @@ export class RaceControl implements RaceCore {
             c.finishLaps === lead.finishLaps
           ) {
             gap = c.finishTime - lead.finishTime;
-          } else if (lapsDown === 0) gap = this.tower.gap(car, leader);
+          } else if (lapsDown === 0) {
+            const at = this.tower.timeAtDistance(
+              leader,
+              d(car),
+              d(leader),
+              lead.finishTime ?? this.tm[1]!,
+            );
+            if (at !== null) gap = Math.max(0, (c.finishTime ?? this.tm[1]!) - at);
+          }
           const aheadCar = this.cars[ahead]!;
           if (
             c.finishTime !== null &&
@@ -890,8 +898,15 @@ export class RaceControl implements RaceCore {
             c.finishLaps === aheadCar.finishLaps
           ) {
             interval = c.finishTime - aheadCar.finishTime;
-          } else if (Math.floor((d(ahead) - d(car)) / L) === 0)
-            interval = this.tower.gap(car, ahead);
+          } else if (Math.floor((d(ahead) - d(car)) / L) === 0) {
+            const at = this.tower.timeAtDistance(
+              ahead,
+              d(car),
+              d(ahead),
+              aheadCar.finishTime ?? this.tm[1]!,
+            );
+            if (at !== null) interval = Math.max(0, (c.finishTime ?? this.tm[1]!) - at);
+          }
         } else {
           const mine = timer.bestLap;
           const lead = this.timers[leader]!.bestLap;

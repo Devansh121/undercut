@@ -1,9 +1,9 @@
 /**
  * Mini-sector crossing times for a timing tower. The lap is cut into `count` equal mini-sectors
  * measured from the timing line; each car records the (tick-interpolated) time it first reaches
- * every boundary of its race distance. A gap between two cars is the difference of their times
- * at the same boundary, so it updates smoothly, about every 150 m, and means the same thing as
- * a broadcast gap: how long ago the car ahead was where this car is now.
+ * every boundary of its race distance. Interpolating the car ahead's timeline at the trailing
+ * car's current distance gives a broadcast gap: how long ago the car ahead was where this car
+ * is now. Every leader gap uses that same timeline, so the gaps follow current race order.
  *
  * Each car keeps its last lap and a bit of boundaries in a ring, so memory and snapshots stay
  * small however long the race.
@@ -77,8 +77,8 @@ export class GapTower {
   }
 
   /**
-   * How far `behind` trails `ahead` in time at the last boundary `behind` reached, s; null
-   * when they have no boundary in common (start of the race, or `ahead` a lap or more up).
+   * Gap at the last boundary the trailing car crossed, for historical timing reads.
+   * Live standings use timeAtDistance so all rows refer to current race distance.
    */
   gap(behind: number, ahead: number): number | null {
     const k = this.last[behind];
@@ -86,6 +86,31 @@ export class GapTower {
     const a = this.timeAt(ahead, k);
     const b = this.timeAt(behind, k);
     return a === null || b === null ? null : b - a;
+  }
+
+  /**
+   * Interpolate when `car` reached a race distance using its mini-sector history. The live
+   * endpoint fills the partial mini-sector. Reading every gap from the same leader timeline
+   * keeps gaps ordered by current distance, even when the pack brakes between boundaries.
+   * Returns null before the first shared timing boundary or after history has expired.
+   */
+  timeAtDistance(
+    car: number,
+    distance: number,
+    currentDistance: number,
+    now: number,
+  ): number | null {
+    if (distance < 0 || distance > currentDistance) return null;
+    const k = Math.floor(distance / this.step);
+    const from = this.timeAt(car, k);
+    if (from === null) return null;
+    const next = this.timeAt(car, k + 1);
+    const endDistance = next === null ? currentDistance : (k + 1) * this.step;
+    const endTime = next ?? now;
+    const startDistance = k * this.step;
+    if (endDistance <= startDistance) return from;
+    const f = (distance - startDistance) / (endDistance - startDistance);
+    return from + f * (endTime - from);
   }
 
   getState(): TowerState {
