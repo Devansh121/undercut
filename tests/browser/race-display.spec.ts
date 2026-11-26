@@ -406,6 +406,10 @@ test('race display: start lights, 20-car timing tower, yellow sector on minimap,
   await expect(tower.locator('.hud-tower__row.is-player .hud-tower__tyre')).toHaveText('H');
   await expect(tower.locator('.hud-tower__row.is-player .hud-tower__pits')).toHaveText('1');
 
+  // Pit exit may still be on the first timed lap: wait for its actual completion.
+  await page.waitForFunction(() => Number(window.__undercut!.state().lap) >= 2, null, {
+    timeout: 120_000,
+  });
   // The first completed lap is visible in race modes, as it already was in Time Trial.
   await expect(page.getByTestId('last-lap')).toHaveText(/\d+:\d{2}\.\d{3}/);
 
