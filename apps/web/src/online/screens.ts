@@ -3,7 +3,7 @@ import { formatLapTime, formatRaceStatus, lapsText } from '../game/format';
 import { classificationGrid, teamBar } from '../ui/classification';
 import { el } from '../ui/dom';
 import { button, card, segmented, settingRow } from '../ui/kit/components';
-import { focusEl, focusFirst, navigate, showFocusRing, type NavAction } from '../ui/kit/nav';
+import { focusFirst, navigate, showFocusRing, type NavAction } from '../ui/kit/nav';
 import { ONLINE_CIRCUITS, onlineCircuit } from './circuits';
 import { displayCode, inviteLink, networkOrigin } from './invite';
 import { seatLivery } from './liveries';
@@ -101,11 +101,11 @@ export class RoomScreens {
         onClick,
         disabled,
         variant: primary ? 'primary' : 'secondary',
-        glyph: primary
-          ? 'menuAccept'
+        ...(primary
+          ? { glyph: 'menuAccept' as const }
           : label === 'Back' || label === 'Leave room'
-            ? 'menuBack'
-            : undefined,
+            ? { glyph: 'menuBack' as const }
+            : {}),
       });
       b.id = 'online-' + label.toLowerCase().replaceAll(' ', '-');
       return b;
@@ -346,7 +346,7 @@ export class RoomScreens {
     this.root.replaceChildren(header, content, notice, actions);
     content.scrollTop = scroll;
     const next = focus ? this.root.querySelector<HTMLElement>(`[id="${CSS.escape(focus)}"]`) : null;
-    if (next && !(next as HTMLButtonElement).disabled) focusEl(next);
+    if (next && !(next as HTMLButtonElement).disabled) next.focus({ preventScroll: true });
     else focusFirst(actions.children.length ? actions : content);
     if (selection && next instanceof HTMLInputElement && next.selectionStart !== null)
       next.setSelectionRange(selection.start, selection.end, selection.direction);

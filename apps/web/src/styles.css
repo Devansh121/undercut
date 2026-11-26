@@ -1914,14 +1914,30 @@ body {
   gap: var(--sp-3);
 }
 .online-settings .setting:first-child {
-  flex-direction: column;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: var(--sp-3);
 }
 .online-settings .seg {
   flex-shrink: 0;
 }
+.online-settings .setting:first-child .seg {
+  display: flex;
+  min-width: 0;
+}
+.online-settings .seg__opt {
+  min-height: var(--touch-min);
+}
+.online-settings .seg__opt:disabled {
+  color: var(--c-text-3);
+}
+.online-settings .seg__opt:disabled[aria-checked='true'] {
+  color: var(--c-text-1);
+}
 .online-settings .setting:first-child .seg__opt {
   flex: 1;
+  min-width: 0;
+  white-space: normal;
+  padding: var(--sp-2);
 }
 .online-settings > .card__body > .online-help {
   margin-bottom: var(--sp-3);
