@@ -54,3 +54,8 @@ export function formatRaceStatus(
 export function lapsText(laps: number): string {
   return `${laps} ${laps === 1 ? 'lap' : 'laps'}`;
 }
+
+/** A pit-stop count as the timing tower reads it to screen readers. */
+export function pitStopsText(stops: number): string {
+  return `${stops} ${stops === 1 ? 'pit stop' : 'pit stops'}`;
+}

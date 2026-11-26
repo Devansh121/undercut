@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatRaceStatus,
   lapsText,
+  pitStopsText,
   formatDelta,
   formatGear,
   formatLapTime,
@@ -13,6 +14,11 @@ describe('format', () => {
     expect(lapsText(0)).toBe('0 laps');
     expect(lapsText(1)).toBe('1 lap');
     expect(lapsText(2)).toBe('2 laps');
+  });
+  it('uses singular pit stop for one and plural for zero and many', () => {
+    expect(pitStopsText(0)).toBe('0 pit stops');
+    expect(pitStopsText(1)).toBe('1 pit stop');
+    expect(pitStopsText(2)).toBe('2 pit stops');
   });
   it('formats lap times to the millisecond, rounding down', () => {
     expect(formatLapTime(81.448)).toBe('1:21.448');

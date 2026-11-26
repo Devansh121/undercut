@@ -1,4 +1,4 @@
-import { lapsText } from '../../game/format';
+import { lapsText, pitStopsText } from '../../game/format';
 /**
  * The timing tower (top left of the HUD), broadcast style: a lap counter, the flag state,
  * optional race column header with gap/interval toggle, one row per car (position, team bar,
@@ -303,12 +303,13 @@ export class TimingTower {
       n.tyreAgeEl.setAttribute('aria-label', `${lapsText(age)} on tyres`);
     }
 
-    const showPits = r.pitStops !== undefined && r.pitStops !== null;
+    const stops = r.pitStops;
+    const showPits = stops !== undefined && stops !== null;
     setHidden(n.pitsEl, !showPits);
-    if (showPits && r.pitStops !== n.pitStopsVal) {
-      n.pitStopsVal = r.pitStops ?? null;
-      n.pits.set(String(r.pitStops));
-      n.pitsEl.setAttribute('aria-label', `${r.pitStops} pit stops`);
+    if (showPits && stops !== n.pitStopsVal) {
+      n.pitStopsVal = stops;
+      n.pits.set(String(stops));
+      n.pitsEl.setAttribute('aria-label', pitStopsText(stops));
     }
   }
 
