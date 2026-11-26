@@ -208,6 +208,8 @@ const LATE_DIVE = CAR_LENGTH;
 const LATE_COOLDOWN = 1.5;
 /** From lap two, a move ends once the car being passed is this far ahead, m. */
 const DROPPED_BACK = 60;
+/** A later-lap move given up this long before a braking zone, s, or in it, holds its lane. */
+const ABANDON_HOLD_BEFORE = 2;
 /** From lap two, a move out of the wake that has not gained for this long is given up, s. */
 const PASS_STALL = 1.5;
 /** A car ahead cornering under this share of this car's plan is a car to press (`quicker`). */
@@ -236,6 +238,8 @@ const HAZARD_SEE = 600;
 const HAZARD_SPEED = BYPASS_SPEED + 2;
 /** A car within this distance behind puts the driver under pressure (more errors), m. */
 const PRESSURE_BEHIND = 30;
+/** No error starts with a car closer than this behind, m. */
+const ERROR_CLEAR_BEHIND = 12;
 /** A slowing pit entrant holds racing moves only this close ahead, m. */
 const ENTRANT_SEE = 200;
 /**
@@ -1088,10 +1092,16 @@ export class RaceDriver implements Driver {
         // (From lap two a move given up before a braking zone may go again sooner after it.)
         if (!done && !blockedByOther && !movedOff)
           this.cooldown = this.passBypass ? 1 : later && late ? LATE_COOLDOWN : 3;
-        // Given up off the line in a braking zone or corner from lap two: the car keeps its lane
-        // on the road through it, as a committed move does. Swinging back to the line under
-        // braking took a car off the road at Ascari.
-        if (later && !done && !this.passBypass && (cornering || midCorner) && Math.abs(myO) > 1)
+        // Given up off the line in or just before a braking zone from lap two: the car keeps its
+        // lane on the road through the corner, as a committed move does. Swinging back to the
+        // line under braking slid a car, its brakes eased, and it ran off the road at Ascari.
+        if (
+          later &&
+          !done &&
+          !this.passBypass &&
+          (cornering || midCorner || this.at(this.brakingAhead, s0) < v * ABANDON_HOLD_BEFORE) &&
+          Math.abs(myO) > 1
+        )
           this.abandonHold = true;
         this.passId = -1;
       } else {
@@ -1135,6 +1145,12 @@ export class RaceDriver implements Driver {
             ? this.passStall + dt
             : 0;
         if (this.passBlocked > 0.6 || this.passStall > PASS_STALL) {
+          if (
+            later &&
+            (cornering || midCorner || this.at(this.brakingAhead, s0) < v * ABANDON_HOLD_BEFORE) &&
+            Math.abs(myO) > 1
+          )
+            this.abandonHold = true;
           this.passId = -1;
           this.cooldown = 3;
           this.passStall = 0;
@@ -1154,7 +1170,9 @@ export class RaceDriver implements Driver {
       }
     }
     if (this.abandonHold) {
-      if (this.passId >= 0 || (!cornering && !midCorner) || !later) this.abandonHold = false;
+      const past =
+        !cornering && !midCorner && this.at(this.brakingAhead, s0) >= v * ABANDON_HOLD_BEFORE;
+      if (this.passId >= 0 || past || !later) this.abandonHold = false;
       else base = Math.max(oMin, Math.min(oMax, myO));
     }
     const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));
@@ -1612,7 +1630,10 @@ export class RaceDriver implements Driver {
         !queueStop &&
         this.rejoinTime <= 0 &&
         !view.blueFlag &&
-        !yielding;
+        !yielding &&
+        // (Not with a car right behind: too close to react, it ran into a car going wide out
+        // of the first chicane.)
+        !this.carApproaching(view, s0, self.d, ERROR_CLEAR_BEHIND);
       const u = plan.track.wrap(s0) / plan.track.lap.step;
       limit = Math.min(
         limit,
