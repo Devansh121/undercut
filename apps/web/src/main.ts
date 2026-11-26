@@ -283,7 +283,17 @@ function showOnline(code: string | null): void {
   online = new OnlineFlow(
     app as HTMLElement,
     code,
-    (extension, quit) => start(currentChoice(), extension, quit),
+    (extension, quit, launch) =>
+      start(
+        {
+          ...currentChoice(launch.circuit),
+          mode: 'timeTrial',
+          circuit: launch.circuit,
+          timeOfDay: launch.timeOfDay,
+        },
+        extension,
+        quit,
+      ),
     () => showMenus('hub'),
   );
 }
@@ -443,10 +453,11 @@ if (debugEnabled()) {
   Object.assign(window.__undercut!, {
     /** The worklet's processing-time report with `&audioProfile=1`, or null. */
     audioProfile: () => audio.profile,
-    online: () => ({
+    online: (includeTrace = false) => ({
       state: online?.session.state ?? null,
-      race: online?.race?.snapshot() ?? null,
+      race: online?.race?.snapshot(includeTrace) ?? null,
     }),
+    onlineOrder: (serverTime: number) => online?.race?.orderAt(serverTime) ?? null,
     onlineSettings: (patch: SettingsPatch) => online?.session.changeSettings(patch) ?? false,
   });
 }

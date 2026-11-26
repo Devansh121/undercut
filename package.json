@@ -21,6 +21,7 @@
     "test:physics": "vitest run --project physics",
     "test:rooms": "vitest run --project rooms && vitest run --project rooms-soak-short",
     "test:browser": "playwright test",
+    "test:browser:online": "playwright test --project=online --workers=1",
     "test:browser:views": "playwright test --project=desktop --project=phone",
     "test:browser:lifecycle": "playwright test --project=lifecycle",
     "test:browser:webkit": "playwright test --project=webkit-phone --project=pixel-phone",

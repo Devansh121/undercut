@@ -92,6 +92,7 @@ import { raceLineFile } from './game/race-line';
 import {
   DriveSession,
   TIME_TRIAL_FUEL,
+  raceTrim,
   type QuickRaceOptions,
   type RaceArtefacts,
   type SessionEvent,
@@ -261,8 +262,10 @@ export interface DriveOptions {
 export interface DriveExtension {
   /** Loading screen detail, e.g. "Online race". */
   label: string;
+  /** Use the circuit's race aero trim and load its racing line / envelope artefacts. */
+  raceTrim?: boolean;
   /** Start standing at lap (s, d) instead of the rolling start. */
-  startAt?: { s: number; d: number };
+  startAt?: { s: number; d: number } | ((track: Track) => { s: number; d: number });
   /** The player's car's look; default the first team's. */
   livery?: CarLivery;
   /** Pause menu quit label. */
@@ -270,18 +273,24 @@ export interface DriveExtension {
   wrapControl?(source: ControlSource): ControlSource;
   /** Before fixed ticks: elapsed wall time accepted by this frame. */
   beforeFrame?(elapsed: number): void;
+  /** After each 240 Hz fixed sim step (for online car-to-car contact and host AI stepping). */
+  afterStep?(dt: number): void;
   attach?(ctx: DriveExtensionContext): void;
   /** Scene and first-frame shaders are ready. */
   ready?(): void;
   events?(events: readonly SessionEvent[]): void;
   /** Each frame after the sim stepped and before drawing; returns other cars for the map. */
   frame?(f: { dt: number; pose: CarPose; paused: boolean }): HudState['others'];
+  /** Override HUD fields (race lap timer, tower rows) right before the HUD paints. */
+  updateHud?(state: HudState, renderTime: number): void;
   detach?(): void;
 }
 
 export interface DriveExtensionContext {
   session: DriveSession;
   loop: GameLoop;
+  /** The circuit's racing line and measured envelope, when loaded for race trim / AI fill. */
+  artefacts: RaceArtefacts | null;
   /** The current view (it is rebuilt on a quality switch or a context restore). */
   view(): RaceView;
   host: HTMLElement;
@@ -372,6 +381,7 @@ async function racingLine(
   race: boolean,
 ): Promise<{
   offsets: Float64Array;
+  trim: string;
   guide: EnvelopeArtefact | null;
   artefacts: RaceArtefacts | null;
 } | null> {
@@ -387,6 +397,7 @@ async function racingLine(
   const envelope = loadEnvelope && (race || raw.trim === playerTrim) ? await loadEnvelope() : null;
   return {
     offsets,
+    trim: raw.trim,
     guide: envelope && raw.trim === playerTrim ? (envelope as EnvelopeArtefact) : null,
     artefacts: race && envelope ? { line: raw, envelope } : null,
   };
@@ -447,7 +458,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const ai = await racingLine(track, o.quickRace !== undefined);
+  const ext = o.extension;
+  const ai = await racingLine(track, o.quickRace !== undefined || ext?.raceTrim === true);
   const line = ai?.offsets ?? null;
   const drivingLine =
     ai && ai.guide
@@ -462,13 +474,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const d = teams.teams.flatMap((t) => t.drivers).find((x) => x.code === l.code);
     return { name: d ? `${d.first} ${d.last}` : l.code, code: l.code };
   });
+  const extTrim = !o.quickRace && ext?.raceTrim && ai?.trim ? raceTrim(ai.trim) : undefined;
   const session = new DriveSession({
     track,
     seed: o.seed,
     record,
     today: o.today,
     ...(o.quickRace ? { quickRace: o.quickRace, drivers } : {}),
-    ...(ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
+    ...((o.quickRace || o.extension?.raceTrim) && ai?.artefacts
+      ? { raceArtefacts: ai.artefacts }
+      : {}),
+    ...(extTrim ? { trim: extTrim } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
@@ -493,7 +509,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     sprungB: 0,
     yawInertia: 0,
   });
-  const ext = o.extension;
   const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -596,8 +611,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     () => session.car.state,
   );
   const wrap = (source: ControlSource): ControlSource => ext?.wrapControl?.(source) ?? source;
-  if (ext?.startAt) session.teleport(ext.startAt.s, ext.startAt.d, 0);
-  const loop = new GameLoop(session, wrap(human));
+  if (ext?.startAt) {
+    const at = typeof ext.startAt === 'function' ? ext.startAt(track) : ext.startAt;
+    session.teleport(at.s, at.d, 0);
+  }
+  const loop = new GameLoop(
+    session,
+    wrap(human),
+    ext?.afterStep ? (dt) => ext.afterStep!(dt) : undefined,
+  );
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
   // Kerbs and contacts as gamepad rumble, or phone vibration on touch controls.
@@ -1946,6 +1968,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
       h.message = notices.current;
       if (others) h.others = others;
       else if (session.quickRace) h.others = fleetDots;
+      h.tower = null;
+      ext?.updateHud?.(h, renderTime);
       hud.update(h);
     }
     overlay?.update();
@@ -1978,6 +2002,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   ext?.attach?.({
     session,
     loop,
+    artefacts: ai?.artefacts ?? null,
     view: () => view,
     host: o.host,
     say: (m, seconds) => say(m, seconds),

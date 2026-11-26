@@ -225,7 +225,6 @@ jobs:
             test-results
           retention-days: 7
       - name: Keep the built client
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: web-client-${{ github.sha }}
@@ -272,6 +271,47 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  online:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Install cached Chromium system libraries
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-client-${{ github.sha }}
+          path: apps/web/dist
+      - run: npm run test:browser:online
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-online
           path: |
             playwright-report
             test-results

@@ -10,6 +10,12 @@ Open the `Wi-Fi:` address it prints on a phone on the same network. The HTTPS ad
 
 ## What changed
 
+- Online slice 2 (PR #81): circuit choice (Monza, Spa, Singapore), live lap timing and named timing tower, bounded symmetric remote contact under latency and loss, and host AI fill up to 20 cars with pose/progress handover on host migration. Two-browser short acceptance passed at all three circuits (`online` CI job); contact passed at 50/100/150 ms with 20 ms jitter and 2% snapshot loss; five-lap 2-human + 18-AI browser soaks passed at Monza (11.3 min), Spa (16.0 min), and Singapore (8.7 min) under 100 ms latency / 20 ms jitter / 2% loss with zero stuck cars, zero rejected laps, and identical 20-car classification on both clients.
+
+- Online review follow-up (PR #81): bounded AI recovery retains counted laps and reset state;
+  the service publishes running order at shared epochs; contact tests compare synchronized
+  oriented footprints. The new three-circuit five-lap browser soaks are being verified.
+
 - M4 Race Weekend and Championship (PR #60): practice, single-session qualifying and a race on every circuit; qualifying sets the grid and every weekend race requires two compounds. Championship runs Monza, Spa-Francorchamps and Singapore Marina Bay in order, with driver and team points, count-back and locally saved progress at session boundaries. The menu offers five laps, fifteen laps or the circuit's full distance.
 - Player pit stops in Quick Race and weekends: I / D-pad up / BOX calls or cancels the crew; O / D-pad down / TYRE cycles the next compound. Drive into the lane; the assist takes the car to its box, shows the service countdown and waits for a safe release. The automatic limiter defaults on and is saved in session settings; turn it off to use L / left-stick click / LIM. An uncalled visit is a drive-through. The HUD and classification show stops and compounds.
 
@@ -418,6 +424,41 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 | Singapore | overcast | park | 1.034 | 1.033 | 1.033 | 1.033–1.034 |
 
 Raw reports and both intentional mutation failures are retained in [the evidence folder](evidence/m2-water-trees-2/README.md). The Mobile relief cost remains about +15 % uncapped frame time, with 60 fps under vsync at all three circuits, as recorded in the performance report.
+
+### Decided for you — online slice 2
+
+- AI physics stays in the host browser; the Worker remains the timing referee and snapshot relay. AI-to-human contact applies the same bounded symmetric response as human-to-human contact, including for the host's own human car. AI-to-AI contact uses the existing sim solver.
+- Online cars retain reference tyres and 20 kg fuel, topped up at line crossings, matching the human online session. The AI driver's private reaction/traffic memory restarts on migration; its latest physical pose, velocities, gears, snapshot tick and service-counted progress carry over. This avoids introducing full sim-state payloads or Worker-side physics in this slice.
+- Long two-browser races are opt-in with ONLINE_SOAK=1 to preserve the ordinary PR browser job's budget. Short circuit, fill, takeover and network-contact proofs run in a separate one-worker CI job, sharing the built client artifact.
+
+### Decided for you — online review follow-up
+
+- A stalled AI is placed at its current longitudinal position, on the centreline, at 8 m/s after
+  8 s without 6 m of forward progress. The move earns no lap, retains counted race time and uses
+  the existing reset counter and two-second ghost grace, including after migration.
+- Running positions use a service-published order with 200 ms evaluation lag and 300 ms shared
+  activation lead, at most 5 Hz. This adds presentation delay while leaving driving immediate.
+- Speculative contact uses a directional prediction horizon capped at 0.3 m and bounded by
+  snapshot age times closing speed along the separating face normal. The proxy is already
+  extrapolated; this reserves approaching distance only. Tangential or separating motion cannot
+  trigger contact across a gap. Ambiguous corner normals fall back to actual-overlap contact.
+  While already overlapping a stale proxy, the same capped age × normal closing speed is added
+  to the measured depth only while the contact point is closing. Without it, the 150 ms contact
+  proof passed 8 of 10 runs (penetration up to 0.41 m); with it, 10 of 10 (at most 0.07 m).
+- The prediction horizon is pose age plus this client's measured clock-sync error
+  (`ClockSync.error`, clamped to 0.1 s), still times normal closing speed and capped at 0.3 m.
+  A CI run of the 50 ms contact proof ended 0.02 m overlapped: the guest kept closing at about
+  3.5° after neutral input, and both clients' age-only horizons were short by the sync error
+  between their clocks. Parallel or separating motion still adds nothing.
+- Browser order comparisons freeze one active epoch and wait up to 6 s for both clients to
+  receive it and reach activation before querying that same timestamp. Startup also waits for
+  active epochs and live peer snapshots. A deterministic 900 ms guest control-message delay
+  covers delivery after the scheduled activation and the former fixed look-back.
+
+- The order proof runs twice, at 1440×900 desktop and at 844×390 landscape phone, with identical
+  assertions. An earlier commit on this branch moved it to the phone viewport alone after a
+  desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
+  phone is added rather than substituted.
 
 ### Decided for you — Mobile prop-kit tuning
 

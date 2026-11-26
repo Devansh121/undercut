@@ -53,9 +53,12 @@ export class GameLoop {
   private frozenAlpha = 0;
   private lookBackValue = false;
 
-  constructor(session: DriveSession, source: ControlSource) {
+  private readonly afterStep: ((dt: number) => void) | undefined;
+
+  constructor(session: DriveSession, source: ControlSource, afterStep?: (dt: number) => void) {
     this.session = session;
     this.source = source;
+    this.afterStep = afterStep;
     this.clock = new FixedStepAccumulator({
       step: session.world.step,
       maxFrameTime: STALL_CLAMP * MAX_TIME_SCALE,
@@ -155,6 +158,7 @@ export class GameLoop {
         else result.actions.push(event.action);
       }
       result.events.push(...session.tick(frame.control, frame.device));
+      this.afterStep?.(dt);
       result.steps++;
       const impact = Math.max(
         session.car.state.wallImpactSpeed,

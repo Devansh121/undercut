@@ -36,10 +36,11 @@ import type { OnlineRaceReport } from './online/race';
 export type QuickRaceDebugOptions = Omit<QuickRaceOptions, 'laps'> & { circuit?: string };
 
 export interface DebugApi {
-  online(): {
+  online(includeTrace?: boolean): {
     state: OnlineState | null;
     race: OnlineRaceReport | null;
   };
+  onlineOrder(serverTime: number): { at: number; order: number[]; position: number } | null;
   onlineSettings(patch: SettingsPatch): boolean;
   start(): Promise<void>;
   /** A Quick Race (at Monza unless `circuit` names another circuit with a racing line). */
@@ -230,6 +231,7 @@ export function installDebugApi(
   };
   window.__undercut = {
     online: () => ({ state: null, race: null }),
+    onlineOrder: () => null,
     onlineSettings: () => false,
     start: async () => {
       if (!getDrive()) await start();
