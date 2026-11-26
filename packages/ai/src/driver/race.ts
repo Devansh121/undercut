@@ -1043,12 +1043,14 @@ export class RaceDriver implements Driver {
         !this.passCommitted &&
         passCar !== null &&
         passDs >= 0.6 * CAR_LENGTH &&
-        // (From lap two, up to a length behind an overlap once out of the car's path.)
+        // From lap two even a slow target needs overlap, or at most one length to gain once
+        // out of its path. Extrapolating its slow pace from farther back committed lapping
+        // cars that never drew level, then ran wide when the lane ended at turn-in.
         (passDs < OVERLAP ||
           (later &&
             passDs < OVERLAP + LATE_DIVE &&
             Math.abs(passCar.d - ldHere - myO) >= CAR_WIDTH + PASS_CLEARANCE) ||
-          this.slowInCorners(passCar.id)) &&
+          (!later && this.slowInCorners(passCar.id))) &&
         this.heldTime > 1.5 - aggression
       ) {
         const lane =
@@ -1251,7 +1253,11 @@ export class RaceDriver implements Driver {
       !midCorner &&
       held &&
       leader !== null &&
-      (leaderDs < OVERLAP || this.slowInCorners(leader.id)) &&
+      (leaderDs < OVERLAP ||
+        (this.slowInCorners(leader.id) &&
+          (!later ||
+            (leaderDs < OVERLAP + LATE_DIVE &&
+              Math.abs(leader.d - self.d) >= CAR_WIDTH + PASS_CLEARANCE)))) &&
       v - leader.speed > 2 &&
       this.passDecel > 2 &&
       gapAhead < 25 + v * 0.5;

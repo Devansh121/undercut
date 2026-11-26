@@ -1060,7 +1060,7 @@ describe('race driver: a move given up under braking', () => {
 });
 
 describe('race driver: moves from lap two', () => {
-  function dive(gap: number, openingLap = false, across = 3.7, side = -1) {
+  function dive(gap: number, openingLap = false, across = 3.7, side = -1, slow = false) {
     const dr = driver();
     const s = 370;
     const me = { id: 0, s, d: lineD(dr, s) + side * across, speed: 85 };
@@ -1069,6 +1069,10 @@ describe('race driver: moves from lap two', () => {
     dr['heldTime'] = 5;
     dr['passId'] = 1;
     dr['passSide'] = side;
+    if (slow) {
+      dr['aheadPaceId'] = 1;
+      dr['aheadPace'] = 0.6;
+    }
     dr['o'] = side * across;
     tick(dr, me, [ahead], { openingLap });
     return dr;
@@ -1081,6 +1085,12 @@ describe('race driver: moves from lap two', () => {
     expect(dive(8, false, 3.7, 1)['passCommitted']).toBe(false);
     expect(dive(8, true)['passCommitted']).toBe(false);
     expect(dive(14)['passCommitted']).toBe(false);
+  });
+
+  it('does not turn a slow car into permission to dive from far behind or through its lane', () => {
+    expect(dive(20, false, 3.7, -1, true)['passCommitted']).toBe(false);
+    expect(dive(8, false, 0, -1, true)['passCommitted']).toBe(false);
+    expect(dive(8, false, 3.7, -1, true)['passCommitted']).toBe(true);
   });
 });
 
