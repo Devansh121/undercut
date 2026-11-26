@@ -471,7 +471,7 @@ export class Hud {
       tGrid.append(w);
       this.tyreCells.push({ cell: w, temp: new Text(temp), wear, pct: -1 });
     }
-    const note = el('span', 'hud-tyres__note', S.hud.noData);
+    const note = el('span', 'hud-tyres__note');
     this.tyreNote = new Text(note);
     tyres.append(tHead, tGrid, note);
 
@@ -602,6 +602,8 @@ export class Hud {
   private updateRace(r: HudRaceState | null): void {
     this.startLights.update(r?.startLights ?? null);
     if (!r) {
+      delete this.raceFlagEl.dataset.flag;
+      setClass(this.raceFlagEl, 'is-on', false);
       if (!this.raceFlagEl.hidden) this.raceFlagEl.hidden = true;
       if (!this.safetyEl.hidden) this.safetyEl.hidden = true;
       if (!this.raceMsgsEl.hidden) this.raceMsgsEl.hidden = true;
@@ -616,6 +618,8 @@ export class Hud {
       setData(this.raceFlagEl, 'flag', banner.flag);
       this.raceFlagTitle.set(banner.title);
       this.raceFlagDetail.set(banner.detail);
+    } else {
+      delete this.raceFlagEl.dataset.flag;
     }
 
     const safety = r.safety;

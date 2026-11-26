@@ -1,3 +1,4 @@
+import { lapsText } from '../../game/format';
 import type { SessionResult } from '@undercut/race';
 import type { StoragePort } from '@undercut/input';
 import type { WeekendProgress } from '../../game/weekend';
@@ -37,7 +38,7 @@ export class WeekendScreen implements Screen {
     const summary = el(
       'p',
       'label',
-      `${circuit.toUpperCase()} · ${p.laps} laps · 20 cars · two compounds required`,
+      `${circuit.toUpperCase()} · ${lapsText(p.laps)} · 20 cars · two compounds required`,
     );
     const schedule = el('div', 'weekend-schedule');
     w.schedule.forEach((s, i) =>

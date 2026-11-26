@@ -141,6 +141,8 @@ test('Quick Race: provisional standings after the player takes the flag, then th
   expect(seen.running).toBe(19);
   // (The readout is rebuilt a few times a second: read once it has caught up.)
   await expect(page.getByTestId('race-status')).toContainText('provisional');
+  await expect(page.getByTestId('race-status').locator('.race-status__row')).toHaveCount(20);
+  await expect(page.getByTestId('race-status').locator('.is-player')).toHaveCount(1);
   expect(seen.skipBottom).toBeLessThanOrEqual(seen.viewport);
   expect(seen.clusterShown).toBe(false);
   expect(seen.coachFinished).toBe(true);

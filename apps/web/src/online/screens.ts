@@ -1,4 +1,5 @@
 import { MAX_CARS } from '@undercut/protocol';
+import { lapsText } from '../game/format';
 import { el } from '../ui/dom';
 import { ONLINE_CIRCUITS, onlineCircuit } from './circuits';
 import { displayCode, inviteLink, networkOrigin } from './invite';
@@ -126,8 +127,8 @@ export class RoomScreens {
               '',
               onlineDriverName(r.name, r.aiIndex, r.seat) +
                 ' · ' +
-                r.laps +
-                ' laps · ' +
+                lapsText(r.laps) +
+                ' · ' +
                 r.status +
                 ' · ' +
                 (r.timeMs === null ? '—' : (r.timeMs / 1000).toFixed(3) + ' s'),
