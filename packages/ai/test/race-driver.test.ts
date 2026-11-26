@@ -1035,6 +1035,30 @@ describe('race driver: a move that stops gaining', () => {
   });
 });
 
+describe('race driver: a move given up under braking', () => {
+  function giveUp(openingLap: boolean) {
+    const dr = driver();
+    const s = 470;
+    const me = { id: 0, s, d: lineD(dr, s) - 4, speed: 70 };
+    const ahead = { id: 1, s: s + 25, d: lineD(dr, s + 25), speed: 60 };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -4;
+    tick(dr, me, [ahead], { openingLap });
+    return dr;
+  }
+
+  it('keeps its lane on the road through the corner from lap two', () => {
+    const later = giveUp(false);
+    expect(later.last.passing).toBe(-1);
+    expect(Math.abs(later.last.target + 4)).toBeLessThan(0.5);
+    // On lap one it heads back toward the line.
+    expect(giveUp(true).last.target).toBeGreaterThan(later.last.target + 0.5);
+  });
+});
+
 describe('race driver: moves from lap two', () => {
   function dive(gap: number, openingLap = false) {
     const dr = driver();

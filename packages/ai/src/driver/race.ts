@@ -322,6 +322,8 @@ export class RaceDriver implements Driver {
   private passBlocked = 0;
   /** A later-lap move out of the wake: time it has gone without gaining, s. */
   private passStall = 0;
+  /** A later-lap move given up in a braking zone or corner: hold the road lane through it. */
+  private abandonHold = false;
   private cooldown = 0;
   private heldTime = 0;
   private switchbackId = -1;
@@ -436,6 +438,7 @@ export class RaceDriver implements Driver {
     this.passTime = 0;
     this.passBlocked = 0;
     this.passStall = 0;
+    this.abandonHold = false;
     this.cooldown = 0;
     this.heldTime = 0;
     this.switchbackId = -1;
@@ -486,6 +489,7 @@ export class RaceDriver implements Driver {
     out.passTime = this.passTime;
     out.passBlocked = this.passBlocked;
     out.passStall = this.passStall;
+    out.abandonHold = this.abandonHold;
     out.cooldown = this.cooldown;
     out.heldTime = this.heldTime;
     out.switchbackId = this.switchbackId;
@@ -553,6 +557,7 @@ export class RaceDriver implements Driver {
     this.passTime = num('passTime');
     this.passBlocked = num('passBlocked');
     this.passStall = typeof m.passStall === 'number' ? m.passStall : 0;
+    this.abandonHold = m.abandonHold === true;
     this.cooldown = num('cooldown');
     this.heldTime = num('heldTime');
     this.switchbackId = typeof m.switchbackId === 'number' ? m.switchbackId : -1;
@@ -1080,10 +1085,14 @@ export class RaceDriver implements Driver {
         this.hazard && !this.passBypass && passCar !== null && passCar.speed >= HAZARD_SPEED;
       const notAlongside = firstCorner && !this.passBypass && passCar !== null && passDs >= OVERLAP;
       if (lost || done || late || blockedByOther || movedOff || yellow || notAlongside) {
-        // (From lap two a move given up before a braking zone may go again on that corner's
-        // exit: three seconds lasted through it, past a car running wide out of it.)
+        // (From lap two a move given up before a braking zone may go again sooner after it.)
         if (!done && !blockedByOther && !movedOff)
           this.cooldown = this.passBypass ? 1 : later && late ? LATE_COOLDOWN : 3;
+        // Given up off the line in a braking zone or corner from lap two: the car keeps its lane
+        // on the road through it, as a committed move does. Swinging back to the line under
+        // braking took a car off the road at Ascari.
+        if (later && !done && !this.passBypass && (cornering || midCorner) && Math.abs(myO) > 1)
+          this.abandonHold = true;
         this.passId = -1;
       } else {
         this.passTime += dt;
@@ -1143,6 +1152,10 @@ export class RaceDriver implements Driver {
           base = Math.min(base, Math.max(myO, oMin));
         }
       }
+    }
+    if (this.abandonHold) {
+      if (this.passId >= 0 || (!cornering && !midCorner) || !later) this.abandonHold = false;
+      else base = Math.max(oMin, Math.min(oMax, myO));
     }
     const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));
     const held = this.heldTime > 1.5 - aggression;
@@ -1433,7 +1446,9 @@ export class RaceDriver implements Driver {
     // underneath steers for the offset's change as well as for the offset (it would trail the
     // lane by a metre or more, into the other car).
     const slope =
-      (this.passId >= 0 || hold || yieldLaneHeld) && v > 5 ? (this.o - oBefore) / (v * dt) : 0;
+      (this.passId >= 0 || hold || yieldLaneHeld || this.abandonHold) && v > 5
+        ? (this.o - oBefore) / (v * dt)
+        : 0;
     this.inner.offsetSlope = Math.max(-0.15, Math.min(0.15, slope));
 
     // The pedals: follow the car ahead, drop back when squeezed, slow off line in a corner.
