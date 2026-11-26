@@ -765,7 +765,8 @@ export class RaceDriver implements Driver {
     // The opening lap: no change of lane under braking, and into the first corner no move that
     // is not already alongside (the field arrives there together).
     const opening = view.openingLap === true && !view.launching;
-    const later = view.openingLap === false && !view.launching && !this.hazard;
+    const laterLap = view.openingLap === false && !view.launching;
+    const later = laterLap && !this.hazard;
     const firstEnd = plan.track.corners[0]?.end ?? 0;
     const firstCorner =
       opening &&
@@ -1107,7 +1108,7 @@ export class RaceDriver implements Driver {
         // lane on the road through the corner, as a committed move does. Swinging back to the
         // line under braking slid a car, its brakes eased, and it ran off the road at Monza's third chicane.
         if (
-          later &&
+          laterLap &&
           !done &&
           !this.passBypass &&
           (cornering || midCorner || this.at(this.brakingAhead, s0) < v * ABANDON_HOLD_BEFORE) &&
@@ -1157,7 +1158,7 @@ export class RaceDriver implements Driver {
             : 0;
         if (this.passBlocked > 0.6 || this.passStall > PASS_STALL) {
           if (
-            later &&
+            laterLap &&
             (cornering || midCorner || this.at(this.brakingAhead, s0) < v * ABANDON_HOLD_BEFORE) &&
             Math.abs(myO) > 1
           )
@@ -1180,10 +1181,12 @@ export class RaceDriver implements Driver {
         }
       }
     }
+    // A hazard cancels racing, not the lane held through braking: the slow target becoming
+    // a crawling hazard must not send the car back across the road in the middle of a corner.
     if (this.abandonHold) {
       const past =
         !cornering && !midCorner && this.at(this.brakingAhead, s0) >= v * ABANDON_HOLD_BEFORE;
-      if (this.passId >= 0 || past || !later) this.abandonHold = false;
+      if (this.passId >= 0 || past || !laterLap) this.abandonHold = false;
       else base = Math.max(oMin, Math.min(oMax, myO));
     }
     const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));

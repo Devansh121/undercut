@@ -1036,7 +1036,7 @@ describe('race driver: a move that stops gaining', () => {
 });
 
 describe('race driver: a move given up under braking', () => {
-  function giveUp(openingLap: boolean) {
+  function giveUp(openingLap: boolean, hazard = false) {
     const dr = driver();
     const s = 470;
     const me = { id: 0, s, d: lineD(dr, s) - 4, speed: 70 };
@@ -1046,7 +1046,8 @@ describe('race driver: a move given up under braking', () => {
     dr['passId'] = 1;
     dr['passSide'] = -1;
     dr['o'] = -4;
-    tick(dr, me, [ahead], { openingLap });
+    const others = hazard ? [ahead, { id: 2, s: s + 200, d: 0, speed: 0 }] : [ahead];
+    tick(dr, me, others, { openingLap });
     return dr;
   }
 
@@ -1056,6 +1057,13 @@ describe('race driver: a move given up under braking', () => {
     expect(Math.abs(later.last.target + 4)).toBeLessThan(0.5);
     // On lap one it heads back toward the line.
     expect(giveUp(true).last.target).toBeGreaterThan(later.last.target + 0.5);
+  });
+
+  it('keeps the abandoned lane when a crawling hazard cancels racing through the corner', () => {
+    const dr = giveUp(false, true);
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['abandonHold']).toBe(true);
+    expect(Math.abs(dr.last.target + 4)).toBeLessThan(0.5);
   });
 });
 
