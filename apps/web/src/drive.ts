@@ -1,3 +1,4 @@
+import { RaceStatusReadout } from './ui/race-status';
 import type { SessionResult } from '@undercut/race';
 /**
  * The drive screen: a time trial or a Quick Race at any circuit in the browser. Loaded on demand from the
@@ -92,6 +93,7 @@ import { raceLineFile } from './game/race-line';
 import {
   DriveSession,
   TIME_TRIAL_FUEL,
+  raceTrim,
   type QuickRaceOptions,
   type RaceArtefacts,
   type SessionEvent,
@@ -261,8 +263,10 @@ export interface DriveOptions {
 export interface DriveExtension {
   /** Loading screen detail, e.g. "Online race". */
   label: string;
+  /** Use the circuit's race aero trim and load its racing line / envelope artefacts. */
+  raceTrim?: boolean;
   /** Start standing at lap (s, d) instead of the rolling start. */
-  startAt?: { s: number; d: number };
+  startAt?: { s: number; d: number } | ((track: Track) => { s: number; d: number });
   /** The player's car's look; default the first team's. */
   livery?: CarLivery;
   /** Pause menu quit label. */
@@ -270,18 +274,24 @@ export interface DriveExtension {
   wrapControl?(source: ControlSource): ControlSource;
   /** Before fixed ticks: elapsed wall time accepted by this frame. */
   beforeFrame?(elapsed: number): void;
+  /** After each 240 Hz fixed sim step (for online car-to-car contact and host AI stepping). */
+  afterStep?(dt: number): void;
   attach?(ctx: DriveExtensionContext): void;
   /** Scene and first-frame shaders are ready. */
   ready?(): void;
   events?(events: readonly SessionEvent[]): void;
   /** Each frame after the sim stepped and before drawing; returns other cars for the map. */
   frame?(f: { dt: number; pose: CarPose; paused: boolean }): HudState['others'];
+  /** Override HUD fields (race lap timer, tower rows) right before the HUD paints. */
+  updateHud?(state: HudState, renderTime: number): void;
   detach?(): void;
 }
 
 export interface DriveExtensionContext {
   session: DriveSession;
   loop: GameLoop;
+  /** The circuit's racing line and measured envelope, when loaded for race trim / AI fill. */
+  artefacts: RaceArtefacts | null;
   /** The current view (it is rebuilt on a quality switch or a context restore). */
   view(): RaceView;
   host: HTMLElement;
@@ -372,6 +382,7 @@ async function racingLine(
   race: boolean,
 ): Promise<{
   offsets: Float64Array;
+  trim: string;
   guide: EnvelopeArtefact | null;
   artefacts: RaceArtefacts | null;
 } | null> {
@@ -387,6 +398,7 @@ async function racingLine(
   const envelope = loadEnvelope && (race || raw.trim === playerTrim) ? await loadEnvelope() : null;
   return {
     offsets,
+    trim: raw.trim,
     guide: envelope && raw.trim === playerTrim ? (envelope as EnvelopeArtefact) : null,
     artefacts: race && envelope ? { line: raw, envelope } : null,
   };
@@ -447,7 +459,8 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   const track = await loadTrack(o.circuit ?? 'monza');
   const records = o.records;
   const record = await records.load(track.id);
-  const ai = await racingLine(track, o.quickRace !== undefined);
+  const ext = o.extension;
+  const ai = await racingLine(track, o.quickRace !== undefined || ext?.raceTrim === true);
   const line = ai?.offsets ?? null;
   const drivingLine =
     ai && ai.guide
@@ -462,13 +475,17 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     const d = teams.teams.flatMap((t) => t.drivers).find((x) => x.code === l.code);
     return { name: d ? `${d.first} ${d.last}` : l.code, code: l.code };
   });
+  const extTrim = !o.quickRace && ext?.raceTrim && ai?.trim ? raceTrim(ai.trim) : undefined;
   const session = new DriveSession({
     track,
     seed: o.seed,
     record,
     today: o.today,
     ...(o.quickRace ? { quickRace: o.quickRace, drivers } : {}),
-    ...(ai?.artefacts ? { raceArtefacts: ai.artefacts } : {}),
+    ...((o.quickRace || o.extension?.raceTrim) && ai?.artefacts
+      ? { raceArtefacts: ai.artefacts }
+      : {}),
+    ...(extTrim ? { trim: extTrim } : {}),
     device: o.touch ? 'touch' : 'keyboard',
     ...(drivingLine ? { guide: drivingLine } : {}),
   });
@@ -493,7 +510,6 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     sprungB: 0,
     yawInertia: 0,
   });
-  const ext = o.extension;
   const playerLivery = ext?.livery ?? all[0];
   if (!playerLivery) throw new Error('design/teams.json has no teams');
   pageRenderer ??= createRenderer(o.canvas);
@@ -596,8 +612,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     () => session.car.state,
   );
   const wrap = (source: ControlSource): ControlSource => ext?.wrapControl?.(source) ?? source;
-  if (ext?.startAt) session.teleport(ext.startAt.s, ext.startAt.d, 0);
-  const loop = new GameLoop(session, wrap(human));
+  if (ext?.startAt) {
+    const at = typeof ext.startAt === 'function' ? ext.startAt(track) : ext.startAt;
+    session.teleport(at.s, at.d, 0);
+  }
+  const loop = new GameLoop(
+    session,
+    wrap(human),
+    ext?.afterStep ? (dt) => ext.afterStep!(dt) : undefined,
+  );
   // Barrier impacts for the audio seam, from the hardest strike of each frame.
   const impacts = new ImpactEvents();
   // Kerbs and contacts as gamepad rumble, or phone vibration on touch controls.
@@ -1382,7 +1405,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
    * player's own row is marked and kept in view (a landscape phone shows eight rows); a fade at
    * the bottom edge says there are more.
    */
-  let statusKey = '';
+  const statusReadout = new RaceStatusReadout(raceStatus);
   let statusPlayer = -1;
   let statusResult: SessionResult | null = null;
   function showRaceStatus(): void {
@@ -1400,18 +1423,14 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
     if (hideForLights) return;
     if (hideStatus) {
       // Keep the legacy readout current without rebuilding rows or measuring hidden layout.
-      const key = raceStatusLines().lines.join('\n');
-      if (key !== statusKey) {
-        statusKey = key;
-        raceStatus.textContent = key;
-      }
+      statusReadout.hiddenText(raceStatusLines().lines);
       return;
     }
     if (session.result) {
       // The classification: a table with a heading, the player's row marked and in view.
       if (statusResult !== session.result) {
         statusResult = session.result;
-        statusKey = '';
+        statusReadout.clear();
         const kind = session.result.kind;
         const table = classificationTable(session.result, {
           points: kind === 'race',
@@ -1443,18 +1462,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   }
   function showRaceStatusLines(): void {
     const { lines, player } = raceStatusLines();
-    const key = lines.join('\n');
-    if (key !== statusKey) {
-      statusKey = key;
-      raceStatus.replaceChildren(
-        ...lines.map((text, i) => {
-          const div = document.createElement('div');
-          div.className = i === 0 && lines.length > 1 ? 'race-status__head' : 'race-status__row';
-          if (i === player) div.classList.add('is-player');
-          div.textContent = text;
-          return div;
-        }),
-      );
+    if (statusReadout.rows(lines, player)) {
       // Into view once per standings (when the player's row moves), not against the reader's
       // own scrolling every rebuild.
       if (player > 0 && player !== statusPlayer) {
@@ -1918,6 +1926,15 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
         h.lap =
           totalLaps !== null ? Math.max(1, Math.min(timer.lap, totalLaps)) : Math.max(1, timer.lap);
         h.valid = true;
+        h.last = timer.lastLap;
+        h.lastClass =
+          timer.lastLap === null
+            ? null
+            : timer.record.lap !== null && timer.lastLap <= timer.record.lap
+              ? 'overall'
+              : timer.bestLap !== null && timer.lastLap <= timer.bestLap
+                ? 'personal'
+                : 'slower';
         h.record = null;
         h.liveDelta = null;
         h.ghost = false;
@@ -1933,19 +1950,28 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
           }
         }
       }
-      if (session.quickRace && t.tyreCompound >= 0) {
-        const c = COMPOUNDS[t.tyreCompound]!;
+      if (t.tyreCompound >= 0 || !session.quickRace) {
+        const c = COMPOUNDS[t.tyreCompound >= 0 ? t.tyreCompound : 0]!;
         hudTyres.compound = c.id;
         hudTyres.low = c.windowLow;
         hudTyres.high = c.windowHigh;
-        (hudTyres.temp as Float64Array).set(t.tyreTemp);
-        (hudTyres.wear as Float64Array).set(t.tyreWear);
+        if (t.tyreCompound >= 0) {
+          (hudTyres.temp as Float64Array).set(t.tyreTemp);
+          (hudTyres.wear as Float64Array).set(t.tyreWear);
+        } else {
+          // Time Trial uses new reference softs at the middle of their working window.
+          // Display that fixed state without enabling tyre evolution or changing record physics.
+          (hudTyres.temp as Float64Array).fill((c.windowLow + c.windowHigh) / 2);
+          (hudTyres.wear as Float64Array).fill(0);
+        }
         h.tyres = hudTyres;
       } else h.tyres = null;
       h.fuel = session.quickRace ? t.fuelMass : null;
       h.message = notices.current;
       if (others) h.others = others;
       else if (session.quickRace) h.others = fleetDots;
+      h.tower = null;
+      ext?.updateHud?.(h, renderTime);
       hud.update(h);
     }
     overlay?.update();
@@ -1978,6 +2004,7 @@ export async function startDrive(o: DriveOptions): Promise<DriveHandle> {
   ext?.attach?.({
     session,
     loop,
+    artefacts: ai?.artefacts ?? null,
     view: () => view,
     host: o.host,
     say: (m, seconds) => say(m, seconds),

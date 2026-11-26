@@ -360,6 +360,10 @@ body {
   font-stretch: var(--wdth-semi);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hud-tower__time {
@@ -2706,11 +2710,10 @@ html:has(.update-bar) .pause {
     left: auto;
     right: var(--safe-r);
   }
-  html[data-touch] .hud[data-mode='race'][data-pit-open] ~ .onboarding {
-    top: calc(100dvh - var(--safe-b) - 160px);
-    left: var(--safe-l);
-    right: auto;
-  }
+}
+/* Keep an active pit instruction clear of the steering area on touch screens. */
+html[data-touch] .hud[data-mode='race'][data-pit-open] ~ .onboarding {
+  display: none;
 }
 @media (orientation: portrait) and (max-width: 600px) {
   .pause__card {

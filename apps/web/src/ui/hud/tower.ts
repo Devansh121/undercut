@@ -1,3 +1,4 @@
+import { lapsText, pitStopsText } from '../../game/format';
 /**
  * The timing tower (top left of the HUD), broadcast style: a lap counter, the flag state,
  * optional race column header with gap/interval toggle, one row per car (position, team bar,
@@ -293,20 +294,22 @@ export class TimingTower {
         n.compound.style.setProperty('--compound', c.colour);
       }
     }
-    const showAge = c !== null && r.tyreAge !== undefined && r.tyreAge !== null;
+    const age = r.tyreAge;
+    const showAge = c !== null && age !== undefined && age !== null;
     setHidden(n.tyreAgeEl, !showAge);
-    if (showAge && r.tyreAge !== n.tyreAgeVal) {
-      n.tyreAgeVal = r.tyreAge ?? null;
-      n.tyreAge.set(String(r.tyreAge));
-      n.tyreAgeEl.setAttribute('aria-label', `${r.tyreAge} laps on tyres`);
+    if (showAge && age !== n.tyreAgeVal) {
+      n.tyreAgeVal = age;
+      n.tyreAge.set(String(age));
+      n.tyreAgeEl.setAttribute('aria-label', `${lapsText(age)} on tyres`);
     }
 
-    const showPits = r.pitStops !== undefined && r.pitStops !== null;
+    const stops = r.pitStops;
+    const showPits = stops !== undefined && stops !== null;
     setHidden(n.pitsEl, !showPits);
-    if (showPits && r.pitStops !== n.pitStopsVal) {
-      n.pitStopsVal = r.pitStops ?? null;
-      n.pits.set(String(r.pitStops));
-      n.pitsEl.setAttribute('aria-label', `${r.pitStops} pit stops`);
+    if (showPits && stops !== n.pitStopsVal) {
+      n.pitStopsVal = stops;
+      n.pits.set(String(stops));
+      n.pitsEl.setAttribute('aria-label', pitStopsText(stops));
     }
   }
 

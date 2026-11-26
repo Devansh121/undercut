@@ -14,6 +14,7 @@ import {
   type HostMessage,
   type LapMessage,
   type LimitsWarningMessage,
+  type OrderMessage,
   type PenaltyMessage,
   type PitEvent,
   type PitRelayMessage,
@@ -58,6 +59,7 @@ export interface RoomClientEvents {
   limits: LimitsWarningMessage;
   pit: PitRelayMessage;
   host: HostMessage;
+  order: OrderMessage;
   results: ResultsMessage;
   error: ErrorMessage;
   snapshots: DownFrame;
@@ -113,6 +115,7 @@ export class RoomClient {
   private pingId = 0;
   private readonly pingsSent = new Map<number, number>();
   private queue: string[] = [];
+  private readonly orders: OrderMessage[] = [];
   private leaving = false;
 
   constructor(private readonly options: RoomClientOptions) {
@@ -197,6 +200,14 @@ export class RoomClient {
   /** Local time at which a server time occurs (for the start lights). */
   localTimeOf(serverTime: number): number | null {
     return this.clock.localTime(serverTime);
+  }
+
+  /** Latest service-published running order whose activation time has been reached. */
+  orderAt(serverNow: number): OrderMessage | null {
+    for (let i = this.orders.length - 1; i >= 0; i--) {
+      if (this.orders[i]!.at <= serverNow) return this.orders[i]!;
+    }
+    return null;
   }
 
   // ---- Connection --------------------------------------------------------------
@@ -296,6 +307,7 @@ export class RoomClient {
   private onMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case 'welcome':
+        this.orders.length = 0;
         this.welcomeMsg = msg;
         this.token = msg.resume;
         this.backoff.reset();
@@ -328,6 +340,14 @@ export class RoomClient {
         if (msg.member === this.me) for (const a of msg.ai) this.remoteCars.remove(a.seat);
         this.emit('host', msg);
         return;
+      case 'order': {
+        let i = this.orders.length;
+        while (i > 0 && this.orders[i - 1]!.at > msg.at) i--;
+        this.orders.splice(i, 0, msg);
+        if (this.orders.length > 32) this.orders.shift();
+        this.emit('order', msg);
+        return;
+      }
       case 'error':
         this.lastError = msg;
         this.emit('error', msg);
@@ -356,6 +376,7 @@ export class RoomClient {
     if (phaseChanged && (room.phase === 'lobby' || room.phase === 'grid')) {
       this.remoteCars.clear();
       this.scheduler.reset();
+      this.orders.length = 0;
     }
     this.emit('room', room);
   }

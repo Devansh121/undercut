@@ -59,6 +59,8 @@ export const CAR_FLAG = {
   limiter: 8,
   ersDeploy: 16,
   retired: 32,
+  /** No contact while a stopped AI recovers; retirement has the same physical treatment. */
+  ghost: 32,
 } as const;
 
 /** Bits of the flags byte that carry CAR_FLAG; the top two carry `resets`. */

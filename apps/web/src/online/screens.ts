@@ -1,5 +1,9 @@
+import { MAX_CARS } from '@undercut/protocol';
+import { lapsText } from '../game/format';
 import { el } from '../ui/dom';
+import { ONLINE_CIRCUITS, onlineCircuit } from './circuits';
 import { displayCode, inviteLink, networkOrigin } from './invite';
+import { onlineDriverName } from './race-rules';
 import type { OnlineSession } from './session';
 
 /** Room screens share the game's typography and buttons; all data comes from the session. */
@@ -121,10 +125,10 @@ export class RoomScreens {
             el(
               'li',
               '',
-              r.name +
+              onlineDriverName(r.name, r.aiIndex, r.seat) +
                 ' · ' +
-                r.laps +
-                ' laps · ' +
+                lapsText(r.laps) +
+                ' · ' +
                 r.status +
                 ' · ' +
                 (r.timeMs === null ? '—' : (r.timeMs / 1000).toFixed(3) + ' s'),
@@ -139,6 +143,26 @@ export class RoomScreens {
           );
         else content.append(el('p', '', 'Waiting for the host to choose rematch'));
       } else {
+        const currentCircuit = onlineCircuit(s.room.settings.circuit.id);
+        const circuitRow = el('div', 'pause__setting online-circuit');
+        circuitRow.append(el('span', 'pause__key', 'Circuit'));
+        const circuitChoices = el('div', 'seg');
+        circuitChoices.setAttribute('role', 'radiogroup');
+        circuitChoices.setAttribute('aria-label', 'Circuit');
+        for (const c of ONLINE_CIRCUITS) {
+          const b = el('button', 'seg__opt', c.name);
+          b.type = 'button';
+          b.id = 'online-circuit-' + c.id;
+          b.setAttribute('role', 'radio');
+          const selected = currentCircuit.id === c.id;
+          b.setAttribute('aria-checked', String(selected));
+          b.classList.toggle('is-on', selected);
+          b.disabled = !s.isHost || s.stage !== 'lobby';
+          b.onclick = () => this.session.setCircuit(c.id);
+          circuitChoices.append(b);
+        }
+        circuitRow.append(circuitChoices);
+
         const laps = field('Laps', String(s.room.settings.laps), (v) =>
           this.session.setLaps(Number(v)),
         );
@@ -147,9 +171,31 @@ export class RoomScreens {
         i.min = '1';
         i.max = '99';
         i.disabled = !s.isHost || s.stage !== 'lobby';
+
+        const maxAi = Math.max(0, MAX_CARS - s.members.length);
+        const aiCount = Math.min(maxAi, s.room.settings.aiCount);
+        const aiField = field('AI cars', String(aiCount), (v) =>
+          this.session.setAiCount(Number(v)),
+        );
+        const aiInput = aiField.querySelector('input')!;
+        aiInput.type = 'number';
+        aiInput.min = '0';
+        aiInput.max = String(maxAi);
+        aiInput.disabled = !s.isHost || s.stage !== 'lobby';
+        const fillBtn = button(
+          aiCount === maxAi && maxAi > 0 ? 'Clear AI' : 'Fill grid',
+          () => this.session.setAiCount(aiCount === maxAi ? 0 : maxAi),
+          !s.isHost || s.stage !== 'lobby' || maxAi === 0,
+        );
+        fillBtn.id = 'online-ai-fill';
+
+        const aiText = aiCount > 0 ? `AI fill: ${aiCount}` : 'AI fill off';
         content.append(
-          el('p', '', 'Monza · Equal cars · Team assigned by seat · AI fill off'),
+          el('p', '', `${currentCircuit.name} · Equal cars · Team assigned by seat · ${aiText}`),
+          circuitRow,
           laps,
+          aiField,
+          fillBtn,
         );
         for (const key of Object.keys(
           s.room.settings.assists,

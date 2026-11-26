@@ -3,7 +3,7 @@ import type { OnlineState } from '../../apps/web/src/online/session';
 declare global {
   /** The debug API the drive tests use (apps/web/src/debug.ts), typed loosely for tests. */
   interface UndercutDebugApi {
-    online(): {
+    online(includeTrace?: boolean): {
       state: OnlineState | null;
       race: {
         released: boolean;
@@ -11,14 +11,39 @@ declare global {
         releasedSimEpoch: number | null;
         releasedServerAt: number | null;
         elapsedRaceMs: number;
+        lapTimeSec: number;
+        circuit: string;
+        order: number[];
+        orderEpoch: number | null;
+        position: number | null;
+        pose: { x: number; y: number; z: number; yaw: number };
+        contacts: { count: number; maxSpeed: number; maxImpulse: number };
+        trace: {
+          t: number;
+          x: number;
+          y: number;
+          z: number;
+          yaw: number;
+          s: number;
+          d: number;
+          aboveRoad: number;
+          cx: number;
+          cz: number;
+          fx: number;
+          fz: number;
+          halfLength: number;
+          halfWidth: number;
+          contacts: number;
+        }[];
         start: { lightsOutAt: number } | null;
         lightsOutLocalEpoch: number | null;
         clockErrorMs: number | null;
-        remote: unknown[];
+        remote: { seat: number; x: number; z: number; opacity: number; mode: string }[];
         claims: unknown[];
         timing: { status: string }[];
       } | null;
     };
+    onlineOrder(serverTime: number): { at: number; order: number[]; position: number } | null;
     onlineSettings(patch: Record<string, unknown>): boolean;
     /** The race view (render package), for scene checks. */
     view(): unknown;

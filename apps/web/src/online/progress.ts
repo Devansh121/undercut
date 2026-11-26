@@ -54,6 +54,11 @@ export class LineCounter {
     return this.lapsValue;
   }
 
+  /** True while the car still owes a timing-line crossing (e.g. started behind the line). */
+  get behindLine(): boolean {
+    return this.debt > 0;
+  }
+
   /** Laps already counted (a resumed seat). */
   setLaps(laps: number): void {
     this.lapsValue = Math.max(0, Math.floor(laps));

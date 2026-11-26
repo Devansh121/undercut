@@ -112,6 +112,8 @@ export interface Results {
 }
 
 export interface AiHandover {
+  /** Still owes the grid's initial timing-line crossing (older servers omit this). */
+  behindLine?: boolean;
   seat: number;
   aiIndex: number;
   /** Laps counted and race time so far. */
@@ -281,6 +283,15 @@ export interface HostMessage {
   /** AI cars the new host now drives, with their last known state. */
   ai: AiHandover[];
 }
+export interface OrderMessage {
+  type: 'order';
+  /** Server time at which clients activate this order so every browser flips together. */
+  at: number;
+  /** Authoritative running order of every seat on the grid (leader first). */
+  order: number[];
+  /** Continuous race distance from the timing line per seat in `order` order, m. */
+  progress: number[];
+}
 export interface ResultsMessage {
   type: 'results';
   results: Results;
@@ -301,6 +312,7 @@ export type ServerMessage =
   | LimitsWarningMessage
   | PitRelayMessage
   | HostMessage
+  | OrderMessage
   | ResultsMessage
   | ErrorMessage;
 
@@ -434,6 +446,7 @@ const SERVER_TYPES: ReadonlySet<string> = new Set<ServerMessageType>([
   'limits',
   'pit',
   'host',
+  'order',
   'results',
   'error',
 ]);

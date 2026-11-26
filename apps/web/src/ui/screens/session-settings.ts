@@ -1,3 +1,4 @@
+import { lapsText } from '../../game/format';
 /**
  * The session settings a mode offers, as rows of kit controls bound to the menu prefs. Built
  * once per container (the inline card on desktop, the dialog on a phone); `sync` re-reads the
@@ -97,7 +98,7 @@ export class SettingsPanel {
       const laps = segmented({
         label: 'Race distance',
         id: 'raceLaps',
-        choices: [5, 15, circuit.raceLaps].map((n) => ({ value: n, label: `${n} laps` })),
+        choices: [5, 15, circuit.raceLaps].map((n) => ({ value: n, label: lapsText(n) })),
         value: prefs.get().race.laps,
         onChange: (v) => {
           prefs.update((p) => {
@@ -126,6 +127,7 @@ export class SettingsPanel {
         settingRow('Automatic pit limiter', limiter.root),
       ];
       for (const row of raceRows) row.classList.add('race-setting');
+      raceRows[0]!.classList.add('race-distance-setting');
       rows.push(...raceRows);
     }
 
@@ -198,10 +200,12 @@ export class SettingsPanel {
     this.syncers.push(() => {
       for (const [c, v] of controls) c.set(v());
     });
+    const stabilityRow = settingRow(S.setup.stability, stability.root);
+    stabilityRow.classList.add('stability-setting');
     rows.push(
       settingRow(S.setup.tractionControl, tc.root),
       settingRow(S.setup.abs, abs.root),
-      settingRow(S.setup.stability, stability.root),
+      stabilityRow,
       settingRow(S.setup.braking, braking.root, brakingHelp ? undefined : S.setup.brakingNoLine),
       settingRow(S.setup.gears, gears.root),
       settingRow(
