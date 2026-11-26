@@ -268,7 +268,7 @@ export class Environment {
     this.dome.frustumCulled = false;
     this.dome.renderOrder = -1000;
     this.dome.onBeforeRender = (_r, _s, cam) => {
-      this.dome.position.copy(cam.position);
+      cam.getWorldPosition(this.dome.position);
       this.dome.updateMatrixWorld();
     };
     scene.add(this.dome);
@@ -346,7 +346,7 @@ export class Environment {
     const dome = new Mesh(this.dome.geometry, this.dome.material);
     dome.frustumCulled = false;
     dome.onBeforeRender = (_r, _s, cam) => {
-      dome.position.copy(cam.position);
+      cam.getWorldPosition(dome.position);
       dome.updateMatrixWorld();
     };
     scene.add(dome);

@@ -123,6 +123,7 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 
 ## Decided for you
 
+- Cockpit mirror review: fit the single live target to the shipped glass's reflected ray bounds, with 3 cm eye travel and an 8 % capture border. Keep the existing target size and cadence; Mobile skips fitting and still allocates no target. Position both sky-dome callbacks at the camera's world position.
 - Cockpit mirrors: one rear-view camera above the driver's eye on the centreline serves both mirrors, rather than one per mirror, so the cost is one small render every third frame. It sees past the car's own bodywork, a little more centrally than a real wing mirror would; at the glass's size that does not read. Medium uses the static reflection like Mobile, because the brief asks for the live one on High and above.
 - The mirror glass was culled from the driver's eye (the asset winds it facing forward), and that, not the material, was the flat grey: the road showed through the housing. The new material draws both sides, and the car's Mobile level keeps the glass as its own material (one more draw call, 26) so the phone gets the static reflection too.
 - The gloves' and arms' extra triangles are paid for by the brake-duct drums and scoops behind the rims (28 → 22 and 12 → 8 segments), not by raising the car's triangle budgets.

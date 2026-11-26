@@ -4,11 +4,15 @@ import {
   HalfFloatType,
   LinearFilter,
   Matrix3,
+  Matrix4,
+  Mesh,
   type Object3D,
   PerspectiveCamera,
   type Scene,
   ShaderMaterial,
   Vector2,
+  Vector3,
+  Vector4,
   WebGLRenderTarget,
   type WebGLRenderer,
 } from 'three';
@@ -23,8 +27,9 @@ export const MIRROR_VIEW = Object.freeze({
   /** Offset from the cockpit eye, m. */
   back: 0.1,
   up: 0.12,
-  /** Vertical field of view, degrees; the horizontal follows the target's aspect. */
-  fovDeg: 34,
+  /** Fit for the cockpit's damped head travel, plus a border outside the glass lookup. */
+  headTravel: 0.03,
+  border: 0.08,
   /** Near plane past the headrest, m; far plane, m. */
   near: 0.35,
   far: 350,
@@ -47,7 +52,7 @@ const FRAGMENT = /* glsl */ `
 uniform sampler2D tMirror;
 uniform float uLive;
 uniform mat3 uMirrorView;
-uniform vec2 uMirrorProj;
+uniform vec4 uMirrorProj;
 uniform vec3 uTint;
 uniform sampler2D tSky;
 uniform float skyScale;
@@ -75,7 +80,7 @@ void main() {
   if (uLive > 0.5) {
     vec3 v = uMirrorView * r;
     if (v.z < -0.05) {
-      vec2 uv = uMirrorProj * v.xy / -v.z * 0.5 + 0.5;
+      vec2 uv = (uMirrorProj.xy * v.xy / -v.z + uMirrorProj.zw) * 0.5 + 0.5;
       vec2 e = min(uv, 1.0 - uv);
       float inside = smoothstep(0.0, 0.03, min(e.x, e.y));
       col = mix(col, texture2D(tMirror, clamp(uv, 0.0, 1.0)).rgb, inside);
@@ -95,7 +100,7 @@ void main() {
  */
 export class CockpitMirrors {
   readonly material: ShaderMaterial;
-  readonly camera = new PerspectiveCamera(MIRROR_VIEW.fovDeg, 1, MIRROR_VIEW.near, MIRROR_VIEW.far);
+  readonly camera = new PerspectiveCamera(90, 1, MIRROR_VIEW.near, MIRROR_VIEW.far);
   private readonly target: WebGLRenderTarget | null = null;
   private readonly every: number;
   private countdown = 0;
@@ -127,6 +132,7 @@ export class CockpitMirrors {
     this.camera.rotation.set(0, Math.PI / 2, 0);
     this.camera.updateProjectionMatrix();
     body.add(this.camera);
+    if (this.target) this.fitProjection(body, eye);
     const p = this.camera.projectionMatrix.elements;
     this.material = new ShaderMaterial({
       name: 'mirror_glass',
@@ -136,7 +142,7 @@ export class CockpitMirrors {
         tMirror: { value: this.target?.texture ?? null },
         uLive: { value: 0 },
         uMirrorView: { value: this.rot },
-        uMirrorProj: { value: new Vector2(p[0], p[5]) },
+        uMirrorProj: { value: new Vector4(p[0], p[5], -(p[8] ?? 0), -(p[9] ?? 0)) },
         uTint: { value: new Color(...MIRROR_TINT) },
         tSky: sky.tSky as { value: unknown },
         skyScale: sky.skyScale as { value: unknown },
@@ -154,6 +160,68 @@ export class CockpitMirrors {
     this.material.userData.surfaceUniforms = this.target
       ? { tMirror: this.material.uniforms.tMirror }
       : {};
+  }
+
+  /**
+   * Bound the actual glass's reflected rays in the rear camera, in body space. The texture's
+   * aspect is a pixel budget, not the optical field of view: these independent, off-centre
+   * bounds include both mirrors without wasting most of the image above/below the glass.
+   * Done once, and only for live mirrors; the car's rigid world pose cannot change the bounds.
+   */
+  private fitProjection(body: Object3D, eye: { x: number; y: number; z: number }): void {
+    body.updateWorldMatrix(true, true);
+    const worldToBody = body.matrixWorld.clone().invert();
+    const toBody = new Matrix4();
+    const normalToBody = new Matrix3();
+    const toView = new Matrix3().setFromMatrix4(this.camera.matrix.clone().invert());
+    const point = new Vector3();
+    const normal = new Vector3();
+    const ray = new Vector3();
+    const head = new Vector3();
+    let left = Infinity;
+    let right = -Infinity;
+    let bottom = Infinity;
+    let top = -Infinity;
+    body.traverse((object) => {
+      if (!(object instanceof Mesh) || Array.isArray(object.material)) return;
+      if (object.material.name !== 'mirror_glass') return;
+      toBody.multiplyMatrices(worldToBody, object.matrixWorld);
+      normalToBody.getNormalMatrix(toBody);
+      const positions = object.geometry.getAttribute('position');
+      const normals = object.geometry.getAttribute('normal');
+      for (let i = 0; i < positions.count; i++) {
+        point.fromBufferAttribute(positions, i).applyMatrix4(toBody);
+        normal.fromBufferAttribute(normals, i).applyMatrix3(normalToBody).normalize();
+        for (const x of [-1, 1])
+          for (const y of [-1, 1])
+            for (const z of [-1, 1]) {
+              head.set(
+                eye.x + x * MIRROR_VIEW.headTravel,
+                eye.y + y * MIRROR_VIEW.headTravel,
+                eye.z + z * MIRROR_VIEW.headTravel,
+              );
+              ray.copy(point).sub(head).normalize().reflect(normal).applyMatrix3(toView);
+              if (ray.z >= -0.05) continue;
+              left = Math.min(left, ray.x / -ray.z);
+              right = Math.max(right, ray.x / -ray.z);
+              bottom = Math.min(bottom, ray.y / -ray.z);
+              top = Math.max(top, ray.y / -ray.z);
+            }
+      }
+    });
+    if (!(right > left && top > bottom)) return;
+    const dx = (right - left) * MIRROR_VIEW.border;
+    const dy = (top - bottom) * MIRROR_VIEW.border;
+    const n = this.camera.near;
+    this.camera.projectionMatrix.makePerspective(
+      (left - dx) * n,
+      (right + dx) * n,
+      (top + dy) * n,
+      (bottom - dy) * n,
+      n,
+      this.camera.far,
+    );
+    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
   }
 
   /** Whether this preset renders the rear view (false: the static reflection only). */
