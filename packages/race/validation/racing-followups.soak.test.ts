@@ -31,8 +31,7 @@ describe('five laps, seed 17', () => {
       expectQuickRace(run, 5);
       expect(Math.max(...run.cars.map((c) => c.maxContactSpeed))).toBeLessThan(3);
     });
-    // Open gap (docs/STATUS.md): no on-track pass in a Quick Race without stops.
-    it.fails(`${circuit}: a faster car passes on track`, () => {
+    it(`${circuit}: a faster car passes on track`, () => {
       expect(race(circuit).racing.overtakes).toBeGreaterThan(0);
     });
   }

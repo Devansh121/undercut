@@ -1,4 +1,9 @@
-import { createAiField, type SessionResult, type AiController } from '@undercut/race';
+import {
+  QUICK_RACE_GRID_NOISE,
+  createAiField,
+  type SessionResult,
+  type AiController,
+} from '@undercut/race';
 import { decodeEnvelope, decodeRacingLine, racingLineOffsets } from '@undercut/ai';
 import monzaLine from '../../../../packages/ai/data/monza-low.line.json';
 import monzaEnvelope from '../../../../packages/ai/data/monza-low.envelope.json';
@@ -266,7 +271,7 @@ export class DriveSession {
             params: this.params,
             line,
             // Pace shuffled against the grid, as qualifying would leave it: cars have to pass.
-            gridNoise: options.quickRace?.gridNoise ?? 0.5,
+            gridNoise: options.quickRace?.gridNoise ?? QUICK_RACE_GRID_NOISE,
             envelope: decodeEnvelope(artefacts.envelope),
             count: this.quickRace ? 20 : 1,
             seed: options.seed,

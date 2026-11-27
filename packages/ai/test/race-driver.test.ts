@@ -62,10 +62,10 @@ function lineD(dr: RaceDriver, s: number): number {
 }
 
 /** Telemetry of a car at lap (s, d) moving at `v` along the lap. */
-function at(s: number, d: number, v: number, yawOffset = 0, gear = 6): CarTelemetry {
+function at(s: number, d: number, v: number, yawOffset = 0, gear = 6, on = track): CarTelemetry {
   const t = createCarTelemetry();
-  const p = track.pointAt(track.wrap(s), d, createVec3());
-  const tan = track.tangentAt(track.wrap(s), createVec3());
+  const p = on.pointAt(on.wrap(s), d, createVec3());
+  const tan = on.tangentAt(on.wrap(s), createVec3());
   t.x = p.x;
   t.z = p.z;
   t.yaw = Math.atan2(-tan.z, tan.x) + yawOffset;
@@ -99,7 +99,7 @@ function view(self: Car, others: Car[], o: Partial<TrafficView> = {}): TrafficVi
 function tick(dr: RaceDriver, self: Car, others: Car[], o: Partial<TrafficView> = {}) {
   const out: ControlInput = { ...NEUTRAL_INPUT };
   dr.sense(view(self, others, o));
-  dr.drive(at(self.s, self.d, self.speed), DT, out);
+  dr.drive(at(self.s, self.d, self.speed, 0, 6, dr.plan.track), DT, out);
   return out;
 }
 
@@ -803,6 +803,31 @@ describe('race driver: a pit entrant beyond the car being passed', () => {
     expect(attempt(false)).toBe(1);
     expect(attempt(true)).toBe(-1);
   });
+
+  it('races on behind an entrant far up the road, which is in the lane before it is reached', () => {
+    const dr = driver();
+    const me = { id: 0, s: 100, d: lineD(dr, 100), speed: 80 };
+    const leader = { id: 1, s: 125, d: lineD(dr, 125), speed: 70 };
+    const entrant = { id: 2, s: 500, d: lineD(dr, 500) + 4, speed: 40, pitApproach: true };
+    for (let k = 0; k < 240; k++) tick(dr, me, [leader, entrant]);
+    expect(dr.snapshot().passId).toBe(1);
+  });
+
+  it('keeps the mirror check while an entrant ahead slows for the lane', () => {
+    const hold = (entrant: boolean) => {
+      const dr = driver({ aggression: 0.6 });
+      dr['wasActive'] = true;
+      dr['o'] = 3;
+      const me = { id: 0, s: 100, d: lineD(dr, 100) + 3, speed: 20 };
+      const rear = { id: 1, s: 86, d: lineD(dr, 100), speed: 35 };
+      const ahead = { id: 2, s: 250, d: lineD(dr, 250) + 4, speed: 15, pitApproach: true };
+      for (let k = 0; k < 240; k++)
+        tick(dr, me, entrant ? [rear, ahead] : [rear], { launching: false });
+      return dr.snapshot().o as number;
+    };
+    expect(hold(false)).toBeGreaterThan(2.5);
+    expect(hold(true)).toBeGreaterThan(2.5);
+  });
 });
 
 describe('race driver: yielding before a narrowing road', () => {
@@ -871,4 +896,175 @@ describe('race driver: room while the bodies overlap under braking', () => {
     expect(dr.last.yielding).toBe(true);
     expect(dr.last.target + ld).toBeGreaterThanOrEqual(me.d - 0.1);
   });
+});
+
+describe('race driver: small errors', () => {
+  function lapAlone(openingLap: boolean, consistency: number, laps = 2) {
+    const dr = createRaceDriver({
+      track,
+      line,
+      envelope,
+      params,
+      skill: { ...DEFAULT_RACE_SKILL, consistency, senseNoise: 0, seed: 3 },
+    });
+    dr['wasActive'] = true;
+    let s = 0;
+    let limited = 0;
+    const step = 40 * DT;
+    for (let k = 0; s < laps * track.length; k++) {
+      const out: ControlInput = { ...NEUTRAL_INPUT };
+      const me = { id: 0, s, d: lineD(dr, s) + dr['o'], speed: 40 };
+      dr.sense(view(me, [], { openingLap }));
+      dr.drive(at(s, me.d, me.speed), DT, out);
+      if (dr.mistakes.active !== null) limited++;
+      s += step;
+    }
+    return { count: dr.mistakes.count, limited, memory: dr.snapshot() };
+  }
+
+  it('makes none on the opening lap, and some from lap two for a rough driver', () => {
+    expect(lapAlone(true, 0.3).count).toBe(0);
+    const later = lapAlone(false, 0.3);
+    expect(later.count).toBeGreaterThan(0);
+    expect(later.limited).toBeGreaterThan(0);
+    expect(lapAlone(false, 1).count).toBe(0);
+  });
+
+  it.each(['hazard', 'overlap'])(
+    'cancels an ongoing error when %s avoidance takes priority',
+    (kind) => {
+      const dr = driver();
+      dr['wasActive'] = true;
+      const memory = {
+        ...dr.snapshot(),
+        'err.kind': 2,
+        'err.from': 0,
+        'err.to': 1000,
+        'err.severity': 0.5,
+      };
+      dr.restore(memory);
+      const me = { id: 0, s: STRAIGHT, d: lineD(dr, STRAIGHT), speed: 40 };
+      tick(dr, me, [], { openingLap: false });
+      expect(dr.mistakes.active).not.toBeNull();
+      const other =
+        kind === 'hazard'
+          ? { id: 1, s: STRAIGHT + 200, d: me.d, speed: 0 }
+          : { id: 1, s: STRAIGHT + 1, d: me.d + SIDE_BY_SIDE + 0.2, speed: 40 };
+      tick(dr, me, [other], { openingLap: false });
+      expect(dr.mistakes.active).toBeNull();
+    },
+  );
+
+  it('keeps its errors in the driver memory', () => {
+    const { memory } = lapAlone(false, 0.3, 1);
+    expect(Array.isArray(memory['err.rng'])).toBe(true);
+    const dr = driver({ consistency: 0.3, seed: 3 });
+    dr.restore(memory);
+    expect(dr.mistakes.count).toBe(memory['err.count']);
+  });
+
+  it('makes none beside another car', () => {
+    const dr = driver({ consistency: 0.1, seed: 3 });
+    dr['wasActive'] = true;
+    for (let s = 0; s < track.length; s += 40 * DT) {
+      const me = { id: 0, s, d: lineD(dr, s), speed: 40 };
+      const beside = { id: 1, s: s + 1, d: lineD(dr, s) + SIDE_BY_SIDE + 0.2, speed: 40 };
+      tick(dr, me, [beside], { openingLap: false });
+    }
+    expect(dr.mistakes.count).toBe(0);
+  });
+});
+
+describe('race driver: a move given up under braking', () => {
+  function giveUp(openingLap: boolean, hazard = false) {
+    const dr = driver();
+    const s = 470;
+    const me = { id: 0, s, d: lineD(dr, s) - 4, speed: 70 };
+    const ahead = { id: 1, s: s + 25, d: lineD(dr, s + 25), speed: 60 };
+    dr['wasActive'] = true;
+    dr['heldTime'] = 5;
+    dr['passId'] = 1;
+    dr['passSide'] = -1;
+    dr['o'] = -4;
+    const others = hazard ? [ahead, { id: 2, s: s + 200, d: 0, speed: 0 }] : [ahead];
+    tick(dr, me, others, { openingLap });
+    return dr;
+  }
+
+  it('keeps its lane on the road through the corner from lap two', () => {
+    const later = giveUp(false);
+    expect(later.last.passing).toBe(-1);
+    expect(Math.abs(later.last.target + 4)).toBeLessThan(0.5);
+    // On lap one it heads back toward the line.
+    expect(giveUp(true).last.target).toBeGreaterThan(later.last.target + 0.5);
+  });
+
+  it('keeps the abandoned lane when a crawling hazard cancels racing through the corner', () => {
+    const dr = giveUp(false, true);
+    expect(dr.last.passing).toBe(-1);
+    expect(dr['abandonHold']).toBe(true);
+    expect(Math.abs(dr.last.target + 4)).toBeLessThan(0.5);
+  });
+});
+
+describe('race driver: a racing line past the white line', () => {
+  it('keeps the car within 0.3 m of the white line from lap two, and drives the line on lap one', () => {
+    const circuit = SINGAPORE.track();
+    const offset = (openingLap: boolean) => {
+      const dr = createRaceDriver({
+        track: circuit,
+        line: loadLine(SINGAPORE),
+        envelope: loadEnvelope(SINGAPORE),
+        params: createCarParams(SINGAPORE.trim),
+        skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
+      });
+      const s = 2850;
+      const ld = dr['at'](dr.plan.line.d, s) as number;
+      dr['wasActive'] = true;
+      const v = createTrafficView(0);
+      Object.assign(v.self, { id: 0, s, d: ld, speed: 50 });
+      v.active = true;
+      v.openingLap = openingLap;
+      dr.sense(v);
+      const tel = createCarTelemetry();
+      const p = circuit.pointAt(s, ld, createVec3());
+      const tangent = circuit.tangentAt(s, createVec3());
+      Object.assign(tel, { x: p.x, z: p.z, yaw: Math.atan2(-tangent.z, tangent.x), speed: 50 });
+      dr.drive(tel, DT, { ...NEUTRAL_INPUT });
+      return { o: dr.last.offset, line: ld, edge: -(dr['at'](circuit.halfWidth[1], s) as number) };
+    };
+    const later = offset(false);
+    // The line runs the car's centre 0.67 m past the right-hand white line here.
+    expect(later.line).toBeLessThan(later.edge - 0.5);
+    expect(later.line + later.o).toBeGreaterThanOrEqual(later.edge - 0.3 - 1e-6);
+    expect(Math.abs(offset(true).o)).toBeLessThan(0.05);
+  });
+});
+
+describe('race driver: a road bound beside overlapping traffic', () => {
+  it.each([
+    { pace: 1, hazard: false },
+    { pace: 0.6, hazard: false },
+    { pace: 1, hazard: true },
+  ])(
+    'keeps the actual lane beside a car at pace $pace with hazard $hazard when road bounds squeeze it',
+    ({ pace, hazard }) => {
+      const dr = createRaceDriver({
+        track: SPA.track(),
+        line: loadLine(SPA),
+        envelope: loadEnvelope(SPA),
+        params: createCarParams(SPA.trim),
+        skill: { ...DEFAULT_RACE_SKILL, consistency: 1, senseNoise: 0 },
+      });
+      const me = { id: 17, s: 902.2, d: -1.66, speed: 84 };
+      const rear = { id: 18, s: 900.5, d: 1.32, speed: 79.9 };
+      dr['aheadPaceId'] = 18;
+      dr['aheadPace'] = pace;
+      dr['wasActive'] = true;
+      const others = hazard ? [rear, { id: 19, s: me.s + 200, d: 0, speed: 0 }] : [rear];
+      tick(dr, me, others, { openingLap: false });
+      const lane = dr['at'](dr.plan.line.d, me.s) + dr.last.target;
+      expect(lane).toBeLessThanOrEqual(me.d + 0.1);
+    },
+  );
 });

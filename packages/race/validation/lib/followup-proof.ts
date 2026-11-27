@@ -1,5 +1,6 @@
 import { circuitInfo } from '../../src/circuit';
 import { raceStartFuel } from '../../src/rules';
+import { QUICK_RACE_GRID_NOISE } from '../../src/session/ai-field';
 import { RACE_CIRCUITS, runRace, type RaceCircuit, type RaceRun } from './runner';
 
 const fuel = new Map<RaceCircuit, number>();
@@ -14,7 +15,21 @@ export function runFollowupRace(circuit: RaceCircuit, seed: number, laps = 1): R
     startFuel = raceStartFuel(5, circuitInfo(RACE_CIRCUITS[circuit].track()).raceLaps);
     fuel.set(circuit, startFuel);
   }
-  return runRace({ circuit, cars: 20, laps, seed, pitLap: null, tyres: true, startFuel });
+  return runRace({
+    circuit,
+    cars: 20,
+    laps,
+    seed,
+    pitLap: null,
+    tyres: true,
+    startFuel,
+    gridNoise: QUICK_RACE_GRID_NOISE,
+  });
+}
+
+/** A race with the telemetry command's own settings: pit stops on, no tyre model, the default start fuel. */
+export function runDefaultRace(circuit: RaceCircuit, seed: number, laps = 5): RaceRun {
+  return runRace({ circuit, cars: 20, laps, seed });
 }
 
 /**

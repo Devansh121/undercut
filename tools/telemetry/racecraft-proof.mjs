@@ -57,13 +57,22 @@ fs.mkdirSync(path.dirname(path.resolve(options.out)), { recursive: true });
 for (const spec of cases) {
   if (
     rows.some(
-      (row) => row.circuit === spec.circuit && row.seed === spec.seed && row.laps === spec.laps,
+      (row) =>
+        row.circuit === spec.circuit &&
+        row.seed === spec.seed &&
+        row.laps === spec.laps &&
+        row.settings === spec.settings,
     )
   )
     continue;
   const row = {
     revision: options.label,
-    ...summarizeRace(spec, module.runFollowupRace(spec.circuit, spec.seed, spec.laps)),
+    ...summarizeRace(
+      spec,
+      spec.settings === 'default'
+        ? module.runDefaultRace(spec.circuit, spec.seed, spec.laps)
+        : module.runFollowupRace(spec.circuit, spec.seed, spec.laps),
+    ),
   };
   fs.appendFileSync(options.out, JSON.stringify(row) + '\n');
   rows.push(row);
