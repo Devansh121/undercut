@@ -189,33 +189,8 @@ const HEADWAY_STRAIGHT = [0.3, 0.15] as const;
 const HEADWAY_CORNER = [0.6, 0.35] as const;
 /** While attacking the car ahead, s: closer, and it brakes on its own plan, not on the other car's. */
 const HEADWAY_ATTACK = 0.12;
-/**
- * An attack on a straight from lap two stays in the other car's wake until this time gap, s
- * (`STANDSTILL_GAP` on top), or until the braking zone is `TOW_PULL_OUT_BEFORE` s off, then
- * pulls out; above `TOW_HOLD_FROM` m/s only (the tow's own range).
- */
-const TOW_PULL_OUT = 0.2;
-const TOW_PULL_OUT_BEFORE = 2;
-const TOW_HOLD_FROM = 35;
-/** The attack's following margins are relaxed in the wake until this long before the zone, s. */
-const TOW_RELAX_UNTIL = 1.5;
-/**
- * From lap two a move into a braking zone may be decided from up to this far behind an overlap,
- * m (a car's length), if the car would still be level by the turn-in with its lane clear.
- */
-const LATE_DIVE = CAR_LENGTH;
-/** From lap two, seconds before a move given up at a braking zone may start again. */
-const LATE_COOLDOWN = 1.5;
-/** From lap two, a move ends once the car being passed is this far ahead, m. */
-const DROPPED_BACK = 60;
-/** A later-lap move given up this long before a braking zone, s, or in it, holds its lane. */
+/** A move ending within this time before a braking zone holds its lane, s. */
 const ABANDON_HOLD_BEFORE = 2;
-/** From lap two, a move out of the wake that has not gained for this long is given up, s. */
-const PASS_STALL = 1.5;
-/** A car ahead cornering under this share of this car's plan is a car to press (`quicker`). */
-const PRESS_PACE = 0.997;
-/** Pressing a slower car from lap two: the most headway kept through corners, s. */
-const HEADWAY_PRESS = 0.2;
 /**
  * What a driver perceives of the other cars: how far ahead and behind (mirrors), m, and how late,
  * s (a car is seen where it was that long ago).
@@ -326,8 +301,6 @@ export class RaceDriver implements Driver {
   private passSide = 0;
   private passTime = 0;
   private passBlocked = 0;
-  /** A later-lap move out of the wake: time it has gone without gaining, s. */
-  private passStall = 0;
   /** A later-lap move given up in a braking zone or corner: hold the road lane through it. */
   private abandonHold = false;
   private cooldown = 0;
@@ -443,7 +416,6 @@ export class RaceDriver implements Driver {
     this.passSide = 0;
     this.passTime = 0;
     this.passBlocked = 0;
-    this.passStall = 0;
     this.abandonHold = false;
     this.cooldown = 0;
     this.heldTime = 0;
@@ -494,7 +466,6 @@ export class RaceDriver implements Driver {
     out.passSide = this.passSide;
     out.passTime = this.passTime;
     out.passBlocked = this.passBlocked;
-    out.passStall = this.passStall;
     out.abandonHold = this.abandonHold;
     out.cooldown = this.cooldown;
     out.heldTime = this.heldTime;
@@ -562,7 +533,6 @@ export class RaceDriver implements Driver {
     this.passSide = num('passSide');
     this.passTime = num('passTime');
     this.passBlocked = num('passBlocked');
-    this.passStall = typeof m.passStall === 'number' ? m.passStall : 0;
     this.abandonHold = m.abandonHold === true;
     this.cooldown = num('cooldown');
     this.heldTime = num('heldTime');
@@ -766,19 +736,7 @@ export class RaceDriver implements Driver {
     // is not already alongside (the field arrives there together).
     const opening = view.openingLap === true && !view.launching;
     const laterLap = view.openingLap === false && !view.launching;
-    // A car well off the corner pace uses the established slow-car passing rules. The
-    // competitive tow/press/dive policy is for cars racing at comparable pace, not avoidance.
-    let slowTraffic = false;
-    if (this.slowInCorners(this.aheadPaceId)) {
-      for (let k = 0; k < view.count; k++) {
-        const c = view.cars[k]!;
-        if (c.id !== this.aheadPaceId) continue;
-        const ds = this.ahead(s0, c.s);
-        slowTraffic = ds > -(CAR_LENGTH + 2) && ds < SEE_AHEAD;
-        break;
-      }
-    }
-    const later = laterLap && !this.hazard && !slowTraffic;
+    const later = laterLap && !this.hazard;
     const firstEnd = plan.track.corners[0]?.end ?? 0;
     const firstCorner =
       opening &&
@@ -1034,9 +992,6 @@ export class RaceDriver implements Driver {
     if (this.passId >= 0) {
       const lost =
         !passCar ||
-        // From lap two, a move that has dropped well back is over (its lane is not held
-        // against a car that far up the road).
-        (later && !this.passCommitted && !this.passBypass && passDs > DROPPED_BACK) ||
         (this.passTime > 15 && !this.passCommitted && !this.passBypass) ||
         this.passTime > 30;
       // Round a stopped car: over once it moves off again (it is traffic then, not an obstacle).
@@ -1061,23 +1016,14 @@ export class RaceDriver implements Driver {
         !this.passCommitted &&
         passCar !== null &&
         passDs >= 0.6 * CAR_LENGTH &&
-        // (From lap two, up to a length behind an overlap once out of the car's path.)
-        (passDs < OVERLAP ||
-          (later &&
-            passDs < OVERLAP + LATE_DIVE &&
-            Math.abs(passCar.d - ldHere - myO) >= CAR_WIDTH + PASS_CLEARANCE) ||
-          this.slowInCorners(passCar.id)) &&
+        (passDs < OVERLAP || this.slowInCorners(passCar.id)) &&
         this.heldTime > 1.5 - aggression
       ) {
         const lane =
           passCar.d -
           ldHere +
           this.passSide * (passSideBySide(v) + passCar.halfWidth - BODY_HALF_WIDTH);
-        // (From lap two only on the inside of the corner: round the outside of La Source the
-        // line runs to the edge, the lane closed, and the two cars met.)
-        const inside = this.cornerSign(s0, true);
         this.passCommitted =
-          (!later || inside === 0 || inside === this.passSide) &&
           this.laneClear(view, s0, lane, passCar.id) &&
           this.levelInTime(
             s0,
@@ -1118,9 +1064,7 @@ export class RaceDriver implements Driver {
         this.hazard && !this.passBypass && passCar !== null && passCar.speed >= HAZARD_SPEED;
       const notAlongside = firstCorner && !this.passBypass && passCar !== null && passDs >= OVERLAP;
       if (lost || done || late || blockedByOther || movedOff || yellow || notAlongside) {
-        // (From lap two a move given up before a braking zone may go again sooner after it.)
-        if (!done && !blockedByOther && !movedOff)
-          this.cooldown = this.passBypass ? 1 : later && late ? LATE_COOLDOWN : 3;
+        if (!done && !blockedByOther && !movedOff) this.cooldown = this.passBypass ? 1 : 3;
         // Given up off the line in or just before a braking zone from lap two: the car keeps its
         // lane on the road through the corner, as a committed move does. Swinging back to the
         // line under braking slid a car, its brakes eased, and it ran off the road at Monza's third chicane.
@@ -1139,41 +1083,15 @@ export class RaceDriver implements Driver {
         const sideBySide = this.passBypass ? BYPASS_SIDE_BY_SIDE : passSideBySide(v);
         base = od + this.passSide * (sideBySide + passCar!.halfWidth - BODY_HALF_WIDTH);
         const fits = this.passBypass || (this.passSide > 0 ? base <= oMax : base >= oMin);
-        // From lap two, on a straight and still well back: stay in the other car's wake, in its
-        // lane, and pull out once close (or with the braking zone two seconds off). Pulled out
-        // early, the tow is gone and the move dies with the straight.
-        // (Nor through a fast bend: a car swerving out at speed there runs out of front grip and
-        // lifts, and lost 15 m/s through Blanchimont.)
-        const curving =
-          Math.abs(this.at(line.curvature, s0)) > 0.5 * CORNER_CURVATURE ||
-          Math.abs(this.at(line.curvature, s0 + v)) > 0.5 * CORNER_CURVATURE;
-        const towHold =
-          later &&
-          !this.passCommitted &&
-          !this.passBypass &&
-          v > TOW_HOLD_FROM &&
-          (curving ||
-            (!cornering &&
-              passDs - CAR_LENGTH > STANDSTILL_GAP + v * TOW_PULL_OUT &&
-              toCorner > v * TOW_PULL_OUT_BEFORE));
         // Committed, the move holds as far over as the track allows (the lane was checked to the
-        // turn-in); it does not give up beside the other car. (Held in the wake, the lane beside
-        // is not needed yet.)
-        this.passBlocked = fits || this.passCommitted || towHold ? 0 : this.passBlocked + dt;
+        // turn-in); it does not give up beside the other car.
+        this.passBlocked = fits || this.passCommitted ? 0 : this.passBlocked + dt;
         if (!fits && this.passCommitted) base = Math.max(oMin, Math.min(oMax, base));
         // Level at the corner: it is this car's corner. It keeps the lane it is in through it
         // (a swerve back to the line in a chicane would throw the car off the road); the rules
         // for cars side by side keep the air between them, and the line comes back once clear.
         if (this.passCommitted && passDs < ALONGSIDE && (cornering || midCorner)) base = this.o;
-        if (towHold) base = od;
-        // From lap two, out of the wake and not gaining on the car: given up here, on the
-        // straight. Kept on beside it at the same speed, the move ended under braking and the car
-        // came back across to the line there, off the road at Monza's third chicane.
-        this.passStall =
-          later && !this.passCommitted && !towHold && v < passCar!.speed + 0.5
-            ? this.passStall + dt
-            : 0;
-        if (this.passBlocked > 0.6 || this.passStall > PASS_STALL) {
+        if (this.passBlocked > 0.6) {
           if (
             laterLap &&
             (cornering || midCorner || this.at(this.brakingAhead, s0) < v * ABANDON_HOLD_BEFORE) &&
@@ -1182,7 +1100,6 @@ export class RaceDriver implements Driver {
             this.abandonHold = true;
           this.passId = -1;
           this.cooldown = 3;
-          this.passStall = 0;
           base = 0;
         } else if (this.passBypass) {
           // Round a stopped car the lane is the one beside it on the road; a car already further
@@ -1208,11 +1125,6 @@ export class RaceDriver implements Driver {
     }
     const launched = !view.launching && (v > LAUNCHED || (leader !== null && leader.speed < 5));
     const held = this.heldTime > 1.5 - aggression;
-    // From lap two, behind a car seen to corner slower than this car's own plan: quicker than
-    // it, even where its pace holds this one only a little (cars a few places apart differ by
-    // under a metre a second in the corners, too little to count as held up).
-    const quicker =
-      later && leader !== null && this.aheadPaceId === leader.id && this.aheadPace < PRESS_PACE;
     // A car standing still in the road ahead (crashed, parked, or the back of a queue that has
     // stopped behind one) is an obstacle, in a corner as on a straight. Seen from as far off as
     // a driver would brake for it, every car heads for the same side of it (the one with more
@@ -1258,7 +1170,6 @@ export class RaceDriver implements Driver {
         this.passSide = side;
         this.passTime = 0;
         this.passBlocked = 0;
-        this.passStall = 0;
         this.passCommitted = false;
         this.passBypass = true;
         base = ob.d - ldHere + side * (BYPASS_SIDE_BY_SIDE + ob.halfWidth - BODY_HALF_WIDTH);
@@ -1288,10 +1199,8 @@ export class RaceDriver implements Driver {
       const faster = this.at(profV, leader.s) > leader.speed + 2 - 1.5 * aggression;
       // A solo-profile speed deficit can mean the leader is still accelerating. Stay in
       // its tow until actually closing, unless it has already shown a slow corner pace.
-      // (From lap two a car measured quicker through the corners goes too: the move holds in
-      // the wake until close, `towHold`, so it gives up no tow by starting.)
-      const gaining = !later || v > leader.speed + 0.5 || this.slowInCorners(leader.id) || quicker;
-      if ((brakingMove || gapAhead < 25 + v * 0.25) && (faster || held || quicker) && gaining) {
+      const gaining = !later || v > leader.speed + 0.5 || this.slowInCorners(leader.id);
+      if ((brakingMove || gapAhead < 25 + v * 0.25) && (faster || held) && gaining) {
         const od = leader.d - ldHere;
         const sep = passSideBySide(v) + leader.halfWidth - BODY_HALF_WIDTH;
         // A side on the track, and not a lane another car is already in, beside or just behind
@@ -1315,11 +1224,9 @@ export class RaceDriver implements Driver {
         }
         const lane = od + side * sep;
         // A move started in the braking zone is committed from the start, or not made.
-        const insideHere = this.cornerSign(s0, true);
         const sure =
           !cornering ||
           (side !== 0 &&
-            (!later || insideHere === 0 || insideHere === side) &&
             this.laneClear(view, s0, lane, leader.id) &&
             this.levelInTime(
               s0,
@@ -1336,7 +1243,6 @@ export class RaceDriver implements Driver {
           this.passSide = side;
           this.passTime = 0;
           this.passBlocked = 0;
-          this.passStall = 0;
           this.passCommitted = cornering;
           base = lane;
         } else this.cooldown = 1;
@@ -1547,18 +1453,7 @@ export class RaceDriver implements Driver {
       const attacking = leader.id === this.passId;
       const tS = HEADWAY_STRAIGHT[0] + (HEADWAY_STRAIGHT[1] - HEADWAY_STRAIGHT[0]) * aggression;
       const tC = HEADWAY_CORNER[0] + (HEADWAY_CORNER[1] - HEADWAY_CORNER[0]) * aggression;
-      // From lap two, held up behind a car it is quicker than, the driver presses: it follows
-      // closer through the corners, to be on the car's gearbox at the exit for the run to the
-      // next braking zone (the kinematic limit below is unchanged).
-      // (Not through braking zones and corners: pressing through Monza's third chicane, a car braking
-      // harder mid-corner for the car ahead ran off both sides and into the barrier.)
-      const pressing = later && (held || quicker) && !queueStop && !cornering;
-      const tFollow = tC + (tS - tC) * straightness;
-      const headway = attacking
-        ? HEADWAY_ATTACK
-        : pressing
-          ? Math.min(tFollow, HEADWAY_PRESS)
-          : tFollow;
+      const headway = attacking ? HEADWAY_ATTACK : tC + (tS - tC) * straightness;
       const standstill = queueStop ? QUEUE_GAP : STANDSTILL_GAP;
       const want = standstill + v * headway;
       const vSafe = vl + (gap - want) * GAP_GAIN;
@@ -1566,19 +1461,7 @@ export class RaceDriver implements Driver {
       // can, noticed after this driver's perception and reaction delay (Gipps' safe speed).
       // Grip falls with speed (downforce), so count on what the brakes give at the slower end.
       const b = this.stopBrake(v, vl, queueStop);
-      // In the wake on a straight from lap two, the braking zone well off and the car ahead not
-      // braking: it brakes at its braking point, no sooner and no harder than this one can, so
-      // the attack sits as close as this driver reacts (the full margins come back over the
-      // second before the zone, by when the move has pulled out or dropped back).
-      // (Measured to the braking zone, not the next bend: a flat-out kink is no reason to
-      // drop back, and dropping the relaxed margin there braked the attack hard at Blanchimont.)
-      const relax =
-        (attacking || pressing) && later && this.passDecel < 1 && vl > TOW_HOLD_FROM
-          ? clamp01((this.at(this.brakingAhead, s0) - v * TOW_RELAX_UNTIL) / Math.max(1, v))
-          : 0;
-      const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN * (1 - relax);
-      const leaderScale =
-        this.leaderBrakeScale() + (Math.min(brakeScale, 1) - this.leaderBrakeScale()) * relax;
+      const tau = SEE_DELAY + this.skill.reaction + REACT_MARGIN;
       // Behind a car standing still, stop with room to steer out and round it.
       // (Round one, also behind the crawling car ahead in the gap: no nose-to-tail queue on it.)
       // (From walking pace down, before the car ahead is quite still: a queue stopping in front
@@ -1589,7 +1472,7 @@ export class RaceDriver implements Driver {
         room <= 0
           ? vl - 1
           : brakeScale > 0 && vl > 15
-            ? this.brakingCurve.safeSpeed(room, vl, tau, brakeScale, leaderScale)
+            ? this.brakingCurve.safeSpeed(room, vl, tau, brakeScale, this.leaderBrakeScale())
             : -b * tau + Math.sqrt(b * b * tau * tau + vl * vl + 2 * b * room);
       let aSafe = SPEED_GAIN * (vSafe - v);
       const aKin = SPEED_GAIN * (vKin - v);
@@ -1664,18 +1547,16 @@ export class RaceDriver implements Driver {
     // car, behind a hazard or a stopped queue, or while coming back to the road.
     if (!view.active || this.recovering) this.mistakes.cancel();
     else {
-      const mayErr =
+      const mayContinue =
         later &&
         this.passId < 0 &&
         ns === 0 &&
         !queueStop &&
         this.rejoinTime <= 0 &&
         !view.blueFlag &&
-        !yielding &&
-        // (Not with a car right behind: too close to react, it ran into a car going wide out
-        // of the first chicane.)
-        !this.carApproaching(view, s0, self.d, ERROR_CLEAR_BEHIND);
-      if (!mayErr) this.mistakes.cancel();
+        !yielding;
+      const mayErr = mayContinue && !this.carApproaching(view, s0, self.d, ERROR_CLEAR_BEHIND);
+      if (!mayContinue) this.mistakes.cancel();
       const u = plan.track.wrap(s0) / plan.track.lap.step;
       limit = Math.min(
         limit,

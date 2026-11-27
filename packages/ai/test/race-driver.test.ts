@@ -545,9 +545,7 @@ describe('race driver: building a run after lap one', () => {
     const s = i * track.lap.step;
     const d = lineD(dr, s);
     const out: ControlInput = { ...NEUTRAL_INPUT };
-    // (Close enough to lift even in the wake on a straight, where a later-lap attack follows
-    // as close as the driver reacts.)
-    const ahead = { id: 1, s: s + 17, d, speed: 69 };
+    const ahead = { id: 1, s: s + 36, d, speed: 69 };
     dr.sense(view({ id: 0, s, d, speed: 70 }, [ahead], { openingLap: false }));
     dr.drive(at(s, d, 70), DT, out);
     expect(out.brake).toBeLessThan(0.02);
@@ -900,61 +898,6 @@ describe('race driver: room while the bodies overlap under braking', () => {
   });
 });
 
-describe('race driver: attacking from lap two', () => {
-  /** A move on the car ahead on the main straight, decided already (this car behind it). */
-  function attack(gap: number, s = 0, speed = 85, openingLap = false) {
-    const dr = driver();
-    const d = lineD(dr, s);
-    const me = { id: 0, s, d, speed };
-    const ahead = { id: 1, s: s + CAR_LENGTH + gap, d: lineD(dr, s + CAR_LENGTH + gap), speed };
-    dr['wasActive'] = true;
-    dr['heldTime'] = 5;
-    dr['passId'] = 1;
-    dr['passSide'] = 1;
-    tick(dr, me, [ahead], { openingLap });
-    return { dr, ahead };
-  }
-
-  it('stays in the wake of the car ahead until close, then pulls out', () => {
-    const far = attack(30);
-    const lane = (r: ReturnType<typeof attack>) => r.dr.last.target - (r.ahead.d - lineD(r.dr, 0));
-    expect(far.dr.last.passing).toBe(1);
-    expect(Math.abs(lane(far))).toBeLessThan(0.5);
-    const close = attack(12);
-    expect(close.dr.last.passing).toBe(1);
-    expect(lane(close)).toBeGreaterThan(SIDE_BY_SIDE);
-    // Two seconds from the braking zone it pulls out from further back.
-    const late = attack(30, 300);
-    expect(lane(late)).toBeGreaterThan(SIDE_BY_SIDE);
-  });
-
-  it('follows as close as it reacts in the wake, far from the braking zone, and keeps the full margin near it', () => {
-    // 15 m behind at 85 m/s: held there (not braked off) on the straight from lap two.
-    expect(attack(15).dr.last.accelLimit).toBeGreaterThan(-1);
-    expect(attack(15, 0, 85, true).dr.last.accelLimit).toBeLessThan(-5);
-    // Within the last second and a half before the zone, the full margins.
-    expect(attack(15, 330).dr.last.accelLimit).toBeLessThan(-5);
-  });
-
-  it('presses a car it is held up by on the straights from lap two, not through the corners', () => {
-    const limit = (s: number, speed: number, gap: number, openingLap: boolean) => {
-      const dr = driver();
-      const me = { id: 0, s, d: lineD(dr, s), speed };
-      const ahead = { id: 1, s: s + CAR_LENGTH + gap, d: lineD(dr, s + CAR_LENGTH + gap), speed };
-      dr['wasActive'] = true;
-      dr['heldTime'] = 5;
-      dr['cooldown'] = 1e9;
-      tick(dr, me, [ahead], { openingLap });
-      return dr.last.accelLimit;
-    };
-    // 20 m behind at 85 m/s on the main straight: held there from lap two, braked off on lap one.
-    expect(limit(0, 85, 20, false)).toBeGreaterThan(-1);
-    expect(limit(0, 85, 20, true)).toBeLessThan(-3);
-    // In the first chicane (12 m behind at 30 m/s) the corner headway stands on every lap.
-    expect(limit(700, 30, 12, false)).toBe(limit(700, 30, 12, true));
-  });
-});
-
 describe('race driver: small errors', () => {
   function lapAlone(openingLap: boolean, consistency: number, laps = 2) {
     const dr = createRaceDriver({
@@ -1032,34 +975,6 @@ describe('race driver: small errors', () => {
   });
 });
 
-describe('race driver: a move that stops gaining', () => {
-  function beside(faster: number) {
-    const dr = driver();
-    const s = 0;
-    const me = { id: 0, s, d: lineD(dr, s) + 3.7, speed: 80 + faster };
-    const ahead = { id: 1, s: s + 10, d: lineD(dr, s + 10), speed: 80 };
-    dr['wasActive'] = true;
-    dr['heldTime'] = 5;
-    dr['passId'] = 1;
-    dr['passSide'] = 1;
-    dr['o'] = 3.7;
-    // Scripted: both cars hold their speeds and lanes for 1.7 s.
-    for (let k = 0; k < Math.round(1.7 / DT); k++) {
-      tick(dr, me, [ahead], { openingLap: false });
-      me.s += me.speed * DT;
-      me.d = lineD(dr, me.s) + 3.7;
-      ahead.s += ahead.speed * DT;
-      ahead.d = lineD(dr, ahead.s);
-    }
-    return dr.last.passing;
-  }
-
-  it('is given up on the straight from lap two, and goes on while it gains', () => {
-    expect(beside(0)).toBe(-1);
-    expect(beside(3)).toBe(1);
-  });
-});
-
 describe('race driver: a move given up under braking', () => {
   function giveUp(openingLap: boolean, hazard = false) {
     const dr = driver();
@@ -1089,31 +1004,6 @@ describe('race driver: a move given up under braking', () => {
     expect(dr.last.passing).toBe(-1);
     expect(dr['abandonHold']).toBe(true);
     expect(Math.abs(dr.last.target + 4)).toBeLessThan(0.5);
-  });
-});
-
-describe('race driver: moves from lap two', () => {
-  function dive(gap: number, openingLap = false, across = 3.7, side = -1) {
-    const dr = driver();
-    const s = 370;
-    const me = { id: 0, s, d: lineD(dr, s) + side * across, speed: 85 };
-    const ahead = { id: 1, s: s + gap, d: lineD(dr, s + gap), speed: 80 };
-    dr['wasActive'] = true;
-    dr['heldTime'] = 5;
-    dr['passId'] = 1;
-    dr['passSide'] = side;
-    dr['o'] = side * across;
-    tick(dr, me, [ahead], { openingLap });
-    return dr;
-  }
-
-  it('commits to a braking-zone move from up to a length behind an overlap, once out of its path', () => {
-    expect(dive(8)['passCommitted']).toBe(true);
-    expect(dive(8, false, 1.2)['passCommitted']).toBe(false);
-    // Never round the outside from lap two (the first chicane turns right).
-    expect(dive(8, false, 3.7, 1)['passCommitted']).toBe(false);
-    expect(dive(8, true)['passCommitted']).toBe(false);
-    expect(dive(14)['passCommitted']).toBe(false);
   });
 });
 
@@ -1177,23 +1067,4 @@ describe('race driver: a road bound beside overlapping traffic', () => {
       expect(lane).toBeLessThanOrEqual(me.d + 0.1);
     },
   );
-});
-
-describe('race driver: established slow-car avoidance', () => {
-  it('keeps the legacy slow-car approach when ordinary later-lap attacks are enabled', () => {
-    function approach(openingLap?: boolean) {
-      const dr = driver();
-      const me = { id: 0, s: 0, d: lineD(dr, 0), speed: 85 };
-      const ahead = { id: 1, s: 30, d: lineD(dr, 30), speed: 80 };
-      dr['wasActive'] = true;
-      dr['heldTime'] = 5;
-      dr['passId'] = 1;
-      dr['passSide'] = -1;
-      dr['aheadPaceId'] = 1;
-      dr['aheadPace'] = 0.6;
-      tick(dr, me, [ahead], openingLap === undefined ? {} : { openingLap });
-      return dr.last;
-    }
-    expect(approach(false)).toEqual(approach());
-  });
 });
