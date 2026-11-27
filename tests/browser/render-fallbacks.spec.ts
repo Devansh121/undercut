@@ -13,7 +13,7 @@ test.use({ viewport: { width: 480, height: 300 } });
 function hideFloatTargets(): void {
   const hidden = new Set(['EXT_color_buffer_float', 'EXT_color_buffer_half_float']);
   const proto = WebGL2RenderingContext.prototype;
-  const getExtension = proto.getExtension;
+  const getExtension = proto.getExtension as (name: string) => unknown;
   proto.getExtension = function (this: WebGL2RenderingContext, name: string) {
     return hidden.has(name) ? null : getExtension.call(this, name);
   } as typeof proto.getExtension;

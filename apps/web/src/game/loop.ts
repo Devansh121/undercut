@@ -55,7 +55,12 @@ export class GameLoop {
 
   private readonly afterStep: ((dt: number) => void) | undefined;
 
-  constructor(session: DriveSession, source: ControlSource, afterStep?: (dt: number) => void) {
+  constructor(
+    session: DriveSession,
+    source: ControlSource,
+    afterStep?: (dt: number) => void,
+    private readonly onAction?: (action: string) => boolean,
+  ) {
     this.session = session;
     this.source = source;
     this.afterStep = afterStep;
@@ -155,7 +160,9 @@ export class GameLoop {
         if (event.action === 'pause') stop = true;
         else if (event.action === 'resetToTrack')
           result.events.push(...this.session.resetToTrack());
-        else result.actions.push(event.action);
+        // Driving actions must affect this tick, rather than wait for a catch-up batch.
+        // Unhandled presentation actions remain in the frame result.
+        else if (!this.onAction?.(event.action)) result.actions.push(event.action);
       }
       result.events.push(...session.tick(frame.control, frame.device));
       this.afterStep?.(dt);

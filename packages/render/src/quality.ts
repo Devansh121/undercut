@@ -32,6 +32,11 @@ export interface Quality {
   };
   /** A soft blob under each car (where the shadow map does not reach or is off). */
   readonly contactShadow: boolean;
+  /**
+   * Cockpit mirrors: the rear view rendered into a `width` × `height` target every `every`th
+   * drawn frame while the cockpit camera is on (0: a static reflection of the sky and ground).
+   */
+  readonly mirrors: { readonly width: number; readonly height: number; readonly every: number };
   /** Prefiltered environment cube size (0: no environment map, hemisphere fill instead). */
   readonly envSize: number;
   readonly skyTier: Tier;
@@ -164,5 +169,7 @@ export function effectiveQuality(q: Quality, caps: RenderCapabilities): Quality 
     grainVignette: false,
     speedBlur: false,
     contactShadow: true,
+    // The rendered rear view is a half-float target too.
+    mirrors: { width: 0, height: 0, every: 0 },
   });
 }

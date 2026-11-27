@@ -156,7 +156,8 @@ def build_upright(front, q):
     """Upright, caliper and brake duct drum, in the wheel frame (origin at the wheel centre,
     +Y outboard). Not spinning; steers with the wheel."""
     m = Mesh()
-    segs = q.n(28, 10)
+    # The drum is hidden behind the rim but for its edge: fewer segments than the wheel's own.
+    segs = q.n(22, 10)
     w = D.TYRE_WIDTH_FRONT if front else D.TYRE_WIDTH_REAR
     rim_in = -(D.RIM_WIDTH_FRONT if front else D.RIM_WIDTH_REAR) / 2
     # brake duct drum: a cylinder filling the inboard side of the rim
@@ -168,6 +169,7 @@ def build_upright(front, q):
     sc = Mesh()
     rows = []
     n = q.n(8, 4)
+    ns = q.n(12, 8)
     for k in range(n + 1):
         t = k / n
         x = lerp(0.20, 0.10, t)
@@ -176,11 +178,11 @@ def build_upright(front, q):
         hh = lerp(0.055, 0.07, t)
         y0 = rim_in - lerp(0.075, 0.06, t)
         ring = []
-        for a in range(12):
-            th = 2 * math.pi * a / 12
+        for a in range(ns):
+            th = 2 * math.pi * a / ns
             ring.append(Vector((x, y0 + hw_ * math.cos(th), zc + hh * math.sin(th))))
         rows.append(ring)
-    lip = [rows[0][0] * 0 + (p - sum(rows[0], Vector()) / 12) * 0.8 + sum(rows[0], Vector()) / 12 for p in rows[0]]
+    lip = [rows[0][0] * 0 + (p - sum(rows[0], Vector()) / ns) * 0.8 + sum(rows[0], Vector()) / ns for p in rows[0]]
     loft(sc, rows, "carbon", closed=True)
     loft(sc, [lip, rows[0]], "carbon", closed=True)
     loft(sc, [[p + Vector((-0.06, 0, 0)) for p in lip], lip], "dark", closed=True, cap0=True)

@@ -8,8 +8,8 @@ All under `apps/web/public/assets/car/` (served at `assets/car/` from the client
 
 | File | Use | Triangles | Draw calls | Size |
 | --- | --- | --- | --- | --- |
-| `car_high.glb` | Player car and close cars on the High preset | 119,582 | 40 | 1.43 MB |
-| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,950 | 25 | 0.65 MB |
+| `car_high.glb` | Player car and close cars on the High preset | 119,954 | 40 | 1.43 MB |
+| `car_mobile.glb` | Player car on Mobile; near cars on High | 39,820 | 26 | 0.66 MB |
 | `car_far.glb` | Distant cars on any preset | 10,296 | 11 | 0.20 MB |
 | `livery/<team id>.png` | Livery mask, 1024 × 1024, one per team (ten) | | | 26–60 KB each |
 | `livery/index.json` | Team id → mask file and the three colours (from `design/teams.json`) | | | |
@@ -96,4 +96,4 @@ Switch down at the threshold and back up only at 1.15 × the threshold, so a car
 
 ## Materials
 
-`paint` (clear coated, recoloured as above), `carbon` (2×2 twill with 3 mm tows: normal and base colour on UV1, soft clear coat, and `KHR_materials_anisotropy` with a direction texture that follows the tows, so highlights stretch along the fibres and alternate with the weave; three.js reads it as `anisotropyMap` and the presets without clear coat set `anisotropy` to 0), `carbon_matte` (floor, fences, diffuser), `tyre`, `rim`, `brake_disc`, `metal_dark`, `exhaust`, `dark`, `visor`, `mirror_glass`, `display`, `rain_light`, `decal`. The levels of detail merge minor materials to save draw calls (on Mobile, for example, `carbon_matte` becomes `carbon` and the wheel cover becomes `rim`), so look materials up by name and expect some to be absent.
+`paint` (clear coated, recoloured as above), `carbon` (2×2 twill with 3 mm tows: normal and base colour on UV1, soft clear coat, and `KHR_materials_anisotropy` with a direction texture that follows the tows, so highlights stretch along the fibres and alternate with the weave; three.js reads it as `anisotropyMap` and the presets without clear coat set `anisotropy` to 0), `carbon_matte` (floor, fences, diffuser), `tyre`, `rim`, `brake_disc`, `metal_dark`, `exhaust`, `dark`, `visor`, `mirror_glass`, `display`, `rain_light`, `decal`. The levels of detail merge minor materials to save draw calls (on Mobile, for example, `carbon_matte` becomes `carbon` and the wheel cover becomes `rim`), so look materials up by name and expect some to be absent. `mirror_glass` is kept on High and Mobile (the cockpit mirrors draw on it) and merged into `dark` on the far level.

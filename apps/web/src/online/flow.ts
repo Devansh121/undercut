@@ -1,3 +1,4 @@
+import type { DeviceKind, MenuButton } from '@undercut/input';
 import { webSocketTransport } from '@undercut/protocol';
 import { debugEnabled } from '../debug';
 import type { DriveExtension, DriveHandle } from '../drive';
@@ -109,8 +110,12 @@ export class OnlineFlow {
   }
   private render(): void {
     if (this.drive || this.loading) return;
-    this.host.replaceChildren(this.screens.root);
+    // Keep the mounted screen during room updates so its focused control survives.
+    if (this.screens.root.parentElement !== this.host) this.host.replaceChildren(this.screens.root);
     this.screens.show();
+  }
+  action(action: MenuButton, device: DeviceKind): void {
+    this.screens.action(action, device === 'keyboard');
   }
   close(): void {
     ++this.generation;

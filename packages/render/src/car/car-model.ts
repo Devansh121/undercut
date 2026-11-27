@@ -1,6 +1,7 @@
 import type { Material, Mesh } from 'three';
 import {
   Box3,
+  Color,
   Group,
   MeshStandardMaterial,
   Quaternion,
@@ -48,6 +49,22 @@ export interface CarExtras {
   headYaw: number;
 }
 
+/**
+ * The cockpit at night: the screen brighter and matte (anti-glare, so floodlights do not wash it
+ * grey), and the faint light it and the wheel's lit buttons put on the face, gloves and grips,
+ * as an emission of each material's own albedo (linear, before exposure).
+ */
+export const COCKPIT_NIGHT = Object.freeze({
+  displayEmissive: 2.2,
+  displayRoughness: 0.55,
+  wheelFill: 0.55,
+  /** The gloves' share of it: light suede, already the brightest thing on the wheel. */
+  gloveFill: 0.12,
+  fillColour: [0.86, 0.9, 1] as const,
+});
+
+const NIGHT_UNLIT = new Set(['display', 'wheel_controls']);
+
 /** Steering-wheel turns per road-wheel angle. */
 export const STEERING_RATIO = 6;
 const FRONT_TYRE_HALF = 0.18;
@@ -92,6 +109,8 @@ export class CarModel {
     readonly geo: CarGeometry,
     mode: 'player' | 'ghost' | 'none' = 'player',
     compound: CompoundLook = MEDIUM_COMPOUND,
+    /** Night under floodlights: the wheel's screen lights its face (COCKPIT_NIGHT). */
+    night = false,
   ) {
     const ghost = mode === 'ghost';
     this.lod = lod;
@@ -148,7 +167,12 @@ export class CarModel {
         const dash = new Dashboard();
         dash.apply(own);
         this.dash = dash;
+        if (night) {
+          own.emissiveIntensity = COCKPIT_NIGHT.displayEmissive;
+          own.roughness = COCKPIT_NIGHT.displayRoughness;
+        }
       }
+      if (night) this.lightWheelAtNight();
     }
     if (!ghost) {
       this.asset.traverse((o) => {
@@ -301,6 +325,64 @@ export class CarModel {
 
   get dashboard(): { gear: string; speed: string; revs: number; unit: string } | null {
     return this.dash?.shown ?? null;
+  }
+
+  /**
+   * At night the wheel's screen and its lit buttons are the brightest things a hand's width from
+   * the face, gloves and grips: every material on the wheel (its own copy where the car shares
+   * it) takes a faint emission of its own albedo, so the face reads in the dark instead of
+   * dropping to black between floodlights. The screen is left as it is.
+   */
+  private lightWheelAtNight(): void {
+    const wheel = this.asset.getObjectByName('steering_wheel');
+    if (!wheel) return;
+    const copies = new Map<Material, Material>();
+    const fill = new Color(...COCKPIT_NIGHT.fillColour).multiplyScalar(COCKPIT_NIGHT.wheelFill);
+    wheel.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      const from = mesh.material as Material;
+      // The screen is lit already; the buttons and switches keep their own colours unlit (their
+      // blue and red caps glowing read as toy LEDs).
+      if (!(from instanceof MeshStandardMaterial) || NIGHT_UNLIT.has(from.name)) return;
+      let to = copies.get(from);
+      if (!to) {
+        // The car's own materials here are the gloves' livery material, whose map is the
+        // team's mask (region codes, not colour): they glow by their colour alone.
+        const livery = this.owned.includes(from);
+        const own = livery ? from : from.clone();
+        if (own !== from) this.owned.push(own);
+        const m = own as MeshStandardMaterial;
+        if (livery) {
+          m.emissive.copy(m.color).multiply(fill).multiplyScalar(COCKPIT_NIGHT.gloveFill);
+        } else if (m.map) {
+          m.emissiveMap = m.map;
+          m.emissive.copy(fill);
+        } else {
+          m.emissive.copy(m.color).multiply(fill);
+        }
+        m.emissiveIntensity = 1;
+        copies.set(from, own);
+        to = own;
+      }
+      mesh.material = to;
+    });
+  }
+
+  /**
+   * Put `material` on the wing mirrors' glass (the cockpit mirrors' reflection). Returns how
+   * many meshes took it.
+   */
+  useMirrorMaterial(material: Material): number {
+    let n = 0;
+    this.asset.traverse((o) => {
+      const mesh = o as Mesh;
+      if (mesh.isMesh && (mesh.material as Material).name === 'mirror_glass') {
+        mesh.material = material;
+        n++;
+      }
+    });
+    return n;
   }
 
   /** Show or hide the driver's helmet (hidden for the cockpit camera). */

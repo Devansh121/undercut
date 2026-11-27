@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'node:fs';
+import { browserShardIgnores } from './tools/ci/browser-shards';
 
 // Browser tests run against the production build served by tools/serve/start.mjs, with
 // the rooms service on the local Workers runtime behind /rooms. Build first:
@@ -32,6 +34,18 @@ const PHONE_SOAK = /\/phone-soak\.spec\.ts$/;
 /** Two-context network tests run separately so they do not crowd the viewport suite. */
 const ONLINE = /\/online-(v2|soak)\.spec\.ts$/;
 
+const VIEW_IGNORE = [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK, ONLINE];
+const viewFiles = fs
+  .readdirSync(new URL('./tests/browser/', import.meta.url), { recursive: true })
+  .map(String)
+  .map((f) => f.replaceAll('\\', '/'))
+  .filter((f) => /\.(spec|test)\.[cm]?[jt]sx?$/.test(f))
+  .filter((f) => !VIEW_IGNORE.some((pattern) => pattern.test(`/${f}`)));
+const viewIgnore = (project: string) => [
+  ...VIEW_IGNORE,
+  ...browserShardIgnores(project, viewFiles, process.env.BROWSER_SHARD),
+];
+
 // Muted: the game's audio still runs (the audio tests read its state and cost), but nothing
 // plays out of the shared laptop's speakers.
 const launchOptions = {
@@ -63,7 +77,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK, ONLINE],
+      testIgnore: viewIgnore('desktop'),
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -73,7 +87,7 @@ export default defineConfig({
     },
     {
       name: 'phone',
-      testIgnore: [LIFECYCLE, PHONE_DEVICE, PHONE_SOAK, ONLINE],
+      testIgnore: viewIgnore('phone'),
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 844, height: 390 },

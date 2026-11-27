@@ -23,6 +23,8 @@
 //   npm run shots -- monza --no-shots --perf           only the frame-time runs
 //   npm run shots -- monza --no-shots --perf --perf-desktop 1440x900
 //                                                      the same with High at 1440x900
+//   npm run shots -- monza --no-shots --perf --perf-camera cockpit
+//                                                      the runs from another camera (the mirrors)
 //
 // Output: artifacts/screenshots/<git-sha>/<station>-<w>x<h>.png and report.json. The GPU is
 // shared by every agent on the machine, so the script re-runs itself under
@@ -333,6 +335,9 @@ const CIRCUIT_STATIONS = {
     chase('marina', 3300, 230, 3460, 'chase-far'),
     tv('marina-heli', [3600, -150, 80], [3450, 0, 0], 45),
     chase('promenade', 4400, 200, 4560),
+    // The cockpit at night: the wheel, its screen, the gloves and the mirrors under floodlights.
+    chase('cockpit-raffles', 650, 230, 800, 'cockpit'),
+    chase('cockpit-straight', 1500, 260, 1700, 'cockpit'),
     // From the bay's edge by the pit straight across the water to the towers beyond the river
     // mouth: waves, the reflection of sky and city (its lit windows at night). World points:
     // the view is across open water, away from the lap.
@@ -694,7 +699,7 @@ async function perfRuns(report, vsync) {
         ? ['grid', 'chicane', 'lesmo', 'parabolica']
         : ['drive', 'grid']) {
         await page.evaluate(
-          ([run, driveS, slot]) => {
+          ([run, driveS, slot, cam]) => {
             const u = globalThis.__undercut;
             u.autopilot(false);
             u.drive(null);
@@ -716,8 +721,9 @@ async function perfRuns(report, vsync) {
               u.camera('chase-far');
               u.drive({ throttle: 0, brake: 1, steer: 0 });
             }
+            if (cam) u.camera(cam);
           },
-          [run, PERF_DRIVE_S[circuit], LAST_SLOT],
+          [run, PERF_DRIVE_S[circuit], LAST_SLOT, option('perf-camera') ?? null],
         );
         if (run === 'grid') {
           const at = await page.evaluate(() => globalThis.__undercut.state());

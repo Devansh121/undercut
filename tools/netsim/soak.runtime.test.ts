@@ -116,6 +116,8 @@ describe(`soak: ${profile.name}`, () => {
 
       // Sample every client's view of every remote car against the known truth.
       const errors: number[] = [];
+      let worstError = -1;
+      let worstSample = '';
       const modes: Record<RemoteCarMode, number> = { interpolated: 0, extrapolated: 0, held: 0 };
       let maxRemoteSize = 0;
       const delays: number[] = [];
@@ -168,7 +170,19 @@ describe(`soak: ${profile.name}`, () => {
             modes[v.mode]++;
             if (v.mode === 'held') heldBySeat.set(v.seat, (heldBySeat.get(v.seat) ?? 0) + 1);
             const truth = carAt(track, v.seat, renderTime, room.start.lightsOutAt, 0);
-            errors.push(Math.hypot(v.x - truth.x, v.z - truth.z));
+            const error = Math.hypot(v.x - truth.x, v.z - truth.z);
+            errors.push(error);
+            if (error > worstError) {
+              worstError = error;
+              worstSample = JSON.stringify({
+                seat: v.seat,
+                mode: v.mode,
+                aheadMs: v.aheadMs,
+                raceMs: renderTime - room.start.lightsOutAt,
+                sampleOffsetMs: v.t - renderTime,
+                latestOffsetMs: (c.remoteCars.latest(v.seat)?.t ?? renderTime) - renderTime,
+              });
+            }
           }
         }
       }, 50);
@@ -232,6 +246,7 @@ describe(`soak: ${profile.name}`, () => {
             ]
           : []),
         `| interpolation error p50 / p99 / max | ${(p50 * 100).toFixed(2)} cm / ${(p99 * 100).toFixed(2)} cm / ${(max * 100).toFixed(1)} cm (bounds ${P99_BOUND_M * 100} cm / ${MAX_BOUND_M * 100} cm) |`,
+        `| worst interpolation sample | ${worstSample} |`,
         `| samples interpolated / extrapolated / held | ${pct(modes.interpolated)} / ${pct(modes.extrapolated)} / ${pct(modes.held)} of ${total} |`,
         `| interpolation delay p50 / max | ${percentile(delays, 0.5).toFixed(0)} ms / ${delays[delays.length - 1]?.toFixed(0)} ms |`,
         `| longest stall of the test process / of relayed frames | ${maxTickGap.toFixed(0)} ms / ${maxFrameGap.toFixed(0)} ms |`,

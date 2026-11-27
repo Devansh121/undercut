@@ -1791,79 +1791,257 @@ body {
   }
 }
 
+/* Online menus share the interface kit's opaque cards and safe frame. */
 .online-screen {
   position: absolute;
   inset: 0;
-  overflow: auto;
-  padding: clamp(16px, 4vw, 56px);
-  padding-top: max(clamp(16px, 4vw, 56px), var(--inset-t));
-  padding-right: max(clamp(16px, 4vw, 56px), var(--inset-r));
-  padding-bottom: max(clamp(16px, 4vw, 56px), var(--inset-b));
-  padding-left: max(clamp(16px, 4vw, 56px), var(--inset-l));
-  background: var(--bg, #101215);
-  color: var(--text, #edf0f2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  background: var(--c-ink-0);
+  color: var(--c-text-1);
 }
-.online-screen h1 {
-  font-size: 32px;
-  margin: 0 0 12px;
+.online-screen__head,
+.online-screen__content,
+.online-screen__actions,
+.online-notice {
+  width: min(100%, 1240px);
+  margin-inline: auto;
+}
+.online-screen__head h1 {
+  margin: var(--sp-2) 0;
+  font-size: var(--fs-32);
+  font-stretch: var(--wdth-condensed);
+  line-height: var(--lh-snug);
+}
+.online-screen__status,
+.online-help {
+  color: var(--c-text-2);
+  margin: 0;
+  font-size: var(--fs-12);
 }
 .online-screen__content {
-  max-width: 960px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-content: start;
+  align-items: start;
+  gap: var(--sp-6);
+  scrollbar-gutter: stable;
+}
+.online-screen__content > .card:only-child {
+  grid-column: 1 / -1;
+}
+.online-screen .card__body {
+  min-width: 0;
+}
+.online-entry {
+  max-width: 560px;
+}
+.online-entry .card__body {
+  display: grid;
+  gap: var(--sp-5);
+}
+.online-entry__join {
+  display: flex;
+  align-items: end;
+  gap: var(--sp-3);
+}
+.online-entry__join .online-field {
+  flex: 1;
+}
+.online-screen__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-line-strong);
 }
-.online-screen__content > p,
-.online-members,
-.online-results {
-  flex-basis: 100%;
+.online-screen__actions .online-help {
+  margin-left: auto;
 }
-.online-screen a {
-  color: #b7d3e8;
-  overflow-wrap: anywhere;
-  /* A 44 px tap target around a one-line link. */
-  display: inline-block;
-  min-height: 44px;
-  padding: 12px 0;
-  box-sizing: border-box;
+.online-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.online-code {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  color: var(--c-text-1);
+  font-size: var(--fs-44);
+  letter-spacing: var(--tracking-label);
+  text-decoration: none;
+}
+.online-drivers .online-help {
+  margin-block: var(--sp-2) var(--sp-4);
 }
 .online-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
+  min-width: 0;
 }
 .online-field input {
-  background: #20252a;
-  color: inherit;
-  border: 1px solid #626c74;
-  padding: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-min);
+  background: var(--c-ink-2);
+  color: var(--c-text-1);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-1);
+  padding: var(--sp-2) var(--sp-3);
   font: inherit;
-  /* 16 px or more: iPhone Safari zooms the page into any smaller field on focus. */
-  font-size: 16px;
-  min-height: 44px;
-  box-sizing: border-box;
-  width: 180px;
+  font-size: var(--fs-16);
 }
-.online-assist {
+.online-field input:disabled {
+  color: var(--c-text-3);
+}
+.online-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: var(--sp-3);
+  padding-block: var(--sp-4);
+}
+.online-settings .setting {
+  gap: var(--sp-3);
+}
+.online-settings .setting:first-child {
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: var(--sp-3);
+}
+.online-settings .seg {
+  flex-shrink: 0;
+}
+.online-settings .setting:first-child .seg {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  min-width: 0;
+}
+.online-settings .seg__opt {
+  min-height: var(--touch-min);
+}
+.online-settings .seg__opt:disabled {
+  color: var(--c-text-3);
+}
+.online-settings .seg__opt:disabled[aria-checked='true'] {
+  color: var(--c-text-1);
+}
+.online-settings .setting:first-child .seg__opt {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  padding: var(--sp-2);
+}
+.online-settings > .card__body > .online-help {
+  margin-bottom: var(--sp-3);
 }
 .online-members {
   list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-2);
 }
-.online-members li {
-  padding: 10px;
-  background: #20252a;
+.online-member {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--c-ink-2);
+  min-width: 0;
+}
+.online-member .classification__bar {
+  align-self: stretch;
+  height: auto;
+}
+.online-member__identity {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-1);
+  overflow-wrap: anywhere;
+}
+.online-member__identity strong {
+  font-size: var(--fs-16);
+}
+.online-member__identity .online-help {
+  margin: 0;
+}
+.online-member__state {
+  display: grid;
+  gap: var(--sp-2);
+  text-align: right;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--fs-12);
+}
+.online-ready {
+  color: var(--c-flag-green);
 }
 .online-notice {
-  min-height: 24px;
+  margin-block: 0;
+  color: var(--c-text-2);
+  font-size: var(--fs-12);
+}
+.online-notice:empty {
+  display: none;
+}
+.online-screen .classification {
+  width: 100%;
+}
+.online-screen [data-nav]:focus-visible,
+[data-focus-ring] .online-screen [data-nav]:focus {
+  outline: 2px solid var(--c-brand);
+  outline-offset: -2px;
+}
+@media (max-height: 500px), (max-width: 700px) {
+  .online-screen {
+    gap: var(--sp-2);
+  }
+  .online-screen__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+  }
+  .online-screen__head > .label {
+    display: none;
+  }
+  .online-screen__head h1 {
+    font-size: var(--fs-24);
+    margin: 0;
+  }
+  .online-screen__content {
+    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+  .online-screen__actions {
+    padding-top: var(--sp-2);
+  }
+  .online-screen__actions .online-help {
+    max-width: 250px;
+  }
+  .online-code {
+    font-size: var(--fs-32);
+  }
+  .online-counts {
+    gap: var(--sp-2);
+  }
+}
+@media (max-width: 700px) {
+  .online-screen__content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .online-screen__actions .online-help {
+    display: none;
+  }
 }
 
 /* ================= Race display ================= */
@@ -2747,13 +2925,6 @@ html[data-touch] .hud[data-mode='race'][data-pit-open] ~ .onboarding {
   }
   .pause__controls {
     display: none;
-  }
-}
-
-@media (max-width: 600px) {
-  .online-screen__content {
-    flex-direction: column;
-    align-items: stretch;
   }
 }
 

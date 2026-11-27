@@ -127,6 +127,13 @@ Keys: arrows or WASD drive, Q/E shift (gears are automatic by default), F asks f
 - Quick Race grid noise stays at 0.5 (now the shared constant `QUICK_RACE_GRID_NOISE`). The brief suggested 0.8 to 1.0; a lap-one sweep at 0.9 (seeds 101 to 110) failed Spa 108 (16 of 20 clean, 5.5 m/s contact) and hit 10.3 and 17.4 m/s at Singapore 101 and 106, against master's 20 of 20 and at most 2.2 m/s there. More pace shuffled against the grid means more lap-one passing in the pack, which the start rules are not proved for.
 - Two later-lap passing rules were built and dropped because the race-driver physics case of a slow pole car passed by a small pack failed with them (contact, or a car that never got by): starting a move on a corner's exit, and switching sides when the road narrows on the side picked.
 - Pit entrants (#76 review item 4): a slowing pit entrant now holds racing moves only within 200 m ahead (was 600 m), and the mirror check and racing room stay on behind it; only a stopped or crawling car turns those off.
+- Cockpit mirror review: fit the single live target to the shipped glass's reflected ray bounds, with 3 cm eye travel and an 8 % capture border. Keep the existing target size and cadence; Mobile skips fitting and still allocates no target. Position both sky-dome callbacks at the camera's world position.
+- Cockpit mirrors: one rear-view camera above the driver's eye on the centreline serves both mirrors, rather than one per mirror, so the cost is one small render every third frame. It sees past the car's own bodywork, a little more centrally than a real wing mirror would; at the glass's size that does not read. Medium uses the static reflection like Mobile, because the brief asks for the live one on High and above.
+- The mirror glass was culled from the driver's eye (the asset winds it facing forward), and that, not the material, was the flat grey: the road showed through the housing. The new material draws both sides, and the car's Mobile level keeps the glass as its own material (one more draw call, 26) so the phone gets the static reflection too.
+- The gloves' and arms' extra triangles are paid for by the brake-duct drums and scoops behind the rims (28 → 22 and 12 → 8 segments), not by raising the car's triangle budgets.
+- The night wheel's light is an emission of each material's own albedo rather than a point light: a light added to the scene would recompile every lit material and cost per pixel everywhere. The buttons are left out (their coloured caps glowing read as toy LEDs).
+- Browser CI: use two weighted shards, balancing desktop and phone independently from per-test durations in the completed and timed-out 26 Nov master runs. Keep the 15-minute budgets and the required `browser` check as an aggregate. Refresh `tools/ci/browser-weights.json` when timings change substantially; new specs still run at the median weight.
+
 - Graphics polish (sky, grass, night road): the brief said mowing bands already existed; master had none, so the circuit's grass is mown here (3.2 m bands along the track edge). The land beyond the circuit is not mown.
 - The new overcast sky has its own id (`overcast_soil`) rather than replacing `overcast` in place. The asset build's metadata cache in `~/.cache/undercut/assets-src/skies/` is shared by every worktree, and another branch rebuilding `overcast` would have paired its old images with the new sky's numbers.
 - Singapore's dark road needed more than dimmer banks: turn 1 and the far end of the pit straight were nearly black on master too. Banks set back behind wide run-off are scaled to light the road as one by the wall would (capped at 6×), and the side opposite the pit lane takes masts at half spacing where the pit side has none.
@@ -471,6 +478,29 @@ Raw reports and both intentional mutation failures are retained in [the evidence
   assertions. An earlier commit on this branch moved it to the phone viewport alone after a
   desktop stall on the shared machine; that dropped desktop coverage, so desktop is restored and
   phone is added rather than substituted.
+- An online session steps its simulation, car contact and snapshots from a timer when no
+  animation frame has come for one snapshot interval (33 ms), without drawing. On the 4-core CI
+  runner the browser presented frames every 150–400 ms with the main thread idle (software
+  compositing of the full-window HUD), so both pages sent 2.5–3.6 snapshots a second and saw
+  each other held; master failed the desktop order proof and the 100 ms contact proof that way.
+  60 Hz frames are never late, and single-player sessions are unchanged.
+- Simulation and presentation keep separate timestamps. Timer steps consume only simulation
+  elapsed time; animation frames give the camera, HUD and frame pacing the full interval since
+  the previous animation frame. The 250 ms simulation stall cap stays in place. Resume resets
+  both clocks so paused time is not caught up. Interleaving tests cover a 10 s, 5 fps schedule
+  with timer callbacks on and around frame boundaries: 10 s presentation and 2,400 sim ticks.
+- Single-player retains the original capped frame delta for presentation as well as simulation;
+  the independent, uncapped presentation delta applies only to online sessions with timer steps.
+- The local rooms proxy opens a fresh upstream HTTP connection for each request. Pooling a
+  health-check socket can race its idle close and make the next room-creation POST return 502.
+  The regression closes reused connections and requires one successful POST without retries.
+- Pit and compound keyboard actions apply before their fixed simulation tick. Previously they
+  waited until the whole catch-up batch completed: at 8× speed, a 250 ms frame advanced two
+  seconds before applying a pit request. Camera actions still return to the presentation path.
+  First-tick regressions cover both normal and stalled frames; browser pit-service assertions
+  and their 50 s deadline are unchanged.
+
+
 
 ### Decided for you — Mobile prop-kit tuning
 
@@ -480,3 +510,11 @@ Raw reports and both intentional mutation failures are retained in [the evidence
 - Pin the full-world Mobile Monza grid at no more than 384 calls and 1,465,000 triangles in the existing browser dressing test, read from frames drawn after the grid setup (four animation frames read the previous view on software WebGL, so the first version passed on master; it now fails there at 394 calls). On the GPU head submits 374 calls and 1,446,890 triangles; no budget or tolerance was loosened.
 - Mobile stands draw their far level up close, so each row's seat band is reshaped into a bench at the seat surface (no added triangles), and the compact far spectator keeps a slim torso and shoulders (50 triangles, was 40, +47,710 triangles at the Grid). Moving the crowd handover from 14–20 m to 34–40 m (1.648M triangles) or the stand hull switch from 160 m to 220 m (1.476M) would exceed the triangle ceiling, so both stay.
 - Against pre-#57 dafda8f, Mobile Grid is 0.14 to 0.18 ms slower after merging master; the merge alone costs 0.145 ms at identical geometry, and the branch's own changes measure faster. Benchmark samples taken at a 1-minute load above 16 are discarded (`docs/evidence/mobile-kit-tuning/README.md`).
+
+### Decided for you — online screens
+
+- Online entry, lobby and results use the existing interface kit. The room code is the invite link's visible label; Copy invite still copies the full Wi-Fi address. Driver cards show names, team colours, readiness and each role once. Ready, Leave room and Rematch stay outside the scrolling content on a landscape phone.
+- Official online results share the local classification renderer, with distance, status, time, best lap and penalties from the room. Unsupported tyre and pit data are omitted. No protocol changes. Names equal to a role (for example Host) do not repeat that role beside the name.
+- Keyboard and gamepad use kit navigation; number fields keep keyboard editing and use left/right on a pad. Room redraws retain focus, text selection and scroll position. Back leaves a room, then returns to the hub from the entry screen.
+
+- First CI run on this branch: the unchanged rooms soak failed its 3 m maximum interpolation bound at 3.635 m (p99 4.13 cm). A diagnostic local run measured max 0.937 m, p99 4.09 cm; it did not reproduce the failure. The soak now reports the worst sample’s mode, render time relative to lights out, and snapshot offsets, retaining every assertion and tolerance. Protocol and networking behaviour remain unchanged.

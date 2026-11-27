@@ -55,13 +55,13 @@ function penaltyText(e: ResultEntry): string {
   return '';
 }
 
-export interface ClassificationColumn {
+export interface ClassificationColumn<R = ResultEntry> {
   head: string;
   /** Numbers align right in tabular figures. */
   num?: boolean;
   /** Optional responsive column class (e.g. `col-team`, `col-tyres`, `col-best`). */
   colClass?: string;
-  cell(e: ResultEntry): string;
+  cell(e: R): string;
 }
 
 export interface ClassificationOptions {
@@ -135,43 +135,57 @@ export function classificationTable(
   const teams = o.teams ?? TEAMS;
   const cols = classificationColumns(result.kind, { ...o, teams });
   const fastestCar = result.fastestLap?.car ?? null;
+  return classificationGrid({
+    kind: result.kind,
+    columns: cols,
+    rows: result.entries,
+    rowClass: (e) => `${o.rowClass ?? ''}${e.car === 0 ? ' is-player' : ''}`.trim(),
+    colour: (e) => teams[e.team]?.colours.tower ?? '#626c74',
+    cellClass: (e, c) =>
+      c.head === 'Best lap' && fastestCar === e.car && e.bestLap !== null
+        ? 'is-fastest'
+        : c.head === 'Pen' && e.penaltyTime > 0
+          ? 'is-penalty'
+          : '',
+  });
+}
+
+/** Shared classification rendering for local sessions and the room's official results. */
+export function classificationGrid<R>(o: {
+  kind: SessionKind;
+  columns: readonly ClassificationColumn<R>[];
+  rows: readonly R[];
+  rowClass: (row: R) => string;
+  colour: (row: R) => string;
+  cellClass?: (row: R, column: ClassificationColumn<R>) => string;
+}): HTMLTableElement {
   const table = el('table', 'classification');
-  table.dataset.kind = result.kind;
+  table.dataset.kind = o.kind;
   const head = el('tr');
-  for (const c of cols) {
-    const cls = `${c.num ? 'num ' : ''}${c.colClass ?? ''}`.trim();
-    head.append(el('th', cls, c.head));
+  for (const c of o.columns) {
+    const th = el('th', `${c.num ? 'num ' : ''}${c.colClass ?? ''}`.trim(), c.head);
+    th.scope = 'col';
+    head.append(th);
   }
   const thead = el('thead');
   thead.append(head);
-  table.append(thead);
   const body = el('tbody');
-  for (const e of result.entries) {
-    const row = el('tr', `${o.rowClass ?? ''}${e.car === 0 ? ' is-player' : ''}`.trim());
-    const teamColour = teams[e.team]?.colours.tower ?? '#626c74';
-    for (const c of cols) {
-      const isBest = c.head === 'Best lap' && fastestCar === e.car && e.bestLap !== null;
-      const isPen = c.head === 'Pen' && e.penaltyTime > 0;
-      const cls = [
-        c.num ? 'num' : '',
-        c.colClass ?? '',
-        isBest ? 'is-fastest' : '',
-        isPen ? 'is-penalty' : '',
-      ]
+  for (const e of o.rows) {
+    const row = el('tr', o.rowClass(e));
+    for (const c of o.columns) {
+      const cls = [c.num ? 'num' : '', c.colClass ?? '', o.cellClass?.(e, c) ?? '']
         .filter(Boolean)
         .join(' ');
+      const td = el('td', cls);
       if (c.head === 'Driver') {
-        const td = el('td', cls);
         const wrap = el('span', 'classification__driver');
-        wrap.append(teamBar(teamColour), el('span', '', c.cell(e)));
+        wrap.append(teamBar(o.colour(e)), el('span', '', c.cell(e)));
         td.append(wrap);
-        row.append(td);
-      } else {
-        row.append(el('td', cls, c.cell(e)));
-      }
+      } else td.textContent = c.cell(e);
+      row.append(td);
     }
     body.append(row);
   }
-  table.append(body);
+  table.append(thead, body);
   return table;
 }
