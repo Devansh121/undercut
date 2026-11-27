@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { proofCases, summarizeRace } from './racecraft-proof-lib.mjs';
+import {
+  proofCases,
+  proofReport,
+  PROOF_CIRCUITS,
+  PROOF_GROUPS,
+  summarizeRace,
+} from './racecraft-proof-lib.mjs';
 
 describe('racecraft proof cases and metrics', () => {
   it('covers twenty starts and ten five-lap races per circuit, with both recorded starts', () => {
@@ -21,7 +27,7 @@ describe('racecraft proof cases and metrics', () => {
       ).toEqual(Array.from({ length: 20 }, (_, i) => 101 + i));
       expect(cases).toHaveLength(circuit === 'monza' ? 32 : 30);
       expect(proofCases(circuit, 'default')).toEqual(
-        [1, 4, 7].map((seed) => ({ circuit, seed, laps: 5, settings: 'default' })),
+        [1, 4, 7, 42].map((seed) => ({ circuit, seed, laps: 5, settings: 'default' })),
       );
       if (circuit === 'monza')
         expect(cases.filter((c) => c.seed > 120).map((c) => c.seed)).toEqual([1022, 7307]);
@@ -85,5 +91,42 @@ describe('racecraft proof cases and metrics', () => {
       beyondBarrier: 0.2,
       longestContact: 0.3,
     });
+  });
+});
+
+describe('racecraft proof rejects later-lap passing regressions', () => {
+  const baseline = () =>
+    PROOF_CIRCUITS.flatMap((c) => PROOF_GROUPS.flatMap((g) => proofCases(c, g))).map((spec) => ({
+      ...spec,
+      cars: 20,
+      passes: 3,
+      byLap: spec.laps === 1 ? [3] : [0, 3],
+      laterPasses: spec.laps === 1 ? 0 : 3,
+      clean: 20,
+      spins: 0,
+      contactTicks: 0,
+      peak: 0,
+      classified: 20,
+      findings: [],
+      beyondBarrier: -1,
+      longestContact: 0,
+      allOffTicks: 0,
+      wallHits: 0,
+    }));
+  it('rejects fewer later-lap passes with the default settings at every circuit', () => {
+    const a = baseline();
+    const b = a.map((r) => (r.settings ? { ...r, passes: 2, byLap: [0, 2], laterPasses: 2 } : r));
+    expect(proofReport(a, b).failures).toEqual(
+      PROOF_CIRCUITS.map((c) => `${c}: default later-lap passes fell below baseline`),
+    );
+  });
+  it('rejects fewer later-lap passes in the tyre/no-stop races even when total passes do not fall', () => {
+    const a = baseline();
+    const b = a.map((r) =>
+      r.laps === 5 && !r.settings ? { ...r, byLap: [1, 2], laterPasses: 2 } : r,
+    );
+    expect(proofReport(a, b).failures).toEqual(
+      PROOF_CIRCUITS.map((c) => `${c}: five-lap later-lap passes fell below baseline`),
+    );
   });
 });

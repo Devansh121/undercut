@@ -16,7 +16,7 @@ export function proofCases(circuit, group) {
   let laps;
   if (group === 'default') {
     // The telemetry command's own settings (pit stops on, no tyre model, the default start fuel).
-    return [1, 4, 7].map((seed) => ({ circuit, seed, laps: 5, settings: 'default' }));
+    return [1, 4, 7, 42].map((seed) => ({ circuit, seed, laps: 5, settings: 'default' }));
   }
   if (group === 'start-a' || group === 'start-b') {
     seeds = Array.from({ length: 10 }, (_, i) => (group === 'start-a' ? 101 : 111) + i);
@@ -131,7 +131,14 @@ export function proofReport(baseline, head) {
       allOffTicks: both(all, 'allOffTicks'),
     };
     circuits.push(aggregate);
+    if (
+      defaults.length === proofCases(circuit, 'default').length &&
+      aggregate.defaultLaterPasses[1] < aggregate.defaultLaterPasses[0]
+    )
+      failures.push(`${circuit}: default later-lap passes fell below baseline`);
     if (races.length === 10) {
+      if (aggregate.laterPasses[1] < aggregate.laterPasses[0])
+        failures.push(`${circuit}: five-lap later-lap passes fell below baseline`);
       if (aggregate.passes[1] < 30 || laterRaces < 8)
         failures.push(
           `${circuit}: passing target not met (three per race and later passes in eight of ten races)`,
@@ -182,7 +189,7 @@ export function proofMarkdown(report, baseSha, headSha) {
         `| ${r.circuit} | ${number(r.passes[0] / Math.max(1, r.races))} / ${number(r.passes[1] / Math.max(1, r.races))} | ${r.laterPasses.join(' / ')} | ${r.racesWithLaterPasses}/${r.races} | ${r.contacts.join(' / ')} | ${r.peak.map(number).join(' / ')} | ${r.spins.join(' / ')} | ${r.cleanStarts.join(' / ')} |`,
     ),
     '',
-    "The telemetry command's default settings (pit stops on, no tyre model, the default start fuel), seeds 1, 4 and 7. Clean through turn one is summed over the three races.",
+    "The telemetry command's default settings (pit stops on, no tyre model, the default start fuel), seeds 1, 4, 7 and 42. Clean through turn one is summed over the three races.",
     '',
     '| Circuit | Passes | Passes on laps 2–5 | Contact ticks | Peak contact, m/s | Spins | Clean through turn one |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
