@@ -2,7 +2,7 @@
 
 Each milestone ends with something playable merged to master. The slicing may change as we learn; slices stay vertical.
 
-Last updated 27 Nov 2026 for the owner's Saturday 28 Nov checkpoint. Releases v0.5.0 to v0.10.0 are published. The hosted build follows master after each merge (`docs/DEPLOY.md`).
+Last updated 27 Nov 2026 for the owner's Saturday 28 Nov checkpoint. Pre-releases v0.5.0 to v0.18.0 are published; v0.18.0 is the checkpoint build. The hosted build follows master after each merge (`docs/DEPLOY.md`).
 
 ## Where things stand (27 Nov 2026)
 
@@ -11,7 +11,8 @@ Championship and private online rooms. It is not yet accepted as complete: physi
 later-lap racecraft, actual-device checks and independent quality scoring remain open.
 
 Merged since 25 Nov: #80, #57, #82, #76, #83, #81, #86, #84, #89, #87, #85 and #90,
-in merge order. PR #88 is still open at this checkpoint and is not counted as delivered.
+in merge order. PR #88 (later-lap passing) is parked as a draft: its review asked for changes, the follow-up commits
+have not been re-reviewed, and it is not counted as delivered.
 The summaries below follow those PR bodies; pending or historical proof in a body is not
 current-build certification. Player-facing changes are in `docs/STATUS.md`.
 
@@ -68,7 +69,7 @@ of the feature builder and attach evidence from the current build.
 
 | # | Criterion | Status | Reason |
 | --- | --- | --- | --- |
-| 1 | Public repo, protected master, green CI | Partly | Public visibility and protection verified; latest master `c2e7c55` CI was still running at this checkpoint (previous master `42a20fa` passed). |
+| 1 | Public repo, protected master, green CI | Partly | Public visibility and protection verified, and every required check passes on master `c2e7c55`. The nightly soak has not passed since 22 Nov (see Nightly soak below), so CI is not fully green. |
 | 2 | M0–M6 merged with passing checks | Partly | Playable milestone features are merged; M1/M4 pace, M2 quality, M3 racecraft and M6 device/quality acceptance remain open. |
 | 3 | Physics validation within documented tolerances on all three circuits | Partly | Singapore is inside; Monza and Spa remain outside their reference-lap bands despite passing checks for recorded gaps. |
 | 4 | Scripted qualifying and race with a pit stop vs nineteen opponents on every circuit, no stuck cars | Done | #60 and follow-ups provide the three-circuit weekend acceptance (`docs/evidence/m4-weekend/`). |
@@ -78,13 +79,29 @@ of the feature builder and attach evidence from the current build.
 | 8 | Independent QUALITY targets with evidence from current build | Open | The 26 Nov pre-score missed Physics/Graphics/UI ≥ 4 and AI/Netcode ≥ 3; current-build scores remain unassigned. |
 | 9 | Every asset in manifest/credits; no real-world marks | Done | Licence/credits audits are merged; #84/#85 passed asset and credits checks for their changes, and repository name checks remain in lint. |
 
+### Nightly soak
+
+The nightly workflow (`.github/workflows/nightly.yml`, not a required check) has failed or hit its
+60-minute limit every night since 22 Nov. The 26 Nov run, the last one to finish, recorded four failures out of 430 tests:
+
+- `packages/track/validation/drive-fuzz.soak.test.ts`, random driving at Spa: seeds 1045 and 1069
+  fail the pose check within three seconds (body 0.655 m and a wheel centre 1.016 m above the ground).
+- `packages/ai/validation/soak/ten-laps.soak.test.ts`, Spa: ten reference laps spread over 0.552 s against the 0.5 s bound.
+- `packages/race/validation/race.soak.test.ts`, twenty AI cars at Monza over race distance: timed out at 600 s.
+
+On 25 and 27 Nov the whole job hit its 60-minute limit. These are open defects, not flakes, and
+the tolerances stay as they are.
+
 ### Next
+
+Development by agents is paused from 27 Nov at the owner's request. The order below is the plan when it resumes.
+
 
 1. Complete and assess #88's later-lap racecraft proof; do not substitute decision tests for racing evidence.
 2. Run `docs/real-phone-test.md` on an actual iPhone and Android phone, including room join, sustained frame pacing and sound; record devices and results in STATUS.
 3. Independently score the current build in `docs/QUALITY.md`, with a listening pass for Audio and current graphics/UI/netcode evidence.
 4. Continue the physics work from #74's measured blockers, preserve existing passing checks and document the remaining pace gap at the checkpoint.
-5. Confirm latest-master CI and rerun final acceptance against the build being scored.
+5. Fix the nightly soak failures above (Spa launches, Spa lap repeatability, the Monza race soak's run time), then rerun final acceptance against the build being scored.
 
 After v1: pick the weakest scorecard axis and raise it. Candidates are weather and wet tyres,
 safety car, replays, car setup, more circuits, public matchmaking, wheel support and a career mode.
